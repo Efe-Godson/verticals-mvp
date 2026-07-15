@@ -31,7 +31,7 @@ function Login() {
         // Drop them into the login view so the next step is obvious once they've confirmed.
         setPassword('')
         setMode('login')
-        setMessage("Check your email for confirmation, we have sent a SUPERBASE AUTH email to " + email + ". Click it, then log in below.")
+        setMessage("Check your email, we have sent a SUP" + email + ". Click it, then log in below.")
       }
     } else if (mode === 'forgot') {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -45,7 +45,7 @@ function Login() {
         // Supabase returns a generic "Invalid login credentials" for both a
         // wrong password and an unconfirmed email — nudge toward the likely cause.
         if (error.message.toLowerCase().includes('invalid login credentials')) {
-          setMessage("Couldn't log in. If you just signed up, make sure you've clicked the confirmation link in your email first.")
+          setMessage("Invalid login credentials. If you just signed up, make sure you've clicked the confirmation link in your email first.")
         } else {
           setMessage(error.message)
         }
