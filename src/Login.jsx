@@ -2,6 +2,10 @@
 import { useState } from 'react'
 import { supabase } from './supabaseClient'
 
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+}
+
 function Login() {
   const [mode, setMode] = useState('login') // 'login' | 'signup' | 'forgot'
   const [email, setEmail] = useState('')
@@ -27,7 +31,7 @@ function Login() {
         // Drop them into the login view so the next step is obvious once they've confirmed.
         setPassword('')
         setMode('login')
-        setMessage("Almost there — we've sent a confirmation link to " + email + ". Click it, then log in above if you are not redirected from your email.")
+        setMessage("Check your email for confirmation, we have sent a SUPERBASE AUTH email to " + email + ". Click it, then log in below.")
       }
     } else if (mode === 'forgot') {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
