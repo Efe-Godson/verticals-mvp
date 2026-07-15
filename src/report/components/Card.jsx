@@ -1,4 +1,4 @@
-export default function ChartCard({
+export default function Card({
     title,
     subtitle,
     children,

@@ -28,6 +28,25 @@ export function getFieldValues(submission, field) {
   return [value];
 }
 
+export function median(values) {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? (sorted[mid - 1] + sorted[mid]) / 2
+    : sorted[mid];
+}
+
+export function formatNaira(value, decimals = 0) {
+  const amount = Number(value) || 0;
+  return new Intl.NumberFormat("en-NG", {
+    style: "currency",
+    currency: "NGN",
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(amount);
+}
+
 export const thStyle = {
   textAlign: "left",
   padding: "0.5rem 0.7rem",
