@@ -1,3 +1,4 @@
+// Place at: src/Login.jsx
 import { useState } from 'react'
 import { supabase } from './supabaseClient'
 
@@ -14,9 +15,20 @@ function Login() {
     setMessage('')
 
     if (mode === 'signup') {
-      const { error } = await supabase.auth.signUp({ email, password })
-      if (error) setMessage(error.message)
-      else setMessage('Account created. You can log in now.')
+      const { data, error } = await supabase.auth.signUp({ email, password })
+
+      if (error) {
+        setMessage(error.message)
+      } else if (data?.session) {
+        // Email confirmation is off (or already confirmed) — they're signed in already.
+        setMessage("Account created! You're all set.")
+      } else {
+        // Session is null: Supabase is waiting on email confirmation.
+        // Drop them into the login view so the next step is obvious once they've confirmed.
+        setPassword('')
+        setMode('login')
+        setMessage("Almost there — we've sent a confirmation link to " + email + ". Click it, then log in above if you are not redirected from your email.")
+      }
     } else if (mode === 'forgot') {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`
@@ -25,7 +37,15 @@ function Login() {
       else setMessage('Check your email for a password reset link.')
     } else {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) setMessage(error.message)
+      if (error) {
+        // Supabase returns a generic "Invalid login credentials" for both a
+        // wrong password and an unconfirmed email — nudge toward the likely cause.
+        if (error.message.toLowerCase().includes('invalid login credentials')) {
+          setMessage("Couldn't log in. If you just signed up, make sure you've clicked the confirmation link in your email first.")
+        } else {
+          setMessage(error.message)
+        }
+      }
     }
     setLoading(false)
   }
@@ -70,7 +90,14 @@ function Login() {
         </button>
       </form>
 
-      {message && <p style={{ marginTop: '1rem', color: '#666' }}>{message}</p>}
+      {message && (
+        <p style={{
+          marginTop: '1rem', padding: '0.7rem 0.9rem', borderRadius: 'var(--radius)',
+          background: '#f3f4f6', color: 'var(--color-text)', fontSize: '0.9rem', lineHeight: 1.4
+        }}>
+          {message}
+        </p>
+      )}
 
       <div style={{ marginTop: '1.5rem', fontSize: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
         {mode === 'login' && (

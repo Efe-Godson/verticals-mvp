@@ -1,3 +1,4 @@
+// Place at: src/Home.jsx
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from './supabaseClient'
@@ -32,9 +33,10 @@ function Home() {
   const [error, setError] = useState('')
   const [searchText, setSearchText] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
-  const [viewMode, setViewMode] = useState(() => localStorage.getItem('verticals_view_mode') || 'list')
+  const [viewMode, setViewMode] = useState(() => localStorage.getItem('verticals_view_mode') || 'grid')
   const [openMenuId, setOpenMenuId] = useState(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
+  const [demoForm, setDemoForm] = useState(null)
   const menuRef = useRef(null)
 
   useEffect(() => {
@@ -55,6 +57,21 @@ function Home() {
     }
     loadForms()
   }, [session])
+
+  useEffect(() => {
+    async function loadDemoForm() {
+      const { data, error } = await supabase
+        .from('forms')
+        .select('*')
+        .eq('is_demo', true)
+        .limit(1)
+
+      if (!error && data && data.length > 0) {
+        setDemoForm(data[0])
+      }
+    }
+    loadDemoForm()
+  }, [])
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -121,6 +138,10 @@ function Home() {
 
   const sharedProps = { togglePin, publishForm, copyLink, requestDelete }
   const formPendingDelete = forms.find(f => f.id === confirmDeleteId)
+
+  // Don't show the demo card to the account that actually owns the demo form —
+  // it already appears in their own list above.
+  const showDemo = demoForm && demoForm.user_id !== session.user.id
 
   return (
     <div className="page">
@@ -247,6 +268,35 @@ function Home() {
             </>
           )}
         </>
+      )}
+
+      {showDemo && (
+        <div style={{ marginTop: '3rem', paddingTop: '2rem', borderTop: '1px solid var(--color-border)' }}>
+          <h3 style={{ margin: '0 0 0.4rem 0', fontSize: '0.95rem', color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+            Try a Demo
+          </h3>
+          <p style={{ color: 'var(--color-muted)', fontSize: '0.9rem', marginBottom: '1rem', maxWidth: '560px' }}>
+            Explore a fully built example form with real submissions, see what records and reports
+            look like once a form has been collecting data for a while.
+          </p>
+
+          <div className="card" style={{
+            padding: '1.2rem 1.5rem', display: 'flex', justifyContent: 'space-between',
+            alignItems: 'center', flexWrap: 'wrap', gap: '0.8rem'
+          }}>
+            <div>
+              <div style={{ fontWeight: '600', fontSize: '1.05rem' }}>{demoForm.name}</div>
+              <div style={{ color: 'var(--color-muted)', fontSize: '0.85rem', marginTop: '0.2rem' }}>
+                {demoForm.fields?.length || 0} field{demoForm.fields?.length !== 1 ? 's' : ''}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <Link to={`/form/${demoForm.id}/records`}><button className="secondary">View Records</button></Link>
+              <Link to={`/form/${demoForm.id}/report`}><button className="secondary">View Report</button></Link>
+              <Link to={`/form/${demoForm.id}`}><button>Open Form</button></Link>
+            </div>
+          </div>
+        </div>
       )}
 
       {confirmDeleteId && (
