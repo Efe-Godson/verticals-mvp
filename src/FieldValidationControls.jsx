@@ -42,7 +42,7 @@ function FieldValidationControls({ field, index, updateField }) {
       {expanded && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.6rem' }}>
           {TYPES_WITH_LENGTH_RULES.includes(field.type) && (
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '0.8rem', color: 'var(--color-muted)', minWidth: '90px' }}>Length</span>
               <input
                 type="number"
@@ -64,7 +64,7 @@ function FieldValidationControls({ field, index, updateField }) {
           )}
 
           {TYPES_WITH_NUMBER_RULES.includes(field.type) && (
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '0.8rem', color: 'var(--color-muted)', minWidth: '90px' }}>Value range</span>
               <input
                 type="number"
@@ -84,7 +84,7 @@ function FieldValidationControls({ field, index, updateField }) {
           )}
 
           {TYPES_WITH_DATE_RULES.includes(field.type) && (
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '0.8rem', color: 'var(--color-muted)', minWidth: '90px' }}>Date range</span>
               <input
                 type="date"
@@ -102,7 +102,7 @@ function FieldValidationControls({ field, index, updateField }) {
           )}
 
           {TYPES_WITH_TIME_RULES.includes(field.type) && (
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '0.8rem', color: 'var(--color-muted)', minWidth: '90px' }}>Time range</span>
               <input
                 type="time"
@@ -120,7 +120,7 @@ function FieldValidationControls({ field, index, updateField }) {
           )}
 
           {TYPES_WITH_SELECTION_RULES.includes(field.type) && (
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '0.8rem', color: 'var(--color-muted)', minWidth: '90px' }}>Selections</span>
               <input
                 type="number"

@@ -134,3 +134,147 @@ input:focus, select:focus, textarea:focus {
   margin: 0 auto;
   padding: 2rem 1.5rem;
 }
+
+/* ---------- Responsive foundation ---------- */
+
+/* Any horizontally-scrollable table wrapper should feel native on touch */
+.table-scroll {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Toolbars of buttons (Print/Download/More, form actions, etc.) —
+   wrap onto multiple lines instead of overflowing or squishing */
+.toolbar-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+/* Dropdown/popover panels — cap width so they never exceed the viewport
+   on a narrow phone, regardless of how they're positioned */
+.dropdown-panel {
+  max-width: min(90vw, 320px);
+}
+
+/* NavBar: hamburger toggle, hidden on desktop by default */
+.navbar-toggle {
+  display: none;
+}
+
+.navbar-links-mobile {
+  display: none;
+}
+
+.navbar-links-mobile.open {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  gap: 0.75rem;
+  padding-top: 0.75rem;
+}
+
+/* Form list rows: full button row on desktop, Open + overflow menu on mobile.
+   !important is required here because the row itself uses an inline
+   `display: flex` style — without it, the inline style always wins and
+   this row never actually hides above the mobile breakpoint. */
+.list-actions-mobile {
+  display: none !important;
+}
+
+@media (max-width: 768px) {
+  .page {
+    padding: 1.25rem 1rem;
+  }
+
+  h1 {
+    font-size: 1.5rem;
+  }
+
+  /* Builder field rows (label + type + remove) stack instead of
+     squeezing into one cramped row */
+  .field-row {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+
+  .field-row > * {
+    width: 100%;
+  }
+
+  .navbar-toggle {
+    display: inline-flex;
+  }
+
+  .navbar-links-desktop {
+    display: none !important;
+  }
+
+  .navbar-row {
+    flex-wrap: wrap;
+  }
+
+  .list-actions-desktop {
+    display: none !important;
+  }
+
+  .list-actions-mobile {
+    display: flex !important;
+  }
+
+  /* Field builder cards: instead of a drag-handle | content | remove
+     row where Remove floats as a tall side column next to a much taller
+     stacked content block, put drag handle + Remove on one compact top
+     row and let content take the full width underneath. */
+  .field-card {
+    flex-wrap: wrap;
+  }
+
+  .field-drag-handle {
+    order: 1;
+  }
+
+  .field-remove-btn {
+    order: 2;
+    margin-left: auto;
+  }
+
+  .field-card-content {
+    order: 3;
+    flex-basis: 100%;
+    width: 100%;
+  }
+
+  /* Product catalogue actions: keep Download Template / Upload Filled
+     Sheet on one row instead of each wrapping onto its own full line */
+  .products-header {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+
+  .products-header-actions {
+    flex-wrap: nowrap;
+  }
+
+  .products-header-actions > * {
+    flex: 1;
+    text-align: center;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .page {
+    padding: 1rem 0.75rem;
+  }
+
+  button {
+    padding: 0.5rem 0.85rem;
+    font-size: 0.85rem;
+  }
+
+  .card-grid {
+    grid-template-columns: 1fr !important;
+  }
+}

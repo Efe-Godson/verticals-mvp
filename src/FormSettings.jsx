@@ -131,7 +131,7 @@ function FormSettings() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '1.5rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '1.5rem', flexWrap: 'wrap' }}>
         <button onClick={saveSettings} disabled={saving}>
           {saving ? 'Saving...' : 'Save Settings'}
         </button>

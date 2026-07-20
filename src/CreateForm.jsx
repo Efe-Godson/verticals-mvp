@@ -369,7 +369,7 @@ function CreateForm() {
             </div>
 
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <div style={{ display: 'flex', gap: '0.6rem' }}>
+              <div className="field-row" style={{ display: 'flex', gap: '0.6rem' }}>
                 <input
                   type="text"
                   value={field.label}

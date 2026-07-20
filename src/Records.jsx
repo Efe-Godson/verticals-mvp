@@ -50,7 +50,7 @@ function CartCell({ value, cellKey, openCartCellKey, setOpenCartCellKey }) {
       {isOpen && (
         <>
           <div style={overlayStyle} onClick={() => setOpenCartCellKey(null)} />
-          <div style={{ ...dropdownStyle, right: 'auto', left: 0, minWidth: '260px' }}>
+          <div className="dropdown-panel" style={{ ...dropdownStyle, right: 'auto', left: 0, minWidth: '260px' }}>
             <div style={{ fontWeight: 600, fontSize: '0.75rem', color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '0.5rem' }}>
               Order Details
             </div>
@@ -502,7 +502,7 @@ function Records() {
       <h1>{form.name}</h1>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem' }}>
         <p style={{ color: '#666', margin: 0 }}>{visible.length} of {submissions.length} record{submissions.length !== 1 ? 's' : ''}</p>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           {visible.length > 0 && (
             <>
               <button className="secondary" onClick={handlePrintTable}>Print</button>
@@ -514,7 +514,7 @@ function Records() {
                 {activeMenu === 'download' && (
                   <>
                     <div style={overlayStyle} onClick={() => setActiveMenu(null)} />
-                    <div style={dropdownStyle} onClick={(e) => e.stopPropagation()}>
+                    <div className="dropdown-panel" style={dropdownStyle} onClick={(e) => e.stopPropagation()}>
                       <DropdownItem onClick={() => { handleExportExcel(); setActiveMenu(null) }}>Excel (.xlsx)</DropdownItem>
                       <DropdownItem onClick={() => { handleExportPDF(); setActiveMenu(null) }}>PDF (.pdf)</DropdownItem>
                       <DropdownItem onClick={() => { handleExportCSV(); setActiveMenu(null) }}>CSV (.csv)</DropdownItem>
@@ -532,7 +532,7 @@ function Records() {
             {activeMenu === 'more' && (
               <>
                 <div style={overlayStyle} onClick={() => setActiveMenu(null)} />
-                  <div style={{ ...dropdownStyle, minWidth: '220px' }} onClick={(e) => e.stopPropagation()}>
+                  <div className="dropdown-panel" style={{ ...dropdownStyle, minWidth: '220px' }} onClick={(e) => e.stopPropagation()}>
                     <div style={{ fontWeight: 600, fontSize: '0.75rem', color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '0.4rem' }}>
                       Columns
                     </div>
@@ -605,7 +605,7 @@ function Records() {
         placeholder="Search all records..."
         value={searchText}
         onChange={(e) => { setSearchText(e.target.value); setCurrentPage(1) }}
-        style={{ padding: '0.5rem', width: '300px', marginBottom: '0.7rem', display: 'block' }}
+        style={{ padding: '0.5rem', width: '100%', maxWidth: '300px', marginBottom: '0.7rem', display: 'block' }}
       />
 
       <div style={{ display: 'flex', gap: '0.7rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '1rem' }}>
@@ -646,7 +646,7 @@ function Records() {
         <p style={{ marginTop: '2rem', color: '#999' }}>No records match your search or filters.</p>
       ) : (
         <>
-          <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '65vh', marginTop: '1rem', border: '1px solid #eee', borderRadius: 'var(--radius)' }}>
+          <div className="table-scroll" style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '65vh', marginTop: '1rem', border: '1px solid #eee', borderRadius: 'var(--radius)' }}>
             <table style={{ borderCollapse: 'collapse', width: '100%' }}>
               <thead>
                 <tr>
@@ -801,40 +801,25 @@ function Records() {
 }
 
 function CartEditInput({ field, value, onChange }) {
-  const [search, setSearch] = useState('')
-  const [category, setCategory] = useState('All')
-
   const products = field.products || []
   const items = value?.items || []
 
-  const categories = ['All', ...Array.from(new Set(
-    products.map(p => p.category).filter(c => c && c.trim() !== '')
-  ))]
-
-  const filteredProducts = products.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase())
-    const matchesCategory = category === 'All' || p.category === category
-    return matchesSearch && matchesCategory
-  })
-
-  function getQuantity(productId) {
-    const item = items.find(i => i.id === productId)
-    return item ? item.quantity : 0
-  }
-
-  function setQuantity(product, rawQty) {
+  function updateQuantity(productId, rawQty) {
     const numQty = Math.max(0, Math.floor(Number(rawQty)) || 0)
-    const existing = items.find(i => i.id === product.id)
+    const catalogueProduct = products.find(p => p.id === productId)
+    const existingItem = items.find(i => i.id === productId)
+    const source = catalogueProduct || existingItem
+    if (!source) return
 
     let newItems
     if (numQty === 0) {
-      newItems = items.filter(i => i.id !== product.id)
-    } else if (existing) {
-      newItems = items.map(i => i.id === product.id ? { ...i, quantity: numQty } : i)
+      newItems = items.filter(i => i.id !== productId)
+    } else if (existingItem) {
+      newItems = items.map(i => i.id === productId ? { ...i, quantity: numQty } : i)
     } else {
       newItems = [...items, {
-        id: product.id, name: product.name, price: product.price,
-        category: product.category || '', quantity: numQty
+        id: source.id, name: source.name, price: source.price,
+        category: source.category || '', quantity: numQty
       }]
     }
 
@@ -842,127 +827,46 @@ function CartEditInput({ field, value, onChange }) {
     onChange({ items: newItems, total })
   }
 
-  function increment(product) {
-    setQuantity(product, getQuantity(product.id) + 1)
-  }
-
-  function decrement(product) {
-    setQuantity(product, Math.max(0, getQuantity(product.id) - 1))
-  }
-
-  function removeItem(productId) {
-    const newItems = items.filter(i => i.id !== productId)
-    const total = newItems.reduce((sum, i) => sum + i.price * i.quantity, 0)
-    onChange({ items: newItems, total })
-  }
-
-  // Cart items whose product has since been removed from the catalogue —
-  // kept visible in the summary below (with a Remove option) even though
-  // they won't appear in the searchable browse list above.
-  const orphanItems = items.filter(i => !products.some(p => p.id === i.id))
+  // Show every product in the form's catalogue (quantity 0 if not currently in the cart),
+  // plus any cart item whose product has since been removed from the catalogue —
+  // so it stays visible and adjustable rather than silently vanishing.
+  const rows = products.map(p => {
+    const existing = items.find(i => i.id === p.id)
+    return { ...p, quantity: existing ? existing.quantity : 0 }
+  })
+  items.forEach(i => {
+    if (!products.some(p => p.id === i.id)) rows.push({ ...i })
+  })
 
   const total = items.reduce((sum, i) => sum + i.price * i.quantity, 0)
 
   return (
     <div>
-      <input
-        type="text"
-        placeholder="Search products to add..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        style={{ width: '100%', padding: '0.5rem', marginBottom: '0.6rem' }}
-      />
-
-      {categories.length > 1 && (
-        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.6rem' }}>
-          {categories.map(cat => (
-            <button
-              key={cat}
-              type="button"
-              onClick={() => setCategory(cat)}
-              className={category === cat ? '' : 'secondary'}
-              style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem', borderRadius: '20px' }}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
-      )}
-
-      <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #eee', borderRadius: '6px', marginBottom: '0.8rem' }}>
-        {filteredProducts.length === 0 ? (
-          <p style={{ padding: '0.7rem', color: '#999', margin: 0, fontSize: '0.85rem' }}>No products match.</p>
-        ) : (
-          filteredProducts.map(p => {
-            const qty = getQuantity(p.id)
-            return (
-              <div key={p.id} style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                padding: '0.5rem 0.7rem', borderBottom: '1px solid #f5f5f5'
-              }}>
-                <div style={{ fontSize: '0.85rem' }}>
-                  {p.name}{' '}
-                  <span style={{ color: '#999', fontSize: '0.75rem' }}>
-                    ₦{Number(p.price).toLocaleString()}
-                  </span>
-                </div>
-
-                {qty === 0 ? (
-                  <button type="button" onClick={() => increment(p)} style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem' }}>
-                    Add
-                  </button>
-                ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <button type="button" className="secondary" onClick={() => decrement(p)} style={{ padding: '0.2rem 0.55rem', fontSize: '0.8rem' }}>−</button>
-                    <input
-                      type="number"
-                      min="0"
-                      value={qty}
-                      onChange={(e) => setQuantity(p, e.target.value)}
-                      style={{ width: '48px', padding: '0.2rem', textAlign: 'center', fontSize: '0.8rem' }}
-                    />
-                    <button type="button" className="secondary" onClick={() => increment(p)} style={{ padding: '0.2rem 0.55rem', fontSize: '0.8rem' }}>+</button>
-                  </div>
-                )}
-              </div>
-            )
-          })
-        )}
-      </div>
-
-      <div className="card" style={{ padding: '0.8rem' }}>
-        <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.4rem' }}>
-          Cart ({items.length})
-        </div>
-
-        {items.length === 0 ? (
-          <p style={{ color: '#999', fontSize: '0.8rem', margin: 0 }}>No items yet.</p>
-        ) : (
-          items.map(item => (
-            <div key={item.id} style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              fontSize: '0.85rem', padding: '0.3rem 0', borderBottom: '1px solid #f5f5f5'
-            }}>
-              <span>
-                {item.name} <span style={{ color: '#999' }}>× {item.quantity}</span>
-                {orphanItems.some(o => o.id === item.id) && (
-                  <span style={{ color: '#c0392b', fontSize: '0.7rem', marginLeft: '0.4rem' }}>(removed from catalogue)</span>
-                )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', maxHeight: '260px', overflowY: 'auto' }}>
+        {rows.map(row => (
+          <div key={row.id} style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            gap: '0.6rem', padding: '0.4rem 0', borderBottom: '1px solid #f5f5f5'
+          }}>
+            <div style={{ fontSize: '0.85rem' }}>
+              {row.name}{' '}
+              <span style={{ color: '#999', fontSize: '0.75rem' }}>
+                ₦{Number(row.price).toLocaleString()}
               </span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <span>₦{(item.price * item.quantity).toLocaleString()}</span>
-                <span onClick={() => removeItem(item.id)} style={{ color: '#c0392b', cursor: 'pointer', fontSize: '0.75rem' }}>
-                  Remove
-                </span>
-              </div>
             </div>
-          ))
-        )}
-
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.5rem', fontWeight: 'bold', fontSize: '0.9rem' }}>
-          <span>Total</span>
-          <span>₦{total.toLocaleString()}</span>
-        </div>
+            <input
+              type="number"
+              min="0"
+              value={row.quantity}
+              onChange={(e) => updateQuantity(row.id, e.target.value)}
+              style={{ width: '70px', padding: '0.3rem', textAlign: 'center' }}
+            />
+          </div>
+        ))}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.7rem', fontWeight: 'bold', fontSize: '0.9rem' }}>
+        <span>Total</span>
+        <span>₦{total.toLocaleString()}</span>
       </div>
     </div>
   )
@@ -1025,14 +929,14 @@ function RecycleBinDialog({ form, submissions, loading, onRestore, onPermanentDe
       style={{
         position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
         background: 'rgba(0,0,0,0.4)', display: 'flex',
-        alignItems: 'center', justifyContent: 'center', zIndex: 100
+        alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '1rem'
       }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
           background: 'white', borderRadius: '8px', padding: '1.5rem',
-          width: '560px', maxHeight: '80vh', overflowY: 'auto'
+          width: '560px', maxWidth: '100%', maxHeight: '80vh', overflowY: 'auto'
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
@@ -1107,12 +1011,12 @@ function SavePresetDialog({ onSave, onClose }) {
       style={{
         position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
         background: 'rgba(0,0,0,0.4)', display: 'flex',
-        alignItems: 'center', justifyContent: 'center', zIndex: 100
+        alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '1rem'
       }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ background: 'white', borderRadius: '8px', padding: '1.5rem', width: '360px' }}
+        style={{ background: 'white', borderRadius: '8px', padding: '1.5rem', width: '360px', maxWidth: '100%' }}
       >
         <h3 style={{ margin: '0 0 1rem' }}>Save Filter Preset</h3>
 
@@ -1254,19 +1158,19 @@ function RecordDetail({ form, record, fields, onClose, onUpdated }) {
       style={{
         position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
         background: 'rgba(0,0,0,0.4)', display: 'flex',
-        alignItems: 'center', justifyContent: 'center', zIndex: 100
+        alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '1rem'
       }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
           background: 'white', borderRadius: '8px', padding: '2rem',
-          width: '480px', maxHeight: '85vh', overflowY: 'auto'
+          width: '480px', maxWidth: '100%', maxHeight: '85vh', overflowY: 'auto'
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
           <h3 style={{ margin: 0 }}>{showHistory ? 'Edit History' : 'Record Detail'}</h3>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
             {!showHistory && !isEditing && (
               <>
                 {hasCartField && (
@@ -1364,7 +1268,7 @@ function FilterPopover({ field, currentFilter, onApply, onClear }) {
   const boxStyle = {
     position: 'absolute', top: '100%', left: 0, background: 'white',
     border: '1px solid #ddd', borderRadius: '6px', padding: '0.8rem',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.1)', zIndex: 10, width: '220px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.1)', zIndex: 10, width: '220px', maxWidth: '90vw',
     fontWeight: 'normal', fontSize: '0.85rem'
   }
 

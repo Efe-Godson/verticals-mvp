@@ -338,7 +338,7 @@ function EditForm() {
             onDragStart={() => handleDragStart(index)}
             onDragOver={(e) => handleDragOver(e, index)}
             onDragEnd={handleDragEnd}
-            className="card"
+            className="card field-card"
             style={{
               padding: '1rem',
               display: 'flex',
@@ -348,15 +348,15 @@ function EditForm() {
               cursor: 'grab'
             }}
           >
-            <div style={{
+            <div className="field-drag-handle" style={{
               fontSize: '1.2rem', color: '#bbb', paddingTop: '0.5rem',
               userSelect: 'none', lineHeight: 1
             }} title="Drag to reorder">
               ⠿
             </div>
 
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <div style={{ display: 'flex', gap: '0.6rem' }}>
+            <div className="field-card-content" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div className="field-row" style={{ display: 'flex', gap: '0.6rem' }}>
                 <input
                   type="text"
                   value={field.label}
@@ -387,9 +387,9 @@ function EditForm() {
 
               {TYPES_WITH_PRODUCTS.includes(field.type) && (
                 <div style={{ marginTop: '0.3rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <div className="products-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                     <label style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>Products</label>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <div className="products-header-actions" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                       <button type="button" className="secondary" onClick={downloadTemplate} style={{ fontSize: '0.8rem', padding: '0.3rem 0.6rem' }}>
                         Download Template
                       </button>
@@ -415,20 +415,20 @@ function EditForm() {
                   </datalist>
 
                   {(field.products || []).map((product, pIndex) => (
-                    <div key={product.id} style={{ display: 'flex', gap: '0.5rem', marginTop: '0.4rem' }}>
+                    <div key={product.id} className="field-row" style={{ display: 'flex', gap: '0.5rem', marginTop: '0.4rem' }}>
                       <input
                         type="text"
                         value={product.name}
                         onChange={(e) => updateProduct(index, pIndex, { name: e.target.value })}
                         placeholder="Item name"
-                        style={{ flex: 2, padding: '0.4rem' }}
+                        style={{ flex: 2, minWidth: 0, padding: '0.4rem' }}
                       />
                       <input
                         type="number"
                         value={product.price}
                         onChange={(e) => updateProduct(index, pIndex, { price: e.target.value })}
                         placeholder="Price"
-                        style={{ flex: 1, padding: '0.4rem' }}
+                        style={{ flex: 1, minWidth: 0, padding: '0.4rem' }}
                       />
                       <input
                         type="text"
@@ -436,9 +436,9 @@ function EditForm() {
                         value={product.category || ''}
                         onChange={(e) => updateProduct(index, pIndex, { category: e.target.value })}
                         placeholder="Category"
-                        style={{ flex: 1, padding: '0.4rem' }}
+                        style={{ flex: 1, minWidth: 0, padding: '0.4rem' }}
                       />
-                      <button className="secondary" style={{ color: '#c0392b' }} onClick={() => setPendingConfirm({ type: 'product', fieldIndex: index, productIndex: pIndex })}>
+                      <button className="secondary" style={{ color: '#c0392b', flexShrink: 0 }} onClick={() => setPendingConfirm({ type: 'product', fieldIndex: index, productIndex: pIndex })}>
                         Remove
                       </button>
                     </div>
@@ -455,8 +455,8 @@ function EditForm() {
             </div>
 
             <button
-              className="secondary"
-              style={{ color: '#c0392b' }}
+              className="secondary field-remove-btn"
+              style={{ color: '#c0392b', flexShrink: 0 }}
               onClick={() => setPendingConfirm({ type: 'field', index })}
             >
               Remove

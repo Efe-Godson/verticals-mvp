@@ -1,4 +1,3 @@
-// Place at: src/Home.jsx
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from './supabaseClient'
@@ -6,6 +5,8 @@ import { useAuth } from './AuthContext'
 import ConfirmDialog from './ConfirmDialog'
 
 const PAGE_SIZE = 8
+
+
 
 function PinIcon({ size = 14 }) {
   return (
@@ -29,14 +30,15 @@ function PinIcon({ size = 14 }) {
 function Home() {
   const { session } = useAuth()
   const [forms, setForms] = useState([])
+  const [demoForm, setDemoForm] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [searchText, setSearchText] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
-  const [viewMode, setViewMode] = useState(() => localStorage.getItem('verticals_view_mode') || 'grid')
+  const [viewMode, setViewMode] = useState(() => localStorage.getItem('verticals_view_mode') || 'list')
+  const [demoCollapsed, setDemoCollapsed] = useState(() => localStorage.getItem('verticals_demo_collapsed') === 'true')
   const [openMenuId, setOpenMenuId] = useState(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
-  const [demoForm, setDemoForm] = useState(null)
   const menuRef = useRef(null)
 
   useEffect(() => {
@@ -52,26 +54,28 @@ function Home() {
         setError('Could not load forms: ' + error.message)
       } else {
         setForms(data)
+
+        // Only fetch the demo form separately if the user doesn't already
+        // own it themselves (avoids showing it twice).
+        const ownedDemo = data.find(f => f.is_demo)
+        if (ownedDemo) {
+          setDemoForm(ownedDemo)
+        } else {
+          const { data: demoData, error: demoError } = await supabase
+            .from('forms')
+            .select('*')
+            .eq('is_demo', true)
+            .maybeSingle()
+
+          if (!demoError && demoData) {
+            setDemoForm(demoData)
+          }
+        }
       }
       setLoading(false)
     }
     loadForms()
   }, [session])
-
-  useEffect(() => {
-    async function loadDemoForm() {
-      const { data, error } = await supabase
-        .from('forms')
-        .select('*')
-        .eq('is_demo', true)
-        .limit(1)
-
-      if (!error && data && data.length > 0) {
-        setDemoForm(data[0])
-      }
-    }
-    loadDemoForm()
-  }, [])
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -88,6 +92,12 @@ function Home() {
   function changeViewMode(mode) {
     setViewMode(mode)
     localStorage.setItem('verticals_view_mode', mode)
+  }
+
+  function toggleDemoCollapsed() {
+    const next = !demoCollapsed
+    setDemoCollapsed(next)
+    localStorage.setItem('verticals_demo_collapsed', String(next))
   }
 
   function copyLink(formId) {
@@ -139,13 +149,9 @@ function Home() {
   const sharedProps = { togglePin, publishForm, copyLink, requestDelete }
   const formPendingDelete = forms.find(f => f.id === confirmDeleteId)
 
-  // Don't show the demo card to the account that actually owns the demo form —
-  // it already appears in their own list above.
-  const showDemo = demoForm && demoForm.user_id !== session.user.id
-
   return (
     <div className="page">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+      <div className="toolbar-row" style={{ justifyContent: 'space-between', marginBottom: '1.5rem' }}>
         <h1 style={{ margin: 0 }}>Your Forms</h1>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
           <div style={{ display: 'flex', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
@@ -189,7 +195,7 @@ function Home() {
             placeholder="Search forms..."
             value={searchText}
             onChange={(e) => { setSearchText(e.target.value); setCurrentPage(1) }}
-            style={{ width: '280px', marginBottom: '1.2rem' }}
+            style={{ width: '100%', maxWidth: '280px', marginBottom: '1.2rem' }}
           />
 
           {visible.length === 0 ? (
@@ -270,32 +276,47 @@ function Home() {
         </>
       )}
 
-      {showDemo && (
-        <div style={{ marginTop: '3rem', paddingTop: '2rem', borderTop: '1px solid var(--color-border)' }}>
-          <h3 style={{ margin: '0 0 0.4rem 0', fontSize: '0.95rem', color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-            Try a Demo
-          </h3>
-          <p style={{ color: 'var(--color-muted)', fontSize: '0.9rem', marginBottom: '1rem', maxWidth: '560px' }}>
-            Explore a fully built example form with real submissions, see what records and reports
-            look like once a form has been collecting data for a while.
-          </p>
-
-          <div className="card" style={{
-            padding: '1.2rem 1.5rem', display: 'flex', justifyContent: 'space-between',
-            alignItems: 'center', flexWrap: 'wrap', gap: '0.8rem'
-          }}>
-            <div>
-              <div style={{ fontWeight: '600', fontSize: '1.05rem' }}>{demoForm.name}</div>
-              <div style={{ color: 'var(--color-muted)', fontSize: '0.85rem', marginTop: '0.2rem' }}>
-                {demoForm.fields?.length || 0} field{demoForm.fields?.length !== 1 ? 's' : ''}
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-              <Link to={`/form/${demoForm.id}/records`}><button className="secondary">View Records</button></Link>
-              <Link to={`/form/${demoForm.id}/report`}><button className="secondary">View Report</button></Link>
-              <Link to={`/form/${demoForm.id}`}><button>Open Form</button></Link>
-            </div>
+      {!loading && demoForm && (
+        <div style={{ marginTop: '2.5rem' }}>
+          <div
+            onClick={toggleDemoCollapsed}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', userSelect: 'none' }}
+            title={demoCollapsed ? 'Expand' : 'Collapse'}
+          >
+            <span style={{
+              display: 'inline-block', fontSize: '0.7rem', color: 'var(--color-muted)',
+              transform: demoCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.15s'
+            }}>
+              ▾
+            </span>
+            <h3 style={{ margin: '0 0 0.4rem 0', fontSize: '0.95rem', color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+              Try a Demo
+            </h3>
           </div>
+
+          {!demoCollapsed && (
+            <>
+              <p style={{ margin: '0 0 0.9rem 0', color: 'var(--color-muted)', fontSize: '0.9rem', maxWidth: '520px' }}>
+                Explore a fully built example form with real submissions, see what records and reports look like once a form has been collecting data for a while.
+              </p>
+              <div className="card" style={{
+                padding: '1.2rem 1.5rem', display: 'flex', justifyContent: 'space-between',
+                alignItems: 'center', flexWrap: 'wrap', gap: '0.8rem'
+              }}>
+                <div>
+                  <div style={{ fontWeight: '600', fontSize: '1.05rem' }}>{demoForm.name}</div>
+                  <div style={{ color: 'var(--color-muted)', fontSize: '0.85rem', marginTop: '0.2rem' }}>
+                    {demoForm.fields?.length || 0} field{demoForm.fields?.length !== 1 ? 's' : ''}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  <Link to={`/form/${demoForm.id}/records`}><button className="secondary">View Records</button></Link>
+                  <Link to={`/form/${demoForm.id}/report`}><button className="secondary">View Report</button></Link>
+                  <Link to={`/form/${demoForm.id}`}><button>Open Form</button></Link>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -340,7 +361,8 @@ function ListView({ pageForms, togglePin, publishForm, copyLink, requestDelete, 
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center' }}>
+          {/* Desktop: full row of individual action buttons */}
+          <div className="list-actions-desktop" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center' }}>
             {form.status === 'draft' && (
               <button onClick={() => publishForm(form.id)}>Publish</button>
             )}
@@ -353,22 +375,64 @@ function ListView({ pageForms, togglePin, publishForm, copyLink, requestDelete, 
             <Link to={`/form/${form.id}/report`}><button className="secondary">Report</button></Link>
             <Link to={`/form/${form.id}`}><button>Open</button></Link>
 
-            <div style={{ position: 'relative' }} ref={openMenuId === form.id ? menuRef : null}>
+            <div style={{ position: 'relative' }} ref={openMenuId === `d-${form.id}` ? menuRef : null}>
               <button
                 className="secondary"
-                onClick={() => setOpenMenuId(openMenuId === form.id ? null : form.id)}
+                onClick={() => setOpenMenuId(openMenuId === `d-${form.id}` ? null : `d-${form.id}`)}
                 title="More options"
               >
                 ⋮
               </button>
 
-              {openMenuId === form.id && (
-                <div style={{
+              {openMenuId === `d-${form.id}` && (
+                <div className="dropdown-panel" style={{
                   position: 'absolute', top: '100%', right: 0, marginTop: '0.3rem',
                   background: 'white', border: '1px solid var(--color-border)',
                   borderRadius: 'var(--radius)', boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
                   zIndex: 20, minWidth: '120px', overflow: 'hidden'
                 }}>
+                  <MenuItem danger onClick={() => requestDelete(form.id)}>Delete</MenuItem>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Mobile: just the primary action plus an overflow menu for everything else */}
+          <div className="list-actions-mobile" style={{ display: 'flex', gap: '0.5rem', width: '100%' }}>
+            <Link to={`/form/${form.id}`} style={{ flex: 1 }}><button style={{ width: '100%' }}>Open</button></Link>
+
+            <div style={{ position: 'relative' }} ref={openMenuId === `m-${form.id}` ? menuRef : null}>
+              <button
+                className="secondary"
+                onClick={() => setOpenMenuId(openMenuId === `m-${form.id}` ? null : `m-${form.id}`)}
+                title="More options"
+              >
+                ⋮
+              </button>
+
+              {openMenuId === `m-${form.id}` && (
+                <div className="dropdown-panel" style={{
+                  position: 'absolute', top: '100%', right: 0, marginTop: '0.3rem',
+                  background: 'white', border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius)', boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+                  zIndex: 20, minWidth: '150px', overflow: 'hidden'
+                }}>
+                  {form.status === 'draft' && (
+                    <MenuItem onClick={() => { publishForm(form.id); setOpenMenuId(null) }}>Publish</MenuItem>
+                  )}
+                  <MenuItem onClick={() => { togglePin(form.id, form.pinned); setOpenMenuId(null) }}>
+                    {form.pinned ? 'Unpin' : 'Pin'}
+                  </MenuItem>
+                  <Link to={`/form/${form.id}/edit`} style={{ display: 'block' }}>
+                    <MenuItem>Edit</MenuItem>
+                  </Link>
+                  <MenuItem onClick={() => { copyLink(form.id); setOpenMenuId(null) }}>Copy Link</MenuItem>
+                  <Link to={`/form/${form.id}/records`} style={{ display: 'block' }}>
+                    <MenuItem>Records</MenuItem>
+                  </Link>
+                  <Link to={`/form/${form.id}/report`} style={{ display: 'block' }}>
+                    <MenuItem>Report</MenuItem>
+                  </Link>
                   <MenuItem danger onClick={() => requestDelete(form.id)}>Delete</MenuItem>
                 </div>
               )}
