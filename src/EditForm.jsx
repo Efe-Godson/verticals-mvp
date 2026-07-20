@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import { supabase } from './supabaseClient'
 import FieldValidationControls from './FieldValidationControls'
@@ -37,6 +37,7 @@ function cleanFieldsForSave(fields) {
         products: (rest.products || []).map(p => ({
           ...p,
           price: Number(p.price) || 0,
+          unit: p.unit || '',
           category: p.category || ''
         }))
       }
@@ -64,6 +65,9 @@ function EditForm() {
   const [recentlyRemoved, setRecentlyRemoved] = useState(null) // { field, index }
   const undoTimeoutRef = useRef(null)
   const [pendingConfirm, setPendingConfirm] = useState(null) // { type: 'field', index } | { type: 'product', fieldIndex, productIndex }
+  const [openFieldMenu, setOpenFieldMenu] = useState(null) // field.id of the open "more options" menu, or null
+  const fieldMenuRef = useRef(null)
+  const [productOverrides, setProductOverrides] = useState({}) // `${fieldIndex}-${productId}` -> true/false, explicit expand/collapse
 
   useEffect(() => {
     async function loadForm() {
@@ -78,6 +82,18 @@ function EditForm() {
     }
     loadForm()
   }, [id])
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (fieldMenuRef.current && !fieldMenuRef.current.contains(e.target)) {
+        setOpenFieldMenu(null)
+      }
+    }
+    if (openFieldMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [openFieldMenu])
 
   // Debounced autosave — skips the initial load, only fires once the person actually edits something
   useEffect(() => {
@@ -123,7 +139,7 @@ function EditForm() {
     const products = newFields[fieldIndex].products || []
     newFields[fieldIndex] = {
       ...newFields[fieldIndex],
-      products: [...products, { id: 'p' + Date.now(), name: '', price: '', category: '' }]
+      products: [...products, { id: 'p' + Date.now(), name: '', price: '', unit: '', category: '' }]
     }
     setFields(newFields)
   }
@@ -143,6 +159,20 @@ function EditForm() {
     setFields(newFields)
   }
 
+  function isProductExpanded(fieldIndex, product) {
+    const key = `${fieldIndex}-${product.id}`
+    if (key in productOverrides) return productOverrides[key]
+    // Products that already have a unit or category saved stay visible by
+    // default — only genuinely empty ones start collapsed.
+    return !!(product.unit || product.category)
+  }
+
+  function toggleProductExpanded(fieldIndex, product) {
+    const key = `${fieldIndex}-${product.id}`
+    const current = isProductExpanded(fieldIndex, product)
+    setProductOverrides(prev => ({ ...prev, [key]: !current }))
+  }
+
   function getFieldCategories(fieldIndex) {
     const products = fields[fieldIndex].products || []
     return Array.from(new Set(products.map(p => p.category).filter(c => c && c.trim() !== '')))
@@ -150,10 +180,10 @@ function EditForm() {
 
   function downloadTemplate() {
     const worksheet = XLSX.utils.json_to_sheet([
-      { Name: 'Sample Product', Price: 1000, Category: 'Category Name' },
-      { Name: 'Another Product', Price: 2500, Category: 'Category Name' }
+      { Name: 'Sample Product', Price: 1000, Unit: 'kg', Category: 'Category Name' },
+      { Name: 'Another Product', Price: 2500, Unit: 'pcs', Category: 'Category Name' }
     ])
-    worksheet['!cols'] = [{ wch: 28 }, { wch: 12 }, { wch: 20 }]
+    worksheet['!cols'] = [{ wch: 28 }, { wch: 12 }, { wch: 10 }, { wch: 20 }]
     const workbook = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Products')
     XLSX.writeFile(workbook, 'product-catalogue-template.xlsx')
@@ -177,6 +207,7 @@ function EditForm() {
             id: 'p' + Date.now() + Math.random().toString(36).slice(2, 7),
             name: row.Name.toString().trim(),
             price: Number(row.Price) || 0,
+            unit: row.Unit ? row.Unit.toString().trim() : '',
             category: row.Category ? row.Category.toString().trim() : ''
           }))
 
@@ -303,9 +334,14 @@ function EditForm() {
     <div className="page">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
         <h1 style={{ margin: 0 }}>Edit Form</h1>
-        <button onClick={saveChanges} disabled={saving}>
-          {saving ? 'Saving...' : 'Save Changes'}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <Link to={`/form/${id}`} style={{ fontSize: '0.9rem', color: 'var(--color-primary)' }}>
+            View public form →
+          </Link>
+          <button onClick={saveChanges} disabled={saving}>
+            {saving ? 'Saving...' : 'Save Changes'}
+          </button>
+        </div>
       </div>
 
       <div style={{ marginBottom: '1.1rem', fontSize: '0.8rem', color: 'var(--color-muted)', minHeight: '1rem' }}>
@@ -349,25 +385,25 @@ function EditForm() {
             }}
           >
             <div className="field-drag-handle" style={{
-              fontSize: '1.2rem', color: '#bbb', paddingTop: '0.5rem',
+              fontSize: '1.2rem', color: '#bbb', paddingTop: '0.6rem',
               userSelect: 'none', lineHeight: 1
             }} title="Drag to reorder">
               ⠿
             </div>
 
-            <div className="field-card-content" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
               <div className="field-row" style={{ display: 'flex', gap: '0.6rem' }}>
                 <input
                   type="text"
                   value={field.label}
                   onChange={(e) => updateField(index, { label: e.target.value })}
                   placeholder="Field name"
-                  style={{ flex: 2, padding: '0.5rem' }}
+                  style={{ flex: 2 }}
                 />
                 <select
                   value={field.type}
                   onChange={(e) => updateField(index, { type: e.target.value })}
-                  style={{ flex: 1, padding: '0.5rem' }}
+                  style={{ flex: 1 }}
                 >
                   {FIELD_TYPES.map(t => (
                     <option key={t.value} value={t.value}>{t.label}</option>
@@ -381,21 +417,93 @@ function EditForm() {
                   value={field.optionsText !== undefined ? field.optionsText : (field.options || []).join(', ')}
                   onChange={(e) => updateFieldOptions(index, e.target.value)}
                   placeholder="Options, comma separated e.g. Cash, Transfer, Card"
-                  style={{ padding: '0.5rem' }}
                 />
               )}
 
               {TYPES_WITH_PRODUCTS.includes(field.type) && (
                 <div style={{ marginTop: '0.3rem' }}>
-                <div className="products-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                    <label style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>Products</label>
-                    <div className="products-header-actions" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      <button type="button" className="secondary" onClick={downloadTemplate} style={{ fontSize: '0.8rem', padding: '0.3rem 0.6rem' }}>
+                  <label style={{ fontSize: '0.8rem', color: 'var(--color-muted)', marginBottom: '0.5rem', display: 'block' }}>
+                    Products
+                  </label>
+
+                  <datalist id={`categories-${field.id}`}>
+                    {getFieldCategories(index).map(cat => (
+                      <option key={cat} value={cat} />
+                    ))}
+                  </datalist>
+
+                  {(field.products || []).map((product, pIndex) => {
+                    const expanded = isProductExpanded(index, product)
+                    return (
+                      <div key={product.id} className="product-card">
+                        <div className="product-row-main">
+                          <input
+                            type="text"
+                            value={product.name}
+                            onChange={(e) => updateProduct(index, pIndex, { name: e.target.value })}
+                            placeholder="Item name"
+                            className="product-name"
+                          />
+                          <input
+                            type="number"
+                            value={product.price}
+                            onChange={(e) => updateProduct(index, pIndex, { price: e.target.value })}
+                            placeholder="Price"
+                            className="product-price"
+                          />
+                          <button
+                            type="button"
+                            className="secondary product-toggle"
+                            onClick={() => toggleProductExpanded(index, product)}
+                            title={expanded ? 'Hide unit & category' : 'Add unit & category'}
+                          >
+                            {expanded ? '▾' : '▸'}
+                          </button>
+                          <button
+                            className="secondary product-remove"
+                            aria-label="Remove product"
+                            title="Remove product"
+                            onClick={() => setPendingConfirm({ type: 'product', fieldIndex: index, productIndex: pIndex })}
+                          >
+                            ✕
+                          </button>
+                        </div>
+
+                        {expanded && (
+                          <div className="product-row-details">
+                            <input
+                              type="text"
+                              value={product.unit || ''}
+                              onChange={(e) => updateProduct(index, pIndex, { unit: e.target.value })}
+                              placeholder="Unit e.g. kg, pcs"
+                              className="product-unit"
+                            />
+                            <input
+                              type="text"
+                              list={`categories-${field.id}`}
+                              value={product.category || ''}
+                              onChange={(e) => updateProduct(index, pIndex, { category: e.target.value })}
+                              placeholder="Category"
+                              className="product-category"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+
+                  <div className="products-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.6rem' }}>
+                    <button className="secondary" onClick={() => addProduct(index)}>
+                      + Add Product
+                    </button>
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <button type="button" className="secondary" onClick={downloadTemplate}>
                         Download Template
                       </button>
                       <label className="secondary" style={{
-                        fontSize: '0.8rem', padding: '0.3rem 0.6rem', borderRadius: 'var(--radius)',
-                        border: '1px solid var(--color-border)', cursor: 'pointer', display: 'inline-block'
+                        borderRadius: 'var(--radius)', border: '1px solid var(--color-border)',
+                        cursor: 'pointer', display: 'inline-flex', alignItems: 'center',
+                        padding: '0.55rem 1.1rem', fontSize: '0.9rem'
                       }}>
                         Upload Filled Sheet
                         <input
@@ -407,45 +515,6 @@ function EditForm() {
                       </label>
                     </div>
                   </div>
-
-                  <datalist id={`categories-${field.id}`}>
-                    {getFieldCategories(index).map(cat => (
-                      <option key={cat} value={cat} />
-                    ))}
-                  </datalist>
-
-                  {(field.products || []).map((product, pIndex) => (
-                    <div key={product.id} className="field-row" style={{ display: 'flex', gap: '0.5rem', marginTop: '0.4rem' }}>
-                      <input
-                        type="text"
-                        value={product.name}
-                        onChange={(e) => updateProduct(index, pIndex, { name: e.target.value })}
-                        placeholder="Item name"
-                        style={{ flex: 2, minWidth: 0, padding: '0.4rem' }}
-                      />
-                      <input
-                        type="number"
-                        value={product.price}
-                        onChange={(e) => updateProduct(index, pIndex, { price: e.target.value })}
-                        placeholder="Price"
-                        style={{ flex: 1, minWidth: 0, padding: '0.4rem' }}
-                      />
-                      <input
-                        type="text"
-                        list={`categories-${field.id}`}
-                        value={product.category || ''}
-                        onChange={(e) => updateProduct(index, pIndex, { category: e.target.value })}
-                        placeholder="Category"
-                        style={{ flex: 1, minWidth: 0, padding: '0.4rem' }}
-                      />
-                      <button className="secondary" style={{ color: '#c0392b', flexShrink: 0 }} onClick={() => setPendingConfirm({ type: 'product', fieldIndex: index, productIndex: pIndex })}>
-                        Remove
-                      </button>
-                    </div>
-                  ))}
-                  <button className="secondary" onClick={() => addProduct(index)} style={{ marginTop: '0.5rem' }}>
-                    + Add Product
-                  </button>
                 </div>
               )}
 
@@ -454,13 +523,34 @@ function EditForm() {
               <FieldValidationControls field={field} index={index} updateField={updateField} />
             </div>
 
-            <button
-              className="secondary field-remove-btn"
-              style={{ color: '#c0392b', flexShrink: 0 }}
-              onClick={() => setPendingConfirm({ type: 'field', index })}
-            >
-              Remove
-            </button>
+            <div style={{ position: 'relative', flexShrink: 0 }} ref={openFieldMenu === field.id ? fieldMenuRef : null}>
+              <button
+                className="secondary"
+                onClick={() => setOpenFieldMenu(openFieldMenu === field.id ? null : field.id)}
+                title="More options"
+              >
+                ⋮
+              </button>
+
+              {openFieldMenu === field.id && (
+                <div className="dropdown-panel" style={{
+                  position: 'absolute', top: '100%', right: 0, marginTop: '0.3rem',
+                  background: 'white', border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius)', boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+                  zIndex: 20, minWidth: '140px', overflow: 'hidden'
+                }}>
+                  <MenuItem
+                    danger
+                    onClick={() => {
+                      setOpenFieldMenu(null)
+                      setPendingConfirm({ type: 'field', index })
+                    }}
+                  >
+                    Remove Field
+                  </MenuItem>
+                </div>
+              )}
+            </div>
           </div>
         ))}
 
@@ -504,6 +594,22 @@ function EditForm() {
           onCancel={() => setPendingConfirm(null)}
         />
       )}
+    </div>
+  )
+}
+
+function MenuItem({ children, onClick, danger }) {
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        padding: '0.6rem 0.9rem', fontSize: '0.85rem', cursor: 'pointer',
+        color: danger ? '#c0392b' : 'inherit'
+      }}
+      onMouseEnter={(e) => e.currentTarget.style.background = '#f5f5f5'}
+      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+    >
+      {children}
     </div>
   )
 }

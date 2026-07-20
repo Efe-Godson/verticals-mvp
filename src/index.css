@@ -157,6 +157,43 @@ input:focus, select:focus, textarea:focus {
   max-width: min(90vw, 320px);
 }
 
+/* Product Cart rows — a compact main line (name, price, expand toggle,
+   remove) always shown; Unit/Category only appear when the product has
+   them set, or the person explicitly expands the row. */
+.product-card {
+  margin-top: 0.5rem;
+}
+
+.product-row-main {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.product-row-details {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+}
+
+.product-name,
+.product-price,
+.product-unit,
+.product-category {
+  min-width: 0;
+}
+
+.product-toggle,
+.product-remove {
+  flex-shrink: 0;
+  padding: 0.55rem 0.7rem;
+  line-height: 1;
+}
+
+.product-remove {
+  color: #c0392b;
+}
+
 /* NavBar: hamburger toggle, hidden on desktop by default */
 .navbar-toggle {
   display: none;
@@ -223,44 +260,12 @@ input:focus, select:focus, textarea:focus {
     display: flex !important;
   }
 
-  /* Field builder cards: instead of a drag-handle | content | remove
-     row where Remove floats as a tall side column next to a much taller
-     stacked content block, put drag handle + Remove on one compact top
-     row and let content take the full width underneath. */
-  .field-card {
+  /* Product rows: with only name + price + toggle + remove on the main
+     line now, this fits most phones without wrapping — but fall back to
+     wrapping gracefully on very narrow screens rather than overflowing */
+  .product-row-main,
+  .product-row-details {
     flex-wrap: wrap;
-  }
-
-  .field-drag-handle {
-    order: 1;
-  }
-
-  .field-remove-btn {
-    order: 2;
-    margin-left: auto;
-  }
-
-  .field-card-content {
-    order: 3;
-    flex-basis: 100%;
-    width: 100%;
-  }
-
-  /* Product catalogue actions: keep Download Template / Upload Filled
-     Sheet on one row instead of each wrapping onto its own full line */
-  .products-header {
-    flex-direction: column;
-    align-items: stretch !important;
-  }
-
-  .products-header-actions {
-    flex-wrap: nowrap;
-  }
-
-  .products-header-actions > * {
-    flex: 1;
-    text-align: center;
-    justify-content: center;
   }
 }
 
