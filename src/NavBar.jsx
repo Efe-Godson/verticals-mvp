@@ -25,6 +25,7 @@ function NavBar() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
           <Link to="/" style={{ fontWeight: 'bold', fontSize: '1.05rem' }}>Verticals</Link>
+          <Link to="/templates" style={{ color: location.pathname === '/templates' ? 'var(--color-primary)' : 'var(--color-muted)', fontSize: '0.9rem' }}>Templates</Link>
 
           {isFormContext && (
             <div className="navbar-links-desktop" style={{ display: 'flex', gap: '1rem', fontSize: '0.9rem' }}>
@@ -32,6 +33,7 @@ function NavBar() {
               <Link to={`/form/${id}/edit`} style={{ color: linkColor('/edit') }}>Builder</Link>
               <Link to={`/form/${id}/records`} style={{ color: linkColor('/records') }}>Records</Link>
               <Link to={`/form/${id}/report`} style={{ color: linkColor('/report') }}>Report</Link>
+              <Link to={`/form/${id}/ai-analyst`} style={{ color: linkColor('/ai-analyst') }}>AI Analyst</Link>
               <Link to={`/form/${id}/settings`} style={{ color: linkColor('/settings') }}>Settings</Link>
             </div>
           )}
@@ -59,6 +61,7 @@ function NavBar() {
           <Link to={`/form/${id}/edit`} style={{ color: linkColor('/edit') }} onClick={() => setMenuOpen(false)}>Builder</Link>
           <Link to={`/form/${id}/records`} style={{ color: linkColor('/records') }} onClick={() => setMenuOpen(false)}>Records</Link>
           <Link to={`/form/${id}/report`} style={{ color: linkColor('/report') }} onClick={() => setMenuOpen(false)}>Report</Link>
+          <Link to={`/form/${id}/ai-analyst`} style={{ color: linkColor('/ai-analyst') }} onClick={() => setMenuOpen(false)}>AI Analyst</Link>
           <Link to={`/form/${id}/settings`} style={{ color: linkColor('/settings') }} onClick={() => setMenuOpen(false)}>Settings</Link>
         </div>
       )}

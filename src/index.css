@@ -137,9 +137,70 @@ input:focus, select:focus, textarea:focus {
 
 /* ---------- Responsive foundation ---------- */
 
-/* Any horizontally-scrollable table wrapper should feel native on touch */
+/* Any horizontally-scrollable table wrapper should feel native on touch,
+   and scroll within itself rather than growing the whole page's height */
 .table-scroll {
   -webkit-overflow-scrolling: touch;
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 65vh;
+  margin-top: 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius);
+  background-color: white;
+
+  /* Pure-CSS "scroll shadow" cue on the left/right edges — each shadow
+     only becomes visible once there's actually more content in that
+     direction to scroll to, no JS required */
+  background-image:
+    linear-gradient(to right, white 30%, rgba(255, 255, 255, 0)),
+    linear-gradient(to left, white 30%, rgba(255, 255, 255, 0)),
+    radial-gradient(farthest-side at 0 50%, rgba(0, 0, 0, 0.15), rgba(0, 0, 0, 0)),
+    radial-gradient(farthest-side at 100% 50%, rgba(0, 0, 0, 0.15), rgba(0, 0, 0, 0));
+  background-repeat: no-repeat;
+  background-size: 40px 100%, 40px 100%, 14px 100%, 14px 100%;
+  background-position: 0 0, 100% 0, 0 0, 100% 0;
+  background-attachment: local, local, scroll, scroll;
+}
+
+/* Only the table breaks out to use the full viewport width on larger
+   screens — everything else on the page (filters, buttons, pagination)
+   stays within the normal reading-width column.
+   Using margin-left/right: calc(50% - 50vw) here instead of the more
+   common `position: relative; left: 50%; margin-left: -50vw` — the
+   position/left version only cancels out correctly when the parent has
+   zero padding of its own. Since .page has real padding that changes
+   per breakpoint, that version shifted the table left by the wrong
+   amount on mobile and clipped the first column. The margin-only
+   calc() formula below correctly cancels the parent's padding at any
+   breakpoint, because the percentage in `50%` resolves against the
+   parent's content width (already inside its padding), not the
+   viewport — so the padding term cancels out algebraically. */
+.table-breakout {
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+  box-sizing: border-box;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+}
+
+.records-table tbody tr {
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+
+.records-table tbody tr:nth-child(even) {
+  background: #fafbfc;
+}
+
+.records-table tbody tr:hover {
+  background: #eef4ff;
+}
+
+.records-table th,
+.records-table td {
+  font-size: 0.88rem;
 }
 
 /* Toolbars of buttons (Print/Download/More, form actions, etc.) —
@@ -186,12 +247,30 @@ input:focus, select:focus, textarea:focus {
 .product-toggle,
 .product-remove {
   flex-shrink: 0;
-  padding: 0.55rem 0.7rem;
+  padding: 0.55rem 0.6rem;
   line-height: 1;
 }
 
 .product-remove {
   color: #c0392b;
+}
+
+/* Download Template / Upload Filled Sheet: always stay paired on one
+   row instead of each wrapping onto its own line */
+.product-template-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+
+.product-template-actions > * {
+  min-width: 0;
+  justify-content: center;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* NavBar: hamburger toggle, hidden on desktop by default */
@@ -218,6 +297,136 @@ input:focus, select:focus, textarea:focus {
    this row never actually hides above the mobile breakpoint. */
 .list-actions-mobile {
   display: none !important;
+}
+
+.form-state-card {
+  min-width: 0;
+}
+
+.form-state-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+  padding: 0.16rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.form-state-badge::before {
+  content: '';
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.form-state-badge.draft { background: #fff4e5; color: #966300; }
+.form-state-badge.live { background: #e6f4ea; color: #1a7f37; }
+.form-state-badge.paused { background: #fff1dd; color: #a24b00; }
+.form-state-badge.archived { background: #eef0f2; color: #5f6973; }
+
+.form-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 0.65rem;
+  margin-top: 0.18rem;
+  color: var(--color-muted);
+  font-size: 0.8rem;
+}
+
+.form-card-meta span + span::before {
+  content: '·';
+  margin-right: 0.65rem;
+}
+
+.grid-live-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+}
+
+.grid-live-actions button {
+  width: 100%;
+  padding: 0.42rem 0.35rem;
+  font-size: 0.74rem;
+  white-space: nowrap;
+}
+
+.report-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1rem;
+  padding: 0.5rem 0 1.25rem;
+}
+
+.report-eyebrow,
+.report-subtitle {
+  color: var(--color-muted);
+}
+
+.report-eyebrow {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.report-title {
+  margin: 0.2rem 0 0;
+  font-size: 2rem;
+}
+
+.report-subtitle {
+  margin: 0.4rem 0 0;
+  font-size: 0.9rem;
+}
+
+.report-filter-bar {
+  margin-bottom: 0.6rem;
+}
+
+.report-filter-group label {
+  color: var(--color-muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.report-section-nav {
+  display: flex;
+  gap: 0.45rem;
+  overflow-x: auto;
+  margin: 0 0 2.2rem;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--color-border);
+  scrollbar-width: none;
+}
+
+.report-section-nav a {
+  flex: 0 0 auto;
+  color: var(--color-muted);
+  font-size: 0.84rem;
+  padding: 0.42rem 0.62rem;
+  border-radius: var(--radius);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.report-section-nav a:hover {
+  background: #eef4ff;
+  color: var(--color-primary);
+}
+
+.report-empty-state {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  margin-top: 2rem;
 }
 
 @media (max-width: 768px) {
@@ -260,12 +469,76 @@ input:focus, select:focus, textarea:focus {
     display: flex !important;
   }
 
-  /* Product rows: with only name + price + toggle + remove on the main
-     line now, this fits most phones without wrapping — but fall back to
-     wrapping gracefully on very narrow screens rather than overflowing */
-  .product-row-main,
-  .product-row-details {
-    flex-wrap: wrap;
+  .report-header {
+    align-items: flex-start;
+    padding-bottom: 1rem;
+  }
+
+  .report-title {
+    font-size: 1.65rem;
+  }
+
+  .report-filter-bar {
+    align-items: stretch !important;
+  }
+
+  .report-filter-group {
+    flex: 1 1 100%;
+  }
+
+  .report-filter-group select {
+    flex: 1;
+  }
+
+  .report-filter-group input[type="date"] {
+    flex: 1 1 140px;
+    min-width: 0;
+  }
+
+  .report-filter-bar > .secondary,
+  .report-filter-bar > div:last-child {
+    flex: 1;
+  }
+
+  .report-filter-bar > .secondary {
+    width: 100%;
+  }
+
+  .report-filter-bar > div:last-child > button {
+    width: 100%;
+  }
+
+  .report-section-nav {
+    margin-bottom: 1.5rem;
+  }
+
+  .report-section-nav a {
+    padding: 0.45rem 0.55rem;
+  }
+
+  .report-filter-bar + div .card,
+  .report-section-nav ~ .card,
+  .report-section-nav ~ div .card {
+    padding: 1.1rem !important;
+  }
+
+  /* Product rows: main line and details line each stay on one row and
+     shrink to fit — wrapping here would push name/price/toggle/remove
+     onto separate lines instead of shrinking them to share one. */
+
+  /* Once Download Template / Upload Filled Sheet wrap onto their own
+     line below "+ Add Product", stretch to fill it and split evenly */
+  .product-template-actions {
+    flex: 1 1 100%;
+  }
+
+  .product-template-actions > * {
+    flex: 1;
+  }
+
+  .table-breakout {
+    padding-left: 1rem;
+    padding-right: 1rem;
   }
 }
 
@@ -281,5 +554,10 @@ input:focus, select:focus, textarea:focus {
 
   .card-grid {
     grid-template-columns: 1fr !important;
+  }
+
+  .table-breakout {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
   }
 }

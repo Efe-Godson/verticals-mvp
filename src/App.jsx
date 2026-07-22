@@ -6,11 +6,13 @@ import EditForm from './EditForm'
 import PublicForm from './PublicForm'
 import Records from './Records'
 import Report from './Report'
+import AIAnalystPage from './AIAnalystPage'
 import FormSettings from './FormSettings'
 import Login from './Login'
 import SignUp from './SignUp'
 import ConfirmEmail from './ConfirmEmail'
 import ResetPassword from './ResetPassword'
+import Templates from './Templates'
 import NavBar from './NavBar'
 
 function PrivateRoute({ children }) {
@@ -46,11 +48,13 @@ function AppShell() {
             on its own, and PublicOnlyRoute would incorrectly redirect it away. */}
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/" element={<PrivateRoute><Home /></PrivateRoute>} />
+        <Route path="/templates" element={<PrivateRoute><Templates /></PrivateRoute>} />
         <Route path="/create" element={<PrivateRoute><CreateForm /></PrivateRoute>} />
         <Route path="/form/:id" element={<PublicForm />} />
         <Route path="/form/:id/edit" element={<PrivateRoute><EditForm /></PrivateRoute>} />
         <Route path="/form/:id/records" element={<PrivateRoute><Records /></PrivateRoute>} />
         <Route path="/form/:id/report" element={<PrivateRoute><Report /></PrivateRoute>} />
+        <Route path="/form/:id/ai-analyst" element={<PrivateRoute><AIAnalystPage /></PrivateRoute>} />
         <Route path="/form/:id/settings" element={<PrivateRoute><FormSettings /></PrivateRoute>} />
       </Routes>
     </>

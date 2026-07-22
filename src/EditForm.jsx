@@ -496,7 +496,7 @@ function EditForm() {
                     <button className="secondary" onClick={() => addProduct(index)}>
                       + Add Product
                     </button>
-                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <div className="product-template-actions">
                       <button type="button" className="secondary" onClick={downloadTemplate}>
                         Download Template
                       </button>

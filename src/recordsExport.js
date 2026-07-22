@@ -61,7 +61,7 @@ export function exportRecordsToExcel(form, records) {
   XLSX.writeFile(workbook, `${safeName || 'records'}-export.xlsx`)
 }
 
-export function exportRecordsToCSV(form, records) {
+export function buildRecordsCSV(form, records) {
   const columns = form.fields.map(f => f.label).concat(['Submitted'])
 
   function csvCell(value) {
@@ -80,8 +80,14 @@ export function exportRecordsToCSV(form, records) {
     lines.push([...cells, submitted].map(csvCell).join(','))
   })
 
+  return lines.join('\r\n')
+}
+
+export function exportRecordsToCSV(form, records) {
+  const csvText = buildRecordsCSV(form, records)
+
   // Leading BOM so Excel opens the UTF-8 file without mangling special characters (e.g. ₦)
-  const blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' })
+  const blob = new Blob(['\ufeff' + csvText], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const safeName = form.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase().replace(/^-+|-+$/g, '')
 
@@ -92,6 +98,111 @@ export function exportRecordsToCSV(form, records) {
   link.click()
   document.body.removeChild(link)
   URL.revokeObjectURL(url)
+}
+
+function getGoogleClientId() {
+  return import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
+}
+
+function loadGoogleIdentityScript() {
+  if (typeof window === 'undefined') return Promise.reject(new Error('Google auth is only available in the browser.'))
+  if (window.google?.accounts?.oauth2) return Promise.resolve()
+
+  if (document.querySelector('script[src="https://accounts.google.com/gsi/client"]')) {
+    return new Promise((resolve, reject) => {
+      const existing = document.querySelector('script[src="https://accounts.google.com/gsi/client"]')
+      existing.onload = () => resolve()
+      existing.onerror = () => reject(new Error('Unable to load Google Identity Services.'))
+    })
+  }
+
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script')
+    script.src = 'https://accounts.google.com/gsi/client'
+    script.async = true
+    script.defer = true
+    script.onload = () => resolve()
+    script.onerror = () => reject(new Error('Unable to load Google Identity Services.'))
+    document.head.appendChild(script)
+  })
+}
+
+function buildRecordsSheetValues(form, records) {
+  const headers = form.fields.map(field => field.label).concat(['Submitted'])
+  const rows = records.map(sub => {
+    const cells = form.fields.map(field => cellToText(sub.data[field.id], field))
+    const submitted = new Date(sub.created_at).toLocaleString('en-GB', {
+      day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+    })
+    return [...cells, submitted]
+  })
+  return [headers, ...rows]
+}
+
+export async function openRecordsInGoogleSheets(form, records) {
+  const clientId = getGoogleClientId()
+  if (!clientId) {
+    alert('Google Sheets integration needs a Google OAuth client ID. Add VITE_GOOGLE_CLIENT_ID to your environment and restart the app.')
+    return
+  }
+
+  await loadGoogleIdentityScript()
+
+  return new Promise((resolve, reject) => {
+    const tokenClient = window.google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file',
+      callback: async (response) => {
+        if (response.error) {
+          reject(new Error(response.error))
+          return
+        }
+
+        try {
+          const values = buildRecordsSheetValues(form, records)
+          const createRes = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${response.access_token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              properties: { title: `${form.name} records` },
+              sheets: [{ properties: { title: 'Records' } }]
+            })
+          })
+
+          const createdSheet = await createRes.json()
+          if (!createRes.ok) {
+            throw new Error(createdSheet.error?.message || 'Could not create a Google Sheet.')
+          }
+
+          const spreadsheetId = createdSheet.spreadsheetId
+          const updateRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Sheet1!A1:append?valueInputOption=RAW`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${response.access_token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ values })
+          })
+
+          if (!updateRes.ok) {
+            const updateBody = await updateRes.json()
+            throw new Error(updateBody.error?.message || 'Could not populate the Google Sheet.')
+          }
+
+          window.open(`https://docs.google.com/spreadsheets/d/${spreadsheetId}`, '_blank', 'noopener,noreferrer')
+          alert('Your records were sent to a new Google Sheet.')
+          resolve(createdSheet)
+        } catch (error) {
+          reject(error)
+        }
+      }
+    })
+
+    tokenClient.requestAccessToken()
+  })
 }
 
 export function exportRecordsToPDF(form, records, filterSummary) {

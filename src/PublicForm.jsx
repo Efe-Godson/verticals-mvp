@@ -26,8 +26,12 @@ function PublicForm() {
 
       if (error) {
         setMessage('This form could not be found.')
+      } else if (data.status === 'paused') {
+        setMessage('This form is temporarily paused and is not accepting responses right now.')
+      } else if (data.status === 'archived') {
+        setMessage('This form has been archived and is no longer accepting responses.')
       } else if (data.status !== 'published') {
-        setMessage('This form is not published yet.')
+        setMessage('This form is not live yet.')
       } else {
         setForm(data)
       }

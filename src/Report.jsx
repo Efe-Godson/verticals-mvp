@@ -10,6 +10,7 @@ import CategoryReport from './report/analysis/Categoryreport'
 import CartCategoryChart from './report/analysis/components/CartCategoryChart'
 import DetailedAnalysis from './report/DetailedAnalysis'
 import CrossAnalysis from './report/analysis/CrossAnalysis'
+import AIInsightCards from './report/ai/AIInsightCards'
 import { formatNaira } from './report/helpers/analysisUtils'
 
 const DATE_RANGE_OPTIONS = [
@@ -57,6 +58,44 @@ function getDateRangeLabel(dateRange, customStart, customEnd) {
   return DATE_RANGE_OPTIONS.find(o => o.value === dateRange)?.label || ''
 }
 
+function getPreviousDateRangeBounds(range, customStart, customEnd) {
+  if (range === 'all') return { start: null, end: null }
+
+  const currentRange = getDateRangeBounds(range, customStart, customEnd)
+  if (!currentRange.start) return { start: null, end: null }
+
+  const duration = currentRange.end
+    ? currentRange.end.getTime() - currentRange.start.getTime()
+    : 24 * 60 * 60 * 1000
+
+  const prevEnd = new Date(currentRange.start.getTime() - 1)
+  const prevStart = new Date(prevEnd.getTime() - duration)
+
+  return { start: prevStart, end: prevEnd }
+}
+
+function getCompletionRate(form, submissions) {
+  const nonCartFields = form.fields.filter(f => f.type !== 'cart')
+  if (nonCartFields.length === 0 || submissions.length === 0) return 0
+
+  const rates = nonCartFields.map(f => {
+    const answered = submissions.filter(s => {
+      const v = s.data[f.id]
+      if (f.type === 'multiplechoicegrid' || f.type === 'checkboxgrid') return v && typeof v === 'object' && Object.keys(v).length > 0
+      if (f.type === 'checkbox') return Array.isArray(v) && v.length > 0
+      return v !== undefined && v !== null && v.toString().trim() !== ''
+    })
+    return (answered.length / submissions.length) * 100
+  })
+
+  return Math.round(rates.reduce((a, b) => a + b, 0) / rates.length)
+}
+
+function formatDelta(value) {
+  const prefix = value > 0 ? '+' : ''
+  return `${prefix}${value}`
+}
+
 const CATEGORICAL_TYPES = ['dropdown', 'multiplechoice', 'checkbox']
 const NUMERIC_TYPES = ['number', 'rating', 'linearscale']
 const DEMOGRAPHIC_TYPES = ['email', 'phone']
@@ -83,7 +122,15 @@ function Report() {
   const [dateRange, setDateRange] = useState('all')
   const [customStart, setCustomStart] = useState('')
   const [customEnd, setCustomEnd] = useState('')
+  const [comparePrevious, setComparePrevious] = useState(true)
   const [downloadMenuOpen, setDownloadMenuOpen] = useState(false)
+  const [collapsedSections, setCollapsedSections] = useState({
+    overview: false,
+    performance: false,
+    ai: false,
+    breakdowns: false,
+    details: false,
+  })
   const reportContentRef = useRef(null)
 
   useEffect(() => {
@@ -136,6 +183,14 @@ function Report() {
     return true
   })
 
+  const previousRange = getPreviousDateRangeBounds(dateRange, customStart, customEnd)
+  const previousFilteredSubmissions = submissions.filter(s => {
+    const created = new Date(s.created_at)
+    if (previousRange.start && created < previousRange.start) return false
+    if (previousRange.end && created > previousRange.end) return false
+    return true
+  })
+
   const totalResponses = filteredSubmissions.length
   const dateRangeLabel = getDateRangeLabel(dateRange, customStart, customEnd)
 
@@ -164,6 +219,10 @@ function Report() {
     return dateRange === 'all' ? '' : dateRangeLabel
   }
 
+  function toggleSection(section) {
+    setCollapsedSections(current => ({ ...current, [section]: !current[section] }))
+  }
+
   function handlePrint() {
     printReport(form, filteredSubmissions, buildFilterSummary())
   }
@@ -183,15 +242,44 @@ function Report() {
 
   return (
     <div className="page" style={{ maxWidth: '960px' }} ref={reportContentRef}>
-      <HeroSection form={form} submissions={filteredSubmissions} dateRangeLabel={dateRangeLabel} />
+      <style>{`
+        .kpi-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.8rem; }
+        .report-section-nav { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1rem 0 1.2rem; }
+        .report-section-nav a {
+          text-decoration: none; color: var(--color-muted); font-size: 0.84rem; font-weight: 600;
+          padding: 0.45rem 0.7rem; border-radius: 999px; border: 1px solid var(--color-border);
+          background: #fff; transition: all 0.15s ease;
+        }
+        .report-section-nav a:hover { color: var(--color-primary); border-color: var(--color-primary); }
+        @media (min-width: 500px) {
+          .kpi-grid { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+        }
+        @media (max-width: 640px) {
+          .report-filter-bar {
+            position: sticky; top: 0.5rem; z-index: 30; background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(10px); border: 1px solid var(--color-border); border-radius: var(--radius);
+            padding: 0.85rem; margin-bottom: 1rem;
+          }
+          .report-section-nav a { flex: 1 1 calc(50% - 0.25rem); justify-content: center; text-align: center; }
+        }
+      `}</style>
 
-      <div data-html2canvas-ignore="true" style={{
+      <header className="report-header" data-html2canvas-ignore="true">
+        <div>
+          <div className="report-eyebrow">{form.name}</div>
+          <h1 className="report-title">Reports</h1>
+          <p className="report-subtitle">{totalResponses.toLocaleString()} response{totalResponses !== 1 ? 's' : ''} · {dateRangeLabel}</p>
+        </div>
+      </header>
+
+      <div className="report-filter-bar" data-html2canvas-ignore="true" style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap',
-        gap: '0.8rem', padding: '1rem 0', borderTop: '1px solid var(--color-border)',
-        borderBottom: '1px solid var(--color-border)', marginBottom: '2.2rem'
+        gap: '0.8rem', padding: '0.9rem 1rem', border: '1px solid var(--color-border)',
+        borderRadius: 'var(--radius)', marginBottom: '1rem', background: 'rgba(255,255,255,0.95)'
       }}>
-        <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <select value={dateRange} onChange={(e) => setDateRange(e.target.value)} style={{ padding: '0.5rem' }}>
+        <div className="report-filter-group" style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <label htmlFor="report-date-range">Date range</label>
+          <select id="report-date-range" value={dateRange} onChange={(e) => setDateRange(e.target.value)} style={{ padding: '0.5rem' }}>
             {DATE_RANGE_OPTIONS.map(opt => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
@@ -205,57 +293,99 @@ function Report() {
           )}
         </div>
 
-        <button className="secondary" onClick={handlePrint}>Print</button>
-
-        <div style={{ position: 'relative' }}>
-          <button className="secondary" onClick={() => setDownloadMenuOpen(!downloadMenuOpen)}>
-            Download ▾
-          </button>
-          {downloadMenuOpen && (
-            <>
-              <div
-                style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 15 }}
-                onClick={() => setDownloadMenuOpen(false)}
-              />
-              <div style={{
-                position: 'absolute', top: '100%', right: 0, marginTop: '0.3rem',
-                background: 'white', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 20, minWidth: '170px', overflow: 'hidden'
-              }}>
-                <button
-                  className="secondary"
-                  onClick={handleDownloadPDF}
-                  style={{ display: 'block', width: '100%', textAlign: 'left', border: 'none', background: 'transparent', padding: '0.6rem 0.9rem', borderRadius: 0 }}
-                >
-                  Download PDF
-                </button>
-                <button
-                  className="secondary"
-                  onClick={handleDownloadPPTX}
-                  style={{ display: 'block', width: '100%', textAlign: 'left', border: 'none', background: 'transparent', padding: '0.6rem 0.9rem', borderRadius: 0 }}
-                >
-                  Download PowerPoint
-                </button>
-              </div>
-            </>
-          )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.86rem', color: 'var(--color-muted)' }}>
+            <input type="checkbox" checked={comparePrevious} onChange={(e) => setComparePrevious(e.target.checked)} />
+            Compare previous period
+          </label>
+          <button className="secondary" onClick={handlePrint}>Print</button>
+          <div style={{ position: 'relative' }}>
+            <button className="secondary" onClick={() => setDownloadMenuOpen(!downloadMenuOpen)}>
+              Download ▾
+            </button>
+            {downloadMenuOpen && (
+              <>
+                <div
+                  style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 15 }}
+                  onClick={() => setDownloadMenuOpen(false)}
+                />
+                <div style={{
+                  position: 'absolute', top: '100%', right: 0, marginTop: '0.3rem',
+                  background: 'white', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 20, minWidth: '170px', overflow: 'hidden'
+                }}>
+                  <button
+                    className="secondary"
+                    onClick={handleDownloadPDF}
+                    style={{ display: 'block', width: '100%', textAlign: 'left', border: 'none', background: 'transparent', padding: '0.6rem 0.9rem', borderRadius: 0 }}
+                  >
+                    Download PDF
+                  </button>
+                  <button
+                    className="secondary"
+                    onClick={handleDownloadPPTX}
+                    style={{ display: 'block', width: '100%', textAlign: 'left', border: 'none', background: 'transparent', padding: '0.6rem 0.9rem', borderRadius: 0 }}
+                  >
+                    Download PowerPoint
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
+      <ExecutiveSummaryCard
+        form={form}
+        submissions={filteredSubmissions}
+        previousSubmissions={previousFilteredSubmissions}
+        dateRangeLabel={dateRangeLabel}
+        comparePrevious={comparePrevious}
+      />
+      <HeroSection
+        form={form}
+        submissions={filteredSubmissions}
+        previousSubmissions={previousFilteredSubmissions}
+        dateRangeLabel={dateRangeLabel}
+        comparePrevious={comparePrevious}
+      />
+      <nav className="report-section-nav" data-html2canvas-ignore="true" aria-label="Report sections">
+        <a href="#report-overview">Overview</a>
+        <a href="#report-performance">Performance</a>
+        <a href="#report-ai">AI recommendations</a>
+        <a href="#report-breakdowns">Breakdowns</a>
+        <a href="#report-details">Details</a>
+      </nav>
+
       {filteredSubmissions.length === 0 ? (
-        <p style={{ color: '#999', marginTop: '2rem' }}>No responses in this date range.</p>
+        <div className="card" style={{ padding: '1.8rem', marginBottom: '1.2rem' }}>
+          <h3 style={{ marginTop: 0, marginBottom: '0.5rem' }}>No responses in this range yet</h3>
+          <p style={{ color: 'var(--color-muted)', margin: '0 0 0.9rem' }}>
+            Try a wider date range, or collect a few more submissions to unlock richer insights.
+          </p>
+          <button className="secondary" onClick={() => { setDateRange('all'); setCustomStart(''); setCustomEnd('') }}>Reset to all time</button>
+        </div>
       ) : (
         <>
-          <SectionHeader>Key Insights</SectionHeader>
-          <InsightsPanel form={form} submissions={filteredSubmissions} />
+          <SectionHeader id="report-overview" collapsed={collapsedSections.overview} onToggle={() => toggleSection('overview')} subtitle="The strongest signals from this view">Highlights from your data</SectionHeader>
+          {!collapsedSections.overview && <InsightsPanel form={form} submissions={filteredSubmissions} />}
 
-          <SectionHeader>Performance</SectionHeader>
-          <KPIGrid form={form} submissions={filteredSubmissions} totalResponses={totalResponses} />
+          <SectionHeader id="report-performance" collapsed={collapsedSections.performance} onToggle={() => toggleSection('performance')} subtitle="Key measures and completion quality">Performance</SectionHeader>
+          {!collapsedSections.performance && <KPIGrid form={form} submissions={filteredSubmissions} totalResponses={totalResponses} />}
+
+          <SectionHeader id="report-ai" collapsed={collapsedSections.ai} onToggle={() => toggleSection('ai')} subtitle="A practical view of what changed and what to do next">AI recommendations</SectionHeader>
+          {!collapsedSections.ai && (
+            <AIInsightCards
+              formId={form.id}
+              dateRangeLabel={dateRangeLabel}
+              submissionIds={filteredSubmissions.map(s => s.id)}
+            />
+          )}
 
           {cartFields.length > 0 && (
             <>
-              <SectionHeader>Catalogue</SectionHeader>
-              {cartFields.map(field => {
+              <SectionHeader id="report-breakdowns" collapsed={collapsedSections.breakdowns} onToggle={() => toggleSection('breakdowns')} subtitle="Where demand is strongest and where attention is needed">Catalogue</SectionHeader>
+              {!collapsedSections.breakdowns && cartFields.map(field => {
                 const answered = filteredSubmissions.filter(s => {
                   const v = s.data[field.id]
                   return v && v.items && v.items.length > 0
@@ -271,8 +401,8 @@ function Report() {
 
           {salesByCategoryPairs.length > 0 && (
             <>
-              <SectionHeader>Sales by Category</SectionHeader>
-              {salesByCategoryPairs.map(({ cartField, catField }) => (
+              <SectionHeader collapsed={collapsedSections.breakdowns} onToggle={() => toggleSection('breakdowns')} subtitle="Category patterns that are driving revenue">Sales by Category</SectionHeader>
+              {!collapsedSections.breakdowns && salesByCategoryPairs.map(({ cartField, catField }) => (
                 <div key={`${catField.id}-${cartField.id}`} className="card" style={{ padding: '1.75rem', marginBottom: '1.2rem' }}>
                   <div style={{ fontSize: '1.15rem', fontWeight: 800, marginBottom: '0.9rem' }}>
                     Sales by {catField.label}
@@ -285,8 +415,8 @@ function Report() {
 
           {categoryFields.length > 0 && (
             <>
-              <SectionHeader>Category Breakdowns</SectionHeader>
-              {categoryFields.map(field => {
+              <SectionHeader collapsed={collapsedSections.breakdowns} onToggle={() => toggleSection('breakdowns')} subtitle="How responses are distributed across your categories">Category Breakdowns</SectionHeader>
+              {!collapsedSections.breakdowns && categoryFields.map(field => {
                 const answered = filteredSubmissions.filter(s => {
                   const v = s.data[field.id]
                   if (field.type === 'checkbox') return Array.isArray(v) && v.length > 0
@@ -302,23 +432,30 @@ function Report() {
             </>
           )}
 
-          <CrossAnalysis fields={crossAnalysisFields} submissions={filteredSubmissions} />
+          <SectionHeader id="report-details" collapsed={collapsedSections.details} onToggle={() => toggleSection('details')} subtitle="Field-level detail for deeper follow-up">Detailed analysis</SectionHeader>
+          {!collapsedSections.details && (
+            <>
+              <CrossAnalysis fields={crossAnalysisFields} submissions={filteredSubmissions} />
 
-          {detailFields.length > 0 && (
-            <DetailedAnalysis
-              fields={detailFields}
-              submissions={filteredSubmissions}
-              totalResponses={totalResponses}
-            />
-          )}
+              {detailFields.length > 0 && (
+                <div id="report-details">
+                  <DetailedAnalysis
+                    fields={detailFields}
+                    submissions={filteredSubmissions}
+                    totalResponses={totalResponses}
+                  />
+                </div>
+              )}
 
-          {demographicFields.length > 0 && (
-            <DetailedAnalysis
-              fields={demographicFields}
-              submissions={filteredSubmissions}
-              totalResponses={totalResponses}
-              title="Demographics"
-            />
+              {demographicFields.length > 0 && (
+                <DetailedAnalysis
+                  fields={demographicFields}
+                  submissions={filteredSubmissions}
+                  totalResponses={totalResponses}
+                  title="Demographics"
+                />
+              )}
+            </>
           )}
         </>
       )}
@@ -326,20 +463,39 @@ function Report() {
   )
 }
 
-function SectionHeader({ children }) {
+function SectionHeader({ children, id, collapsed, onToggle, subtitle }) {
   return (
-    <h3 style={{
-      marginTop: '3rem', marginBottom: '1.1rem', fontSize: '0.8rem',
-      color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 700
+    <div id={id} style={{
+      marginTop: '2.4rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.7rem'
     }}>
-      {children}
-    </h3>
+      <div>
+        <h3 style={{
+          margin: 0, fontSize: '0.8rem', color: 'var(--color-muted)',
+          textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 700
+        }}>
+          {children}
+        </h3>
+        {subtitle && (
+          <div style={{ marginTop: '0.25rem', fontSize: '0.82rem', color: 'var(--color-muted)', lineHeight: 1.4 }}>
+            {subtitle}
+          </div>
+        )}
+      </div>
+      {onToggle && (
+        <button className="secondary" onClick={onToggle} style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem' }}>
+          {collapsed ? 'Expand' : 'Collapse'}
+        </button>
+      )}
+    </div>
   )
 }
 
-function HeroSection({ form, submissions, dateRangeLabel }) {
+function ExecutiveSummaryCard({ form, submissions, previousSubmissions, dateRangeLabel, comparePrevious }) {
   const cartFields = form.fields.filter(f => f.type === 'cart')
   let totalRevenue = 0
+  let previousRevenue = 0
+  let totalOrders = 0
+  let previousOrders = 0
   let hasCartData = false
 
   cartFields.forEach(field => {
@@ -348,40 +504,156 @@ function HeroSection({ form, submissions, dateRangeLabel }) {
       if (v && v.items && v.items.length > 0) {
         hasCartData = true
         totalRevenue += v.total
+        totalOrders += 1
+      }
+    })
+
+    previousSubmissions.forEach(s => {
+      const v = s.data[field.id]
+      if (v && v.items && v.items.length > 0) {
+        previousRevenue += v.total
+        previousOrders += 1
       }
     })
   })
 
   const totalResponses = submissions.length
+  const previousResponses = previousSubmissions.length
+  const responseDelta = totalResponses - previousResponses
+  const responseDeltaPercent = previousResponses > 0 ? Math.round((responseDelta / previousResponses) * 100) : null
+  const revenueDelta = totalRevenue - previousRevenue
+  const insights = computeInsights(form, submissions)
+  const topInsight = insights[0] || 'Collect a few more responses to start seeing stronger patterns.'
+  const comparisonText = comparePrevious && previousResponses > 0
+    ? `${responseDelta >= 0 ? '+' : ''}${responseDelta} responses (${responseDeltaPercent >= 0 ? '+' : ''}${responseDeltaPercent}%) vs previous period`
+    : comparePrevious
+      ? 'No previous period to compare against yet'
+      : 'Comparison is currently paused'
 
   return (
-    <div style={{ padding: '1.8rem 0 1.6rem' }}>
-      <div style={{ fontSize: '0.85rem', color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.3rem' }}>
-        {form.name}
+    <div className="card" style={{ padding: '1.2rem 1.25rem', marginBottom: '1rem', background: 'linear-gradient(135deg, #f8fbff 0%, #f3f7ff 100%)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap' }}>
+        <div style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+          Executive summary
+        </div>
+        <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>
+          {dateRangeLabel}
+        </div>
       </div>
-      <div style={{ fontSize: '0.95rem', color: 'var(--color-muted)', marginBottom: '1.3rem' }}>
-        {dateRangeLabel}
+      <div style={{ display: 'grid', gap: '0.8rem', marginTop: '0.75rem' }}>
+        <div style={{ fontSize: '1.04rem', fontWeight: 700, lineHeight: 1.45 }}>
+          {hasCartData
+            ? `Revenue is ${revenueDelta >= 0 ? 'up' : 'down'} ${comparePrevious ? `by ${formatNaira(Math.abs(revenueDelta))}` : ''} in this view, and the strongest signal is: ${topInsight}`
+            : `You’ve collected ${totalResponses.toLocaleString()} responses in this view, and the strongest signal is: ${topInsight}`}
+        </div>
+        <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+          <span style={{ background: '#fff', border: '1px solid var(--color-border)', borderRadius: '999px', padding: '0.3rem 0.6rem', fontSize: '0.78rem', color: 'var(--color-muted)' }}>
+            {hasCartData ? `${formatNaira(totalRevenue)} total revenue` : `${totalResponses.toLocaleString()} responses`}
+          </span>
+          <span style={{ background: '#fff', border: '1px solid var(--color-border)', borderRadius: '999px', padding: '0.3rem 0.6rem', fontSize: '0.78rem', color: 'var(--color-muted)' }}>
+            {hasCartData ? `${totalOrders.toLocaleString()} orders` : 'response volume'}
+          </span>
+          <span style={{ background: '#fff', border: '1px solid var(--color-border)', borderRadius: '999px', padding: '0.3rem 0.6rem', fontSize: '0.78rem', color: 'var(--color-muted)' }}>
+            {comparisonText}
+          </span>
+        </div>
       </div>
+    </div>
+  )
+}
 
-      {hasCartData ? (
-        <>
-          <div style={{ fontSize: '1.05rem', color: 'var(--color-muted)' }}>Your business generated</div>
-          <div style={{ fontSize: '3rem', fontWeight: 800, letterSpacing: '-0.02em', margin: '0.2rem 0' }}>
-            {formatNaira(totalRevenue)}
+function HeroSection({ form, submissions, dateRangeLabel, previousSubmissions, comparePrevious }) {
+  const cartFields = form.fields.filter(f => f.type === 'cart')
+  let totalRevenue = 0
+  let previousRevenue = 0
+  let totalOrders = 0
+  let previousOrders = 0
+  let hasCartData = false
+
+  cartFields.forEach(field => {
+    submissions.forEach(s => {
+      const v = s.data[field.id]
+      if (v && v.items && v.items.length > 0) {
+        hasCartData = true
+        totalRevenue += v.total
+        totalOrders += 1
+      }
+    })
+
+    previousSubmissions.forEach(s => {
+      const v = s.data[field.id]
+      if (v && v.items && v.items.length > 0) {
+        previousRevenue += v.total
+        previousOrders += 1
+      }
+    })
+  })
+
+  const totalResponses = submissions.length
+  const previousResponses = previousSubmissions.length
+  const responseDelta = totalResponses - previousResponses
+  const responseDeltaPercent = previousResponses > 0 ? Math.round((responseDelta / previousResponses) * 100) : null
+  const revenueDelta = totalRevenue - previousRevenue
+  const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0
+  const completionRate = getCompletionRate(form, submissions)
+
+  const responseDeltaText = comparePrevious && previousResponses > 0
+    ? `${responseDelta >= 0 ? '+' : ''}${responseDelta} (${responseDeltaPercent >= 0 ? '+' : ''}${responseDeltaPercent}%)`
+    : comparePrevious
+      ? 'No prior period'
+      : 'Comparison disabled'
+
+  return (
+    <div className="card" style={{ padding: '1.5rem', marginBottom: '1.2rem', background: 'linear-gradient(135deg, #fbfdff 0%, #f5f8ff 100%)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontSize: '0.82rem', color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.3rem' }}>
+            {form.name}
           </div>
-          <div style={{ fontSize: '0.95rem', color: 'var(--color-muted)' }}>during the selected period</div>
-        </>
-      ) : (
-        <>
-          <div style={{ fontSize: '1.05rem', color: 'var(--color-muted)' }}>You received</div>
-          <div style={{ fontSize: '3rem', fontWeight: 800, letterSpacing: '-0.02em', margin: '0.2rem 0' }}>
-            {totalResponses.toLocaleString()}
+          <div style={{ fontSize: '0.95rem', color: 'var(--color-muted)', marginBottom: '0.8rem' }}>
+            {dateRangeLabel}
           </div>
-          <div style={{ fontSize: '0.95rem', color: 'var(--color-muted)' }}>
-            response{totalResponses !== 1 ? 's' : ''} during the selected period
+          {hasCartData ? (
+            <div style={{ fontSize: '1.15rem', color: '#000', lineHeight: 1.5 }}>
+              Your business generated{' '}
+              <span style={{ fontSize: '2rem', fontWeight: 800, letterSpacing: '-0.01em' }}>
+                {formatNaira(totalRevenue)}
+              </span>{' '}
+              for this period.
+            </div>
+          ) : (
+            <div style={{ fontSize: '1.15rem', color: '#000', lineHeight: 1.5 }}>
+              You received{' '}
+              <span style={{ fontSize: '2rem', fontWeight: 800, letterSpacing: '-0.01em' }}>
+                {totalResponses.toLocaleString()}
+              </span>{' '}
+              response{totalResponses !== 1 ? 's' : ''} in this range.
+            </div>
+          )}
+        </div>
+
+        <div style={{ minWidth: '220px', display: 'grid', gap: '0.6rem' }}>
+          <div className="card" style={{ padding: '0.8rem 0.95rem', background: 'white' }}>
+            <div style={{ fontSize: '0.75rem', color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Responses</div>
+            <div style={{ fontWeight: 700, fontSize: '1.05rem' }}>{totalResponses.toLocaleString()}</div>
+            <div style={{ fontSize: '0.8rem', color: comparePrevious && responseDelta >= 0 ? '#1f9d5b' : comparePrevious ? '#c0392b' : 'var(--color-muted)' }}>{responseDeltaText}</div>
           </div>
-        </>
-      )}
+          {hasCartData && (
+            <div className="card" style={{ padding: '0.8rem 0.95rem', background: 'white' }}>
+              <div style={{ fontSize: '0.75rem', color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Revenue trend</div>
+              <div style={{ fontWeight: 700, fontSize: '1.05rem' }}>{formatNaira(totalRevenue)}</div>
+              <div style={{ fontSize: '0.8rem', color: comparePrevious && revenueDelta >= 0 ? '#1f9d5b' : comparePrevious ? '#c0392b' : 'var(--color-muted)' }}>
+                {comparePrevious ? `${revenueDelta >= 0 ? '+' : ''}${formatNaira(revenueDelta)} vs previous period` : 'Comparison disabled'}
+              </div>
+            </div>
+          )}
+          <div className="card" style={{ padding: '0.8rem 0.95rem', background: 'white' }}>
+            <div style={{ fontSize: '0.75rem', color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Completion</div>
+            <div style={{ fontWeight: 700, fontSize: '1.05rem' }}>{completionRate}%</div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>{hasCartData ? `${formatNaira(avgOrderValue)} avg. order` : 'Completion rate across form fields'}</div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -413,19 +685,9 @@ function KPIGrid({ form, submissions, totalResponses }) {
 
   kpis.push({ label: 'Total Responses', value: totalResponses.toLocaleString() })
 
-  const nonCartFields = form.fields.filter(f => f.type !== 'cart')
-  if (nonCartFields.length > 0 && totalResponses > 0) {
-    const rates = nonCartFields.map(f => {
-      const answered = submissions.filter(s => {
-        const v = s.data[f.id]
-        if (f.type === 'multiplechoicegrid' || f.type === 'checkboxgrid') return v && typeof v === 'object' && Object.keys(v).length > 0
-        if (f.type === 'checkbox') return Array.isArray(v) && v.length > 0
-        return v !== undefined && v !== null && v.toString().trim() !== ''
-      })
-      return (answered.length / totalResponses) * 100
-    })
-    const avgRate = rates.reduce((a, b) => a + b, 0) / rates.length
-    kpis.push({ label: 'Avg. Completion', value: `${Math.round(avgRate)}%` })
+  const completionRate = getCompletionRate(form, submissions)
+  if (completionRate > 0) {
+    kpis.push({ label: 'Avg. Completion', value: `${completionRate}%` })
   }
 
   if (numericField) {
@@ -437,7 +699,7 @@ function KPIGrid({ form, submissions, totalResponses }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
+    <div className="kpi-grid">
       {kpis.map(k => <StatTile key={k.label} label={k.label} value={k.value} />)}
     </div>
   )
@@ -512,11 +774,15 @@ function InsightsPanel({ form, submissions }) {
   const insights = computeInsights(form, submissions)
   return (
     <div className="card" style={{ padding: '1.75rem', marginBottom: '1.2rem' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+        <div style={{ fontSize: '1rem', fontWeight: 700 }}>What stands out right now</div>
+        <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>Updated from the current filter</div>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
         {insights.map((text, i) => (
-          <div key={i} style={{ display: 'flex', gap: '0.7rem', alignItems: 'flex-start' }}>
-            <span style={{ color: 'var(--color-primary)', fontSize: '1.05rem', lineHeight: 1.4 }}>→</span>
-            <span style={{ fontSize: '0.95rem', lineHeight: 1.4 }}>{text}</span>
+          <div key={i} style={{ display: 'flex', gap: '0.7rem', alignItems: 'flex-start', background: '#f8f9fc', border: '1px solid #eef2f7', borderRadius: '0.7rem', padding: '0.8rem 0.95rem' }}>
+            <span style={{ color: 'var(--color-primary)', fontSize: '1rem', lineHeight: 1.4, fontWeight: 700 }}>•</span>
+            <span style={{ fontSize: '0.95rem', lineHeight: 1.5 }}>{text}</span>
           </div>
         ))}
       </div>
