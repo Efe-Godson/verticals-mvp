@@ -408,7 +408,14 @@ function Records() {
       `}</style>
       <h1>{form.name}</h1>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem' }}>
-        <p style={{ color: '#666', margin: 0 }}>{visible.length} of {submissions.length} record{submissions.length !== 1 ? 's' : ''}</p>
+        <input
+          type="text"
+          className="records-search"
+          placeholder="Search all records..."
+          value={searchText}
+          onChange={(e) => { setSearchText(e.target.value); setCurrentPage(1) }}
+          style={{ padding: '0.5rem' }}
+        />
 
         <div style={{ position: 'relative', flexShrink: 0 }}>
           <button className="secondary" onClick={() => setActiveMenu(activeMenu === 'options' ? null : 'options')}>
@@ -506,18 +513,7 @@ function Records() {
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '0.6rem', marginBottom: '0.6rem', flexWrap: 'wrap' }}>
-        <input
-          type="text"
-          className="records-search"
-          placeholder="Search all records..."
-          value={searchText}
-          onChange={(e) => { setSearchText(e.target.value); setCurrentPage(1) }}
-          style={{ padding: '0.5rem' }}
-        />
-      </div>
-
-      <div className="date-range-row" style={{ marginBottom: '0.8rem' }}>
+      <div className="date-range-row" style={{ marginTop: '0.6rem', marginBottom: '0.8rem' }}>
         <select
           value={dateRange}
           onChange={(e) => { setDateRange(e.target.value); setCurrentPage(1) }}
