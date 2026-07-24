@@ -354,16 +354,6 @@ function Records() {
   return (
     <div className="page">
       <style>{`
-        .records-actions-desktop { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-        .records-actions-mobile { display: none; }
-        @media (max-width: 900px) {
-          .records-actions-desktop { display: none; }
-          .records-actions-mobile { display: block; }
-        }
-        @media (max-width: 640px) {
-          .records-actions-desktop { display: none; }
-          .records-actions-mobile { display: block; }
-        }
         .records-search { flex: 1 1 auto; min-width: 0; max-width: 400px; }
         @media (max-width: 640px) {
           .records-search { max-width: none; }
@@ -420,137 +410,11 @@ function Records() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem' }}>
         <p style={{ color: '#666', margin: 0 }}>{visible.length} of {submissions.length} record{submissions.length !== 1 ? 's' : ''}</p>
 
-        {/* Desktop: Print / Download / More as separate buttons — plenty of room */}
-        <div className="records-actions-desktop">
-          {visible.length > 0 && (
-            <>
-              <button className="secondary" onClick={handlePrintTable}>Print</button>
-
-              <div style={{ position: 'relative' }}>
-                <button className="secondary" onClick={() => setActiveMenu(activeMenu === 'download' ? null : 'download')}>
-                  Download ▾
-                </button>
-                {activeMenu === 'download' && (
-                  <>
-                    <div style={overlayStyle} onClick={() => setActiveMenu(null)} />
-                    <div className="dropdown-panel" style={dropdownStyle} onClick={(e) => e.stopPropagation()}>
-                              <DropdownItem onClick={() => { handleExportExcel(); setActiveMenu(null) }}>Excel (.xlsx)</DropdownItem>
-                      <DropdownItem onClick={() => { handleExportPDF(); setActiveMenu(null) }}>PDF (.pdf)</DropdownItem>
-                      <DropdownItem onClick={() => { handleExportCSV(); setActiveMenu(null) }}>CSV (.csv)</DropdownItem>
-                      <DropdownItem onClick={() => { handleOpenInGoogleSheets(); setActiveMenu(null) }}>Open in Google Sheets</DropdownItem>
-                  </div>
-                </>
-              )}
-            </div>
-            </>
-          )}
-
-          <div style={{ position: 'relative' }}>
-            <button className="secondary" onClick={() => setActiveMenu(activeMenu === 'more' ? null : 'more')}>
-              More ▾
-            </button>
-            {activeMenu === 'more' && (
-              <>
-                <div style={overlayStyle} onClick={() => setActiveMenu(null)} />
-                  <div className="dropdown-panel" style={{ ...dropdownStyle, minWidth: '220px' }} onClick={(e) => e.stopPropagation()}>
-                    <div style={{ fontWeight: 600, fontSize: '0.75rem', color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '0.4rem' }}>
-                      Columns
-                    </div>
-                    {form.fields.map(field => (
-                      <label key={field.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.3rem 0', fontSize: '0.85rem', cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={!hiddenFieldIds.includes(field.id)}
-                          onChange={() => toggleColumnVisibility(field.id)}
-                        />
-                        {field.label}
-                      </label>
-                    ))}
-
-                    <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.7rem 0 0.5rem' }} />
-
-                    <div style={{ fontWeight: 600, fontSize: '0.75rem', color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '0.4rem' }}>
-                      Presets
-                    </div>
-                    {presets.length === 0 && (
-                      <p style={{ fontSize: '0.8rem', color: '#999', margin: '0 0 0.5rem' }}>No saved presets yet.</p>
-                    )}
-                    {presets.map((preset, i) => (
-                      <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6rem', padding: '0.3rem 0' }}>
-                        <span onClick={() => applyPreset(preset)} style={{ cursor: 'pointer', fontSize: '0.85rem' }}>
-                          {preset.name}
-                        </span>
-                        <span onClick={() => deletePreset(i)} style={{ cursor: 'pointer', color: '#c0392b', fontSize: '0.75rem' }}>
-                          Delete
-                        </span>
-                      </div>
-                    ))}
-                    <button
-                      className="secondary"
-                      onClick={() => { setActiveMenu(null); setShowSaveDialog(true) }}
-                      style={{ marginTop: '0.5rem', width: '100%', fontSize: '0.8rem' }}
-                    >
-                      + Save current filters
-                    </button>
-
-                    <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.7rem 0 0.5rem' }} />
-
-                    <button
-                      className="secondary"
-                      onClick={() => { setActiveMenu(null); openBin() }}
-                      style={{ width: '100%', fontSize: '0.8rem' }}
-                    >
-                      Recycle Bin{binCount > 0 ? ` (${binCount})` : ''}
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-        </div>
-      </div>
-
-      {selectedIds.length > 0 && (
-        <div style={{
-          display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '1rem', marginTop: '0.8rem',
-          padding: '0.6rem 1rem', background: '#fff4e5', borderRadius: 'var(--radius)'
-        }}>
-          <span style={{ fontSize: '0.9rem' }}>{selectedIds.length} selected</span>
-          <button className="secondary" style={{ color: '#c0392b' }} onClick={deleteSelected}>Move to Bin</button>
-          <button className="secondary" onClick={() => setSelectedIds([])}>Clear selection</button>
-        </div>
-      )}
-
-      {hasActiveFilters && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.6rem', marginTop: '0.7rem', marginBottom: '0.8rem', padding: '0.7rem 0.9rem', background: '#f8fbff', border: '1px solid #e2e8f0', borderRadius: 'var(--radius)' }}>
-          <span style={{ fontSize: '0.82rem', color: 'var(--color-muted)' }}>
-            {activeFilterCount > 0 ? `${activeFilterCount} active filter${activeFilterCount !== 1 ? 's' : ''}` : 'Search and filters are active'}
-          </span>
-          <button className="secondary" onClick={clearAllFilters} style={{ padding: '0.35rem 0.7rem', fontSize: '0.8rem' }}>
-            Clear all
+        <div style={{ position: 'relative', flexShrink: 0 }}>
+          <button className="secondary" onClick={() => setActiveMenu(activeMenu === 'options' ? null : 'options')}>
+            Options ▾
           </button>
-        </div>
-      )}
-
-      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '0.6rem', marginBottom: '0.6rem', flexWrap: 'wrap' }}>
-        <input
-          type="text"
-          className="records-search"
-          placeholder="Search all records..."
-          value={searchText}
-          onChange={(e) => { setSearchText(e.target.value); setCurrentPage(1) }}
-          style={{ padding: '0.5rem' }}
-        />
-
-        {/* Mobile: everything else collapses into one overflow menu, next to search */}
-        <div className="records-actions-mobile" style={{ position: 'relative', flexShrink: 0 }}>
-          <button
-            className="secondary"
-            onClick={() => setActiveMenu(activeMenu === 'mobileAll' ? null : 'mobileAll')}
-            title="More options"
-          >
-            ⋮
-          </button>
-          {activeMenu === 'mobileAll' && (
+          {activeMenu === 'options' && (
             <>
               <div style={overlayStyle} onClick={() => setActiveMenu(null)} />
               <div className="dropdown-panel" style={{ ...dropdownStyle, minWidth: '220px' }} onClick={(e) => e.stopPropagation()}>
@@ -618,6 +482,39 @@ function Records() {
             </>
           )}
         </div>
+      </div>
+
+      {selectedIds.length > 0 && (
+        <div style={{
+          display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '1rem', marginTop: '0.8rem',
+          padding: '0.6rem 1rem', background: '#fff4e5', borderRadius: 'var(--radius)'
+        }}>
+          <span style={{ fontSize: '0.9rem' }}>{selectedIds.length} selected</span>
+          <button className="secondary" style={{ color: '#c0392b' }} onClick={deleteSelected}>Move to Bin</button>
+          <button className="secondary" onClick={() => setSelectedIds([])}>Clear selection</button>
+        </div>
+      )}
+
+      {hasActiveFilters && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.6rem', marginTop: '0.7rem', marginBottom: '0.8rem', padding: '0.7rem 0.9rem', background: '#f8fbff', border: '1px solid #e2e8f0', borderRadius: 'var(--radius)' }}>
+          <span style={{ fontSize: '0.82rem', color: 'var(--color-muted)' }}>
+            {activeFilterCount > 0 ? `${activeFilterCount} active filter${activeFilterCount !== 1 ? 's' : ''}` : 'Search and filters are active'}
+          </span>
+          <button className="secondary" onClick={clearAllFilters} style={{ padding: '0.35rem 0.7rem', fontSize: '0.8rem' }}>
+            Clear all
+          </button>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '0.6rem', marginBottom: '0.6rem', flexWrap: 'wrap' }}>
+        <input
+          type="text"
+          className="records-search"
+          placeholder="Search all records..."
+          value={searchText}
+          onChange={(e) => { setSearchText(e.target.value); setCurrentPage(1) }}
+          style={{ padding: '0.5rem' }}
+        />
       </div>
 
       <div className="date-range-row" style={{ marginBottom: '0.8rem' }}>
