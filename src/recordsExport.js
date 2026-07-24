@@ -145,64 +145,125 @@ function isScopeError(status, body) {
   return /insufficient.*scope/i.test(body?.error?.message || '')
 }
 
-// Requests Sheets/Drive access incrementally, via a fresh Supabase Google
-// OAuth grant, the first time there's no provider_token with the right
-// scopes — not at login. Once granted, subsequent exports reuse the same
-// session's token.
-export async function openRecordsInGoogleSheets(form, records) {
-  const { data: { session } } = await supabase.auth.getSession()
-
-  if (!session?.provider_token) {
-    await requestGoogleSheetsAccess()
-    return
-  }
-
-  const values = buildRecordsSheetValues(form, records)
-  const createRes = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
-    method: 'POST',
+async function fetchSheetsJson(url, accessToken, init) {
+  const res = await fetch(url, {
+    ...init,
     headers: {
-      Authorization: `Bearer ${session.provider_token}`,
-      'Content-Type': 'application/json'
-    },
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      ...(init?.headers || {})
+    }
+  })
+  const body = await res.json().catch(() => ({}))
+  return { res, body }
+}
+
+// Creates a brand-new spreadsheet for this form and writes the current
+// records into it. Used the first time a form is connected, and again if a
+// previously-linked sheet has since been deleted or access to it revoked.
+async function createFormGoogleSheet(form, records, accessToken) {
+  const { res, body } = await fetchSheetsJson('https://sheets.googleapis.com/v4/spreadsheets', accessToken, {
+    method: 'POST',
     body: JSON.stringify({
       properties: { title: `${form.name} records` },
       sheets: [{ properties: { title: 'Records' } }]
     })
   })
 
-  const createdSheet = await createRes.json()
-  if (!createRes.ok) {
-    if (isScopeError(createRes.status, createdSheet)) {
-      await requestGoogleSheetsAccess()
-      return
-    }
-    if (createRes.status === 401) {
-      throw new Error('Your Google Sheets connection has expired. Please try again to reconnect.')
-    }
-    throw new Error(createdSheet.error?.message || 'Could not create a Google Sheet.')
+  if (!res.ok) {
+    if (isScopeError(res.status, body)) return { needsConsent: true }
+    if (res.status === 401) throw new Error('Your Google Sheets connection has expired. Please try again to reconnect.')
+    throw new Error(body.error?.message || 'Could not create a Google Sheet.')
   }
 
-  const spreadsheetId = createdSheet.spreadsheetId
-  const updateRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Records!A1:append?valueInputOption=RAW`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${session.provider_token}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ values })
-  })
+  const spreadsheetId = body.spreadsheetId
+  const values = buildRecordsSheetValues(form, records)
+  const { res: updateRes, body: updateBody } = await fetchSheetsJson(
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Records!A1:append?valueInputOption=RAW`,
+    accessToken,
+    { method: 'POST', body: JSON.stringify({ values }) }
+  )
 
   if (!updateRes.ok) {
-    const updateBody = await updateRes.json()
-    if (isScopeError(updateRes.status, updateBody)) {
-      await requestGoogleSheetsAccess()
-      return
-    }
+    if (isScopeError(updateRes.status, updateBody)) return { needsConsent: true }
     throw new Error(updateBody.error?.message || 'Could not populate the Google Sheet.')
   }
 
-  window.open(`https://docs.google.com/spreadsheets/d/${spreadsheetId}`, '_blank', 'noopener,noreferrer')
-  return createdSheet
+  return { spreadsheetId, url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}`, created: true }
+}
+
+// Overwrites the existing linked sheet's "Records" tab with the current
+// records — so re-syncing after the form has collected new submissions
+// updates the same sheet in place rather than creating a new one.
+async function resyncFormGoogleSheet(spreadsheetId, form, records, accessToken) {
+  const values = buildRecordsSheetValues(form, records)
+
+  const { res: clearRes, body: clearBody } = await fetchSheetsJson(
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Records!A:ZZ:clear`,
+    accessToken,
+    { method: 'POST', body: JSON.stringify({}) }
+  )
+
+  if (!clearRes.ok) {
+    if (isScopeError(clearRes.status, clearBody)) return { needsConsent: true }
+    // The linked sheet is gone or no longer accessible (e.g. deleted, or
+    // ownership/sharing changed) — fall back to creating a fresh one rather
+    // than failing the sync outright.
+    if (clearRes.status === 404 || clearRes.status === 403) return { staleLink: true }
+    throw new Error(clearBody.error?.message || 'Could not sync the Google Sheet.')
+  }
+
+  const { res: updateRes, body: updateBody } = await fetchSheetsJson(
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Records!A1?valueInputOption=RAW`,
+    accessToken,
+    { method: 'PUT', body: JSON.stringify({ values }) }
+  )
+
+  if (!updateRes.ok) {
+    if (isScopeError(updateRes.status, updateBody)) return { needsConsent: true }
+    throw new Error(updateBody.error?.message || 'Could not populate the Google Sheet.')
+  }
+
+  return { spreadsheetId, url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}`, created: false }
+}
+
+// Requests Sheets/Drive access incrementally, via a fresh Supabase Google
+// OAuth grant, the first time there's no provider_token with the right
+// scopes — not at login. Once granted, subsequent syncs reuse the same
+// session's token.
+//
+// `form.settings.googleSheetId`, if present, is reused so every sync updates
+// the same spreadsheet (and the same shareable link) instead of creating a
+// new one each time. The caller is responsible for persisting the returned
+// spreadsheetId onto the form the first time one is created.
+export async function syncFormGoogleSheet(form, records) {
+  const { data: { session } } = await supabase.auth.getSession()
+
+  if (!session?.provider_token) {
+    await requestGoogleSheetsAccess()
+    return null
+  }
+
+  const existingId = form.settings?.googleSheetId
+  let result = existingId
+    ? await resyncFormGoogleSheet(existingId, form, records, session.provider_token)
+    : await createFormGoogleSheet(form, records, session.provider_token)
+
+  if (result.needsConsent) {
+    await requestGoogleSheetsAccess()
+    return null
+  }
+
+  if (result.staleLink) {
+    result = await createFormGoogleSheet(form, records, session.provider_token)
+    if (result.needsConsent) {
+      await requestGoogleSheetsAccess()
+      return null
+    }
+  }
+
+  window.open(result.url, '_blank', 'noopener,noreferrer')
+  return result
 }
 
 export function exportRecordsToPDF(form, records, filterSummary) {

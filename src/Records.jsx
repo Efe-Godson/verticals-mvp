@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
-import { exportRecordsToExcel, exportRecordsToCSV, exportRecordsToPDF, printRecordsTable, openRecordsInGoogleSheets } from './recordsExport'
+import { exportRecordsToExcel, exportRecordsToCSV, exportRecordsToPDF, printRecordsTable, syncFormGoogleSheet } from './recordsExport'
 import { DATE_RANGE_OPTIONS, getDateRangeBounds, compareValues, passesFilter } from './records/recordsUtils'
 import { formatCell, FilterIcon, CubeIcon, overlayStyle, dropdownStyle, DropdownItem } from './records/recordsUiKit'
 import { CartCell } from './records/CartCell'
@@ -153,12 +153,22 @@ function Records() {
     exportRecordsToCSV(form, visible)
   }
 
-  async function handleOpenInGoogleSheets() {
+  async function handleSyncGoogleSheet() {
     try {
-      await openRecordsInGoogleSheets(form, visible)
+      const result = await syncFormGoogleSheet(form, visible)
+      // null means syncFormGoogleSheet just kicked off a Google consent
+      // redirect (no scope yet, or the linked sheet needed re-auth) — the
+      // browser is navigating away, so there's nothing to persist yet.
+      if (!result) return
+
+      if (result.created || result.spreadsheetId !== form.settings?.googleSheetId) {
+        const updatedSettings = { ...(form.settings || {}), googleSheetId: result.spreadsheetId }
+        const { error } = await supabase.from('forms').update({ settings: updatedSettings }).eq('id', form.id)
+        if (!error) setForm({ ...form, settings: updatedSettings })
+      }
     } catch (error) {
       console.error(error)
-      alert(error.message || 'Google Sheets could not be opened.')
+      alert(error.message || 'Google Sheets could not be synced.')
     }
   }
 
@@ -431,7 +441,14 @@ function Records() {
                     <DropdownItem onClick={() => { handleExportExcel(); setActiveMenu(null) }}>Download Excel (.xlsx)</DropdownItem>
                     <DropdownItem onClick={() => { handleExportPDF(); setActiveMenu(null) }}>Download PDF (.pdf)</DropdownItem>
                     <DropdownItem onClick={() => { handleExportCSV(); setActiveMenu(null) }}>Download CSV (.csv)</DropdownItem>
-                    <DropdownItem onClick={() => { handleOpenInGoogleSheets(); setActiveMenu(null) }}>Open in Google Sheets</DropdownItem>
+                    {form.settings?.googleSheetId && (
+                      <DropdownItem onClick={() => { window.open(`https://docs.google.com/spreadsheets/d/${form.settings.googleSheetId}`, '_blank', 'noopener,noreferrer'); setActiveMenu(null) }}>
+                        Open Google Sheet
+                      </DropdownItem>
+                    )}
+                    <DropdownItem onClick={() => { handleSyncGoogleSheet(); setActiveMenu(null) }}>
+                      {form.settings?.googleSheetId ? 'Sync to Google Sheet' : 'Connect Google Sheets'}
+                    </DropdownItem>
                     <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.7rem 0 0.5rem' }} />
                   </>
                 )}
