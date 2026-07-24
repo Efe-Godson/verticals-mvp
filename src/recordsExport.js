@@ -120,27 +120,40 @@ function buildRecordsSheetValues(form, records) {
   return [headers, ...rows]
 }
 
+// Sends the user through Google's consent screen via Supabase, scoped to
+// just Sheets/Drive. This navigates the browser away, so nothing after the
+// call site runs; once they're back, the session carries a fresh
+// provider_token with the right scopes and the same button completes the export.
+async function requestGoogleSheetsAccess() {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: window.location.href,
+      scopes: GOOGLE_SHEETS_SCOPES,
+      queryParams: { access_type: 'offline', prompt: 'consent' }
+    }
+  })
+  if (error) throw new Error(error.message)
+}
+
+// A 403 here means the request reached Google fine, but the current
+// provider_token doesn't carry the Sheets/Drive scopes — e.g. the user's
+// session predates ever granting them. A missing provider_token is the same
+// situation. Either way, the fix is the same incremental consent redirect.
+function isScopeError(status, body) {
+  if (status === 403) return true
+  return /insufficient.*scope/i.test(body?.error?.message || '')
+}
+
 // Requests Sheets/Drive access incrementally, via a fresh Supabase Google
-// OAuth grant, the first time there's no usable provider_token — not at
-// login. Once granted, subsequent exports reuse the same session's token.
+// OAuth grant, the first time there's no provider_token with the right
+// scopes — not at login. Once granted, subsequent exports reuse the same
+// session's token.
 export async function openRecordsInGoogleSheets(form, records) {
   const { data: { session } } = await supabase.auth.getSession()
 
   if (!session?.provider_token) {
-    // No Google session yet, or the provider token has expired — send the
-    // user through Google's consent screen via Supabase, scoped to just
-    // Sheets/Drive. This navigates the browser away, so nothing after this
-    // runs; once they're back, the session carries a fresh provider_token
-    // and this same button will complete the export.
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: window.location.href,
-        scopes: GOOGLE_SHEETS_SCOPES,
-        queryParams: { access_type: 'offline', prompt: 'consent' }
-      }
-    })
-    if (error) throw new Error(error.message)
+    await requestGoogleSheetsAccess()
     return
   }
 
@@ -159,6 +172,10 @@ export async function openRecordsInGoogleSheets(form, records) {
 
   const createdSheet = await createRes.json()
   if (!createRes.ok) {
+    if (isScopeError(createRes.status, createdSheet)) {
+      await requestGoogleSheetsAccess()
+      return
+    }
     if (createRes.status === 401) {
       throw new Error('Your Google Sheets connection has expired. Please try again to reconnect.')
     }
@@ -177,6 +194,10 @@ export async function openRecordsInGoogleSheets(form, records) {
 
   if (!updateRes.ok) {
     const updateBody = await updateRes.json()
+    if (isScopeError(updateRes.status, updateBody)) {
+      await requestGoogleSheetsAccess()
+      return
+    }
     throw new Error(updateBody.error?.message || 'Could not populate the Google Sheet.')
   }
 
