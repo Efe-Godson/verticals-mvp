@@ -12,15 +12,13 @@ export function AuthProvider({ children }) {
 
     async function initializeAuth() {
       try {
-        const [sessionResult, callbackResult] = await Promise.all([
-          supabase.auth.getSession(),
-          supabase.auth.getSessionFromUrl({ storeSession: true })
-        ])
+        // supabase-js v2 auto-detects auth tokens/codes in the URL (detectSessionInUrl
+        // defaults to true) during client init, so a plain getSession() is enough here.
+        const { data } = await supabase.auth.getSession()
 
         if (!mounted) return
 
-        const activeSession = callbackResult?.data?.session ?? sessionResult?.data?.session ?? null
-        setSession(activeSession)
+        setSession(data?.session ?? null)
       } catch (error) {
         console.error('Auth initialization failed', error)
         if (mounted) {

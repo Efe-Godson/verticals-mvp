@@ -1,6 +1,14 @@
 import * as XLSX from 'xlsx'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import { supabase } from './supabaseClient'
+
+// Sheets/Drive access is requested incrementally via Supabase's Google OAuth
+// session — not at login (see Login.jsx, which only requests openid/email/
+// profile). The first time this scope hasn't been granted yet, we trigger a
+// fresh signInWithOAuth requesting it; once granted, session.provider_token
+// carries a usable Google access token.
+const GOOGLE_SHEETS_SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file'
 
 // Turns any field's stored value into a plain, human-readable string —
 // shared by both the Excel export and the printable table below.
@@ -100,33 +108,6 @@ export function exportRecordsToCSV(form, records) {
   URL.revokeObjectURL(url)
 }
 
-function getGoogleClientId() {
-  return import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
-}
-
-function loadGoogleIdentityScript() {
-  if (typeof window === 'undefined') return Promise.reject(new Error('Google auth is only available in the browser.'))
-  if (window.google?.accounts?.oauth2) return Promise.resolve()
-
-  if (document.querySelector('script[src="https://accounts.google.com/gsi/client"]')) {
-    return new Promise((resolve, reject) => {
-      const existing = document.querySelector('script[src="https://accounts.google.com/gsi/client"]')
-      existing.onload = () => resolve()
-      existing.onerror = () => reject(new Error('Unable to load Google Identity Services.'))
-    })
-  }
-
-  return new Promise((resolve, reject) => {
-    const script = document.createElement('script')
-    script.src = 'https://accounts.google.com/gsi/client'
-    script.async = true
-    script.defer = true
-    script.onload = () => resolve()
-    script.onerror = () => reject(new Error('Unable to load Google Identity Services.'))
-    document.head.appendChild(script)
-  })
-}
-
 function buildRecordsSheetValues(form, records) {
   const headers = form.fields.map(field => field.label).concat(['Submitted'])
   const rows = records.map(sub => {
@@ -139,70 +120,68 @@ function buildRecordsSheetValues(form, records) {
   return [headers, ...rows]
 }
 
+// Requests Sheets/Drive access incrementally, via a fresh Supabase Google
+// OAuth grant, the first time there's no usable provider_token — not at
+// login. Once granted, subsequent exports reuse the same session's token.
 export async function openRecordsInGoogleSheets(form, records) {
-  const clientId = getGoogleClientId()
-  if (!clientId) {
-    alert('Google Sheets integration needs a Google OAuth client ID. Add VITE_GOOGLE_CLIENT_ID to your environment and restart the app.')
+  const { data: { session } } = await supabase.auth.getSession()
+
+  if (!session?.provider_token) {
+    // No Google session yet, or the provider token has expired — send the
+    // user through Google's consent screen via Supabase, scoped to just
+    // Sheets/Drive. This navigates the browser away, so nothing after this
+    // runs; once they're back, the session carries a fresh provider_token
+    // and this same button will complete the export.
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.href,
+        scopes: GOOGLE_SHEETS_SCOPES,
+        queryParams: { access_type: 'offline', prompt: 'consent' }
+      }
+    })
+    if (error) throw new Error(error.message)
     return
   }
 
-  await loadGoogleIdentityScript()
-
-  return new Promise((resolve, reject) => {
-    const tokenClient = window.google.accounts.oauth2.initTokenClient({
-      client_id: clientId,
-      scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file',
-      callback: async (response) => {
-        if (response.error) {
-          reject(new Error(response.error))
-          return
-        }
-
-        try {
-          const values = buildRecordsSheetValues(form, records)
-          const createRes = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${response.access_token}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              properties: { title: `${form.name} records` },
-              sheets: [{ properties: { title: 'Records' } }]
-            })
-          })
-
-          const createdSheet = await createRes.json()
-          if (!createRes.ok) {
-            throw new Error(createdSheet.error?.message || 'Could not create a Google Sheet.')
-          }
-
-          const spreadsheetId = createdSheet.spreadsheetId
-          const updateRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Sheet1!A1:append?valueInputOption=RAW`, {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${response.access_token}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ values })
-          })
-
-          if (!updateRes.ok) {
-            const updateBody = await updateRes.json()
-            throw new Error(updateBody.error?.message || 'Could not populate the Google Sheet.')
-          }
-
-          window.open(`https://docs.google.com/spreadsheets/d/${spreadsheetId}`, '_blank', 'noopener,noreferrer')
-          alert('Your records were sent to a new Google Sheet.')
-          resolve(createdSheet)
-        } catch (error) {
-          reject(error)
-        }
-      }
+  const values = buildRecordsSheetValues(form, records)
+  const createRes = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${session.provider_token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      properties: { title: `${form.name} records` },
+      sheets: [{ properties: { title: 'Records' } }]
     })
-
-    tokenClient.requestAccessToken()
   })
+
+  const createdSheet = await createRes.json()
+  if (!createRes.ok) {
+    if (createRes.status === 401) {
+      throw new Error('Your Google Sheets connection has expired. Please try again to reconnect.')
+    }
+    throw new Error(createdSheet.error?.message || 'Could not create a Google Sheet.')
+  }
+
+  const spreadsheetId = createdSheet.spreadsheetId
+  const updateRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Sheet1!A1:append?valueInputOption=RAW`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${session.provider_token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ values })
+  })
+
+  if (!updateRes.ok) {
+    const updateBody = await updateRes.json()
+    throw new Error(updateBody.error?.message || 'Could not populate the Google Sheet.')
+  }
+
+  window.open(`https://docs.google.com/spreadsheets/d/${spreadsheetId}`, '_blank', 'noopener,noreferrer')
+  return createdSheet
 }
 
 export function exportRecordsToPDF(form, records, filterSummary) {

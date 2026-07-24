@@ -35,7 +35,7 @@ function formatTimestamp(value) {
   }).format(new Date(value))
 }
 
-function AIInsightCards({ formId, dateRangeLabel, submissionIds }) {
+function AIInsightCards({ formId, dateRangeLabel, submissionIds, hideExecutiveSummary = false }) {
   const [analysis, setAnalysis] = useState(null)
   const [generatedAt, setGeneratedAt] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -119,24 +119,26 @@ function AIInsightCards({ formId, dateRangeLabel, submissionIds }) {
 
       {hasAnalysis && (
         <>
-          <div className="card" style={{ padding: '1.1rem 1.2rem', marginBottom: '1rem', background: 'linear-gradient(135deg, #f8faff 0%, #f3f7ff 100%)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap' }}>
-              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                Executive summary
+          {!hideExecutiveSummary && (
+            <div className="card" style={{ padding: '1.1rem 1.2rem', marginBottom: '1rem', background: 'linear-gradient(135deg, #f8faff 0%, #f3f7ff 100%)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap' }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                  Executive summary
+                </div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--color-muted)' }}>
+                  {submissionIds.length} response{submissionIds.length === 1 ? '' : 's'} · {dateRangeLabel || 'All time'}
+                </div>
               </div>
-              <div style={{ fontSize: '0.78rem', color: 'var(--color-muted)' }}>
-                {submissionIds.length} response{submissionIds.length === 1 ? '' : 's'} · {dateRangeLabel || 'All time'}
+              <div style={{ fontSize: '0.95rem', fontWeight: 700, marginTop: '0.45rem', lineHeight: 1.5 }}>
+                {analysis.executiveSummary || 'This view shows a few clear opportunities to improve performance.'}
               </div>
+              {generatedAt && (
+                <div style={{ fontSize: '0.76rem', color: 'var(--color-muted)', marginTop: '0.55rem' }}>
+                  {cached ? 'Cached result' : 'Fresh analysis'} · {formatTimestamp(generatedAt)}
+                </div>
+              )}
             </div>
-            <div style={{ fontSize: '0.95rem', fontWeight: 700, marginTop: '0.45rem', lineHeight: 1.5 }}>
-              {analysis.executiveSummary || 'This view shows a few clear opportunities to improve performance.'}
-            </div>
-            {generatedAt && (
-              <div style={{ fontSize: '0.76rem', color: 'var(--color-muted)', marginTop: '0.55rem' }}>
-                {cached ? 'Cached result' : 'Fresh analysis'} · {formatTimestamp(generatedAt)}
-              </div>
-            )}
-          </div>
+          )}
 
           {analysis.recommendations?.length > 0 && (
             <div style={{ marginBottom: '1rem' }}>

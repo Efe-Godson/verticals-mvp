@@ -1,14 +1,35 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from './supabaseClient'
- 
+
 function Login() {
   const [mode, setMode] = useState('login') // 'login' | 'forgot'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
- 
+  const [googleLoading, setGoogleLoading] = useState(false)
+
+  async function handleGoogleLogin() {
+    setGoogleLoading(true)
+    setMessage('')
+    // Identity only — deliberately not requesting Sheets/Drive scopes here.
+    // Those are requested separately, incrementally, only when the user
+    // actually tries to use the Google Sheets export (see recordsExport.js).
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin,
+        scopes: 'openid email profile'
+      }
+    })
+    if (error) {
+      setMessage(error.message)
+      setGoogleLoading(false)
+    }
+    // On success the browser navigates to Google, so nothing further runs here.
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
     setLoading(true)
@@ -64,7 +85,26 @@ function Login() {
             'Send reset link'}
         </button>
       </form>
- 
+
+      {mode === 'login' && (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', margin: '1rem 0', color: 'var(--color-muted)', fontSize: '0.8rem' }}>
+            <div style={{ flex: 1, height: '1px', background: 'var(--color-border)' }} />
+            or
+            <div style={{ flex: 1, height: '1px', background: 'var(--color-border)' }} />
+          </div>
+          <button
+            type="button"
+            className="secondary"
+            onClick={handleGoogleLogin}
+            disabled={googleLoading}
+            style={{ width: '100%' }}
+          >
+            {googleLoading ? 'Redirecting to Google...' : 'Continue with Google'}
+          </button>
+        </>
+      )}
+
       {message && <p style={{ marginTop: '1rem', color: '#666' }}>{message}</p>}
  
       <div style={{ marginTop: '1.5rem', fontSize: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>

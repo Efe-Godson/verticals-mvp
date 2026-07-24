@@ -151,6 +151,7 @@ function HorizontalBarChart({
                                 color: "#000",
                                 marginBottom: ".4rem",
                                 whiteSpace: "nowrap",
+                                fontVariantNumeric: "tabular-nums",
                             }}
                         >
                             {valueText(d)}
@@ -165,8 +166,7 @@ function HorizontalBarChart({
                                         (isMobile ? 120 : 150),
                                     4
                                 )}px`,
-                                background:
-                                    "var(--color-primary, #0070f3)",
+                                background: "var(--chart-series-1)",
                                 borderRadius: "5px 5px 0 0",
                             }}
                         />
@@ -257,8 +257,7 @@ function HorizontalBarChart({
                                         2
                                     )}%`,
                                     height: "100%",
-                                    background:
-                                        "var(--color-primary, #0070f3)",
+                                    background: "var(--chart-series-1)",
                                     borderRadius: "6px",
                                 }}
                             />
@@ -275,6 +274,7 @@ function HorizontalBarChart({
                                 color: "#000",
                                 textAlign: "right",
                                 whiteSpace: "nowrap",
+                                fontVariantNumeric: "tabular-nums",
                             }}
                         >
                             {valueText(d)}

@@ -9,7 +9,7 @@ import { buildStats, fetchSubmissions, hashObject, jsonResponse, corsHeaders } f
 
 // Check ai.google.dev for the current recommended free-tier Flash model —
 // model names get superseded, this is just today's sensible default.
-const GEMINI_MODEL = 'gemini-3.5-flash'
+const GEMINI_MODEL = 'gemini-2.5-flash'
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
 
 const RESPONSE_SCHEMA = {
