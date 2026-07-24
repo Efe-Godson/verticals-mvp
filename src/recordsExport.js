@@ -166,7 +166,7 @@ export async function openRecordsInGoogleSheets(form, records) {
   }
 
   const spreadsheetId = createdSheet.spreadsheetId
-  const updateRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Sheet1!A1:append?valueInputOption=RAW`, {
+  const updateRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Records!A1:append?valueInputOption=RAW`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${session.provider_token}`,
