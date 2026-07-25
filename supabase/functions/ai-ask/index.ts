@@ -3,7 +3,7 @@
 // Uses the same GEMINI_API_KEY secret as ai-analyst.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { buildStats, fetchSubmissions, jsonResponse, corsHeaders } from '../_shared/stats.ts'
+import { buildStats, fetchSubmissions, jsonResponse, corsHeaders, requireFormOwner } from '../_shared/stats.ts'
 
 const GEMINI_MODEL = 'gemini-2.5-flash'
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
@@ -20,9 +20,9 @@ Deno.serve(async req => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
-    const { data: form, error: formError } = await supabase
-      .from('forms').select('*').eq('id', form_id).single()
-    if (formError || !form) throw formError || new Error('Form not found')
+    const owner = await requireFormOwner(req, supabase, form_id)
+    if (owner.error) return jsonResponse({ error: owner.error }, owner.status)
+    const { form } = owner
 
     const submissions = await fetchSubmissions(supabase, form_id, submission_ids)
     const stats = buildStats(form, submissions)
@@ -31,7 +31,7 @@ Deno.serve(async req => {
       ? 'Use precise technical and analytical language, explaining abbreviations on first use.'
       : 'Use everyday plain English, avoiding technical jargon.'
 
-    const prompt = `You are a business analyst. ${languageInstruction} Using only the aggregated data below for "${form.name}", answer the user's question directly and concisely (2-4 sentences). If the data doesn't contain enough information to answer, say so plainly rather than guessing.
+    const prompt = `You are a business analyst. ${languageInstruction} Using only the aggregated data below for "${form.name}", answer the user's question in 1-3 sentences. Start with the direct answer — no preamble, no restating the question, no hedging unless the data genuinely doesn't support an answer, in which case say so plainly in one sentence.
 
 Data:
 ${JSON.stringify(stats, null, 2)}

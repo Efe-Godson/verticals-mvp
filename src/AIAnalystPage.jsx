@@ -1,10 +1,11 @@
 // Place at: src/AIAnalystPage.jsx
 // Route suggestion: <Route path="/forms/:id/ai-analyst" element={<AIAnalystPage />} />
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { fetchAIAnalysis, askAIQuestion } from './lib/aiClient'
 import { DATE_RANGE_OPTIONS, getDateRangeBounds, getDateRangeLabel } from './report/helpers/dateRange'
+import StatTile from './report/components/StatTile'
 
 const EXAMPLE_QUESTIONS = [
   'Which product should I restock first?',
@@ -40,6 +41,13 @@ function formatLastUpdated(timestamp) {
   }).format(new Date(timestamp))
 }
 
+// Sorts high/medium/low first, undefined/unknown labels last, so the most
+// urgent items in each section surface at the top instead of model order.
+const SEVERITY_RANK = { high: 0, medium: 1, low: 2 }
+function bySeverity(field) {
+  return (a, b) => (SEVERITY_RANK[a[field]] ?? 3) - (SEVERITY_RANK[b[field]] ?? 3)
+}
+
 function Badge({ label }) {
   if (!label) return null
   const color = BADGE_TONE[label] || 'var(--color-muted)'
@@ -51,6 +59,36 @@ function Badge({ label }) {
     }}>
       {label}
     </span>
+  )
+}
+
+// Wraps StatTile to add a "N high priority" flag without abusing its
+// trend prop, which is hardcoded to "vs previous period" copy.
+function FlaggedStatTile({ label, value, flagCount, flagLabel }) {
+  return (
+    <div style={{ position: 'relative' }}>
+      <StatTile label={label} value={value} />
+      {flagCount > 0 && (
+        <div style={{
+          fontSize: '0.78rem', fontWeight: 600, marginTop: '0.35rem',
+          color: 'var(--status-critical)'
+        }}>
+          {flagCount} {flagLabel}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// A left accent bar keyed to severity color, so scanning down a section
+// reads urgency at a glance without having to read every badge.
+function InsightRow({ title, detail, tone, footer }) {
+  return (
+    <div className="card" style={{ padding: '1.2rem', borderLeft: `3px solid ${tone}` }}>
+      {title}
+      <div style={{ color: 'var(--color-muted)', fontSize: '0.9rem', marginTop: '0.3rem', lineHeight: 1.55 }}>{detail}</div>
+      {footer}
+    </div>
   )
 }
 
@@ -96,6 +134,8 @@ function AIAnalystPage() {
   const [qaHistory, setQaHistory] = useState([])
   const [asking, setAsking] = useState(false)
   const [askError, setAskError] = useState('')
+  const [reportExpanded, setReportExpanded] = useState(false)
+  const chatEndRef = useRef(null)
 
   useEffect(() => {
     async function load() {
@@ -126,6 +166,10 @@ function AIAnalystPage() {
       localStorage.removeItem(`ai-analysis:${id}`)
     }
   }, [id])
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+  }, [qaHistory, asking])
 
   if (loading) return <div className="page">Loading...</div>
   if (!form) return <div className="page">Form not found.</div>
@@ -162,7 +206,7 @@ function AIAnalystPage() {
     setAskError('')
     try {
       const result = await askAIQuestion(form.id, trimmed, submissionIds, languageStyle)
-      setQaHistory(current => [{ question: trimmed, answer: result }, ...current])
+      setQaHistory(current => [...current, { question: trimmed, answer: result }])
       setQuestion('')
     } catch (err) {
       setAskError('Could not get an answer: ' + err.message)
@@ -194,6 +238,38 @@ function AIAnalystPage() {
           cursor: pointer; transition: border-color 0.15s ease, color 0.15s ease;
         }
         .ai-example-chip:hover { border-color: var(--color-primary); color: var(--color-primary); }
+        .ai-chat-window {
+          border: 1px solid var(--color-border); border-radius: var(--radius);
+          background: var(--color-surface); padding: 1rem;
+          max-height: 420px; overflow-y: auto;
+        }
+        .ai-chat-bubble {
+          padding: 0.6rem 0.9rem; border-radius: 12px; font-size: 0.9rem;
+          line-height: 1.5; max-width: 80%; white-space: pre-wrap;
+        }
+        .ai-chat-bubble-user {
+          align-self: flex-end; margin-left: auto;
+          background: var(--color-primary); color: white; border-bottom-right-radius: 4px;
+        }
+        .ai-chat-bubble-answer {
+          align-self: flex-start; margin-right: auto;
+          background: #f2f4f7; color: var(--color-text); border-bottom-left-radius: 4px;
+        }
+        .ai-chat-typing { display: flex; gap: 0.25rem; align-items: center; width: fit-content; }
+        .ai-chat-typing span {
+          width: 6px; height: 6px; border-radius: 50%; background: var(--color-muted);
+          animation: ai-chat-typing-bounce 1.2s infinite ease-in-out;
+        }
+        .ai-chat-typing span:nth-child(2) { animation-delay: 0.15s; }
+        .ai-chat-typing span:nth-child(3) { animation-delay: 0.3s; }
+        @keyframes ai-chat-typing-bounce {
+          0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+          30% { transform: translateY(-3px); opacity: 1; }
+        }
+        @media print {
+          .no-print { display: none !important; }
+          .card { box-shadow: none !important; break-inside: avoid; }
+        }
       `}</style>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.8rem' }}>
@@ -204,7 +280,7 @@ function AIAnalystPage() {
           <h1 style={{ margin: '0.2rem 0 0', fontSize: '1.6rem' }}>AI Analyst</h1>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="no-print" style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <select value={dateRange} onChange={(e) => setDateRange(e.target.value)} style={{ padding: '0.5rem' }}>
             {DATE_RANGE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
           </select>
@@ -219,15 +295,14 @@ function AIAnalystPage() {
             <option value="plain">Plain language</option>
             <option value="technical">Technical detail</option>
           </select>
+          {analysis && (
+            <button className="secondary" onClick={() => window.print()}>Export / Print</button>
+          )}
           <button className="secondary" onClick={handleGenerate} disabled={analyzing || filtered.length === 0}>
             {analyzing ? (analysis ? 'Refreshing…' : 'Analyzing…') : analysis ? 'Refresh Analysis' : 'Generate Analysis'}
           </button>
         </div>
       </div>
-
-      <p style={{ color: 'var(--color-muted)', fontSize: '0.85rem', marginTop: '0.6rem' }}>
-        {filtered.length.toLocaleString()} response{filtered.length !== 1 ? 's' : ''} in this view
-      </p>
 
       {filtered.length === 0 && (
         <p style={{ color: '#999', marginTop: '1.5rem' }}>No responses in this date range.</p>
@@ -243,88 +318,169 @@ function AIAnalystPage() {
 
       {analyzing && !analysis && <AnalysisSkeleton />}
 
-      {analysis && (
-        <>
-          {analyzing && (
-            <p style={{ color: 'var(--color-primary)', fontSize: '0.85rem', marginTop: '1rem' }}>
-              Refreshing the report — the version below stays visible until the new one is ready.
-            </p>
-          )}
+      {analysis && (() => {
+        const insights = [...(analysis.keyInsights || [])].sort(bySeverity('priority'))
+        const recommendations = [...(analysis.recommendations || [])].sort(bySeverity('impact'))
+        const anomalies = [...(analysis.anomalies || [])].sort(bySeverity('severity'))
+        const forecasts = analysis.forecasts || []
+        const highPriorityCount = insights.filter(i => i.priority === 'high').length
+        const highSeverityCount = anomalies.filter(a => a.severity === 'high').length
 
-          <SectionHeader>Executive Summary</SectionHeader>
-          <div className="card" style={{ padding: '1.5rem' }}>
-            <p style={{ margin: 0, lineHeight: 1.6 }}>{analysis.executiveSummary}</p>
-          </div>
+        return (
+          <>
+            {analyzing && (
+              <p className="no-print" style={{ color: 'var(--color-primary)', fontSize: '0.85rem', marginTop: '1rem' }}>
+                Refreshing the report — the version below stays visible until the new one is ready.
+              </p>
+            )}
 
-          {analysis.keyInsights?.length > 0 && (
-            <>
-              <SectionHeader>Key Insights</SectionHeader>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-                {analysis.keyInsights.map((item, i) => (
-                  <div key={i} className="card" style={{ padding: '1.2rem' }}>
-                    <div style={{ fontWeight: 700 }}>{item.title}<Badge label={item.priority} /></div>
-                    <div style={{ color: 'var(--color-muted)', fontSize: '0.9rem', marginTop: '0.3rem', lineHeight: 1.5 }}>{item.detail}</div>
-                  </div>
-                ))}
+            <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap', marginTop: '1.2rem' }}>
+              <StatTile label="Responses" value={filtered.length.toLocaleString()} />
+              <FlaggedStatTile
+                label="Key Insights" value={insights.length}
+                flagCount={highPriorityCount} flagLabel="high priority"
+              />
+              <StatTile label="Recommendations" value={recommendations.length} />
+              <FlaggedStatTile
+                label="Anomalies" value={anomalies.length}
+                flagCount={highSeverityCount} flagLabel="high severity"
+              />
+            </div>
+
+            <SectionHeader>Executive Summary</SectionHeader>
+            <div className="card" style={{
+              padding: '1.6rem', background: 'linear-gradient(135deg, #f8faff 0%, #f3f7ff 100%)',
+              borderLeft: '4px solid var(--color-primary)'
+            }}>
+              <p style={{ margin: 0, lineHeight: 1.65, fontSize: '1.02rem' }}>{analysis.executiveSummary}</p>
+            </div>
+
+            <button
+              type="button"
+              className="secondary no-print"
+              onClick={() => setReportExpanded(v => !v)}
+              style={{ marginTop: '1rem', fontSize: '0.85rem' }}
+            >
+              {reportExpanded ? 'Hide full report ▲' : `Show full report (${insights.length + recommendations.length + anomalies.length + forecasts.length} more items) ▼`}
+            </button>
+
+            {(reportExpanded) && (
+              <div className="ai-report-detail">
+                {insights.length > 0 && (
+                  <>
+                    <SectionHeader>Key Insights</SectionHeader>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                      {insights.map((item, i) => (
+                        <InsightRow
+                          key={i}
+                          tone={BADGE_TONE[item.priority] || 'var(--color-border)'}
+                          title={<div style={{ fontWeight: 700 }}>{item.title}<Badge label={item.priority} /></div>}
+                          detail={item.detail}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {recommendations.length > 0 && (
+                  <>
+                    <SectionHeader>Recommendations</SectionHeader>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                      {recommendations.map((item, i) => (
+                        <InsightRow
+                          key={i}
+                          tone={BADGE_TONE[item.impact] || 'var(--color-border)'}
+                          title={<div style={{ fontWeight: 700 }}>{item.title}<Badge label={item.impact} /></div>}
+                          detail={item.detail}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {anomalies.length > 0 && (
+                  <>
+                    <SectionHeader>Anomalies</SectionHeader>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                      {anomalies.map((item, i) => (
+                        <InsightRow
+                          key={i}
+                          tone={BADGE_TONE[item.severity] || 'var(--color-border)'}
+                          title={<div style={{ fontWeight: 700 }}>{item.title}<Badge label={item.severity} /></div>}
+                          detail={item.detail}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {forecasts.length > 0 && (
+                  <>
+                    <SectionHeader>Forecasts</SectionHeader>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.8rem' }}>
+                      {forecasts.map((item, i) => (
+                        <InsightRow
+                          key={i}
+                          tone="#10b981"
+                          title={<div style={{ fontWeight: 700 }}>{item.metric}<Badge label={item.confidence} /></div>}
+                          detail={item.prediction}
+                          footer={<div style={{ color: 'var(--color-muted)', fontSize: '0.78rem', marginTop: '0.4rem' }}>Horizon: {item.horizon}</div>}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
-            </>
-          )}
+            )}
 
-          {analysis.recommendations?.length > 0 && (
-            <>
-              <SectionHeader>Recommendations</SectionHeader>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-                {analysis.recommendations.map((item, i) => (
-                  <div key={i} className="card" style={{ padding: '1.2rem' }}>
-                    <div style={{ fontWeight: 700 }}>{item.title}<Badge label={item.impact} /></div>
-                    <div style={{ color: 'var(--color-muted)', fontSize: '0.9rem', marginTop: '0.3rem', lineHeight: 1.5 }}>{item.detail}</div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-
-          {analysis.anomalies?.length > 0 && (
-            <>
-              <SectionHeader>Anomalies</SectionHeader>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-                {analysis.anomalies.map((item, i) => (
-                  <div key={i} className="card" style={{ padding: '1.2rem' }}>
-                    <div style={{ fontWeight: 700 }}>{item.title}<Badge label={item.severity} /></div>
-                    <div style={{ color: 'var(--color-muted)', fontSize: '0.9rem', marginTop: '0.3rem', lineHeight: 1.5 }}>{item.detail}</div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-
-          {analysis.forecasts?.length > 0 && (
-            <>
-              <SectionHeader>Forecasts</SectionHeader>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-                {analysis.forecasts.map((item, i) => (
-                  <div key={i} className="card" style={{ padding: '1.2rem' }}>
-                    <div style={{ fontWeight: 700 }}>{item.metric}<Badge label={item.confidence} /></div>
-                    <div style={{ color: 'var(--color-muted)', fontSize: '0.9rem', marginTop: '0.3rem', lineHeight: 1.5 }}>{item.prediction}</div>
-                    <div style={{ color: 'var(--color-muted)', fontSize: '0.78rem', marginTop: '0.4rem' }}>Horizon: {item.horizon}</div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-
-          {analysisMeta && (
-            <p style={{ color: 'var(--color-muted)', fontSize: '0.78rem', marginTop: '1.8rem', marginBottom: 0 }}>
-              Last updated: {formatLastUpdated(analysisMeta.generatedAt)} · {analysisMeta.dateRangeLabel} · {analysisMeta.languageStyle === 'technical' ? 'Technical detail' : 'Plain language'}
-            </p>
-          )}
-        </>
-      )}
+            {analysisMeta && (
+              <p style={{ color: 'var(--color-muted)', fontSize: '0.78rem', marginTop: '1.8rem', marginBottom: 0 }}>
+                Last updated: {formatLastUpdated(analysisMeta.generatedAt)} · {analysisMeta.dateRangeLabel} · {analysisMeta.languageStyle === 'technical' ? 'Technical detail' : 'Plain language'}
+              </p>
+            )}
+          </>
+        )
+      })()}
 
       {filtered.length > 0 && (
-        <>
+        <div className="no-print">
           <SectionHeader>Ask a Question</SectionHeader>
-          <form onSubmit={handleAsk} style={{ display: 'flex', gap: '0.6rem' }}>
+
+          <div className="ai-chat-window">
+            {qaHistory.length === 0 && !asking && (
+              <div style={{ padding: '0.2rem 0.2rem 0.6rem' }}>
+                <p style={{ color: 'var(--color-muted)', fontSize: '0.88rem', margin: '0 0 0.7rem' }}>
+                  Ask anything about this data — answers are short and to the point.
+                </p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  {EXAMPLE_QUESTIONS.map(q => (
+                    <button key={q} type="button" className="ai-example-chip" onClick={() => submitQuestion(q)} disabled={asking}>
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {qaHistory.map((qa, i) => (
+              <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '0.9rem' }}>
+                <div className="ai-chat-bubble ai-chat-bubble-user">{qa.question}</div>
+                <div className="ai-chat-bubble ai-chat-bubble-answer">{qa.answer}</div>
+              </div>
+            ))}
+
+            {asking && (
+              <div className="ai-chat-bubble ai-chat-bubble-answer ai-chat-typing">
+                <span /><span /><span />
+              </div>
+            )}
+
+            {askError && <p style={{ color: 'red', fontSize: '0.85rem', margin: '0.4rem 0 0' }}>{askError}</p>}
+
+            <div ref={chatEndRef} />
+          </div>
+
+          <form onSubmit={handleAsk} style={{ display: 'flex', gap: '0.6rem', marginTop: '0.8rem' }}>
             <input
               type="text"
               value={question}
@@ -336,30 +492,7 @@ function AIAnalystPage() {
               {asking ? 'Thinking…' : 'Ask'}
             </button>
           </form>
-
-          {qaHistory.length === 0 && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.8rem' }}>
-              {EXAMPLE_QUESTIONS.map(q => (
-                <button key={q} type="button" className="ai-example-chip" onClick={() => submitQuestion(q)} disabled={asking}>
-                  {q}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {askError && <p style={{ color: 'red', marginTop: '0.6rem' }}>{askError}</p>}
-
-          {qaHistory.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', marginTop: '0.8rem' }}>
-              {qaHistory.map((qa, i) => (
-                <div key={i} className="card" style={{ padding: '1.2rem' }}>
-                  <div style={{ fontWeight: 700, fontSize: '0.92rem', marginBottom: '0.4rem' }}>{qa.question}</div>
-                  <p style={{ margin: 0, lineHeight: 1.6, color: 'var(--color-muted)' }}>{qa.answer}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </>
+        </div>
       )}
     </div>
   )

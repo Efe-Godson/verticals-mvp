@@ -19,6 +19,29 @@ export const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
+// Both AI functions run with the service-role key (needed to read submissions
+// regardless of RLS), which means they must do their own ownership check
+// instead of relying on RLS to scope the query. This validates the caller's
+// JWT (sent by supabase-js as the Authorization header) and confirms the
+// resulting user actually owns the form they're asking about — without this,
+// anyone who knows a form_id (they're used in public URLs) could pull another
+// account's submission data or run up their Gemini bill.
+export async function requireFormOwner(req: Request, supabase: any, formId: string) {
+  const authHeader = req.headers.get('Authorization') || ''
+  const jwt = authHeader.replace(/^Bearer\s+/i, '')
+  if (!jwt) return { error: 'Missing Authorization header', status: 401 }
+
+  const { data: userData, error: userError } = await supabase.auth.getUser(jwt)
+  if (userError || !userData?.user) return { error: 'Invalid or expired session', status: 401 }
+
+  const { data: form, error: formError } = await supabase
+    .from('forms').select('*').eq('id', formId).single()
+  if (formError || !form) return { error: 'Form not found', status: 404 }
+  if (form.user_id !== userData.user.id) return { error: 'Form not found', status: 404 }
+
+  return { form }
+}
+
 // PostgREST represents `.in()` filters in the URL. A report can contain many
 // hundreds of selected submissions, which makes one request large enough for
 // the network/proxy to reject it. Keep each URL small and combine the results.

@@ -1,7 +1,7 @@
 
 [functions.ai-analyst]
 enabled = true
-verify_jwt = false
+verify_jwt = true
 import_map = "./functions/ai-analyst/deno.json"
 # Uncomment to specify a custom file path to the entrypoint.
 # Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
@@ -12,7 +12,7 @@ entrypoint = "./functions/ai-analyst/index.ts"
 
 [functions.ai-ask]
 enabled = true
-verify_jwt = false
+verify_jwt = true
 import_map = "./functions/ai-ask/deno.json"
 # Uncomment to specify a custom file path to the entrypoint.
 # Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx

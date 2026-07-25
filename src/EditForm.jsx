@@ -5,6 +5,7 @@ import { supabase } from './supabaseClient'
 import FieldValidationControls from './FieldValidationControls'
 import FieldTypeConfig from './FieldTypeConfig'
 import ConfirmDialog from './ConfirmDialog'
+import FormPreviewModal from './FormPreview'
 
 const FIELD_TYPES = [
   { value: 'text', label: 'Short Text' },
@@ -67,6 +68,7 @@ function EditForm() {
   const [pendingConfirm, setPendingConfirm] = useState(null) // { type: 'field', index } | { type: 'product', fieldIndex, productIndex }
   const [openFieldMenu, setOpenFieldMenu] = useState(null) // field.id of the open "more options" menu, or null
   const fieldMenuRef = useRef(null)
+  const [showPreview, setShowPreview] = useState(false)
   const [productOverrides, setProductOverrides] = useState({}) // `${fieldIndex}-${productId}` -> true/false, explicit expand/collapse
 
   useEffect(() => {
@@ -592,6 +594,27 @@ function EditForm() {
           danger
           onConfirm={handleConfirmRemove}
           onCancel={() => setPendingConfirm(null)}
+        />
+      )}
+
+      <button
+        type="button"
+        onClick={() => setShowPreview(true)}
+        title="Preview form"
+        style={{
+          position: 'fixed', bottom: '2rem', right: '2rem', zIndex: 150,
+          borderRadius: '999px', padding: '0.8rem 1.3rem', fontSize: '0.9rem',
+          boxShadow: '0 6px 18px rgba(0,0,0,0.22)'
+        }}
+      >
+        Preview
+      </button>
+
+      {showPreview && (
+        <FormPreviewModal
+          formName={formName}
+          fields={fields}
+          onClose={() => setShowPreview(false)}
         />
       )}
     </div>
