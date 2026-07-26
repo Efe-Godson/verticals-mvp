@@ -9,11 +9,15 @@ import { FilterPopover } from './records/FilterPopover'
 import { RecordDetail } from './records/RecordDetail'
 import { RecycleBinDialog } from './records/RecycleBinDialog'
 import { SavePresetDialog } from './records/SavePresetDialog'
+import ConfirmDialog from './ConfirmDialog'
+import { useToast } from './Toast'
 
 const PAGE_SIZE = 10
 
 function Records() {
   const { id } = useParams()
+  const { showToast } = useToast()
+  const [pendingConfirm, setPendingConfirm] = useState(null) // { type: 'deleteSelected' } | { type: 'permanentlyDelete', subId } | { type: 'emptyBin' }
   const [form, setForm] = useState(null)
   const [submissions, setSubmissions] = useState([])
   const [loading, setLoading] = useState(true)
@@ -158,7 +162,7 @@ function Records() {
       }
     } catch (error) {
       console.error(error)
-      alert(error.message || 'Google Sheets could not be synced.')
+      showToast(error.message || 'Google Sheets could not be synced.', 'error')
     }
   }
 
@@ -207,13 +211,12 @@ function Records() {
     setCurrentPage(1)
   }
 
-  async function deleteSelected() {
+  function deleteSelected() {
     if (selectedIds.length === 0) return
-    const confirmed = window.confirm(
-      `Move ${selectedIds.length} selected record${selectedIds.length !== 1 ? 's' : ''} to the Recycle Bin?`
-    )
-    if (!confirmed) return
+    setPendingConfirm({ type: 'deleteSelected' })
+  }
 
+  async function performDeleteSelected() {
     const { data, error } = await supabase
       .from('submissions')
       .update({ deleted_at: new Date().toISOString() })
@@ -221,17 +224,19 @@ function Records() {
       .select('id')
 
     if (error) {
-      alert('Could not delete records: ' + error.message)
+      showToast('Could not delete records: ' + error.message, 'error')
       return
     }
 
     const deletedIds = (data || []).map(d => d.id)
 
     if (deletedIds.length < selectedIds.length) {
-      alert(
-        `Only ${deletedIds.length} of ${selectedIds.length} record(s) were actually moved to the bin. ` +
-        `This usually means a database permission is missing — check the update policy on the submissions table.`
+      showToast(
+        `Only ${deletedIds.length} of ${selectedIds.length} record(s) were actually moved to the bin — a database permission may be missing.`,
+        'error'
       )
+    } else {
+      showToast(`Moved ${deletedIds.length} record${deletedIds.length !== 1 ? 's' : ''} to the Recycle Bin.`, 'success')
     }
 
     setSubmissions(submissions.filter(s => !deletedIds.includes(s.id)))
@@ -260,42 +265,54 @@ function Records() {
       .single()
 
     if (error) {
-      alert('Could not restore record: ' + error.message)
+      showToast('Could not restore record: ' + error.message, 'error')
       return
     }
     setTrashedSubmissions(trashedSubmissions.filter(s => s.id !== subId))
     setSubmissions([data, ...submissions].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)))
     setBinCount(Math.max(0, binCount - 1))
+    showToast('Record restored.', 'success')
   }
 
-  async function permanentlyDeleteRecord(subId) {
-    const confirmed = window.confirm('Permanently delete this record? This cannot be undone.')
-    if (!confirmed) return
+  function permanentlyDeleteRecord(subId) {
+    setPendingConfirm({ type: 'permanentlyDelete', subId })
+  }
 
+  async function performPermanentlyDelete(subId) {
     const { error } = await supabase.from('submissions').delete().eq('id', subId)
     if (error) {
-      alert('Could not permanently delete: ' + error.message)
+      showToast('Could not permanently delete: ' + error.message, 'error')
       return
     }
     setTrashedSubmissions(trashedSubmissions.filter(s => s.id !== subId))
     setBinCount(Math.max(0, binCount - 1))
+    showToast('Record permanently deleted.', 'success')
   }
 
-  async function emptyBin() {
+  function emptyBin() {
     if (trashedSubmissions.length === 0) return
-    const confirmed = window.confirm(
-      `Permanently delete all ${trashedSubmissions.length} record(s) in the bin? This cannot be undone.`
-    )
-    if (!confirmed) return
+    setPendingConfirm({ type: 'emptyBin' })
+  }
 
+  async function performEmptyBin() {
     const ids = trashedSubmissions.map(s => s.id)
     const { error } = await supabase.from('submissions').delete().in('id', ids)
     if (error) {
-      alert('Could not empty the bin: ' + error.message)
+      showToast('Could not empty the bin: ' + error.message, 'error')
       return
     }
     setTrashedSubmissions([])
     setBinCount(0)
+    showToast('Recycle Bin emptied.', 'success')
+  }
+
+  function handleConfirm() {
+    const confirm = pendingConfirm
+    setPendingConfirm(null)
+    if (!confirm) return
+    if (confirm.type === 'deleteSelected') performDeleteSelected()
+    else if (confirm.type === 'permanentlyDelete') performPermanentlyDelete(confirm.subId)
+    else if (confirm.type === 'emptyBin') performEmptyBin()
   }
 
   async function savePreset(name) {
@@ -732,7 +749,10 @@ function Records() {
                         <button
                           className="secondary"
                           style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem' }}
-                          onClick={() => navigator.clipboard.writeText(`${window.location.origin}/form/${form.id}/response/${sub.edit_token}`)}
+                          onClick={() => {
+                            navigator.clipboard.writeText(`${window.location.origin}/form/${form.id}/response/${sub.edit_token}`)
+                            showToast('Edit link copied!', 'success')
+                          }}
                         >
                           Copy Link
                         </button>
@@ -785,6 +805,27 @@ function Records() {
           onPermanentDelete={permanentlyDeleteRecord}
           onEmptyBin={emptyBin}
           onClose={() => setShowBin(false)}
+        />
+      )}
+
+      {pendingConfirm && (
+        <ConfirmDialog
+          title={
+            pendingConfirm.type === 'deleteSelected' ? 'Move to Recycle Bin?' :
+            pendingConfirm.type === 'emptyBin' ? 'Empty Recycle Bin?' :
+            'Permanently delete this record?'
+          }
+          message={
+            pendingConfirm.type === 'deleteSelected'
+              ? `Move ${selectedIds.length} selected record${selectedIds.length !== 1 ? 's' : ''} to the Recycle Bin?`
+              : pendingConfirm.type === 'emptyBin'
+              ? `Permanently delete all ${trashedSubmissions.length} record(s) in the bin? This cannot be undone.`
+              : 'This cannot be undone.'
+          }
+          confirmLabel={pendingConfirm.type === 'deleteSelected' ? 'Move' : 'Delete'}
+          danger={pendingConfirm.type !== 'deleteSelected'}
+          onConfirm={handleConfirm}
+          onCancel={() => setPendingConfirm(null)}
         />
       )}
     </div>

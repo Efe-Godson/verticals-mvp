@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './AuthContext'
+import { ToastProvider } from './Toast'
 import Home from './Home'
 import CreateForm from './CreateForm'
 import EditForm from './EditForm'
@@ -65,7 +66,9 @@ function AppShell() {
 function App() {
   return (
     <AuthProvider>
-      <AppShell />
+      <ToastProvider>
+        <AppShell />
+      </ToastProvider>
     </AuthProvider>
   )
 }

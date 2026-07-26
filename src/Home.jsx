@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
 import ConfirmDialog from './ConfirmDialog'
+import { useToast } from './Toast'
 
 const PAGE_SIZE = 8
 
@@ -96,6 +97,7 @@ function getContextualAction(formId, responseCounts) {
 
 function Home() {
   const { session } = useAuth()
+  const { showToast } = useToast()
   const [forms, setForms] = useState([])
   const [demoForm, setDemoForm] = useState(null)
   const [responseCounts, setResponseCounts] = useState({})
@@ -188,7 +190,7 @@ function Home() {
   function copyLink(formId) {
     const url = `${window.location.origin}/form/${formId}`
     navigator.clipboard.writeText(url)
-    alert('Form link copied!')
+    showToast('Form link copied!', 'success')
   }
 
   async function publishForm(formId) {
@@ -230,9 +232,18 @@ function Home() {
   async function confirmDelete() {
     const formId = confirmDeleteId
     setConfirmDeleteId(null)
-    const { error } = await supabase.from('forms').delete().eq('id', formId)
-    if (!error) {
+    // .delete() only reports an error for things like a network failure —
+    // if RLS silently filters the row instead (no matching policy), this
+    // resolves with no error and an empty `data`, so we have to check the
+    // returned rows ourselves to know whether anything was actually deleted.
+    const { data, error } = await supabase.from('forms').delete().eq('id', formId).select('id')
+    if (error) {
+      showToast('Could not delete: ' + error.message, 'error')
+    } else if (!data || data.length === 0) {
+      showToast('This form could not be deleted — you may not have permission to remove it.', 'error')
+    } else {
       setForms(forms.filter(f => f.id !== formId))
+      showToast('Form deleted.', 'success')
     }
   }
 
