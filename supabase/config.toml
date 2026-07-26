@@ -20,3 +20,15 @@ entrypoint = "./functions/ai-ask/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/ai-ask/*.html" ]
+
+[functions.submit-form]
+enabled = true
+verify_jwt = false
+import_map = "./functions/submit-form/deno.json"
+entrypoint = "./functions/submit-form/index.ts"
+
+[functions.manage-submission]
+enabled = true
+verify_jwt = false
+import_map = "./functions/manage-submission/deno.json"
+entrypoint = "./functions/manage-submission/index.ts"

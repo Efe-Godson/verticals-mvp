@@ -67,6 +67,7 @@ function CreateForm() {
   const undoTimeoutRef = useRef(null)
   const [pendingConfirm, setPendingConfirm] = useState(null) // { type: 'field', index } | { type: 'product', fieldIndex, productIndex }
   const [showPreview, setShowPreview] = useState(false)
+  const [collapsedCarts, setCollapsedCarts] = useState({})
 
   // Debounced autosave — fires shortly after formName or fields stop changing
   useEffect(() => {
@@ -402,65 +403,77 @@ function CreateForm() {
 
               {TYPES_WITH_PRODUCTS.includes(field.type) && (
                 <div style={{ marginTop: '0.3rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                    <label style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>Products</label>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <button type="button" className="secondary" onClick={downloadTemplate} style={{ fontSize: '0.8rem', padding: '0.3rem 0.6rem' }}>
-                        Download Template
-                      </button>
-                      <label className="secondary" style={{
-                        fontSize: '0.8rem', padding: '0.3rem 0.6rem', borderRadius: 'var(--radius)',
-                        border: '1px solid var(--color-border)', cursor: 'pointer', display: 'inline-block'
-                      }}>
-                        Upload Filled Sheet
-                        <input
-                          type="file"
-                          accept=".xlsx,.xls"
-                          onChange={(e) => handleFileUpload(index, e)}
-                          style={{ display: 'none' }}
-                        />
-                      </label>
-                    </div>
+                  <div
+                    onClick={() => setCollapsedCarts(current => ({ ...current, [field.id]: !current[field.id] }))}
+                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', cursor: 'pointer' }}
+                  >
+                    <label style={{ fontSize: '0.8rem', color: 'var(--color-muted)', display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
+                      <span style={{ display: 'inline-block', transition: 'transform 0.15s ease', transform: collapsedCarts[field.id] ? 'rotate(-90deg)' : 'rotate(0deg)' }}>▾</span>
+                      Products ({(field.products || []).length})
+                    </label>
+                    {!collapsedCarts[field.id] && (
+                      <div style={{ display: 'flex', gap: '0.5rem' }} onClick={(e) => e.stopPropagation()}>
+                        <button type="button" className="secondary" onClick={downloadTemplate} style={{ fontSize: '0.8rem', padding: '0.3rem 0.6rem' }}>
+                          Download Template
+                        </button>
+                        <label className="secondary" style={{
+                          fontSize: '0.8rem', padding: '0.3rem 0.6rem', borderRadius: 'var(--radius)',
+                          border: '1px solid var(--color-border)', cursor: 'pointer', display: 'inline-block'
+                        }}>
+                          Upload Filled Sheet
+                          <input
+                            type="file"
+                            accept=".xlsx,.xls"
+                            onChange={(e) => handleFileUpload(index, e)}
+                            style={{ display: 'none' }}
+                          />
+                        </label>
+                      </div>
+                    )}
                   </div>
 
-                  <datalist id={`categories-${field.id}`}>
-                    {getFieldCategories(index).map(cat => (
-                      <option key={cat} value={cat} />
-                    ))}
-                  </datalist>
+                  {!collapsedCarts[field.id] && (
+                    <>
+                      <datalist id={`categories-${field.id}`}>
+                        {getFieldCategories(index).map(cat => (
+                          <option key={cat} value={cat} />
+                        ))}
+                      </datalist>
 
-                  {(field.products || []).map((product, pIndex) => (
-                    <div key={product.id} style={{ display: 'flex', gap: '0.5rem', marginTop: '0.4rem' }}>
-                      <input
-                        type="text"
-                        value={product.name}
-                        onChange={(e) => updateProduct(index, pIndex, { name: e.target.value })}
-                        placeholder="Item name"
-                        style={{ flex: 2, padding: '0.4rem' }}
-                      />
-                      <input
-                        type="number"
-                        value={product.price}
-                        onChange={(e) => updateProduct(index, pIndex, { price: e.target.value })}
-                        placeholder="Price"
-                        style={{ flex: 1, padding: '0.4rem' }}
-                      />
-                      <input
-                        type="text"
-                        list={`categories-${field.id}`}
-                        value={product.category || ''}
-                        onChange={(e) => updateProduct(index, pIndex, { category: e.target.value })}
-                        placeholder="Category"
-                        style={{ flex: 1, padding: '0.4rem' }}
-                      />
-                      <button className="secondary" style={{ color: '#c0392b' }} onClick={() => setPendingConfirm({ type: 'product', fieldIndex: index, productIndex: pIndex })}>
-                        Remove
+                      {(field.products || []).map((product, pIndex) => (
+                        <div key={product.id} style={{ display: 'flex', gap: '0.5rem', marginTop: '0.4rem' }}>
+                          <input
+                            type="text"
+                            value={product.name}
+                            onChange={(e) => updateProduct(index, pIndex, { name: e.target.value })}
+                            placeholder="Item name"
+                            style={{ flex: 2, padding: '0.4rem' }}
+                          />
+                          <input
+                            type="number"
+                            value={product.price}
+                            onChange={(e) => updateProduct(index, pIndex, { price: e.target.value })}
+                            placeholder="Price"
+                            style={{ flex: 1, padding: '0.4rem' }}
+                          />
+                          <input
+                            type="text"
+                            list={`categories-${field.id}`}
+                            value={product.category || ''}
+                            onChange={(e) => updateProduct(index, pIndex, { category: e.target.value })}
+                            placeholder="Category"
+                            style={{ flex: 1, padding: '0.4rem' }}
+                          />
+                          <button className="secondary" style={{ color: '#c0392b' }} onClick={() => setPendingConfirm({ type: 'product', fieldIndex: index, productIndex: pIndex })}>
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+                      <button className="secondary" onClick={() => addProduct(index)} style={{ marginTop: '0.5rem' }}>
+                        + Add Product
                       </button>
-                    </div>
-                  ))}
-                  <button className="secondary" onClick={() => addProduct(index)} style={{ marginTop: '0.5rem' }}>
-                    + Add Product
-                  </button>
+                    </>
+                  )}
                 </div>
               )}
 

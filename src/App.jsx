@@ -31,7 +31,7 @@ function PublicOnlyRoute({ children }) {
 
 function AppShell() {
   const location = useLocation()
-  const isPublicForm = /^\/form\/[^/]+$/.test(location.pathname)
+  const isPublicForm = /^\/form\/[^/]+(\/response\/[^/]+)?$/.test(location.pathname)
   const isLogin = location.pathname === '/login'
   const isSignUp = location.pathname === '/signup'
   const isConfirmEmail = location.pathname === '/confirm-email'
@@ -51,6 +51,7 @@ function AppShell() {
         <Route path="/templates" element={<PrivateRoute><Templates /></PrivateRoute>} />
         <Route path="/create" element={<PrivateRoute><CreateForm /></PrivateRoute>} />
         <Route path="/form/:id" element={<PublicForm />} />
+        <Route path="/form/:id/response/:token" element={<PublicForm />} />
         <Route path="/form/:id/edit" element={<PrivateRoute><EditForm /></PrivateRoute>} />
         <Route path="/form/:id/records" element={<PrivateRoute><Records /></PrivateRoute>} />
         <Route path="/form/:id/report" element={<PrivateRoute><Report /></PrivateRoute>} />

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { exportRecordsToExcel, exportRecordsToCSV, exportRecordsToPDF, printRecordsTable, syncFormGoogleSheet } from './recordsExport'
-import { DATE_RANGE_OPTIONS, getDateRangeBounds, compareValues, passesFilter } from './records/recordsUtils'
+import { DATE_RANGE_OPTIONS, getDateRangeBounds, passesFilter } from './records/recordsUtils'
 import { formatCell, FilterIcon, CubeIcon, overlayStyle, dropdownStyle, DropdownItem } from './records/recordsUiKit'
 import { CartCell } from './records/CartCell'
 import { FilterPopover } from './records/FilterPopover'
@@ -23,8 +23,6 @@ function Records() {
   const [dateRange, setDateRange] = useState('all')
   const [customStart, setCustomStart] = useState('')
   const [customEnd, setCustomEnd] = useState('')
-  const [sortFieldId, setSortFieldId] = useState(null)
-  const [sortDirection, setSortDirection] = useState('asc')
   const [filters, setFilters] = useState({})
   const [openFilterId, setOpenFilterId] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
@@ -112,14 +110,6 @@ function Records() {
       return passesFilter(sub, field, filter)
     })
   })
-
-  if (sortFieldId) {
-    const field = form.fields.find(f => f.id === sortFieldId)
-    visible = [...visible].sort((a, b) => {
-      const result = compareValues(a, b, field)
-      return sortDirection === 'asc' ? result : -result
-    })
-  }
 
   const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE))
   const safePage = Math.min(currentPage, totalPages)
@@ -337,16 +327,6 @@ function Records() {
     if (!error) setForm({ ...form, settings: updatedSettings })
   }
 
-  function toggleSort(fieldId) {
-    if (sortFieldId === fieldId) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
-    } else {
-      setSortFieldId(fieldId)
-      setSortDirection('asc')
-    }
-    setCurrentPage(1)
-  }
-
   function applyFilter(fieldId, filterData) {
     setFilters({ ...filters, [fieldId]: filterData })
     setOpenFilterId(null)
@@ -385,10 +365,6 @@ function Records() {
         }
         .records-table th:hover {
           background: #eef6ff;
-        }
-        .records-table th.active-header {
-          background: #dbeafe;
-          color: var(--color-primary);
         }
         .records-table td {
           padding: 0.7rem 0.75rem;
@@ -591,6 +567,12 @@ function Records() {
                       onChange={toggleSelectAllOnPage}
                     />
                   </th>
+                  <th style={{
+                    textAlign: 'left', borderBottom: '2px solid #e5e7eb', padding: '0.75rem 0.9rem',
+                    position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap', background: '#fafafa'
+                  }}>
+                    Order ID
+                  </th>
                   {visibleFields.map(field => {
                     const isHovered = hoveredHeaderId === field.id
                     return (
@@ -598,28 +580,22 @@ function Records() {
                       key={field.id}
                       onMouseEnter={() => setHoveredHeaderId(field.id)}
                       onMouseLeave={() => setHoveredHeaderId(null)}
-                      className={sortFieldId === field.id ? 'active-header' : ''}
                       style={{
                         textAlign: 'left', borderBottom: '2px solid #e5e7eb',
                         padding: '0.75rem 0.9rem', position: 'sticky', top: 0, zIndex: 5,
                         whiteSpace: 'nowrap', minWidth: '140px',
-                        background: isHovered || sortFieldId === field.id ? '#eef6ff' : '#fafafa',
+                        background: isHovered ? '#eef6ff' : '#fafafa',
                         transition: 'background 0.1s ease'
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.45rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0 }}>
                           <span title={field.type} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <CubeIcon color={isHovered || sortFieldId === field.id ? 'var(--color-primary)' : '#94a3b8'} />
+                            <CubeIcon color={isHovered ? 'var(--color-primary)' : '#94a3b8'} />
                           </span>
 
-                          <span
-                            onClick={() => toggleSort(field.id)}
-                            style={{ cursor: 'pointer', color: isHovered || sortFieldId === field.id ? 'var(--color-primary)' : 'inherit', transition: 'color 0.1s ease', whiteSpace: 'nowrap' }}
-                            title="Click to sort"
-                          >
+                          <span style={{ whiteSpace: 'nowrap' }}>
                             {field.label}
-                            {sortFieldId === field.id ? (sortDirection === 'asc' ? ' ▲' : ' ▼') : ''}
                           </span>
                         </div>
 
@@ -634,7 +610,7 @@ function Records() {
                               border: filters[field.id] ? 'none' : '1px solid #cbd5e1'
                             }}
                           >
-                            <FilterIcon color={filters[field.id] ? 'white' : (isHovered || sortFieldId === field.id ? 'var(--color-primary)' : '#64748b')} />
+                            <FilterIcon color={filters[field.id] ? 'white' : (isHovered ? 'var(--color-primary)' : '#64748b')} />
                           </button>
                         )}
                       </div>
@@ -653,28 +629,43 @@ function Records() {
                   <th
                     onMouseEnter={() => setHoveredHeaderId('__submitted')}
                     onMouseLeave={() => setHoveredHeaderId(null)}
-                    className={sortFieldId === '__submitted' ? 'active-header' : ''}
                     style={{
                       textAlign: 'left', borderBottom: '2px solid #e5e7eb', padding: '0.75rem 0.9rem',
                       position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap',
-                      background: hoveredHeaderId === '__submitted' || sortFieldId === '__submitted' ? '#eef6ff' : '#fafafa',
+                      background: hoveredHeaderId === '__submitted' ? '#eef6ff' : '#fafafa',
                       transition: 'background 0.1s ease'
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.4rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <span title="date">
-                          <CubeIcon color={hoveredHeaderId === '__submitted' || sortFieldId === '__submitted' ? 'var(--color-primary)' : '#94a3b8'} />
-                        </span>
-                        <span
-                          onClick={() => toggleSort('__submitted')}
-                          style={{ cursor: 'pointer', color: hoveredHeaderId === '__submitted' || sortFieldId === '__submitted' ? 'var(--color-primary)' : 'inherit', transition: 'color 0.1s ease' }}
-                        >
-                          Submitted
-                          {sortFieldId === '__submitted' ? (sortDirection === 'asc' ? ' ▲' : ' ▼') : ''}
-                        </span>
-                      </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <span title="date">
+                        <CubeIcon color={hoveredHeaderId === '__submitted' ? 'var(--color-primary)' : '#94a3b8'} />
+                      </span>
+                      <span>Submission Date</span>
                     </div>
+                  </th>
+                  <th style={{
+                    textAlign: 'left', borderBottom: '2px solid #e5e7eb', padding: '0.75rem 0.9rem',
+                    position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap', background: '#fafafa'
+                  }}>
+                    Last Update Date
+                  </th>
+                  <th style={{
+                    textAlign: 'left', borderBottom: '2px solid #e5e7eb', padding: '0.75rem 0.9rem',
+                    position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap', background: '#fafafa'
+                  }}>
+                    IP
+                  </th>
+                  <th style={{
+                    textAlign: 'left', borderBottom: '2px solid #e5e7eb', padding: '0.75rem 0.9rem',
+                    position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap', background: '#fafafa'
+                  }}>
+                    Submission ID
+                  </th>
+                  <th style={{
+                    textAlign: 'left', borderBottom: '2px solid #e5e7eb', padding: '0.75rem 0.9rem',
+                    position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap', background: '#fafafa'
+                  }}>
+                    Edit Link
                   </th>
                 </tr>
               </thead>
@@ -694,6 +685,9 @@ function Records() {
                         checked={selectedIds.includes(sub.id)}
                         onChange={() => toggleSelectRow(sub.id)}
                       />
+                    </td>
+                    <td style={{ borderBottom: '1px solid #eee', padding: '0.75rem 0.9rem', color: '#666', whiteSpace: 'nowrap' }}>
+                      {sub.order_number ? `ORD-${String(sub.order_number).padStart(6, '0')}` : '—'}
                     </td>
                     {visibleFields.map(field => (
                       <td key={field.id} style={{
@@ -718,6 +712,31 @@ function Records() {
                       {new Date(sub.created_at).toLocaleDateString('en-GB', {
                         day: '2-digit', month: 'short', year: 'numeric'
                       })}
+                    </td>
+                    <td style={{ borderBottom: '1px solid #eee', padding: '0.75rem 0.9rem', color: '#666', whiteSpace: 'nowrap' }}>
+                      {sub.updated_at ? new Date(sub.updated_at).toLocaleDateString('en-GB', {
+                        day: '2-digit', month: 'short', year: 'numeric'
+                      }) : '—'}
+                    </td>
+                    <td style={{ borderBottom: '1px solid #eee', padding: '0.75rem 0.9rem', color: '#666', whiteSpace: 'nowrap' }}>
+                      {sub.ip_address || '—'}
+                    </td>
+                    <td style={{ borderBottom: '1px solid #eee', padding: '0.75rem 0.9rem', color: '#666', whiteSpace: 'nowrap', fontFamily: 'monospace', fontSize: '0.8rem' }}>
+                      {sub.id.slice(0, 8)}
+                    </td>
+                    <td
+                      style={{ borderBottom: '1px solid #eee', padding: '0.75rem 0.9rem', whiteSpace: 'nowrap' }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {sub.edit_token ? (
+                        <button
+                          className="secondary"
+                          style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem' }}
+                          onClick={() => navigator.clipboard.writeText(`${window.location.origin}/form/${form.id}/response/${sub.edit_token}`)}
+                        >
+                          Copy Link
+                        </button>
+                      ) : '—'}
                     </td>
                   </tr>
                 ))}

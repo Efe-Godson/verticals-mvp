@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
+import { submitForm, getSubmissionByToken, updateSubmissionByToken } from './lib/submissionsClient'
 
 function PublicForm() {
-  const { id } = useParams()
+  const { id, token } = useParams()
   const [form, setForm] = useState(null)
   const [answers, setAnswers] = useState({})
   const [cartQuantities, setCartQuantities] = useState({})
@@ -15,8 +16,42 @@ function PublicForm() {
   const [message, setMessage] = useState('')
   const [errors, setErrors] = useState({})
   const [uploading, setUploading] = useState({})
+  const [editLink, setEditLink] = useState(null)
+
+  // Prefills the builder state from a saved submission — the inverse of the
+  // { items, total } / plain-value shape submitAnswers() writes out.
+  function loadAnswersFromData(fields, data) {
+    const nextAnswers = {}
+    const nextCartQuantities = {}
+    fields.forEach(field => {
+      if (field.type === 'cart') {
+        const quantities = {}
+        ;(data[field.id]?.items || []).forEach(item => {
+          const product = (field.products || []).find(p => p.name === item.name)
+          if (product) quantities[product.id] = item.quantity
+        })
+        nextCartQuantities[field.id] = quantities
+      } else {
+        nextAnswers[field.id] = data[field.id]
+      }
+    })
+    setAnswers(nextAnswers)
+    setCartQuantities(nextCartQuantities)
+    if (data._respondent_email) setRespondentEmail(data._respondent_email)
+  }
 
   useEffect(() => {
+    async function loadForEdit() {
+      try {
+        const { submission, form: formData } = await getSubmissionByToken(token)
+        setForm(formData)
+        loadAnswersFromData(formData.fields, submission.data)
+      } catch (err) {
+        setMessage(err.message || 'This response link is no longer valid.')
+      }
+      setLoading(false)
+    }
+
     async function loadForm() {
       const { data, error } = await supabase
         .from('forms')
@@ -38,8 +73,9 @@ function PublicForm() {
       setLoading(false)
     }
 
-    loadForm()
-  }, [id])
+    if (token) loadForEdit()
+    else loadForm()
+  }, [id, token])
 
   function updateAnswer(fieldId, value) {
     setAnswers({ ...answers, [fieldId]: value })
@@ -264,14 +300,16 @@ function PublicForm() {
       finalData._respondent_email = respondentEmail
     }
 
-    const { error } = await supabase
-      .from('submissions')
-      .insert([{ form_id: form.id, data: finalData }])
-
-    if (error) {
-      setMessage('Error submitting: ' + error.message)
-    } else {
+    try {
+      if (token) {
+        await updateSubmissionByToken(token, finalData)
+      } else {
+        const result = await submitForm(form.id, finalData)
+        setEditLink(`${window.location.origin}/form/${form.id}/response/${result.edit_token}`)
+      }
       setSubmitted(true)
+    } catch (err) {
+      setMessage('Error submitting: ' + err.message)
     }
   }
 
@@ -680,8 +718,21 @@ function PublicForm() {
   if (submitted) {
     return (
       <div className="page">
-        <h2>Response submitted successfully.</h2>
+        <h2>{token ? 'Response updated successfully.' : 'Response submitted successfully.'}</h2>
         <p>Thank you.</p>
+        {editLink && (
+          <div className="card" style={{ padding: '1rem', marginTop: '1rem' }}>
+            <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem', color: 'var(--color-muted)' }}>
+              Save this link if you need to come back and edit your response:
+            </p>
+            <input
+              readOnly
+              value={editLink}
+              onFocus={(e) => e.target.select()}
+              style={{ width: '100%', padding: '0.5rem', fontSize: '0.85rem' }}
+            />
+          </div>
+        )}
         {form.settings?.allowMultipleResponses && (
           <button
             onClick={() => {
@@ -751,7 +802,7 @@ function PublicForm() {
       ))}
 
       <button onClick={submitAnswers} style={{ padding: '0.7rem 1.5rem', fontSize: '1rem' }}>
-        Submit
+        {token ? 'Save Changes' : 'Submit'}
       </button>
 
       {message && <p style={{ marginTop: '1rem', color: 'red' }}>{message}</p>}

@@ -69,6 +69,7 @@ function EditForm() {
   const [openFieldMenu, setOpenFieldMenu] = useState(null) // field.id of the open "more options" menu, or null
   const fieldMenuRef = useRef(null)
   const [showPreview, setShowPreview] = useState(false)
+  const [collapsedCarts, setCollapsedCarts] = useState({})
   const [productOverrides, setProductOverrides] = useState({}) // `${fieldIndex}-${productId}` -> true/false, explicit expand/collapse
 
   useEffect(() => {
@@ -424,10 +425,16 @@ function EditForm() {
 
               {TYPES_WITH_PRODUCTS.includes(field.type) && (
                 <div style={{ marginTop: '0.3rem' }}>
-                  <label style={{ fontSize: '0.8rem', color: 'var(--color-muted)', marginBottom: '0.5rem', display: 'block' }}>
-                    Products
+                  <label
+                    onClick={() => setCollapsedCarts(current => ({ ...current, [field.id]: !current[field.id] }))}
+                    style={{ fontSize: '0.8rem', color: 'var(--color-muted)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}
+                  >
+                    <span style={{ display: 'inline-block', transition: 'transform 0.15s ease', transform: collapsedCarts[field.id] ? 'rotate(-90deg)' : 'rotate(0deg)' }}>▾</span>
+                    Products ({(field.products || []).length})
                   </label>
 
+                  {!collapsedCarts[field.id] && (
+                  <>
                   <datalist id={`categories-${field.id}`}>
                     {getFieldCategories(index).map(cat => (
                       <option key={cat} value={cat} />
@@ -517,6 +524,8 @@ function EditForm() {
                       </label>
                     </div>
                   </div>
+                  </>
+                  )}
                 </div>
               )}
 
