@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { exportRecordsToExcel, exportRecordsToCSV, exportRecordsToPDF, printRecordsTable, syncFormGoogleSheet } from './recordsExport'
+import { downloadRecordsTemplate, parseRecordsFile, readWorkbookRows } from './recordsImport'
 import { DATE_RANGE_OPTIONS, getDateRangeBounds, passesFilter } from './records/recordsUtils'
 import { formatCell, FilterIcon, CubeIcon, overlayStyle, dropdownStyle, DropdownItem } from './records/recordsUiKit'
 import { CartCell } from './records/CartCell'
@@ -145,6 +146,62 @@ function Records() {
 
   function handleExportCSV() {
     exportRecordsToCSV(form, visible)
+  }
+
+  // linked_record fields need the other form's records to turn a typed
+  // label back into a { recordId, label } value — fetched fresh each time
+  // rather than cached, since the linked form's records can change anytime.
+  async function loadLinkedFieldOptions() {
+    const linkedFields = form.fields.filter(f => f.type === 'linked_record' && f.linkedFormId)
+    const results = {}
+    await Promise.all(linkedFields.map(async (field) => {
+      const { data } = await supabase
+        .from('submissions').select('id, data')
+        .eq('form_id', field.linkedFormId)
+        .is('deleted_at', null)
+      results[field.id] = (data || []).map(sub => ({
+        recordId: sub.id,
+        label: field.linkedDisplayFieldId ? (sub.data[field.linkedDisplayFieldId] ?? sub.id) : sub.id,
+      }))
+    }))
+    return results
+  }
+
+  async function handleDownloadFillTemplate() {
+    const linkedOptions = await loadLinkedFieldOptions()
+    downloadRecordsTemplate(form, linkedOptions)
+  }
+
+  async function handleUploadFilledSheet(event) {
+    const file = event.target.files[0]
+    event.target.value = ''
+    if (!file) return
+
+    try {
+      const [rows, linkedOptions] = await Promise.all([readWorkbookRows(file), loadLinkedFieldOptions()])
+      const { submissions, warnings } = parseRecordsFile(rows, form, linkedOptions)
+
+      if (submissions.length === 0) {
+        showToast('No fillable rows found in that file.', 'error')
+        return
+      }
+
+      const { data, error } = await supabase
+        .from('submissions')
+        .insert(submissions.map(s => ({ form_id: form.id, data: s.data })))
+        .select()
+
+      if (error) {
+        showToast('Could not import: ' + error.message, 'error')
+        return
+      }
+
+      setSubmissions(current => [...(data || []), ...current])
+      const warningNote = warnings.length > 0 ? ` (${warnings.length} cell${warnings.length !== 1 ? 's' : ''} skipped — check values against field options)` : ''
+      showToast(`Imported ${data.length} record${data.length !== 1 ? 's' : ''}.${warningNote}`, warnings.length > 0 ? 'error' : 'success')
+    } catch (err) {
+      showToast('Could not read that file: ' + err.message, 'error')
+    }
   }
 
   async function handleSyncGoogleSheet() {
@@ -428,6 +485,21 @@ function Records() {
             <>
               <div style={overlayStyle} onClick={() => setActiveMenu(null)} />
               <div className="dropdown-panel" style={{ ...dropdownStyle, minWidth: '220px' }} onClick={(e) => e.stopPropagation()}>
+                <DropdownItem onClick={() => { handleDownloadFillTemplate(); setActiveMenu(null) }}>
+                  Download Fill-In Template (.xlsx)
+                </DropdownItem>
+                <label
+                  className="secondary"
+                  style={{
+                    display: 'block', width: '100%', textAlign: 'left', border: 'none',
+                    padding: '0.45rem 0.3rem', fontSize: '0.85rem', background: 'transparent', cursor: 'pointer'
+                  }}
+                >
+                  Upload Filled Sheet (.xlsx)
+                  <input type="file" accept=".xlsx,.xls" onChange={(e) => { handleUploadFilledSheet(e); setActiveMenu(null) }} style={{ display: 'none' }} />
+                </label>
+                <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.7rem 0 0.5rem' }} />
+
                 {visible.length > 0 && (
                   <>
                     <DropdownItem onClick={() => { handlePrintTable(); setActiveMenu(null) }}>Print</DropdownItem>
