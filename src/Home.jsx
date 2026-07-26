@@ -522,13 +522,11 @@ function ListView({ pageForms, togglePin, publishForm, setFormStatus, duplicateF
                   borderRadius: 'var(--radius)', boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
                   zIndex: 20, minWidth: '120px', overflow: 'hidden'
                 }}>
-                  {form.status === 'draft' && <MenuItem danger onClick={() => requestDelete(form.id)}>Delete</MenuItem>}
                   {form.status === 'published' && <MenuItem onClick={() => { setFormStatus(form.id, 'paused'); setOpenMenuId(null) }}>Pause</MenuItem>}
-                  {form.status === 'published' && <MenuItem onClick={() => { setFormStatus(form.id, 'archived'); setOpenMenuId(null) }}>Archive</MenuItem>}
-                  {form.status === 'paused' && <MenuItem onClick={() => { setFormStatus(form.id, 'archived'); setOpenMenuId(null) }}>Archive</MenuItem>}
-                  {form.status === 'archived' && <MenuItem danger onClick={() => requestDelete(form.id)}>Delete permanently</MenuItem>}
+                  {(form.status === 'published' || form.status === 'paused') && <MenuItem onClick={() => { setFormStatus(form.id, 'archived'); setOpenMenuId(null) }}>Archive</MenuItem>}
                   <MenuItem onClick={() => duplicateForm(form)}>Duplicate</MenuItem>
                   <MenuItem onClick={() => { togglePin(form.id, form.pinned); setOpenMenuId(null) }}>{form.pinned ? 'Unpin' : 'Pin'}</MenuItem>
+                  <MenuItem danger onClick={() => requestDelete(form.id)}>{form.status === 'archived' ? 'Delete permanently' : 'Delete'}</MenuItem>
                 </div>
               )}
             </div>
@@ -581,7 +579,7 @@ function ListView({ pageForms, togglePin, publishForm, setFormStatus, duplicateF
                   {form.status === 'published' && <MenuItem onClick={() => { setFormStatus(form.id, 'paused'); setOpenMenuId(null) }}>Pause</MenuItem>}
                   {(form.status === 'published' || form.status === 'paused') && <MenuItem onClick={() => { setFormStatus(form.id, 'archived'); setOpenMenuId(null) }}>Archive</MenuItem>}
                   <MenuItem onClick={() => duplicateForm(form)}>Duplicate</MenuItem>
-                  {(form.status === 'draft' || form.status === 'archived') && <MenuItem danger onClick={() => requestDelete(form.id)}>{form.status === 'archived' ? 'Delete permanently' : 'Delete'}</MenuItem>}
+                  <MenuItem danger onClick={() => requestDelete(form.id)}>{form.status === 'archived' ? 'Delete permanently' : 'Delete'}</MenuItem>
                 </div>
               )}
             </div>
@@ -656,7 +654,7 @@ function GridView({ pageForms, togglePin, publishForm, setFormStatus, duplicateF
                   {form.status === 'published' && <MenuItem onClick={() => { setFormStatus(form.id, 'paused'); setOpenMenuId(null) }}>Pause</MenuItem>}
                   {(form.status === 'published' || form.status === 'paused') && <MenuItem onClick={() => { setFormStatus(form.id, 'archived'); setOpenMenuId(null) }}>Archive</MenuItem>}
                   <MenuItem onClick={() => duplicateForm(form)}>Duplicate</MenuItem>
-                  {(form.status === 'draft' || form.status === 'archived') && <MenuItem danger onClick={() => requestDelete(form.id)}>{form.status === 'archived' ? 'Delete permanently' : 'Delete'}</MenuItem>}
+                  <MenuItem danger onClick={() => requestDelete(form.id)}>{form.status === 'archived' ? 'Delete permanently' : 'Delete'}</MenuItem>
                 </div>
               )}
             </div>
