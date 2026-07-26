@@ -18,6 +18,7 @@ import SignUp from './SignUp'
 import ConfirmEmail from './ConfirmEmail'
 import ResetPassword from './ResetPassword'
 import Templates from './Templates'
+import AccountPage from './AccountPage'
 import NavBar from './NavBar'
 
 function PrivateRoute({ children }) {
@@ -54,6 +55,7 @@ function AppShell() {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/" element={<PrivateRoute><Home /></PrivateRoute>} />
         <Route path="/templates" element={<PrivateRoute><Templates /></PrivateRoute>} />
+        <Route path="/account" element={<PrivateRoute><AccountPage /></PrivateRoute>} />
         <Route path="/create" element={<PrivateRoute><CreateForm /></PrivateRoute>} />
         <Route path="/form/:id" element={<PublicForm />} />
         <Route path="/form/:id/response/:token" element={<PublicForm />} />

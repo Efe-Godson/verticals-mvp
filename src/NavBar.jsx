@@ -1,15 +1,20 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { supabase } from './supabaseClient'
+import { useAuth } from './AuthContext'
 import { useRecycleBinTrigger } from './RecycleBinContext'
 
 function NavBar() {
   const location = useLocation()
+  const { session } = useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
   const [linkedMenuOpen, setLinkedMenuOpen] = useState(false)
   const [isPayrollForm, setIsPayrollForm] = useState(false)
   const [linkedForms, setLinkedForms] = useState([]) // sibling forms in the same bundle, excluding self
   const { trigger: binTrigger } = useRecycleBinTrigger()
+
+  const displayName = session?.user?.user_metadata?.full_name || ''
+  const initials = (displayName || session?.user?.email || '?').trim().slice(0, 1).toUpperCase()
 
   // Manually extract the form ID from paths like /form/abc-123/records
   const match = location.pathname.match(/^\/form\/([^/]+)/)
@@ -110,6 +115,19 @@ function NavBar() {
               Recycle Bin{binTrigger.count > 0 ? ` (${binTrigger.count})` : ''}
             </button>
           )}
+          <Link
+            to="/account"
+            title="Account"
+            style={{
+              width: '30px', height: '30px', borderRadius: '50%', background: 'var(--color-primary)',
+              color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '0.8rem', fontWeight: 700, flexShrink: 0,
+              outline: location.pathname === '/account' ? '2px solid var(--color-primary)' : 'none',
+              outlineOffset: '2px'
+            }}
+          >
+            {initials}
+          </Link>
           <button className="secondary" onClick={() => supabase.auth.signOut()}>Log out</button>
 
           {isFormContext && (
