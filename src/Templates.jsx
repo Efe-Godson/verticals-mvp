@@ -104,7 +104,14 @@ function Templates() {
       if (template.bundle?.length > 0) {
         const createdByKey = await startBundleTemplate(template)
         showToast(`"${template.name}" created — ${template.bundle.length} forms set up and linked.`, 'success')
-        navigate(`/form/${createdByKey[template.bundle[0].key]}/edit`)
+        const primaryFormId = createdByKey[template.bundle[0].key]
+        // Payroll-flavored bundles (settings.payrollRole === 'employees' on
+        // the primary entry) have a purpose-built Dashboard — more useful
+        // as a landing page than the empty form builder.
+        const destination = template.bundle[0].settings?.payrollRole === 'employees'
+          ? `/form/${primaryFormId}/payroll`
+          : `/form/${primaryFormId}/edit`
+        navigate(destination)
         return
       }
 
