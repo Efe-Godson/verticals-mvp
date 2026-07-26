@@ -6,7 +6,9 @@ import { useRecycleBinTrigger } from './RecycleBinContext'
 function NavBar() {
   const location = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [linkedMenuOpen, setLinkedMenuOpen] = useState(false)
   const [isPayrollForm, setIsPayrollForm] = useState(false)
+  const [linkedForms, setLinkedForms] = useState([]) // sibling forms in the same bundle, excluding self
   const { trigger: binTrigger } = useRecycleBinTrigger()
 
   // Manually extract the form ID from paths like /form/abc-123/records
@@ -14,15 +16,34 @@ function NavBar() {
   const id = match ? match[1] : null
   const isFormContext = !!id
 
-  // Only Employees forms (created by the Staff Payment Tracker template)
-  // get a Payroll tab — a lightweight settings-only lookup per form
-  // navigation, not worth a shared context for a single boolean.
+  // Lightweight settings-only lookup per form navigation — cheap enough not
+  // to be worth a shared context for a couple of booleans/a short list.
+  // Only Employees forms (Staff Payment Tracker) get a Payroll tab; any
+  // form that's part of a bundle template (primary or secondary) gets a
+  // Linked Forms menu, since secondary forms are hidden from Home's list
+  // and this is otherwise the only way back to them.
   useEffect(() => {
     let cancelled = false
-    if (!id) { setIsPayrollForm(false); return }
-    supabase.from('forms').select('settings').eq('id', id).single().then(({ data }) => {
-      if (!cancelled) setIsPayrollForm(data?.settings?.payrollRole === 'employees')
-    })
+    if (!id) { setIsPayrollForm(false); setLinkedForms([]); return }
+
+    async function load() {
+      const { data: current } = await supabase.from('forms').select('id, name, settings').eq('id', id).single()
+      if (cancelled || !current) return
+      setIsPayrollForm(current.settings?.payrollRole === 'employees')
+
+      const groupPrimaryId = current.settings?.primaryFormId || current.id
+      const [{ data: primary }, { data: siblings }] = await Promise.all([
+        groupPrimaryId !== current.id
+          ? supabase.from('forms').select('id, name').eq('id', groupPrimaryId).is('deleted_at', null).maybeSingle()
+          : Promise.resolve({ data: null }),
+        supabase.from('forms').select('id, name').eq('settings->>primaryFormId', groupPrimaryId).is('deleted_at', null),
+      ])
+      if (cancelled) return
+
+      const group = [primary, ...(siblings || [])].filter(f => f && f.id !== current.id)
+      setLinkedForms(group)
+    }
+    load()
     return () => { cancelled = true }
   }, [id])
 
@@ -56,6 +77,34 @@ function NavBar() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          {linkedForms.length > 0 && (
+            <div style={{ position: 'relative' }}>
+              <button className="secondary" onClick={() => setLinkedMenuOpen(!linkedMenuOpen)}>
+                Linked Forms ▾
+              </button>
+              {linkedMenuOpen && (
+                <>
+                  <div style={{ position: 'fixed', inset: 0, zIndex: 15 }} onClick={() => setLinkedMenuOpen(false)} />
+                  <div style={{
+                    position: 'absolute', top: '100%', right: 0, marginTop: '0.3rem',
+                    background: 'white', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 20, minWidth: '180px', overflow: 'hidden'
+                  }}>
+                    {linkedForms.map(f => (
+                      <Link
+                        key={f.id}
+                        to={`/form/${f.id}/records`}
+                        onClick={() => setLinkedMenuOpen(false)}
+                        style={{ display: 'block', padding: '0.55rem 0.9rem', fontSize: '0.85rem', color: 'inherit' }}
+                      >
+                        {f.name}
+                      </Link>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
           {binTrigger && (
             <button className="secondary" onClick={binTrigger.onOpen}>
               Recycle Bin{binTrigger.count > 0 ? ` (${binTrigger.count})` : ''}
@@ -85,6 +134,11 @@ function NavBar() {
           {isPayrollForm && <Link to={`/form/${id}/payroll`} style={{ color: linkColor('/payroll') }} onClick={() => setMenuOpen(false)}>Payroll</Link>}
           <Link to={`/form/${id}/ai-analyst`} style={{ color: linkColor('/ai-analyst') }} onClick={() => setMenuOpen(false)}>AI Analyst</Link>
           <Link to={`/form/${id}/settings`} style={{ color: linkColor('/settings') }} onClick={() => setMenuOpen(false)}>Settings</Link>
+          {linkedForms.map(f => (
+            <Link key={f.id} to={`/form/${f.id}/records`} style={{ color: 'var(--color-muted)' }} onClick={() => setMenuOpen(false)}>
+              → {f.name}
+            </Link>
+          ))}
         </div>
       )}
     </div>

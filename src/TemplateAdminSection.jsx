@@ -7,6 +7,7 @@
 // without rebuilding its source form and re-converting it.
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
+import { useAuth } from './AuthContext'
 import { useToast } from './Toast'
 import TemplateFieldEditor from './TemplateFieldEditor'
 
@@ -223,12 +224,26 @@ function TemplateEditorDialog({ template, realForms, onClose, onSaved }) {
   )
 }
 
-function TemplateAdminSection({ forms }) {
+function TemplateAdminSection() {
+  const { session } = useAuth()
   const { showToast } = useToast()
   const [templates, setTemplates] = useState([])
+  const [allForms, setAllForms] = useState([])
   const [loading, setLoading] = useState(true)
   const [editingTemplate, setEditingTemplate] = useState(null) // null = closed, {} = new, template object = editing
   const [pendingDeleteId, setPendingDeleteId] = useState(null)
+
+  // Fetched independently from Home's own form list (which hides secondary
+  // bundle forms like Salary Events to reduce clutter) — template building
+  // needs to be able to link to ANY of the admin's forms, hidden or not.
+  useEffect(() => {
+    supabase
+      .from('forms').select('id, name, fields')
+      .eq('user_id', session.user.id)
+      .is('deleted_at', null)
+      .order('name', { ascending: true })
+      .then(({ data }) => setAllForms(data || []))
+  }, [session])
 
   async function loadTemplates() {
     setLoading(true)
@@ -290,7 +305,7 @@ function TemplateAdminSection({ forms }) {
       {editingTemplate && (
         <TemplateEditorDialog
           template={editingTemplate.id ? editingTemplate : null}
-          realForms={forms}
+          realForms={allForms}
           onClose={() => setEditingTemplate(null)}
           onSaved={() => { setEditingTemplate(null); loadTemplates() }}
         />

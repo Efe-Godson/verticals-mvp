@@ -53,8 +53,16 @@ function Templates() {
   // "$employees" pointing at another entry's `key` — those don't have real
   // ids until the forms are actually created, so this resolves them after
   // insert instead of the template storing real (and reusable) form ids.
+  //
+  // The bundle's first entry becomes the "primary" form — the one that
+  // shows up in the main Home list. Every other entry gets settings.
+  // primaryFormId pointing back at it, which Home filters out of the list
+  // entirely (they'd otherwise clutter it as extra, mostly-internal cards —
+  // e.g. Salary Events isn't something you browse on its own, you reach it
+  // from the Employees form's Payroll tab or NavBar's Linked Forms menu).
   async function startBundleTemplate(template) {
     const createdByKey = {}
+    let primaryFormId = null
 
     function resolvePlaceholder(value) {
       return typeof value === 'string' && value.startsWith('$') ? createdByKey[value.slice(1)] : value
@@ -64,9 +72,15 @@ function Templates() {
       const resolvedFields = spec.fields.map(field => (
         field.type === 'linked_record' ? { ...field, linkedFormId: resolvePlaceholder(field.linkedFormId) } : field
       ))
-      const resolvedSettings = spec.settings
+      const resolvedSpecSettings = spec.settings
         ? Object.fromEntries(Object.entries(spec.settings).map(([k, v]) => [k, resolvePlaceholder(v)]))
-        : undefined
+        : {}
+      const resolvedSettings = {
+        ...resolvedSpecSettings,
+        templateSlug: template.slug,
+        templateBundleKey: spec.key,
+        ...(primaryFormId ? { primaryFormId } : {}),
+      }
 
       const { data, error } = await supabase.from('forms').insert([{
         name: spec.name,
@@ -77,6 +91,7 @@ function Templates() {
       }]).select().single()
 
       if (error || !data) throw new Error(error?.message || `Could not create "${spec.name}"`)
+      if (!primaryFormId) primaryFormId = data.id
       createdByKey[spec.key] = data.id
     }
 

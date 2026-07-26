@@ -132,12 +132,17 @@ function Home() {
       if (error) {
         setError('Could not load forms: ' + error.message)
       } else {
-        setForms(data)
+        // Secondary forms created as part of a bundle template (e.g.
+        // Salary Events, alongside its primary Employees form) carry
+        // settings.primaryFormId and are reached from the primary form's
+        // context instead of cluttering the main list as their own cards.
+        const visibleForms = data.filter(f => !f.settings?.primaryFormId)
+        setForms(visibleForms)
 
         // One batched query for all forms' response counts, instead of a
         // separate count query per card — cheaper and avoids a waterfall
         // of requests as the number of forms grows.
-        const formIds = data.map(f => f.id)
+        const formIds = visibleForms.map(f => f.id)
         if (formIds.length > 0) {
           const { data: subsData, error: subsError } = await supabase
             .from('submissions')
@@ -561,7 +566,7 @@ function Home() {
       )}
 
       {session?.user?.id === TEMPLATE_ADMIN_USER_ID && (
-        <TemplateAdminSection forms={forms} />
+        <TemplateAdminSection />
       )}
 
       {showBin && (
