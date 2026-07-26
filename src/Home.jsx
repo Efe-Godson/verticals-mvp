@@ -4,6 +4,7 @@ import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
 import ConfirmDialog from './ConfirmDialog'
 import { useToast } from './Toast'
+import HomeRecycleBinDialog from './HomeRecycleBinDialog'
 
 const PAGE_SIZE = 8
 
@@ -75,16 +76,6 @@ function CalendarIcon({ size = 12 }) {
   )
 }
 
-// Approximate the same hues used by the .form-state-badge CSS classes, for
-// the card's left accent border — adjust these if they drift from the
-// actual badge colors defined in your stylesheet.
-const STATUS_ACCENT = {
-  draft: '#d97706',
-  published: '#16a34a',
-  paused: '#6b7280',
-  archived: '#9ca3af',
-}
-
 // Response-count breakpoints: which action is most useful to a form owner
 // changes as a form matures, so the primary button on published cards
 // adapts instead of always being the same static link.
@@ -108,7 +99,12 @@ function Home() {
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('verticals_view_mode') || 'grid')
   const [demoCollapsed, setDemoCollapsed] = useState(() => localStorage.getItem('verticals_demo_collapsed') === 'true')
   const [openMenuId, setOpenMenuId] = useState(null)
-  const [confirmDeleteId, setConfirmDeleteId] = useState(null)
+  const [pendingConfirm, setPendingConfirm] = useState(null) // { type: 'moveToBin', formId } | { type: 'bulkMoveToBin' } | { type: 'permanentDelete', formId } | { type: 'emptyBin' }
+  const [selectedFormIds, setSelectedFormIds] = useState([])
+  const [binCount, setBinCount] = useState(0)
+  const [showBin, setShowBin] = useState(false)
+  const [trashedForms, setTrashedForms] = useState([])
+  const [loadingBin, setLoadingBin] = useState(false)
   const menuRef = useRef(null)
 
   useEffect(() => {
@@ -117,8 +113,16 @@ function Home() {
         .from('forms')
         .select('*')
         .eq('user_id', session.user.id)
+        .is('deleted_at', null)
         .order('pinned', { ascending: false })
         .order('created_at', { ascending: false })
+
+      const { count: trashCount } = await supabase
+        .from('forms')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', session.user.id)
+        .not('deleted_at', 'is', null)
+      setBinCount(trashCount || 0)
 
       if (error) {
         setError('Could not load forms: ' + error.message)
@@ -226,25 +230,110 @@ function Home() {
 
   function requestDelete(formId) {
     setOpenMenuId(null)
-    setConfirmDeleteId(formId)
+    setPendingConfirm({ type: 'moveToBin', formId })
   }
 
-  async function confirmDelete() {
-    const formId = confirmDeleteId
-    setConfirmDeleteId(null)
-    // .delete() only reports an error for things like a network failure —
-    // if RLS silently filters the row instead (no matching policy), this
-    // resolves with no error and an empty `data`, so we have to check the
-    // returned rows ourselves to know whether anything was actually deleted.
-    const { data, error } = await supabase.from('forms').delete().eq('id', formId).select('id')
+  function requestBulkDelete() {
+    if (selectedFormIds.length === 0) return
+    setPendingConfirm({ type: 'bulkMoveToBin' })
+  }
+
+  function toggleSelectForm(formId) {
+    setSelectedFormIds(current => current.includes(formId) ? current.filter(id => id !== formId) : [...current, formId])
+  }
+
+  async function moveFormsToBin(formIds) {
+    const { data, error } = await supabase
+      .from('forms')
+      .update({ deleted_at: new Date().toISOString() })
+      .in('id', formIds)
+      .select('id')
+
     if (error) {
       showToast('Could not delete: ' + error.message, 'error')
-    } else if (!data || data.length === 0) {
-      showToast('This form could not be deleted — you may not have permission to remove it.', 'error')
-    } else {
-      setForms(forms.filter(f => f.id !== formId))
-      showToast('Form deleted.', 'success')
+      return
     }
+    const deletedIds = (data || []).map(d => d.id)
+    if (deletedIds.length === 0) {
+      showToast('These forms could not be deleted — you may not have permission to remove them.', 'error')
+      return
+    }
+    setForms(current => current.filter(f => !deletedIds.includes(f.id)))
+    setSelectedFormIds(current => current.filter(id => !deletedIds.includes(id)))
+    setBinCount(count => count + deletedIds.length)
+    showToast(deletedIds.length === 1 ? 'Form moved to Recycle Bin.' : `${deletedIds.length} forms moved to Recycle Bin.`, 'success')
+  }
+
+  async function openBin() {
+    setShowBin(true)
+    setLoadingBin(true)
+    const { data, error } = await supabase
+      .from('forms').select('*')
+      .eq('user_id', session.user.id)
+      .not('deleted_at', 'is', null)
+      .order('deleted_at', { ascending: false })
+    if (!error) setTrashedForms(data || [])
+    setLoadingBin(false)
+  }
+
+  async function restoreForm(formId) {
+    const { data, error } = await supabase
+      .from('forms')
+      .update({ deleted_at: null })
+      .eq('id', formId)
+      .select()
+      .single()
+
+    if (error) {
+      showToast('Could not restore form: ' + error.message, 'error')
+      return
+    }
+    setTrashedForms(current => current.filter(f => f.id !== formId))
+    setForms(current => [data, ...current])
+    setBinCount(count => Math.max(0, count - 1))
+    showToast('Form restored.', 'success')
+  }
+
+  function requestPermanentDelete(formId) {
+    setPendingConfirm({ type: 'permanentDelete', formId })
+  }
+
+  async function performPermanentDelete(formId) {
+    const { error } = await supabase.from('forms').delete().eq('id', formId)
+    if (error) {
+      showToast('Could not permanently delete: ' + error.message, 'error')
+      return
+    }
+    setTrashedForms(current => current.filter(f => f.id !== formId))
+    setBinCount(count => Math.max(0, count - 1))
+    showToast('Form permanently deleted.', 'success')
+  }
+
+  function requestEmptyBin() {
+    if (trashedForms.length === 0) return
+    setPendingConfirm({ type: 'emptyBin' })
+  }
+
+  async function performEmptyBin() {
+    const ids = trashedForms.map(f => f.id)
+    const { error } = await supabase.from('forms').delete().in('id', ids)
+    if (error) {
+      showToast('Could not empty the bin: ' + error.message, 'error')
+      return
+    }
+    setTrashedForms([])
+    setBinCount(0)
+    showToast('Recycle Bin emptied.', 'success')
+  }
+
+  function handleConfirm() {
+    const confirm = pendingConfirm
+    setPendingConfirm(null)
+    if (!confirm) return
+    if (confirm.type === 'moveToBin') moveFormsToBin([confirm.formId])
+    else if (confirm.type === 'bulkMoveToBin') moveFormsToBin(selectedFormIds)
+    else if (confirm.type === 'permanentDelete') performPermanentDelete(confirm.formId)
+    else if (confirm.type === 'emptyBin') performEmptyBin()
   }
 
   const visible = forms.filter(form =>
@@ -259,19 +348,26 @@ function Home() {
   const startIndex = (safePage - 1) * PAGE_SIZE
   const pageForms = unpinnedForms.slice(startIndex, startIndex + PAGE_SIZE)
 
-  const sharedProps = { togglePin, publishForm, setFormStatus, duplicateForm, copyLink, requestDelete, responseCounts }
-  const formPendingDelete = forms.find(f => f.id === confirmDeleteId)
+  const sharedProps = {
+    togglePin, publishForm, setFormStatus, duplicateForm, copyLink, requestDelete, responseCounts,
+    selectedFormIds, toggleSelectForm,
+  }
+  const formPendingDelete = forms.find(f => f.id === pendingConfirm?.formId)
 
   return (
     <div className="page">
       <style>{`
-        .form-grid-card { transition: box-shadow 0.15s ease, border-color 0.15s ease; }
-        .form-grid-card:hover { box-shadow: 0 6px 16px rgba(0,0,0,0.10); border-color: var(--color-primary); }
+        .form-grid-card { transition: border-color 0.15s ease, background-color 0.15s ease; }
+        .form-grid-card:hover { border-color: var(--color-primary); }
+        .form-grid-card.selected { border-color: var(--color-primary); background: #eff6ff; }
       `}</style>
 
       <div className="toolbar-row" style={{ justifyContent: 'space-between', marginBottom: '1.5rem' }}>
         <h1 style={{ margin: 0 }}>Your Forms</h1>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <button className="secondary" onClick={openBin} style={{ position: 'relative' }}>
+            Recycle Bin{binCount > 0 ? ` (${binCount})` : ''}
+          </button>
           <div style={{ display: 'flex', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
             <button
               onClick={() => changeViewMode('list')}
@@ -295,6 +391,17 @@ function Home() {
           </Link>
         </div>
       </div>
+
+      {selectedFormIds.length > 0 && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '0.8rem', marginBottom: '1.2rem',
+          padding: '0.6rem 1rem', background: '#eff6ff', border: '1px solid var(--color-primary)', borderRadius: 'var(--radius)'
+        }}>
+          <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>{selectedFormIds.length} selected</span>
+          <button className="secondary" style={{ color: '#c0392b' }} onClick={requestBulkDelete}>Delete Selected</button>
+          <button className="secondary" onClick={() => setSelectedFormIds([])}>Clear</button>
+        </div>
+      )}
 
       {loading && <p style={{ color: 'var(--color-muted)' }}>Loading...</p>}
       {error && <p style={{ color: 'red' }}>{error}</p>}
@@ -438,29 +545,64 @@ function Home() {
         </div>
       )}
 
-      {confirmDeleteId && (
+      {showBin && (
+        <HomeRecycleBinDialog
+          forms={trashedForms}
+          loading={loadingBin}
+          onRestore={restoreForm}
+          onPermanentDelete={requestPermanentDelete}
+          onEmptyBin={requestEmptyBin}
+          onClose={() => setShowBin(false)}
+        />
+      )}
+
+      {pendingConfirm && (
         <ConfirmDialog
-          title="Delete this form?"
-          message={`This will permanently delete "${formPendingDelete?.name || 'this form'}" and all of its records. This cannot be undone.`}
-          confirmLabel="Delete"
-          danger
-          onConfirm={confirmDelete}
-          onCancel={() => setConfirmDeleteId(null)}
+          title={
+            pendingConfirm.type === 'moveToBin' ? 'Move this form to the Recycle Bin?' :
+            pendingConfirm.type === 'bulkMoveToBin' ? 'Move selected forms to the Recycle Bin?' :
+            pendingConfirm.type === 'emptyBin' ? 'Empty Recycle Bin?' :
+            'Permanently delete this form?'
+          }
+          message={
+            pendingConfirm.type === 'moveToBin'
+              ? `"${formPendingDelete?.name || 'This form'}" will move to the Recycle Bin. You can restore it later.`
+              : pendingConfirm.type === 'bulkMoveToBin'
+              ? `${selectedFormIds.length} form${selectedFormIds.length !== 1 ? 's' : ''} will move to the Recycle Bin. You can restore them later.`
+              : pendingConfirm.type === 'emptyBin'
+              ? `Permanently delete all ${trashedForms.length} form(s) in the bin, along with their records? This cannot be undone.`
+              : 'This will permanently delete this form and all of its records. This cannot be undone.'
+          }
+          confirmLabel={pendingConfirm.type === 'moveToBin' || pendingConfirm.type === 'bulkMoveToBin' ? 'Move to Bin' : 'Delete'}
+          danger={pendingConfirm.type !== 'moveToBin' && pendingConfirm.type !== 'bulkMoveToBin'}
+          onConfirm={handleConfirm}
+          onCancel={() => setPendingConfirm(null)}
         />
       )}
     </div>
   )
 }
 
-function ListView({ pageForms, togglePin, publishForm, setFormStatus, duplicateForm, copyLink, requestDelete, openMenuId, setOpenMenuId, menuRef }) {
+function ListView({ pageForms, togglePin, publishForm, setFormStatus, duplicateForm, copyLink, requestDelete, selectedFormIds, toggleSelectForm, openMenuId, setOpenMenuId, menuRef }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-      {pageForms.map(form => (
+      {pageForms.map(form => {
+        const selected = selectedFormIds.includes(form.id)
+        return (
         <div key={form.id} className="card form-state-card" style={{
           padding: '0.95rem 1.2rem', display: 'flex', justifyContent: 'space-between',
-          alignItems: 'center', flexWrap: 'wrap', gap: '0.8rem'
+          alignItems: 'center', flexWrap: 'wrap', gap: '0.8rem',
+          borderColor: selected ? 'var(--color-primary)' : undefined,
+          background: selected ? '#eff6ff' : undefined
         }}>
-          <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
+            <input
+              type="checkbox"
+              checked={selected}
+              onChange={() => toggleSelectForm(form.id)}
+              onClick={(e) => e.stopPropagation()}
+            />
+            <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               {form.pinned && (
                 <span title="Pinned"><PinIcon /></span>
@@ -470,6 +612,7 @@ function ListView({ pageForms, togglePin, publishForm, setFormStatus, duplicateF
             </div>
             <div style={{ color: 'var(--color-muted)', fontSize: '0.85rem', marginTop: '0.2rem' }}>
               {form.fields?.length || 0} field{form.fields?.length !== 1 ? 's' : ''} · Created {new Date(form.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+            </div>
             </div>
           </div>
 
@@ -526,7 +669,7 @@ function ListView({ pageForms, togglePin, publishForm, setFormStatus, duplicateF
                   {(form.status === 'published' || form.status === 'paused') && <MenuItem onClick={() => { setFormStatus(form.id, 'archived'); setOpenMenuId(null) }}>Archive</MenuItem>}
                   <MenuItem onClick={() => duplicateForm(form)}>Duplicate</MenuItem>
                   <MenuItem onClick={() => { togglePin(form.id, form.pinned); setOpenMenuId(null) }}>{form.pinned ? 'Unpin' : 'Pin'}</MenuItem>
-                  <MenuItem danger onClick={() => requestDelete(form.id)}>{form.status === 'archived' ? 'Delete permanently' : 'Delete'}</MenuItem>
+                  <MenuItem danger onClick={() => requestDelete(form.id)}>Delete</MenuItem>
                 </div>
               )}
             </div>
@@ -579,32 +722,45 @@ function ListView({ pageForms, togglePin, publishForm, setFormStatus, duplicateF
                   {form.status === 'published' && <MenuItem onClick={() => { setFormStatus(form.id, 'paused'); setOpenMenuId(null) }}>Pause</MenuItem>}
                   {(form.status === 'published' || form.status === 'paused') && <MenuItem onClick={() => { setFormStatus(form.id, 'archived'); setOpenMenuId(null) }}>Archive</MenuItem>}
                   <MenuItem onClick={() => duplicateForm(form)}>Duplicate</MenuItem>
-                  <MenuItem danger onClick={() => requestDelete(form.id)}>{form.status === 'archived' ? 'Delete permanently' : 'Delete'}</MenuItem>
+                  <MenuItem danger onClick={() => requestDelete(form.id)}>Delete</MenuItem>
                 </div>
               )}
             </div>
           </div>
         </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
 
-function GridView({ pageForms, togglePin, publishForm, setFormStatus, duplicateForm, copyLink, requestDelete, responseCounts, openMenuId, setOpenMenuId, menuRef }) {
+function GridView({ pageForms, togglePin, publishForm, setFormStatus, duplicateForm, copyLink, requestDelete, responseCounts, selectedFormIds, toggleSelectForm, openMenuId, setOpenMenuId, menuRef }) {
   return (
     <div style={{
       display: 'grid',
       gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
       gap: '1rem'
     }}>
-      {pageForms.map(form => (
-        <div key={form.id} className="card form-state-card form-grid-card" style={{
-          padding: '0.9rem', display: 'flex', flexDirection: 'column',
-          gap: '0.5rem', position: 'relative', height: '100%',
-          borderLeft: `3px solid ${STATUS_ACCENT[form.status] || STATUS_ACCENT.draft}`
-        }}>
+      {pageForms.map(form => {
+        const selected = selectedFormIds.includes(form.id)
+        return (
+        <div
+          key={form.id}
+          className={`form-state-card form-grid-card${selected ? ' selected' : ''}`}
+          style={{
+            padding: '0.9rem', display: 'flex', flexDirection: 'column',
+            gap: '0.5rem', position: 'relative', height: '100%',
+            background: 'var(--color-surface)', border: '1px solid var(--color-border)',
+            borderRadius: 0, boxShadow: 'none'
+          }}
+        >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0 }}>
+              <input
+                type="checkbox"
+                checked={selected}
+                onChange={() => toggleSelectForm(form.id)}
+              />
               {form.pinned && (
                 <span title="Pinned"><PinIcon size={12} /></span>
               )}
@@ -654,7 +810,7 @@ function GridView({ pageForms, togglePin, publishForm, setFormStatus, duplicateF
                   {form.status === 'published' && <MenuItem onClick={() => { setFormStatus(form.id, 'paused'); setOpenMenuId(null) }}>Pause</MenuItem>}
                   {(form.status === 'published' || form.status === 'paused') && <MenuItem onClick={() => { setFormStatus(form.id, 'archived'); setOpenMenuId(null) }}>Archive</MenuItem>}
                   <MenuItem onClick={() => duplicateForm(form)}>Duplicate</MenuItem>
-                  <MenuItem danger onClick={() => requestDelete(form.id)}>{form.status === 'archived' ? 'Delete permanently' : 'Delete'}</MenuItem>
+                  <MenuItem danger onClick={() => requestDelete(form.id)}>Delete</MenuItem>
                 </div>
               )}
             </div>
@@ -692,7 +848,8 @@ function GridView({ pageForms, togglePin, publishForm, setFormStatus, duplicateF
             })()}
           </div>
         </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
