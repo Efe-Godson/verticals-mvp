@@ -1,33 +1,71 @@
-import { Link } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { supabase } from './supabaseClient'
+import { useAuth } from './AuthContext'
+import { useToast } from './Toast'
 
-const templates = [
-  {
-    slug: 'retail',
-    title: 'Retail',
-    eyebrow: 'Sales & customer feedback',
-    description: 'Capture product feedback, order requests, return reasons, and customer satisfaction in a polished experience.',
-    highlights: ['Product feedback', 'Order follow-up', 'Store experience'],
-    cta: 'Start Retail template',
-  },
-  {
-    slug: 'restaurant',
-    title: 'Restaurant',
-    eyebrow: 'Dining & service experience',
-    description: 'Collect table feedback, delivery requests, menu preferences, and staff performance insights with ease.',
-    highlights: ['Service feedback', 'Order preferences', 'Guest experience'],
-    cta: 'Start Restaurant template',
-  },
-  {
-    slug: 'school',
-    title: 'School',
-    eyebrow: 'Admin & student engagement',
-    description: 'Streamline attendance, parent communication, event signups, and student feedback for everyday operations.',
-    highlights: ['Student feedback', 'Event signup', 'Parent forms'],
-    cta: 'Start School template',
-  },
-]
+function TemplatesSkeleton() {
+  return (
+    <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
+      {[0, 1, 2].map(i => (
+        <div key={i} className="card" style={{ padding: '1.2rem', height: '220px' }} />
+      ))}
+    </div>
+  )
+}
 
 function Templates() {
+  const { session } = useAuth()
+  const { showToast } = useToast()
+  const navigate = useNavigate()
+
+  const [templates, setTemplates] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [activeCategory, setActiveCategory] = useState('All')
+  const [searchText, setSearchText] = useState('')
+  const [startingSlug, setStartingSlug] = useState(null)
+
+  useEffect(() => {
+    async function loadTemplates() {
+      const { data, error } = await supabase.from('templates').select('*').order('created_at', { ascending: false })
+      if (!error) setTemplates(data || [])
+      setLoading(false)
+    }
+    loadTemplates()
+  }, [])
+
+  const categories = useMemo(() => {
+    const set = new Set(templates.map(t => t.category))
+    return ['All', ...Array.from(set).sort()]
+  }, [templates])
+
+  const visible = templates.filter(t => {
+    const matchesCategory = activeCategory === 'All' || t.category === activeCategory
+    const matchesSearch = !searchText.trim() ||
+      t.name.toLowerCase().includes(searchText.toLowerCase()) ||
+      t.description?.toLowerCase().includes(searchText.toLowerCase()) ||
+      t.highlights?.some(h => h.toLowerCase().includes(searchText.toLowerCase()))
+    return matchesCategory && matchesSearch
+  })
+
+  async function startTemplate(template) {
+    setStartingSlug(template.slug)
+    const { data, error } = await supabase.from('forms').insert([{
+      name: template.name,
+      fields: template.fields,
+      status: 'draft',
+      user_id: session.user.id,
+    }]).select().single()
+
+    setStartingSlug(null)
+    if (error || !data) {
+      showToast('Could not start this template: ' + (error?.message || 'unknown error'), 'error')
+      return
+    }
+    showToast(`"${template.name}" created — customize it now.`, 'success')
+    navigate(`/form/${data.id}/edit`)
+  }
+
   return (
     <div className="page" style={{ maxWidth: '1080px' }}>
       <div className="card" style={{ padding: '1.4rem 1.5rem', marginBottom: '1.2rem', background: 'linear-gradient(135deg, #f9fbff 0%, #f3f7ff 100%)' }}>
@@ -40,54 +78,79 @@ function Templates() {
         </p>
       </div>
 
-      <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
-        {templates.map((template) => (
-          <div key={template.slug} className="card" style={{ padding: '1.2rem 1.2rem 1.15rem', display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-              {template.eyebrow}
-            </div>
-            <div style={{ fontSize: '1.15rem', fontWeight: 800 }}>{template.title}</div>
-            <div style={{ color: 'var(--color-muted)', lineHeight: 1.55, fontSize: '0.94rem' }}>
-              {template.description}
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem' }}>
-              {template.highlights.map((item) => (
-                <span key={item} style={{ border: '1px solid var(--color-border)', borderRadius: '999px', padding: '0.28rem 0.6rem', fontSize: '0.78rem', color: 'var(--color-muted)' }}>
-                  {item}
-                </span>
-              ))}
-            </div>
-            <div style={{ display: 'flex', gap: '0.6rem', marginTop: 'auto', flexWrap: 'wrap' }}>
-              <Link to="/create">
-                <button>{template.cta}</button>
-              </Link>
-              <Link to="/">
-                <button className="secondary">View forms</button>
-              </Link>
-            </div>
+      {!loading && templates.length > 0 && (
+        <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '1.2rem' }}>
+          <input
+            type="text"
+            placeholder="Search templates..."
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            style={{ padding: '0.5rem 0.7rem', minWidth: '200px', flex: '0 1 240px' }}
+          />
+          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+            {categories.map(cat => (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setActiveCategory(cat)}
+                className={activeCategory === cat ? '' : 'secondary'}
+                style={{ fontSize: '0.82rem', padding: '0.35rem 0.8rem', borderRadius: '999px' }}
+              >
+                {cat}
+              </button>
+            ))}
           </div>
-        ))}
-      </div>
+        </div>
+      )}
 
-      <div className="card" style={{ marginTop: '1.2rem', padding: '1.2rem 1.25rem' }}>
-        <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-          Why templates help
+      {loading && <TemplatesSkeleton />}
+
+      {!loading && templates.length === 0 && (
+        <div className="card" style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--color-muted)' }}>
+          No templates are published yet — check back soon.
         </div>
-        <div style={{ display: 'grid', gap: '0.8rem', marginTop: '0.8rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
-          <div style={{ background: '#f8fbff', border: '1px solid #eef3fa', borderRadius: '0.8rem', padding: '0.9rem' }}>
-            <div style={{ fontWeight: 700, marginBottom: '0.25rem' }}>Launch quickly</div>
-            <div style={{ color: 'var(--color-muted)', fontSize: '0.9rem' }}>Use a strong starting point instead of building from a blank page.</div>
-          </div>
-          <div style={{ background: '#f8fbff', border: '1px solid #eef3fa', borderRadius: '0.8rem', padding: '0.9rem' }}>
-            <div style={{ fontWeight: 700, marginBottom: '0.25rem' }}>Stay consistent</div>
-            <div style={{ color: 'var(--color-muted)', fontSize: '0.9rem' }}>Keep your forms structured and easy for teams to reuse.</div>
-          </div>
-          <div style={{ background: '#f8fbff', border: '1px solid #eef3fa', borderRadius: '0.8rem', padding: '0.9rem' }}>
-            <div style={{ fontWeight: 700, marginBottom: '0.25rem' }}>Collect better data</div>
-            <div style={{ color: 'var(--color-muted)', fontSize: '0.9rem' }}>Each template is designed around common business and school use cases.</div>
-          </div>
+      )}
+
+      {!loading && templates.length > 0 && visible.length === 0 && (
+        <p style={{ color: 'var(--color-muted)' }}>No templates match your search.</p>
+      )}
+
+      {!loading && visible.length > 0 && (
+        <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
+          {visible.map((template) => (
+            <div key={template.id} className="card" style={{ padding: '1.2rem 1.2rem 1.15rem', display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+              {template.eyebrow && (
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                  {template.eyebrow}
+                </div>
+              )}
+              <div style={{ fontSize: '1.15rem', fontWeight: 800 }}>{template.name}</div>
+              {template.description && (
+                <div style={{ color: 'var(--color-muted)', lineHeight: 1.55, fontSize: '0.94rem' }}>
+                  {template.description}
+                </div>
+              )}
+              <div style={{ color: 'var(--color-muted)', fontSize: '0.8rem' }}>
+                {template.fields?.length || 0} field{template.fields?.length !== 1 ? 's' : ''}
+              </div>
+              {template.highlights?.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem' }}>
+                  {template.highlights.map((item) => (
+                    <span key={item} style={{ border: '1px solid var(--color-border)', borderRadius: '999px', padding: '0.28rem 0.6rem', fontSize: '0.78rem', color: 'var(--color-muted)' }}>
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div style={{ marginTop: 'auto' }}>
+                <button style={{ width: '100%' }} disabled={startingSlug === template.slug} onClick={() => startTemplate(template)}>
+                  {startingSlug === template.slug ? 'Creating…' : `Start ${template.name}`}
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
-      </div>
+      )}
     </div>
   )
 }

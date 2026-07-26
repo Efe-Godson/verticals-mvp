@@ -6,6 +6,8 @@ import ConfirmDialog from './ConfirmDialog'
 import { useToast } from './Toast'
 import HomeRecycleBinDialog from './HomeRecycleBinDialog'
 import { useRecycleBinTrigger } from './RecycleBinContext'
+import TemplateAdminSection from './TemplateAdminSection'
+import { TEMPLATE_ADMIN_USER_ID } from './adminAccount'
 
 const PAGE_SIZE = 8
 
@@ -99,7 +101,7 @@ function Home() {
   const [searchText, setSearchText] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('verticals_view_mode') || 'grid')
-  const [demoCollapsed, setDemoCollapsed] = useState(() => localStorage.getItem('verticals_demo_collapsed') === 'true')
+  const [demoCollapsed, setDemoCollapsed] = useState(() => localStorage.getItem('verticals_demo_collapsed') !== 'false')
   const [openMenuId, setOpenMenuId] = useState(null)
   const [pendingConfirm, setPendingConfirm] = useState(null) // { type: 'moveToBin', formId } | { type: 'bulkMoveToBin' } | { type: 'permanentDelete', formId } | { type: 'emptyBin' }
   const [selectedFormIds, setSelectedFormIds] = useState([])
@@ -523,47 +525,43 @@ function Home() {
       )}
 
       {!loading && demoForm && (
-        <div style={{ marginTop: '2.5rem' }}>
+        <div style={{ marginTop: '2.5rem', maxWidth: demoCollapsed ? '220px' : '100%' }}>
           <div
             onClick={toggleDemoCollapsed}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', userSelect: 'none' }}
-            title={demoCollapsed ? 'Expand' : 'Collapse'}
+            className="card"
+            style={{
+              padding: demoCollapsed ? '0.9rem 1.1rem' : '1.2rem 1.5rem',
+              cursor: 'pointer', userSelect: 'none', background: 'white'
+            }}
           >
-            <span style={{
-              display: 'inline-block', fontSize: '0.7rem', color: 'var(--color-muted)',
-              transform: demoCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.15s'
-            }}>
-              ▾
-            </span>
-            <h3 style={{ margin: '0 0 0.4rem 0', fontSize: '0.95rem', color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-              Try a Demo
-            </h3>
-          </div>
-
-          {!demoCollapsed && (
-            <>
-              <p style={{ margin: '0 0 0.9rem 0', color: 'var(--color-muted)', fontSize: '0.9rem', maxWidth: '520px' }}>
-                Explore a fully built example form with real submissions, see what records and reports look like once a form has been collecting data for a while.
-              </p>
-              <div className="card" style={{
-                padding: '1.2rem 1.5rem', display: 'flex', justifyContent: 'space-between',
-                alignItems: 'center', flexWrap: 'wrap', gap: '0.8rem'
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6rem' }}>
+              <span style={{ fontWeight: 600, fontSize: '0.92rem' }}>Try Demo</span>
+              <span style={{
+                display: 'inline-block', fontSize: '0.7rem', color: 'var(--color-muted)',
+                transform: demoCollapsed ? 'rotate(0deg)' : 'rotate(180deg)', transition: 'transform 0.15s'
               }}>
-                <div>
-                  <div style={{ fontWeight: '600', fontSize: '1.05rem' }}>{demoForm.name}</div>
-                  <div style={{ color: 'var(--color-muted)', fontSize: '0.85rem', marginTop: '0.2rem' }}>
-                    {demoForm.fields?.length || 0} field{demoForm.fields?.length !== 1 ? 's' : ''}
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                ▾
+              </span>
+            </div>
+
+            {!demoCollapsed && (
+              <div onClick={(e) => e.stopPropagation()} style={{ marginTop: '0.9rem' }}>
+                <p style={{ margin: '0 0 0.9rem 0', color: 'var(--color-muted)', fontSize: '0.88rem' }}>
+                  Explore "{demoForm.name}" — a fully built example with real submissions, so you can see what records and reports look like once a form has been collecting data for a while.
+                </p>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <Link to={`/form/${demoForm.id}/records`}><button className="secondary">View Records</button></Link>
                   <Link to={`/form/${demoForm.id}/report`}><button className="secondary">View Report</button></Link>
                   <Link to={`/form/${demoForm.id}`}><button>Open Form</button></Link>
                 </div>
               </div>
-            </>
-          )}
+            )}
+          </div>
         </div>
+      )}
+
+      {session?.user?.id === TEMPLATE_ADMIN_USER_ID && (
+        <TemplateAdminSection forms={forms} />
       )}
 
       {showBin && (
