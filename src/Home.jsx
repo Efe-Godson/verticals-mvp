@@ -101,6 +101,7 @@ function Home() {
   const [openMenuId, setOpenMenuId] = useState(null)
   const [pendingConfirm, setPendingConfirm] = useState(null) // { type: 'moveToBin', formId } | { type: 'bulkMoveToBin' } | { type: 'permanentDelete', formId } | { type: 'emptyBin' }
   const [selectedFormIds, setSelectedFormIds] = useState([])
+  const [selectionMode, setSelectionMode] = useState(false)
   const [binCount, setBinCount] = useState(0)
   const [showBin, setShowBin] = useState(false)
   const [trashedForms, setTrashedForms] = useState([])
@@ -242,6 +243,16 @@ function Home() {
     setSelectedFormIds(current => current.includes(formId) ? current.filter(id => id !== formId) : [...current, formId])
   }
 
+  function enterSelectionMode() {
+    setOpenMenuId(null)
+    setSelectionMode(true)
+  }
+
+  function exitSelectionMode() {
+    setSelectionMode(false)
+    setSelectedFormIds([])
+  }
+
   async function moveFormsToBin(formIds) {
     const { data, error } = await supabase
       .from('forms')
@@ -350,7 +361,7 @@ function Home() {
 
   const sharedProps = {
     togglePin, publishForm, setFormStatus, duplicateForm, copyLink, requestDelete, responseCounts,
-    selectedFormIds, toggleSelectForm,
+    selectedFormIds, toggleSelectForm, selectionMode, enterSelectionMode,
   }
   const formPendingDelete = forms.find(f => f.id === pendingConfirm?.formId)
 
@@ -392,14 +403,16 @@ function Home() {
         </div>
       </div>
 
-      {selectedFormIds.length > 0 && (
+      {selectionMode && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: '0.8rem', marginBottom: '1.2rem',
           padding: '0.6rem 1rem', background: '#eff6ff', border: '1px solid var(--color-primary)', borderRadius: 'var(--radius)'
         }}>
           <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>{selectedFormIds.length} selected</span>
-          <button className="secondary" style={{ color: '#c0392b' }} onClick={requestBulkDelete}>Delete Selected</button>
-          <button className="secondary" onClick={() => setSelectedFormIds([])}>Clear</button>
+          <button className="secondary" style={{ color: '#c0392b' }} disabled={selectedFormIds.length === 0} onClick={requestBulkDelete}>
+            Delete Selected
+          </button>
+          <button className="secondary" onClick={exitSelectionMode}>Cancel</button>
         </div>
       )}
 
@@ -583,7 +596,7 @@ function Home() {
   )
 }
 
-function ListView({ pageForms, togglePin, publishForm, setFormStatus, duplicateForm, copyLink, requestDelete, selectedFormIds, toggleSelectForm, openMenuId, setOpenMenuId, menuRef }) {
+function ListView({ pageForms, togglePin, publishForm, setFormStatus, duplicateForm, copyLink, requestDelete, selectedFormIds, toggleSelectForm, selectionMode, enterSelectionMode, openMenuId, setOpenMenuId, menuRef }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
       {pageForms.map(form => {
@@ -596,12 +609,14 @@ function ListView({ pageForms, togglePin, publishForm, setFormStatus, duplicateF
           background: selected ? '#eff6ff' : undefined
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
-            <input
-              type="checkbox"
-              checked={selected}
-              onChange={() => toggleSelectForm(form.id)}
-              onClick={(e) => e.stopPropagation()}
-            />
+            {selectionMode && (
+              <input
+                type="checkbox"
+                checked={selected}
+                onChange={() => toggleSelectForm(form.id)}
+                onClick={(e) => e.stopPropagation()}
+              />
+            )}
             <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               {form.pinned && (
@@ -669,6 +684,7 @@ function ListView({ pageForms, togglePin, publishForm, setFormStatus, duplicateF
                   {(form.status === 'published' || form.status === 'paused') && <MenuItem onClick={() => { setFormStatus(form.id, 'archived'); setOpenMenuId(null) }}>Archive</MenuItem>}
                   <MenuItem onClick={() => duplicateForm(form)}>Duplicate</MenuItem>
                   <MenuItem onClick={() => { togglePin(form.id, form.pinned); setOpenMenuId(null) }}>{form.pinned ? 'Unpin' : 'Pin'}</MenuItem>
+                  <MenuItem onClick={enterSelectionMode}>Select</MenuItem>
                   <MenuItem danger onClick={() => requestDelete(form.id)}>Delete</MenuItem>
                 </div>
               )}
@@ -722,6 +738,7 @@ function ListView({ pageForms, togglePin, publishForm, setFormStatus, duplicateF
                   {form.status === 'published' && <MenuItem onClick={() => { setFormStatus(form.id, 'paused'); setOpenMenuId(null) }}>Pause</MenuItem>}
                   {(form.status === 'published' || form.status === 'paused') && <MenuItem onClick={() => { setFormStatus(form.id, 'archived'); setOpenMenuId(null) }}>Archive</MenuItem>}
                   <MenuItem onClick={() => duplicateForm(form)}>Duplicate</MenuItem>
+                  <MenuItem onClick={enterSelectionMode}>Select</MenuItem>
                   <MenuItem danger onClick={() => requestDelete(form.id)}>Delete</MenuItem>
                 </div>
               )}
@@ -734,7 +751,7 @@ function ListView({ pageForms, togglePin, publishForm, setFormStatus, duplicateF
   )
 }
 
-function GridView({ pageForms, togglePin, publishForm, setFormStatus, duplicateForm, copyLink, requestDelete, responseCounts, selectedFormIds, toggleSelectForm, openMenuId, setOpenMenuId, menuRef }) {
+function GridView({ pageForms, togglePin, publishForm, setFormStatus, duplicateForm, copyLink, requestDelete, responseCounts, selectedFormIds, toggleSelectForm, selectionMode, enterSelectionMode, openMenuId, setOpenMenuId, menuRef }) {
   return (
     <div style={{
       display: 'grid',
@@ -756,11 +773,13 @@ function GridView({ pageForms, togglePin, publishForm, setFormStatus, duplicateF
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0 }}>
-              <input
-                type="checkbox"
-                checked={selected}
-                onChange={() => toggleSelectForm(form.id)}
-              />
+              {selectionMode && (
+                <input
+                  type="checkbox"
+                  checked={selected}
+                  onChange={() => toggleSelectForm(form.id)}
+                />
+              )}
               {form.pinned && (
                 <span title="Pinned"><PinIcon size={12} /></span>
               )}
@@ -810,6 +829,7 @@ function GridView({ pageForms, togglePin, publishForm, setFormStatus, duplicateF
                   {form.status === 'published' && <MenuItem onClick={() => { setFormStatus(form.id, 'paused'); setOpenMenuId(null) }}>Pause</MenuItem>}
                   {(form.status === 'published' || form.status === 'paused') && <MenuItem onClick={() => { setFormStatus(form.id, 'archived'); setOpenMenuId(null) }}>Archive</MenuItem>}
                   <MenuItem onClick={() => duplicateForm(form)}>Duplicate</MenuItem>
+                  <MenuItem onClick={enterSelectionMode}>Select</MenuItem>
                   <MenuItem danger onClick={() => requestDelete(form.id)}>Delete</MenuItem>
                 </div>
               )}
