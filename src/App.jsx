@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './AuthContext'
+import { isFirstVisit } from './firstVisit'
 import { ToastProvider } from './Toast'
 import { RecycleBinProvider } from './RecycleBinContext'
 import Home from './Home'
@@ -22,7 +23,7 @@ import NavBar from './NavBar'
 function PrivateRoute({ children }) {
   const { session, loading } = useAuth()
   if (loading) return <div className="page">Loading...</div>
-  if (!session) return <Navigate to="/login" replace />
+  if (!session) return <Navigate to={isFirstVisit() ? '/signup' : '/login'} replace />
   return children
 }
 

@@ -102,7 +102,7 @@ function SignUp() {
         style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.6rem' }}
       >
         <GoogleLogo />
-        {googleLoading ? 'Redirecting to Google...' : 'Continue with Google'}
+        {googleLoading ? 'Redirecting to Google...' : 'Sign up with Google'}
       </button>
 
       {message && <p style={{ marginTop: '1rem', color: '#c0392b' }}>{message}</p>}

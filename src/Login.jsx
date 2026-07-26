@@ -112,7 +112,7 @@ function Login() {
             style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.6rem' }}
           >
             <GoogleLogo />
-            {googleLoading ? 'Redirecting to Google...' : 'Continue with Google'}
+            {googleLoading ? 'Redirecting to Google...' : 'Log in with Google'}
           </button>
         </>
       )}
