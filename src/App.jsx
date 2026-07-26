@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './AuthContext'
 import { ToastProvider } from './Toast'
+import { RecycleBinProvider } from './RecycleBinContext'
 import Home from './Home'
 import CreateForm from './CreateForm'
 import EditForm from './EditForm'
@@ -67,7 +68,9 @@ function App() {
   return (
     <AuthProvider>
       <ToastProvider>
-        <AppShell />
+        <RecycleBinProvider>
+          <AppShell />
+        </RecycleBinProvider>
       </ToastProvider>
     </AuthProvider>
   )

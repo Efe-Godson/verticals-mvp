@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { supabase } from './supabaseClient'
+import { useRecycleBinTrigger } from './RecycleBinContext'
 
 function NavBar() {
   const location = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
+  const { trigger: binTrigger } = useRecycleBinTrigger()
 
   // Manually extract the form ID from paths like /form/abc-123/records
   const match = location.pathname.match(/^\/form\/([^/]+)/)
@@ -40,6 +42,11 @@ function NavBar() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          {binTrigger && (
+            <button className="secondary" onClick={binTrigger.onOpen}>
+              Recycle Bin{binTrigger.count > 0 ? ` (${binTrigger.count})` : ''}
+            </button>
+          )}
           <button className="secondary" onClick={() => supabase.auth.signOut()}>Log out</button>
 
           {isFormContext && (

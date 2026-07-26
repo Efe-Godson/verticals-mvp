@@ -5,6 +5,7 @@ import { useAuth } from './AuthContext'
 import ConfirmDialog from './ConfirmDialog'
 import { useToast } from './Toast'
 import HomeRecycleBinDialog from './HomeRecycleBinDialog'
+import { useRecycleBinTrigger } from './RecycleBinContext'
 
 const PAGE_SIZE = 8
 
@@ -89,6 +90,7 @@ function getContextualAction(formId, responseCounts) {
 function Home() {
   const { session } = useAuth()
   const { showToast } = useToast()
+  const { setTrigger } = useRecycleBinTrigger()
   const [forms, setForms] = useState([])
   const [demoForm, setDemoForm] = useState(null)
   const [responseCounts, setResponseCounts] = useState({})
@@ -180,6 +182,15 @@ function Home() {
     }
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [openMenuId])
+
+  // Publishes the bin's open handler + count to NavBar, which renders the
+  // actual button — NavBar isn't a descendant of Home, so it can't call
+  // openBin() directly. Clear the trigger on unmount so the button
+  // disappears once you navigate away from a page that owns a bin.
+  useEffect(() => {
+    setTrigger({ onOpen: openBin, count: binCount })
+    return () => setTrigger(null)
+  }, [binCount])
 
   function changeViewMode(mode) {
     setViewMode(mode)
@@ -376,9 +387,6 @@ function Home() {
       <div className="toolbar-row" style={{ justifyContent: 'space-between', marginBottom: '1.5rem' }}>
         <h1 style={{ margin: 0 }}>Your Forms</h1>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <button className="secondary" onClick={openBin} style={{ position: 'relative' }}>
-            Recycle Bin{binCount > 0 ? ` (${binCount})` : ''}
-          </button>
           <div style={{ display: 'flex', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
             <button
               onClick={() => changeViewMode('list')}
