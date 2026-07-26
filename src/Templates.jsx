@@ -6,12 +6,71 @@ import { useToast } from './Toast'
 import { TEMPLATE_ADMIN_USER_ID } from './adminAccount'
 import TemplateEditorDialog from './TemplateEditorDialog'
 
+const ROW_HEIGHT = 60
+
 function TemplatesSkeleton() {
   return (
-    <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
-      {[0, 1, 2].map(i => (
-        <div key={i} className="card" style={{ padding: '1.2rem', height: '220px' }} />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      {[0, 1, 2, 3, 4].map(i => (
+        <div key={i} className="card" style={{ height: ROW_HEIGHT }} />
       ))}
+    </div>
+  )
+}
+
+// Square (name) + rectangle (details + actions) pair, same height, kept
+// small enough that ~10 fit on screen without scrolling — this page is
+// meant to be scanned quickly, not browsed like a gallery of big cards.
+function TemplateRow({ template, started, starting, isAdmin, onStart, onAccess, onManage, onDelete }) {
+  const detail = template.description
+    || (template.bundle?.length > 0 ? `${template.bundle.length} linked forms` : `${template.fields?.length || 0} field${template.fields?.length !== 1 ? 's' : ''}`)
+
+  return (
+    <div style={{ display: 'flex', gap: '0.5rem', height: ROW_HEIGHT }}>
+      <div style={{
+        width: ROW_HEIGHT, height: ROW_HEIGHT, flexShrink: 0,
+        border: '1px solid var(--color-border)', borderRadius: '6px',
+        padding: '0.3rem 0.4rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        textAlign: 'center', overflow: 'hidden'
+      }}>
+        <span style={{
+          fontSize: '0.66rem', fontWeight: 700, lineHeight: 1.2,
+          display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+        }}>
+          {template.name}
+        </span>
+      </div>
+
+      <div style={{
+        flex: 1, height: ROW_HEIGHT, minWidth: 0,
+        border: '1px solid var(--color-border)', borderRadius: '6px',
+        padding: '0.3rem 0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6rem'
+      }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ fontSize: '0.68rem', color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+            {template.category}
+          </div>
+          <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {detail}
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '0.35rem', flexShrink: 0, alignItems: 'center' }}>
+          {isAdmin && (
+            <>
+              <button className="secondary" style={{ fontSize: '0.72rem', padding: '0.25rem 0.55rem' }} onClick={onManage}>Manage</button>
+              <button className="secondary" style={{ fontSize: '0.72rem', padding: '0.25rem 0.55rem', color: '#c0392b' }} onClick={onDelete}>Delete</button>
+            </>
+          )}
+          {started ? (
+            <button style={{ fontSize: '0.8rem', padding: '0.3rem 0.75rem', whiteSpace: 'nowrap' }} onClick={onAccess}>Access</button>
+          ) : (
+            <button style={{ fontSize: '0.8rem', padding: '0.3rem 0.75rem', whiteSpace: 'nowrap' }} disabled={starting} onClick={onStart}>
+              {starting ? '…' : 'Start'}
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
@@ -30,6 +89,7 @@ function Templates() {
   const [editingTemplate, setEditingTemplate] = useState(null) // null = closed, {} = new, template object = editing
   const [pendingDeleteId, setPendingDeleteId] = useState(null)
   const [allForms, setAllForms] = useState([]) // admin-only: for TemplateEditorDialog's "link to" choices
+  const [galleryExpanded, setGalleryExpanded] = useState(true)
 
   const isAdmin = session.user.id === TEMPLATE_ADMIN_USER_ID
 
@@ -101,6 +161,8 @@ function Templates() {
     return matchesCategory && matchesSearch
   })
 
+  const inUseTemplates = templates.filter(t => myFormsBySlug[t.slug])
+
   // Bundle templates (e.g. Employees + Salary Events) create multiple forms
   // at once. A linked_record field's linkedFormId can be a placeholder like
   // "$employees" pointing at another entry's `key` — those don't have real
@@ -164,6 +226,7 @@ function Templates() {
         const destination = template.bundle[0].settings?.payrollRole === 'employees'
           ? `/form/${primaryFormId}/payroll`
           : `/form/${primaryFormId}/edit`
+        setMyFormsBySlug(current => ({ ...current, [template.slug]: primaryFormId }))
         navigate(destination)
         return
       }
@@ -178,6 +241,7 @@ function Templates() {
 
       if (error || !data) throw new Error(error?.message || 'unknown error')
       showToast(`"${template.name}" created — customize it now.`, 'success')
+      setMyFormsBySlug(current => ({ ...current, [template.slug]: data.id }))
       navigate(`/form/${data.id}/edit`)
     } catch (err) {
       showToast('Could not start this template: ' + err.message, 'error')
@@ -196,7 +260,7 @@ function Templates() {
   }
 
   return (
-    <div className="page" style={{ maxWidth: '1080px' }}>
+    <div className="page" style={{ maxWidth: '860px' }}>
       <div className="card" style={{ padding: '1.4rem 1.5rem', marginBottom: '1.2rem', background: 'linear-gradient(135deg, #f9fbff 0%, #f3f7ff 100%)' }}>
         <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
           Templates
@@ -207,102 +271,103 @@ function Templates() {
         </p>
       </div>
 
-      {isAdmin && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
-          <button className="secondary" onClick={() => setEditingTemplate({})}>+ New Template</button>
-        </div>
-      )}
-
-      {!loading && templates.length > 0 && (
-        <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '1.2rem' }}>
-          <input
-            type="text"
-            placeholder="Search templates..."
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            style={{ padding: '0.5rem 0.7rem', minWidth: '200px', flex: '0 1 240px' }}
-          />
-          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-            {categories.map(cat => (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => setActiveCategory(cat)}
-                className={activeCategory === cat ? '' : 'secondary'}
-                style={{ fontSize: '0.82rem', padding: '0.35rem 0.8rem', borderRadius: '999px' }}
-              >
-                {cat}
-              </button>
+      {!loading && inUseTemplates.length > 0 && (
+        <div style={{ marginBottom: '2rem' }}>
+          <h3 style={{ margin: '0 0 0.7rem', fontSize: '0.85rem', color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+            Templates in Use
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {inUseTemplates.map(template => (
+              <TemplateRow
+                key={template.id}
+                template={template}
+                started
+                isAdmin={isAdmin}
+                onAccess={() => accessTemplate(template)}
+                onManage={() => setEditingTemplate(template)}
+                onDelete={() => setPendingDeleteId(template.id)}
+              />
             ))}
           </div>
         </div>
       )}
 
-      {loading && <TemplatesSkeleton />}
+      <div
+        onClick={() => setGalleryExpanded(v => !v)}
+        style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', userSelect: 'none', marginBottom: '0.8rem' }}
+      >
+        <span style={{ fontSize: '0.7rem', color: 'var(--color-muted)', transform: galleryExpanded ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.15s', display: 'inline-block' }}>▾</span>
+        <h3 style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+          All Templates
+        </h3>
+        {isAdmin && (
+          <button
+            className="secondary"
+            onClick={(e) => { e.stopPropagation(); setEditingTemplate({}) }}
+            style={{ marginLeft: 'auto', fontSize: '0.8rem', padding: '0.3rem 0.7rem' }}
+          >
+            + New Template
+          </button>
+        )}
+      </div>
 
-      {!loading && templates.length === 0 && (
-        <div className="card" style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--color-muted)' }}>
-          No templates are published yet — check back soon.
-        </div>
-      )}
-
-      {!loading && templates.length > 0 && visible.length === 0 && (
-        <p style={{ color: 'var(--color-muted)' }}>No templates match your search.</p>
-      )}
-
-      {!loading && visible.length > 0 && (
-        <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
-          {visible.map((template) => (
-            <div key={template.id} className="card" style={{ padding: '1.2rem 1.2rem 1.15rem', display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-              {template.eyebrow && (
-                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                  {template.eyebrow}
-                </div>
-              )}
-              <div style={{ fontSize: '1.15rem', fontWeight: 800 }}>{template.name}</div>
-              {template.description && (
-                <div style={{ color: 'var(--color-muted)', lineHeight: 1.55, fontSize: '0.94rem' }}>
-                  {template.description}
-                </div>
-              )}
-              <div style={{ color: 'var(--color-muted)', fontSize: '0.8rem' }}>
-                {template.bundle?.length > 0
-                  ? `${template.bundle.length} linked forms`
-                  : `${template.fields?.length || 0} field${template.fields?.length !== 1 ? 's' : ''}`}
-              </div>
-              {template.highlights?.length > 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem' }}>
-                  {template.highlights.map((item) => (
-                    <span key={item} style={{ border: '1px solid var(--color-border)', borderRadius: '999px', padding: '0.28rem 0.6rem', fontSize: '0.78rem', color: 'var(--color-muted)' }}>
-                      {item}
-                    </span>
-                  ))}
-                </div>
-              )}
-              <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {myFormsBySlug[template.slug] ? (
-                  <button style={{ width: '100%' }} onClick={() => accessTemplate(template)}>
-                    Access {template.name}
+      {galleryExpanded && (
+        <>
+          {!loading && templates.length > 0 && (
+            <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '1rem' }}>
+              <input
+                type="text"
+                placeholder="Search templates..."
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                style={{ padding: '0.45rem 0.7rem', minWidth: '200px', flex: '0 1 240px' }}
+              />
+              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                {categories.map(cat => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setActiveCategory(cat)}
+                    className={activeCategory === cat ? '' : 'secondary'}
+                    style={{ fontSize: '0.78rem', padding: '0.3rem 0.7rem', borderRadius: '999px' }}
+                  >
+                    {cat}
                   </button>
-                ) : (
-                  <button style={{ width: '100%' }} disabled={startingSlug === template.slug} onClick={() => startTemplate(template)}>
-                    {startingSlug === template.slug ? 'Creating…' : `Start ${template.name}`}
-                  </button>
-                )}
-                {isAdmin && (
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button className="secondary" style={{ flex: 1, fontSize: '0.82rem' }} onClick={() => setEditingTemplate(template)}>
-                      Manage
-                    </button>
-                    <button className="secondary" style={{ flex: 1, fontSize: '0.82rem', color: '#c0392b' }} onClick={() => setPendingDeleteId(template.id)}>
-                      Delete
-                    </button>
-                  </div>
-                )}
+                ))}
               </div>
             </div>
-          ))}
-        </div>
+          )}
+
+          {loading && <TemplatesSkeleton />}
+
+          {!loading && templates.length === 0 && (
+            <div className="card" style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--color-muted)' }}>
+              No templates are published yet — check back soon.
+            </div>
+          )}
+
+          {!loading && templates.length > 0 && visible.length === 0 && (
+            <p style={{ color: 'var(--color-muted)' }}>No templates match your search.</p>
+          )}
+
+          {!loading && visible.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {visible.map((template) => (
+                <TemplateRow
+                  key={template.id}
+                  template={template}
+                  started={!!myFormsBySlug[template.slug]}
+                  starting={startingSlug === template.slug}
+                  isAdmin={isAdmin}
+                  onStart={() => startTemplate(template)}
+                  onAccess={() => accessTemplate(template)}
+                  onManage={() => setEditingTemplate(template)}
+                  onDelete={() => setPendingDeleteId(template.id)}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {editingTemplate && (

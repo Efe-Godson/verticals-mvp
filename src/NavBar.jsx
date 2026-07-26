@@ -67,6 +67,14 @@ function NavBar() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
           <Link to="/" style={{ fontWeight: 'bold', fontSize: '1.05rem' }}>Verticals</Link>
           <Link to="/templates" style={{ color: location.pathname === '/templates' ? 'var(--color-primary)' : 'var(--color-muted)', fontSize: '0.9rem' }}>Templates</Link>
+          {binTrigger && (
+            <span
+              onClick={binTrigger.onOpen}
+              style={{ color: 'var(--color-muted)', fontSize: '0.9rem', cursor: 'pointer' }}
+            >
+              Recycle Bin{binTrigger.count > 0 ? ` (${binTrigger.count})` : ''}
+            </span>
+          )}
 
           {isFormContext && (
             <div className="navbar-links-desktop" style={{ display: 'flex', gap: '1rem', fontSize: '0.9rem' }}>
@@ -109,11 +117,6 @@ function NavBar() {
                 </>
               )}
             </div>
-          )}
-          {binTrigger && (
-            <button className="secondary" onClick={binTrigger.onOpen}>
-              Recycle Bin{binTrigger.count > 0 ? ` (${binTrigger.count})` : ''}
-            </button>
           )}
           <Link
             to="/account"
