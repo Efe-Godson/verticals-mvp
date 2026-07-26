@@ -10,6 +10,7 @@ import Records from './Records'
 import Report from './Report'
 import AIAnalystPage from './AIAnalystPage'
 import FormSettings from './FormSettings'
+import PayrollPage from './PayrollPage'
 import Login from './Login'
 import SignUp from './SignUp'
 import ConfirmEmail from './ConfirmEmail'
@@ -59,6 +60,7 @@ function AppShell() {
         <Route path="/form/:id/report" element={<PrivateRoute><Report /></PrivateRoute>} />
         <Route path="/form/:id/ai-analyst" element={<PrivateRoute><AIAnalystPage /></PrivateRoute>} />
         <Route path="/form/:id/settings" element={<PrivateRoute><FormSettings /></PrivateRoute>} />
+        <Route path="/form/:id/payroll" element={<PrivateRoute><PayrollPage /></PrivateRoute>} />
       </Routes>
     </>
   )

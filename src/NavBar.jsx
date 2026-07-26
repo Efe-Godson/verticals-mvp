@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { useRecycleBinTrigger } from './RecycleBinContext'
@@ -6,12 +6,25 @@ import { useRecycleBinTrigger } from './RecycleBinContext'
 function NavBar() {
   const location = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [isPayrollForm, setIsPayrollForm] = useState(false)
   const { trigger: binTrigger } = useRecycleBinTrigger()
 
   // Manually extract the form ID from paths like /form/abc-123/records
   const match = location.pathname.match(/^\/form\/([^/]+)/)
   const id = match ? match[1] : null
   const isFormContext = !!id
+
+  // Only Employees forms (created by the Staff Payment Tracker template)
+  // get a Payroll tab — a lightweight settings-only lookup per form
+  // navigation, not worth a shared context for a single boolean.
+  useEffect(() => {
+    let cancelled = false
+    if (!id) { setIsPayrollForm(false); return }
+    supabase.from('forms').select('settings').eq('id', id).single().then(({ data }) => {
+      if (!cancelled) setIsPayrollForm(data?.settings?.payrollRole === 'employees')
+    })
+    return () => { cancelled = true }
+  }, [id])
 
   function linkColor(segment) {
     return location.pathname.includes(segment) ? 'var(--color-primary)' : 'var(--color-muted)'
@@ -35,6 +48,7 @@ function NavBar() {
               <Link to={`/form/${id}/edit`} style={{ color: linkColor('/edit') }}>Builder</Link>
               <Link to={`/form/${id}/records`} style={{ color: linkColor('/records') }}>Records</Link>
               <Link to={`/form/${id}/report`} style={{ color: linkColor('/report') }}>Report</Link>
+              {isPayrollForm && <Link to={`/form/${id}/payroll`} style={{ color: linkColor('/payroll') }}>Payroll</Link>}
               <Link to={`/form/${id}/ai-analyst`} style={{ color: linkColor('/ai-analyst') }}>AI Analyst</Link>
               <Link to={`/form/${id}/settings`} style={{ color: linkColor('/settings') }}>Settings</Link>
             </div>
@@ -68,6 +82,7 @@ function NavBar() {
           <Link to={`/form/${id}/edit`} style={{ color: linkColor('/edit') }} onClick={() => setMenuOpen(false)}>Builder</Link>
           <Link to={`/form/${id}/records`} style={{ color: linkColor('/records') }} onClick={() => setMenuOpen(false)}>Records</Link>
           <Link to={`/form/${id}/report`} style={{ color: linkColor('/report') }} onClick={() => setMenuOpen(false)}>Report</Link>
+          {isPayrollForm && <Link to={`/form/${id}/payroll`} style={{ color: linkColor('/payroll') }} onClick={() => setMenuOpen(false)}>Payroll</Link>}
           <Link to={`/form/${id}/ai-analyst`} style={{ color: linkColor('/ai-analyst') }} onClick={() => setMenuOpen(false)}>AI Analyst</Link>
           <Link to={`/form/${id}/settings`} style={{ color: linkColor('/settings') }} onClick={() => setMenuOpen(false)}>Settings</Link>
         </div>
