@@ -1,8 +1,8 @@
 // Place at: src/PayrollPage.jsx
-// Route: /form/:id/payroll — :id is the Employees form. Finds its paired
-// Salary Events form via settings.linkedEmployeesFormId, computes each
-// employee's breakdown for the selected period, and lets the owner mark
-// Paid/Pending (persisted in payroll_payments; the breakdown itself is
+// Route: /form/:id/payroll/payments — :id is the Employees form. Finds its
+// paired Salary Events form via settings.linkedEmployeesFormId, computes
+// each employee's breakdown for the selected period, and lets the owner
+// mark Paid/Pending (persisted in payroll_payments; the breakdown itself is
 // always recomputed live from Employees + Salary Events).
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
@@ -10,6 +10,7 @@ import { supabase } from './supabaseClient'
 import { useToast } from './Toast'
 import { calculateEmployeePayroll, eventPeriod, eventEmployeeId } from './payroll/calculatePayroll'
 import StatTile from './report/components/StatTile'
+import { PayrollSubNav } from './PayrollDashboard'
 
 function currentPeriod() {
   const now = new Date()
@@ -155,6 +156,8 @@ function PayrollPage() {
         </div>
         <input type="month" value={period} onChange={(e) => setPeriod(e.target.value)} style={{ padding: '0.5rem' }} />
       </div>
+
+      <PayrollSubNav id={id} active="payments" />
 
       {!eventsForm && (
         <p style={{ color: 'var(--color-muted)', marginTop: '1rem' }}>
