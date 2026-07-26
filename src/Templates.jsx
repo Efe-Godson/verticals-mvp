@@ -6,7 +6,18 @@ import { useToast } from './Toast'
 import { TEMPLATE_ADMIN_USER_ID } from './adminAccount'
 import TemplateEditorDialog from './TemplateEditorDialog'
 
-const ROW_HEIGHT = 60
+const ROW_HEIGHT = 64
+
+// Stable per-category color so the square reads as more than a label —
+// consistent across sessions since it's keyed by name, not insertion order.
+const CATEGORY_COLORS = {
+  'Retail': '#0ea5e9', 'Restaurant': '#f97316', 'Education': '#8b5cf6',
+  'Healthcare': '#ef4444', 'Nonprofit': '#16a34a', 'Events': '#d946ef',
+  'HR & Operations': '#0070f3', 'Other': '#6b7280',
+}
+function categoryColor(category) {
+  return CATEGORY_COLORS[category] || '#6b7280'
+}
 
 function TemplatesSkeleton() {
   return (
@@ -24,35 +35,45 @@ function TemplatesSkeleton() {
 function TemplateRow({ template, started, starting, isAdmin, onStart, onAccess, onManage, onDelete }) {
   const detail = template.description
     || (template.bundle?.length > 0 ? `${template.bundle.length} linked forms` : `${template.fields?.length || 0} field${template.fields?.length !== 1 ? 's' : ''}`)
+  const color = categoryColor(template.category)
 
   return (
-    <div style={{ display: 'flex', gap: '0.5rem', height: ROW_HEIGHT }}>
-      <div style={{
-        width: ROW_HEIGHT, height: ROW_HEIGHT, flexShrink: 0,
-        border: '1px solid var(--color-border)', borderRadius: '6px',
-        padding: '0.3rem 0.4rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        textAlign: 'center', overflow: 'hidden'
-      }}>
+    <div className="template-row" style={{ display: 'flex', gap: '0.5rem', height: ROW_HEIGHT }}>
+      <div
+        className="template-row-tile"
+        style={{
+          width: ROW_HEIGHT, height: ROW_HEIGHT, flexShrink: 0,
+          borderRadius: '8px', borderLeft: `3px solid ${color}`,
+          background: `${color}14`,
+          padding: '0.3rem 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          textAlign: 'center', overflow: 'hidden'
+        }}
+      >
         <span style={{
-          fontSize: '0.66rem', fontWeight: 700, lineHeight: 1.2,
+          fontSize: '0.68rem', fontWeight: 700, lineHeight: 1.25, color: 'var(--color-text)',
           display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden'
         }}>
           {template.name}
         </span>
       </div>
 
-      <div style={{
-        flex: 1, height: ROW_HEIGHT, minWidth: 0,
-        border: '1px solid var(--color-border)', borderRadius: '6px',
-        padding: '0.3rem 0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6rem'
-      }}>
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontSize: '0.68rem', color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+      <div
+        className="template-row-tile"
+        style={{
+          flex: 1, height: ROW_HEIGHT, minWidth: 0,
+          border: '1px solid var(--color-border)', borderRadius: '8px',
+          padding: '0.4rem 0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6rem'
+        }}
+      >
+        <div style={{ minWidth: 0, flex: 1, display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
+          <span style={{
+            fontSize: '0.68rem', fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '0.03em', flexShrink: 0
+          }}>
             {template.category}
-          </div>
-          <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          </span>
+          <span style={{ fontSize: '0.8rem', color: 'var(--color-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {detail}
-          </div>
+          </span>
         </div>
 
         <div style={{ display: 'flex', gap: '0.35rem', flexShrink: 0, alignItems: 'center' }}>
@@ -63,7 +84,7 @@ function TemplateRow({ template, started, starting, isAdmin, onStart, onAccess, 
             </>
           )}
           {started ? (
-            <button style={{ fontSize: '0.8rem', padding: '0.3rem 0.75rem', whiteSpace: 'nowrap' }} onClick={onAccess}>Access</button>
+            <button className="secondary" style={{ fontSize: '0.8rem', padding: '0.3rem 0.75rem', whiteSpace: 'nowrap' }} onClick={onAccess}>Access</button>
           ) : (
             <button style={{ fontSize: '0.8rem', padding: '0.3rem 0.75rem', whiteSpace: 'nowrap' }} disabled={starting} onClick={onStart}>
               {starting ? '…' : 'Start'}
@@ -261,6 +282,11 @@ function Templates() {
 
   return (
     <div className="page" style={{ maxWidth: '860px' }}>
+      <style>{`
+        .template-row-tile { transition: border-color 0.12s ease, box-shadow 0.12s ease; }
+        .template-row:hover .template-row-tile { border-color: var(--color-primary); }
+        .template-row:hover .template-row-tile:first-child { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+      `}</style>
       <div className="card" style={{ padding: '1.4rem 1.5rem', marginBottom: '1.2rem', background: 'linear-gradient(135deg, #f9fbff 0%, #f3f7ff 100%)' }}>
         <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
           Templates
@@ -282,10 +308,7 @@ function Templates() {
                 key={template.id}
                 template={template}
                 started
-                isAdmin={isAdmin}
                 onAccess={() => accessTemplate(template)}
-                onManage={() => setEditingTemplate(template)}
-                onDelete={() => setPendingDeleteId(template.id)}
               />
             ))}
           </div>
