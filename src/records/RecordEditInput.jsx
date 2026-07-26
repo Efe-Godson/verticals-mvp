@@ -1,4 +1,17 @@
 export function RecordEditInput({ field, value, onChange }) {
+  if (field.type === 'linked_record') {
+    // Editing this inline would need to re-fetch the linked form's records
+    // (RecordEditInput has no access to the other form's data) — shown
+    // read-only here for now; edit it from the linked form's own record.
+    return (
+      <input
+        type="text"
+        value={value?.label || ''}
+        disabled
+        style={{ padding: '0.5rem', width: '100%', color: 'var(--color-muted)' }}
+      />
+    )
+  }
   if (field.type === 'longtext') {
     return (
       <textarea

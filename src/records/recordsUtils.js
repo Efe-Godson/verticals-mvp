@@ -37,15 +37,6 @@ export function getDateRangeBounds(range, customStart, customEnd) {
   return { start, end: null }
 }
 
-export function compareValues(a, b, field) {
-  const valA = a.data[field.id]
-  const valB = b.data[field.id]
-  if (valA === undefined || valA === null || valA === '') return 1
-  if (valB === undefined || valB === null || valB === '') return -1
-  if (field.type === 'number') return Number(valA) - Number(valB)
-  if (field.type === 'date') return new Date(valA) - new Date(valB)
-  return valA.toString().localeCompare(valB.toString())
-}
 
 export function passesFilter(sub, field, filter) {
   const value = sub.data[field.id]
@@ -69,5 +60,8 @@ export function passesFilter(sub, field, filter) {
     return filter.selected.includes(value)
   }
   if (!value) return false
+  if (field.type === 'linked_record') {
+    return (value.label || '').toString().toLowerCase().includes((filter.value || '').toLowerCase())
+  }
   return value.toString().toLowerCase().includes((filter.value || '').toLowerCase())
 }

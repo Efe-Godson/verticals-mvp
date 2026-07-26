@@ -48,22 +48,66 @@ function Templates() {
     return matchesCategory && matchesSearch
   })
 
+  // Bundle templates (e.g. Employees + Salary Events) create multiple forms
+  // at once. A linked_record field's linkedFormId can be a placeholder like
+  // "$employees" pointing at another entry's `key` — those don't have real
+  // ids until the forms are actually created, so this resolves them after
+  // insert instead of the template storing real (and reusable) form ids.
+  async function startBundleTemplate(template) {
+    const createdByKey = {}
+
+    function resolvePlaceholder(value) {
+      return typeof value === 'string' && value.startsWith('$') ? createdByKey[value.slice(1)] : value
+    }
+
+    for (const spec of template.bundle) {
+      const resolvedFields = spec.fields.map(field => (
+        field.type === 'linked_record' ? { ...field, linkedFormId: resolvePlaceholder(field.linkedFormId) } : field
+      ))
+      const resolvedSettings = spec.settings
+        ? Object.fromEntries(Object.entries(spec.settings).map(([k, v]) => [k, resolvePlaceholder(v)]))
+        : undefined
+
+      const { data, error } = await supabase.from('forms').insert([{
+        name: spec.name,
+        fields: resolvedFields,
+        settings: resolvedSettings,
+        status: 'draft',
+        user_id: session.user.id,
+      }]).select().single()
+
+      if (error || !data) throw new Error(error?.message || `Could not create "${spec.name}"`)
+      createdByKey[spec.key] = data.id
+    }
+
+    return createdByKey
+  }
+
   async function startTemplate(template) {
     setStartingSlug(template.slug)
-    const { data, error } = await supabase.from('forms').insert([{
-      name: template.name,
-      fields: template.fields,
-      status: 'draft',
-      user_id: session.user.id,
-    }]).select().single()
+    try {
+      if (template.bundle?.length > 0) {
+        const createdByKey = await startBundleTemplate(template)
+        showToast(`"${template.name}" created — ${template.bundle.length} forms set up and linked.`, 'success')
+        navigate(`/form/${createdByKey[template.bundle[0].key]}/edit`)
+        return
+      }
 
-    setStartingSlug(null)
-    if (error || !data) {
-      showToast('Could not start this template: ' + (error?.message || 'unknown error'), 'error')
-      return
+      const { data, error } = await supabase.from('forms').insert([{
+        name: template.name,
+        fields: template.fields,
+        status: 'draft',
+        user_id: session.user.id,
+      }]).select().single()
+
+      if (error || !data) throw new Error(error?.message || 'unknown error')
+      showToast(`"${template.name}" created — customize it now.`, 'success')
+      navigate(`/form/${data.id}/edit`)
+    } catch (err) {
+      showToast('Could not start this template: ' + err.message, 'error')
+    } finally {
+      setStartingSlug(null)
     }
-    showToast(`"${template.name}" created — customize it now.`, 'success')
-    navigate(`/form/${data.id}/edit`)
   }
 
   return (
@@ -131,7 +175,9 @@ function Templates() {
                 </div>
               )}
               <div style={{ color: 'var(--color-muted)', fontSize: '0.8rem' }}>
-                {template.fields?.length || 0} field{template.fields?.length !== 1 ? 's' : ''}
+                {template.bundle?.length > 0
+                  ? `${template.bundle.length} linked forms`
+                  : `${template.fields?.length || 0} field${template.fields?.length !== 1 ? 's' : ''}`}
               </div>
               {template.highlights?.length > 0 && (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem' }}>

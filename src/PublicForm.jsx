@@ -17,6 +17,7 @@ function PublicForm() {
   const [errors, setErrors] = useState({})
   const [uploading, setUploading] = useState({})
   const [editLink, setEditLink] = useState(null)
+  const [linkedOptions, setLinkedOptions] = useState({}) // { [fieldId]: [{ recordId, label }] }
 
   // Prefills the builder state from a saved submission — the inverse of the
   // { items, total } / plain-value shape submitAnswers() writes out.
@@ -76,6 +77,33 @@ function PublicForm() {
     if (token) loadForEdit()
     else loadForm()
   }, [id, token])
+
+  // Linked-record dropdowns pull their options from another form's records.
+  // Only readable when the person filling this in is authenticated as that
+  // linked form's owner (RLS scopes submission reads to the owner) — for an
+  // anonymous public respondent, this quietly resolves to an empty list
+  // rather than erroring, since most linked-record use cases (like Salary
+  // Events → Employees) are filled in by the account owner, not the public.
+  useEffect(() => {
+    async function loadLinkedOptions() {
+      const linkedFields = (form?.fields || []).filter(f => f.type === 'linked_record' && f.linkedFormId)
+      if (linkedFields.length === 0) return
+
+      const results = {}
+      await Promise.all(linkedFields.map(async (field) => {
+        const { data } = await supabase
+          .from('submissions').select('id, data')
+          .eq('form_id', field.linkedFormId)
+          .is('deleted_at', null)
+        results[field.id] = (data || []).map(sub => ({
+          recordId: sub.id,
+          label: field.linkedDisplayFieldId ? (sub.data[field.linkedDisplayFieldId] ?? sub.id) : sub.id,
+        }))
+      }))
+      setLinkedOptions(results)
+    }
+    if (form) loadLinkedOptions()
+  }, [form])
 
   function updateAnswer(fieldId, value) {
     setAnswers({ ...answers, [fieldId]: value })
@@ -162,6 +190,13 @@ function PublicForm() {
 
   function validateField(field, value) {
     if (field.type === 'cart') return null
+
+    if (field.type === 'linked_record') {
+      if (field.required && !value?.recordId) {
+        return field.errorMessage || `${field.label} is required.`
+      }
+      return null
+    }
 
     if (field.type === 'checkbox') {
       const arr = Array.isArray(value) ? value : []
@@ -690,6 +725,24 @@ function PublicForm() {
             </p>
           )}
         </div>
+      )
+    }
+
+    if (field.type === 'linked_record') {
+      const options = linkedOptions[field.id] || []
+      const current = answers[field.id]
+      return (
+        <select
+          value={current?.recordId || ''}
+          onChange={(e) => {
+            const option = options.find(o => o.recordId === e.target.value)
+            updateAnswer(field.id, option ? { recordId: option.recordId, label: option.label } : undefined)
+          }}
+          style={{ padding: '0.5rem', width: '100%' }}
+        >
+          <option value="">{options.length === 0 ? 'No records available' : 'Select...'}</option>
+          {options.map(o => <option key={o.recordId} value={o.recordId}>{o.label}</option>)}
+        </select>
       )
     }
 

@@ -1,8 +1,60 @@
+import { useEffect, useState } from 'react'
+import { supabase } from './supabaseClient'
+import { useAuth } from './AuthContext'
+
 const TYPES_WITH_GRID = ['multiplechoicegrid', 'checkboxgrid']
 
 function updateListField(field, index, updateField, key, text) {
   const items = text.split(',').map(o => o.trim()).filter(o => o !== '')
   updateField(index, { [`${key}Text`]: text, [key]: items })
+}
+
+// A dropdown whose options come from another one of your own forms' records
+// (e.g. a "Salary Events" form linking to "Employees") instead of a fixed
+// list — lets one form reference specific records in another.
+function LinkedRecordConfig({ field, index, updateField }) {
+  const { session } = useAuth()
+  const [forms, setForms] = useState([])
+
+  useEffect(() => {
+    async function loadForms() {
+      const { data } = await supabase
+        .from('forms').select('id, name, fields')
+        .eq('user_id', session.user.id)
+        .is('deleted_at', null)
+        .order('name', { ascending: true })
+      setForms(data || [])
+    }
+    loadForms()
+  }, [session])
+
+  const linkedForm = forms.find(f => f.id === field.linkedFormId)
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.3rem' }}>
+      <select
+        value={field.linkedFormId || ''}
+        onChange={(e) => updateField(index, { linkedFormId: e.target.value || undefined, linkedDisplayFieldId: undefined })}
+        style={{ padding: '0.4rem' }}
+      >
+        <option value="">Link to form...</option>
+        {forms.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+      </select>
+
+      {linkedForm && (
+        <select
+          value={field.linkedDisplayFieldId || ''}
+          onChange={(e) => updateField(index, { linkedDisplayFieldId: e.target.value || undefined })}
+          style={{ padding: '0.4rem' }}
+        >
+          <option value="">Field to display...</option>
+          {(linkedForm.fields || []).filter(f => f.type !== 'cart').map(f => (
+            <option key={f.id} value={f.id}>{f.label}</option>
+          ))}
+        </select>
+      )}
+    </div>
+  )
 }
 
 // Renders the extra builder inputs a field type needs beyond label/type/options —
@@ -78,6 +130,10 @@ function FieldTypeConfig({ field, index, updateField }) {
         />
       </div>
     )
+  }
+
+  if (field.type === 'linked_record') {
+    return <LinkedRecordConfig field={field} index={index} updateField={updateField} />
   }
 
   if (field.type === 'fileupload') {

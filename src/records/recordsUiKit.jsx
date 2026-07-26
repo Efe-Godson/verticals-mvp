@@ -13,6 +13,9 @@ export function formatCell(value, field) {
     const num = Number(value)
     return isNaN(num) ? value : num.toLocaleString()
   }
+  if (field.type === 'linked_record') {
+    return value.label ? value.label.toString() : <span style={{ color: '#ccc' }}>—</span>
+  }
   if (field.type === 'cart') {
     if (!value || !value.items || value.items.length === 0) {
       return <span style={{ color: '#ccc' }}>—</span>

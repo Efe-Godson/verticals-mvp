@@ -80,6 +80,7 @@ function FieldReport({ field, submissions, totalResponses }) {
       case 'checkboxgrid':
       case 'fileupload':
       case 'time':
+      case 'linked_record':
         return (
           <TextReport
             field={field}

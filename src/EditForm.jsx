@@ -24,6 +24,7 @@ const FIELD_TYPES = [
   { value: 'checkboxgrid', label: 'Checkbox Grid' },
   { value: 'fileupload', label: 'File Upload' },
   { value: 'cart', label: 'Product Cart' },
+  { value: 'linked_record', label: 'Linked Record' },
 ]
 
 const TYPES_WITH_OPTIONS = ['dropdown', 'multiplechoice', 'checkbox']
