@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
 import { useToast } from './Toast'
+import { TEMPLATE_ADMIN_USER_ID } from './adminAccount'
+import TemplateEditorDialog from './TemplateEditorDialog'
 
 function TemplatesSkeleton() {
   return (
@@ -24,15 +26,66 @@ function Templates() {
   const [activeCategory, setActiveCategory] = useState('All')
   const [searchText, setSearchText] = useState('')
   const [startingSlug, setStartingSlug] = useState(null)
+  const [myFormsBySlug, setMyFormsBySlug] = useState({}) // { [templateSlug]: primaryFormId } — most recent instance
+  const [editingTemplate, setEditingTemplate] = useState(null) // null = closed, {} = new, template object = editing
+  const [pendingDeleteId, setPendingDeleteId] = useState(null)
+  const [allForms, setAllForms] = useState([]) // admin-only: for TemplateEditorDialog's "link to" choices
+
+  const isAdmin = session.user.id === TEMPLATE_ADMIN_USER_ID
+
+  async function loadTemplates() {
+    setLoading(true)
+    const { data, error } = await supabase.from('templates').select('*').order('created_at', { ascending: false })
+    if (!error) setTemplates(data || [])
+    setLoading(false)
+  }
+
+  useEffect(() => { loadTemplates() }, [])
+
+  // "Access" vs "Start": has this user already created a form from this
+  // template? Only forms with no primaryFormId count (a bundle's primary,
+  // or a single-form template's own form) — that's the one worth going
+  // back to. Picks the most recent if started more than once.
+  useEffect(() => {
+    async function loadMyInstances() {
+      const { data } = await supabase
+        .from('forms').select('id, settings, created_at')
+        .eq('user_id', session.user.id)
+        .is('deleted_at', null)
+        .not('settings->>templateSlug', 'is', null)
+        .order('created_at', { ascending: false })
+
+      const bySlug = {}
+      ;(data || []).forEach(f => {
+        const slug = f.settings?.templateSlug
+        if (slug && !f.settings?.primaryFormId && !bySlug[slug]) bySlug[slug] = f.id
+      })
+      setMyFormsBySlug(bySlug)
+    }
+    loadMyInstances()
+  }, [session, templates])
 
   useEffect(() => {
-    async function loadTemplates() {
-      const { data, error } = await supabase.from('templates').select('*').order('created_at', { ascending: false })
-      if (!error) setTemplates(data || [])
-      setLoading(false)
+    if (!isAdmin) return
+    supabase
+      .from('forms').select('id, name, fields')
+      .eq('user_id', session.user.id)
+      .is('deleted_at', null)
+      .order('name', { ascending: true })
+      .then(({ data }) => setAllForms(data || []))
+  }, [session, isAdmin])
+
+  async function confirmDeleteTemplate() {
+    const id = pendingDeleteId
+    setPendingDeleteId(null)
+    const { error } = await supabase.from('templates').delete().eq('id', id)
+    if (error) {
+      showToast('Could not delete template: ' + error.message, 'error')
+      return
     }
-    loadTemplates()
-  }, [])
+    setTemplates(current => current.filter(t => t.id !== id))
+    showToast('Template deleted.', 'success')
+  }
 
   const categories = useMemo(() => {
     const set = new Set(templates.map(t => t.category))
@@ -120,6 +173,7 @@ function Templates() {
         fields: template.fields,
         status: 'draft',
         user_id: session.user.id,
+        settings: { templateSlug: template.slug },
       }]).select().single()
 
       if (error || !data) throw new Error(error?.message || 'unknown error')
@@ -130,6 +184,15 @@ function Templates() {
     } finally {
       setStartingSlug(null)
     }
+  }
+
+  function accessTemplate(template) {
+    const formId = myFormsBySlug[template.slug]
+    if (!formId) return
+    const destination = template.bundle?.[0]?.settings?.payrollRole === 'employees'
+      ? `/form/${formId}/payroll`
+      : `/form/${formId}/records`
+    navigate(destination)
   }
 
   return (
@@ -143,6 +206,12 @@ function Templates() {
           Pick a starting point for your business or organization and launch a polished form in minutes.
         </p>
       </div>
+
+      {isAdmin && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+          <button className="secondary" onClick={() => setEditingTemplate({})}>+ New Template</button>
+        </div>
+      )}
 
       {!loading && templates.length > 0 && (
         <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '1.2rem' }}>
@@ -210,13 +279,56 @@ function Templates() {
                   ))}
                 </div>
               )}
-              <div style={{ marginTop: 'auto' }}>
-                <button style={{ width: '100%' }} disabled={startingSlug === template.slug} onClick={() => startTemplate(template)}>
-                  {startingSlug === template.slug ? 'Creating…' : `Start ${template.name}`}
-                </button>
+              <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {myFormsBySlug[template.slug] ? (
+                  <button style={{ width: '100%' }} onClick={() => accessTemplate(template)}>
+                    Access {template.name}
+                  </button>
+                ) : (
+                  <button style={{ width: '100%' }} disabled={startingSlug === template.slug} onClick={() => startTemplate(template)}>
+                    {startingSlug === template.slug ? 'Creating…' : `Start ${template.name}`}
+                  </button>
+                )}
+                {isAdmin && (
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button className="secondary" style={{ flex: 1, fontSize: '0.82rem' }} onClick={() => setEditingTemplate(template)}>
+                      Manage
+                    </button>
+                    <button className="secondary" style={{ flex: 1, fontSize: '0.82rem', color: '#c0392b' }} onClick={() => setPendingDeleteId(template.id)}>
+                      Delete
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {editingTemplate && (
+        <TemplateEditorDialog
+          template={editingTemplate.id ? editingTemplate : null}
+          realForms={allForms}
+          onClose={() => setEditingTemplate(null)}
+          onSaved={() => { setEditingTemplate(null); loadTemplates() }}
+        />
+      )}
+
+      {pendingDeleteId && (
+        <div
+          onClick={() => setPendingDeleteId(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '1rem' }}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{ background: 'white', borderRadius: '8px', padding: '1.5rem', width: '380px', maxWidth: '100%' }}>
+            <h3 style={{ margin: '0 0 0.7rem' }}>Delete this template?</h3>
+            <p style={{ color: 'var(--color-muted)', fontSize: '0.9rem', margin: '0 0 1.3rem' }}>
+              This removes it from the Templates page for everyone. Forms already created from it are unaffected.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem' }}>
+              <button className="secondary" onClick={() => setPendingDeleteId(null)}>Cancel</button>
+              <button style={{ background: '#c0392b' }} onClick={confirmDeleteTemplate}>Delete</button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -1,19 +1,15 @@
-// Place at: src/TemplateAdminSection.jsx
-// Home-page-only section, visible solely to TEMPLATE_ADMIN_USER_ID, for
-// curating the shared template library. Templates are built and edited
-// directly here (via TemplateFieldEditor) rather than requiring a
-// throwaway real form to "convert" into a template first — that was the
-// previous flow, and it meant there was no way to fix a template afterward
-// without rebuilding its source form and re-converting it.
-import { useEffect, useState } from 'react'
+// Place at: src/TemplateEditorDialog.jsx
+// Used by Templates.jsx's inline "Manage"/"+ New Template" controls (admin
+// account only) to create and edit templates directly on the Templates
+// page — the access point for both starting and curating templates.
+import { useState } from 'react'
 import { supabase } from './supabaseClient'
-import { useAuth } from './AuthContext'
 import { useToast } from './Toast'
 import TemplateFieldEditor from './TemplateFieldEditor'
 
-const CATEGORY_OPTIONS = ['Retail', 'Restaurant', 'Education', 'Healthcare', 'Nonprofit', 'Events', 'HR & Operations', 'Other']
+export const CATEGORY_OPTIONS = ['Retail', 'Restaurant', 'Education', 'Healthcare', 'Nonprofit', 'Events', 'HR & Operations', 'Other']
 
-function slugify(name) {
+export function slugify(name) {
   return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'template'
 }
 
@@ -226,112 +222,4 @@ function TemplateEditorDialog({ template, realForms, onClose, onSaved }) {
   )
 }
 
-function TemplateAdminSection() {
-  const { session } = useAuth()
-  const { showToast } = useToast()
-  const [templates, setTemplates] = useState([])
-  const [allForms, setAllForms] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [editingTemplate, setEditingTemplate] = useState(null) // null = closed, {} = new, template object = editing
-  const [pendingDeleteId, setPendingDeleteId] = useState(null)
-
-  // Fetched independently from Home's own form list (which hides secondary
-  // bundle forms like Salary Events to reduce clutter) — template building
-  // needs to be able to link to ANY of the admin's forms, hidden or not.
-  useEffect(() => {
-    supabase
-      .from('forms').select('id, name, fields')
-      .eq('user_id', session.user.id)
-      .is('deleted_at', null)
-      .order('name', { ascending: true })
-      .then(({ data }) => setAllForms(data || []))
-  }, [session])
-
-  async function loadTemplates() {
-    setLoading(true)
-    const { data, error } = await supabase.from('templates').select('*').order('created_at', { ascending: false })
-    if (!error) setTemplates(data || [])
-    setLoading(false)
-  }
-
-  useEffect(() => { loadTemplates() }, [])
-
-  async function confirmDelete() {
-    const id = pendingDeleteId
-    setPendingDeleteId(null)
-    const { error } = await supabase.from('templates').delete().eq('id', id)
-    if (error) {
-      showToast('Could not delete template: ' + error.message, 'error')
-      return
-    }
-    setTemplates(current => current.filter(t => t.id !== id))
-    showToast('Template deleted.', 'success')
-  }
-
-  return (
-    <div style={{ marginTop: '2.5rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
-        <h3 style={{ margin: 0, fontSize: '0.95rem', color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-          Manage Templates
-        </h3>
-        <button className="secondary" onClick={() => setEditingTemplate({})}>+ New Template</button>
-      </div>
-
-      {loading ? (
-        <p style={{ color: 'var(--color-muted)' }}>Loading…</p>
-      ) : templates.length === 0 ? (
-        <div className="card" style={{ padding: '1.2rem', color: 'var(--color-muted)' }}>
-          No templates published yet. Templates you create here show up for every user on the Templates page.
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-          {templates.map(t => (
-            <div key={t.id} className="card" style={{
-              padding: '0.8rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap'
-            }}>
-              <div>
-                <div style={{ fontWeight: 600 }}>{t.name}</div>
-                <div style={{ fontSize: '0.78rem', color: 'var(--color-muted)' }}>
-                  {t.category} · {t.bundle?.length > 0 ? `${t.bundle.length} linked forms` : `${t.fields?.length || 0} fields`}
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button className="secondary" onClick={() => setEditingTemplate(t)}>Edit</button>
-                <button className="secondary" style={{ color: '#c0392b' }} onClick={() => setPendingDeleteId(t.id)}>Delete</button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {editingTemplate && (
-        <TemplateEditorDialog
-          template={editingTemplate.id ? editingTemplate : null}
-          realForms={allForms}
-          onClose={() => setEditingTemplate(null)}
-          onSaved={() => { setEditingTemplate(null); loadTemplates() }}
-        />
-      )}
-
-      {pendingDeleteId && (
-        <div
-          onClick={() => setPendingDeleteId(null)}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '1rem' }}
-        >
-          <div onClick={(e) => e.stopPropagation()} style={{ background: 'white', borderRadius: '8px', padding: '1.5rem', width: '380px', maxWidth: '100%' }}>
-            <h3 style={{ margin: '0 0 0.7rem' }}>Delete this template?</h3>
-            <p style={{ color: 'var(--color-muted)', fontSize: '0.9rem', margin: '0 0 1.3rem' }}>
-              This removes it from the Templates page for everyone. Forms already created from it are unaffected.
-            </p>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem' }}>
-              <button className="secondary" onClick={() => setPendingDeleteId(null)}>Cancel</button>
-              <button style={{ background: '#c0392b' }} onClick={confirmDelete}>Delete</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-export default TemplateAdminSection
+export default TemplateEditorDialog

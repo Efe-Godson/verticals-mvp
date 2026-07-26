@@ -6,8 +6,6 @@ import ConfirmDialog from './ConfirmDialog'
 import { useToast } from './Toast'
 import HomeRecycleBinDialog from './HomeRecycleBinDialog'
 import { useRecycleBinTrigger } from './RecycleBinContext'
-import TemplateAdminSection from './TemplateAdminSection'
-import { TEMPLATE_ADMIN_USER_ID } from './adminAccount'
 
 const PAGE_SIZE = 8
 
@@ -563,10 +561,6 @@ function Home() {
             )}
           </div>
         </div>
-      )}
-
-      {session?.user?.id === TEMPLATE_ADMIN_USER_ID && (
-        <TemplateAdminSection />
       )}
 
       {showBin && (
