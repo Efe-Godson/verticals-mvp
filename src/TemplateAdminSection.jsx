@@ -111,7 +111,9 @@ function TemplateEditorDialog({ template, realForms, onClose, onSaved }) {
       description: description.trim() || null,
       highlights,
       fields: mode === 'single' ? fields : [],
-      bundle: mode === 'bundle' ? bundle.map(({ key, name: entryName, fields: entryFields }) => ({ key, name: entryName.trim(), fields: entryFields })) : null,
+      bundle: mode === 'bundle' ? bundle.map(({ key, name: entryName, fields: entryFields, settings: entrySettings }) => ({
+        key, name: entryName.trim(), fields: entryFields, ...(entrySettings ? { settings: entrySettings } : {})
+      })) : null,
     }
 
     let error
