@@ -4,7 +4,7 @@
 
 export function printReceipt(form, submission) {
   const cartFields = form.fields.filter(f => f.type === 'cart')
-  const otherFields = form.fields.filter(f => f.type !== 'cart')
+  const otherFields = form.fields.filter(f => f.type !== 'cart' && f.type !== 'section')
   const settings = form.settings || {}
 
   function formatFieldValue(field, value) {

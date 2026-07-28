@@ -7,7 +7,7 @@
 
 import * as XLSX from 'xlsx'
 
-const UNSUPPORTED_TYPES = ['cart', 'fileupload', 'multiplechoicegrid', 'checkboxgrid']
+const UNSUPPORTED_TYPES = ['cart', 'fileupload', 'multiplechoicegrid', 'checkboxgrid', 'section']
 
 export function isImportableField(field) {
   return !UNSUPPORTED_TYPES.includes(field.type)

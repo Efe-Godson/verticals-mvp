@@ -10,6 +10,13 @@ import { supabase } from './supabaseClient'
 // carries a usable Google access token.
 const GOOGLE_SHEETS_SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file'
 
+// Sections are page-break markers in the builder, not data fields — they
+// have no submission value, so every export skips them via this instead of
+// touching form.fields directly.
+function dataFields(form) {
+  return form.fields.filter(f => f.type !== 'section')
+}
+
 // Turns any field's stored value into a plain, human-readable string —
 // shared by both the Excel export and the printable table below.
 function cellToText(value, field) {
@@ -52,7 +59,7 @@ function escapeHtml(str) {
 export function exportRecordsToExcel(form, records) {
   const rows = records.map(sub => {
     const row = {}
-    form.fields.forEach(field => {
+    dataFields(form).forEach(field => {
       row[field.label] = cellToText(sub.data[field.id], field)
     })
     row['Submitted'] = new Date(sub.created_at).toLocaleString('en-GB', {
@@ -70,7 +77,7 @@ export function exportRecordsToExcel(form, records) {
 }
 
 export function buildRecordsCSV(form, records) {
-  const columns = form.fields.map(f => f.label).concat(['Submitted'])
+  const columns = dataFields(form).map(f => f.label).concat(['Submitted'])
 
   function csvCell(value) {
     const str = value === undefined || value === null ? '' : value.toString()
@@ -81,7 +88,7 @@ export function buildRecordsCSV(form, records) {
   const lines = [columns.map(csvCell).join(',')]
 
   records.forEach(sub => {
-    const cells = form.fields.map(field => cellToText(sub.data[field.id], field))
+    const cells = dataFields(form).map(field => cellToText(sub.data[field.id], field))
     const submitted = new Date(sub.created_at).toLocaleString('en-GB', {
       day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
     })
@@ -109,9 +116,9 @@ export function exportRecordsToCSV(form, records) {
 }
 
 function buildRecordsSheetValues(form, records) {
-  const headers = form.fields.map(field => field.label).concat(['Submitted'])
+  const headers = dataFields(form).map(field => field.label).concat(['Submitted'])
   const rows = records.map(sub => {
-    const cells = form.fields.map(field => cellToText(sub.data[field.id], field))
+    const cells = dataFields(form).map(field => cellToText(sub.data[field.id], field))
     const submitted = new Date(sub.created_at).toLocaleString('en-GB', {
       day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
     })
@@ -268,10 +275,10 @@ export async function syncFormGoogleSheet(form, records) {
 
 export function exportRecordsToPDF(form, records, filterSummary) {
   const doc = new jsPDF({ orientation: 'landscape' })
-  const columns = form.fields.map(f => f.label).concat(['Submitted'])
+  const columns = dataFields(form).map(f => f.label).concat(['Submitted'])
 
   const rows = records.map(sub => {
-    const cells = form.fields.map(field => cellToText(sub.data[field.id], field))
+    const cells = dataFields(form).map(field => cellToText(sub.data[field.id], field))
     const submitted = new Date(sub.created_at).toLocaleDateString('en-GB', {
       day: '2-digit', month: 'short', year: 'numeric'
     })
@@ -299,10 +306,10 @@ export function exportRecordsToPDF(form, records, filterSummary) {
 }
 
 export function printRecordsTable(form, records, filterSummary) {
-  const columns = form.fields.map(f => f.label).concat(['Submitted'])
+  const columns = dataFields(form).map(f => f.label).concat(['Submitted'])
 
   const rowsHtml = records.map(sub => {
-    const cells = form.fields
+    const cells = dataFields(form)
       .map(field => `<td>${escapeHtml(cellToText(sub.data[field.id], field))}</td>`)
       .join('')
     const submitted = new Date(sub.created_at).toLocaleDateString('en-GB', {

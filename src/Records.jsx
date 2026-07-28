@@ -121,7 +121,7 @@ function Records() {
   const startIndex = (safePage - 1) * PAGE_SIZE
   const pageRows = visible.slice(startIndex, startIndex + PAGE_SIZE)
 
-  const visibleFields = form.fields.filter(f => !hiddenFieldIds.includes(f.id))
+  const visibleFields = form.fields.filter(f => f.type !== 'section' && !hiddenFieldIds.includes(f.id))
   const presets = form.settings?.recordPresets || []
   const activeFilterCount = Object.keys(filters).length
   const hasActiveFilters = activeFilterCount > 0 || searchText.trim() !== '' || dateRange !== 'all'
@@ -521,7 +521,7 @@ function Records() {
                 <div style={{ fontWeight: 600, fontSize: '0.75rem', color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '0.4rem' }}>
                   Columns
                 </div>
-                {form.fields.map(field => (
+                {form.fields.filter(f => f.type !== 'section').map(field => (
                   <label key={field.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.3rem 0', fontSize: '0.85rem', cursor: 'pointer' }}>
                     <input
                       type="checkbox"
@@ -855,7 +855,7 @@ function Records() {
         <RecordDetail
           form={form}
           record={selectedRecord}
-          fields={form.fields}
+          fields={form.fields.filter(f => f.type !== 'section')}
           onClose={() => setSelectedRecord(null)}
           onUpdated={handleRecordUpdated}
         />

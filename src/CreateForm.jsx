@@ -54,6 +54,7 @@ function CreateForm() {
 
   const [formId, setFormId] = useState(null)
   const [formName, setFormName] = useState('')
+  const [formDescription, setFormDescription] = useState('')
   const [fields, setFields] = useState([])
   const [message, setMessage] = useState('')
   const [saving, setSaving] = useState(false)
@@ -91,7 +92,7 @@ function CreateForm() {
       if (!formIdRef.current) {
         const { data, error } = await supabase
           .from('forms')
-          .insert([{ name: nameToSave, fields: cleanedFields, status: 'draft', user_id: session.user.id }])
+          .insert([{ name: nameToSave, description: formDescription.trim() || null, fields: cleanedFields, status: 'draft', user_id: session.user.id }])
           .select()
           .single()
 
@@ -105,7 +106,7 @@ function CreateForm() {
       } else {
         const { error } = await supabase
           .from('forms')
-          .update({ name: nameToSave, fields: cleanedFields })
+          .update({ name: nameToSave, description: formDescription.trim() || null, fields: cleanedFields })
           .eq('id', formIdRef.current)
 
         setAutosaveStatus(error ? 'error' : 'saved')
@@ -113,7 +114,7 @@ function CreateForm() {
     }, AUTOSAVE_DELAY)
 
     return () => clearTimeout(debounceRef.current)
-  }, [formName, fields, session])
+  }, [formName, formDescription, fields, session])
 
   function updateField(index, changes) {
     const newFields = [...fields]
@@ -248,6 +249,19 @@ function CreateForm() {
     }])
   }
 
+  // A section is a marker in the same `fields` array (not a separate list)
+  // — everything between one section and the next belongs to it. PublicForm
+  // splits on these to paginate, Google-Forms style; Records/Report/exports
+  // filter them out since they carry no data of their own.
+  function addSection() {
+    setFields([...fields, {
+      id: 's' + Date.now(),
+      type: 'section',
+      title: '',
+      description: '',
+    }])
+  }
+
   function handleDragStart(index) {
     setDragIndex(index)
   }
@@ -275,7 +289,7 @@ function CreateForm() {
       setMessage('Please add at least one field.')
       return
     }
-    if (fields.some(f => f.label.trim() === '')) {
+    if (fields.some(f => f.type !== 'section' && f.label.trim() === '')) {
       setMessage('Every field needs a name.')
       return
     }
@@ -294,13 +308,13 @@ function CreateForm() {
     if (!formIdRef.current) {
       const result = await supabase
         .from('forms')
-        .insert([{ name: formName, fields: cleanedFields, status: 'draft', user_id: session.user.id }])
+        .insert([{ name: formName, description: formDescription.trim() || null, fields: cleanedFields, status: 'draft', user_id: session.user.id }])
         .select()
       error = result.error
     } else {
       const result = await supabase
         .from('forms')
-        .update({ name: formName, fields: cleanedFields })
+        .update({ name: formName, description: formDescription.trim() || null, fields: cleanedFields })
         .eq('id', formIdRef.current)
       error = result.error
     }
@@ -345,10 +359,65 @@ function CreateForm() {
           placeholder="e.g. Daily Sales Tracker"
           style={{ padding: '0.6rem', width: '100%', fontSize: '1rem', marginTop: '0.3rem' }}
         />
+        <label style={{ fontSize: '0.85rem', color: 'var(--color-muted)', marginTop: '0.8rem', display: 'block' }}>
+          Description <span style={{ fontWeight: 400 }}>(optional)</span>
+        </label>
+        <textarea
+          value={formDescription}
+          onChange={(e) => setFormDescription(e.target.value)}
+          placeholder="Shown to respondents under the title"
+          rows={2}
+          style={{ padding: '0.6rem', width: '100%', fontSize: '0.92rem', marginTop: '0.3rem' }}
+        />
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
         {fields.map((field, index) => (
+          field.type === 'section' ? (
+            <div
+              key={field.id}
+              draggable
+              onDragStart={() => handleDragStart(index)}
+              onDragOver={(e) => handleDragOver(e, index)}
+              onDragEnd={handleDragEnd}
+              className="card"
+              style={{
+                padding: '1rem', display: 'flex', alignItems: 'flex-start', gap: '0.8rem',
+                opacity: dragIndex === index ? 0.5 : 1, cursor: 'grab',
+                borderLeft: '4px solid var(--color-primary)', background: 'linear-gradient(135deg, #f8faff 0%, #f3f7ff 100%)'
+              }}
+            >
+              <div style={{ fontSize: '1.2rem', color: '#bbb', paddingTop: '0.5rem', userSelect: 'none', lineHeight: 1 }} title="Drag to reorder">
+                ⠿
+              </div>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  Section {index > 0 ? `— starts a new page` : ''}
+                </div>
+                <input
+                  type="text"
+                  value={field.title}
+                  onChange={(e) => updateField(index, { title: e.target.value })}
+                  placeholder="Section title"
+                  style={{ padding: '0.5rem', fontWeight: 700 }}
+                />
+                <textarea
+                  value={field.description}
+                  onChange={(e) => updateField(index, { description: e.target.value })}
+                  placeholder="Section description (optional)"
+                  rows={2}
+                  style={{ padding: '0.5rem' }}
+                />
+              </div>
+              <button
+                className="secondary"
+                style={{ color: '#c0392b' }}
+                onClick={() => setPendingConfirm({ type: 'field', index })}
+              >
+                Remove
+              </button>
+            </div>
+          ) : (
           <div
             key={field.id}
             draggable
@@ -491,6 +560,7 @@ function CreateForm() {
               Remove
             </button>
           </div>
+          )
         ))}
 
         {fields.length === 0 && (
@@ -498,9 +568,14 @@ function CreateForm() {
         )}
       </div>
 
-      <button className="secondary" onClick={addField} style={{ marginTop: '1rem' }}>
-        + Add Field
-      </button>
+      <div style={{ display: 'flex', gap: '0.6rem', marginTop: '1rem', flexWrap: 'wrap' }}>
+        <button className="secondary" onClick={addField}>
+          + Add Field
+        </button>
+        <button className="secondary" onClick={addSection}>
+          + Add Section
+        </button>
+      </div>
 
       {recentlyRemoved && (
         <div style={{
@@ -550,6 +625,7 @@ function CreateForm() {
       {showPreview && (
         <FormPreviewModal
           formName={formName}
+          description={formDescription}
           fields={fields}
           onClose={() => setShowPreview(false)}
         />

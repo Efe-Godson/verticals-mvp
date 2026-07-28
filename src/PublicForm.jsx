@@ -1,7 +1,28 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { submitForm, getSubmissionByToken, updateSubmissionByToken } from './lib/submissionsClient'
+
+// Splits fields into pages at each 'section' marker, Google-Forms style —
+// fields before the first section (if any) form an unheaded first page,
+// then every section starts a new page containing its own fields. A form
+// with no sections is just one page, so this is a no-op for most forms.
+function buildPages(fields) {
+  const pages = []
+  let current = null
+  fields.forEach(field => {
+    if (field.type === 'section') {
+      if (current) pages.push(current)
+      current = { section: field, fields: [] }
+    } else {
+      if (!current) current = { section: null, fields: [] }
+      current.fields.push(field)
+    }
+  })
+  if (current) pages.push(current)
+  if (pages.length === 0) pages.push({ section: null, fields: [] })
+  return pages
+}
 
 function PublicForm() {
   const { id, token } = useParams()
@@ -18,6 +39,11 @@ function PublicForm() {
   const [uploading, setUploading] = useState({})
   const [editLink, setEditLink] = useState(null)
   const [linkedOptions, setLinkedOptions] = useState({}) // { [fieldId]: [{ recordId, label }] }
+  const [pageIndex, setPageIndex] = useState(0)
+
+  const pages = useMemo(() => buildPages(form?.fields || []), [form])
+  const currentPage = pages[pageIndex] || pages[0]
+  const isLastPage = pageIndex === pages.length - 1
 
   // Prefills the builder state from a saved submission — the inverse of the
   // { items, total } / plain-value shape submitAnswers() writes out.
@@ -25,6 +51,7 @@ function PublicForm() {
     const nextAnswers = {}
     const nextCartQuantities = {}
     fields.forEach(field => {
+      if (field.type === 'section') return
       if (field.type === 'cart') {
         const quantities = {}
         ;(data[field.id]?.items || []).forEach(item => {
@@ -42,6 +69,8 @@ function PublicForm() {
   }
 
   useEffect(() => {
+    setPageIndex(0)
+
     async function loadForEdit() {
       try {
         const { submission, form: formData } = await getSubmissionByToken(token)
@@ -294,17 +323,43 @@ function PublicForm() {
     return null
   }
 
+  // Validates just the fields on one page — used both for the Next button
+  // (only that page's fields should block advancing) and, with the full
+  // field list, for the final submit.
+  function validatePageFields(pageFields) {
+    const newErrors = {}
+    pageFields.forEach(field => {
+      if (field.type === 'section') return
+      const err = validateField(field, answers[field.id])
+      if (err) newErrors[field.id] = err
+    })
+    return newErrors
+  }
+
+  function goNext() {
+    const pageErrors = validatePageFields(currentPage.fields)
+    if (Object.keys(pageErrors).length > 0) {
+      setErrors(current => ({ ...current, ...pageErrors }))
+      setMessage('Please fix the errors below before continuing.')
+      return
+    }
+    setMessage('')
+    setPageIndex(i => Math.min(i + 1, pages.length - 1))
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function goBack() {
+    setPageIndex(i => Math.max(i - 1, 0))
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   async function submitAnswers() {
     if (Object.values(uploading).some(v => v)) {
       setMessage('Please wait for the file upload to finish.')
       return
     }
 
-    const newErrors = {}
-    form.fields.forEach(field => {
-      const err = validateField(field, answers[field.id])
-      if (err) newErrors[field.id] = err
-    })
+    const newErrors = validatePageFields(form.fields)
 
     if (form.settings?.collectEmail && (!respondentEmail || respondentEmail.trim() === '')) {
       newErrors._respondent_email = 'Please enter your email before submitting.'
@@ -319,6 +374,7 @@ function PublicForm() {
 
     const finalData = {}
     form.fields.forEach(field => {
+      if (field.type === 'section') return
       if (field.type === 'cart') {
         const quantities = cartQuantities[field.id] || {}
         const items = (field.products || [])
@@ -798,6 +854,7 @@ function PublicForm() {
               setMessage('')
               setErrors({})
               setUploading({})
+              setPageIndex(0)
             }}
             style={{ marginTop: '1rem' }}
           >
@@ -816,7 +873,21 @@ function PublicForm() {
       <h1>{form.name}</h1>
       {form.description && <p>{form.description}</p>}
 
-      {form.settings?.collectEmail && (
+      {pages.length > 1 && (
+        <div style={{ margin: '0.8rem 0 1.2rem' }}>
+          <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)', marginBottom: '0.4rem' }}>
+            Page {pageIndex + 1} of {pages.length}
+          </div>
+          <div style={{ height: '4px', background: '#eee', borderRadius: '2px', overflow: 'hidden' }}>
+            <div style={{
+              height: '100%', width: `${((pageIndex + 1) / pages.length) * 100}%`,
+              background: 'var(--color-primary)', transition: 'width 0.2s ease'
+            }} />
+          </div>
+        </div>
+      )}
+
+      {pageIndex === 0 && form.settings?.collectEmail && (
         <div className="card" style={{ padding: '1rem', marginBottom: '1rem' }}>
           <label>Your Email</label><br />
           <input
@@ -838,7 +909,16 @@ function PublicForm() {
         </div>
       )}
 
-      {form.fields.map(field => (
+      {currentPage.section && (
+        <div style={{ marginBottom: '1.2rem' }}>
+          <h2 style={{ margin: '0 0 0.3rem', fontSize: '1.25rem' }}>{currentPage.section.title || 'Untitled Section'}</h2>
+          {currentPage.section.description && (
+            <p style={{ margin: 0, color: 'var(--color-muted)' }}>{currentPage.section.description}</p>
+          )}
+        </div>
+      )}
+
+      {currentPage.fields.map(field => (
         <div key={field.id} className="card" style={{ padding: '1rem', marginBottom: '1rem' }}>
           <label style={{ fontWeight: '600' }}>
             {field.label}{field.required && <span style={{ color: '#c0392b' }}> *</span>}
@@ -854,9 +934,23 @@ function PublicForm() {
         </div>
       ))}
 
-      <button onClick={submitAnswers} style={{ padding: '0.7rem 1.5rem', fontSize: '1rem' }}>
-        {token ? 'Save Changes' : 'Submit'}
-      </button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem' }}>
+        {pageIndex > 0 ? (
+          <button className="secondary" onClick={goBack} style={{ padding: '0.7rem 1.5rem', fontSize: '1rem' }}>
+            Back
+          </button>
+        ) : <span />}
+
+        {isLastPage ? (
+          <button onClick={submitAnswers} style={{ padding: '0.7rem 1.5rem', fontSize: '1rem' }}>
+            {token ? 'Save Changes' : 'Submit'}
+          </button>
+        ) : (
+          <button onClick={goNext} style={{ padding: '0.7rem 1.5rem', fontSize: '1rem' }}>
+            Next
+          </button>
+        )}
+      </div>
 
       {message && <p style={{ marginTop: '1rem', color: 'red' }}>{message}</p>}
 

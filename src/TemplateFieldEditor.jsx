@@ -99,7 +99,7 @@ function TemplateFieldEditor({ fields, onChange, linkTargets = [] }) {
                     style={{ flex: 1, padding: '0.4rem' }}
                   >
                     <option value="">Field to display...</option>
-                    {(linkedTarget.fields || []).filter(f => f.type !== 'cart').map(f => (
+                    {(linkedTarget.fields || []).filter(f => f.type !== 'cart' && f.type !== 'section').map(f => (
                       <option key={f.id} value={f.id}>{f.label || '(untitled)'}</option>
                     ))}
                   </select>

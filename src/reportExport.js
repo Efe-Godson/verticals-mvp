@@ -155,7 +155,7 @@ function buildFieldSectionHtml(field, submissions, totalResponses) {
 
 export function printReport(form, submissions, filterSummary) {
   const totalResponses = submissions.length
-  const orderedFields = orderFieldsCartFirst(form.fields)
+  const orderedFields = orderFieldsCartFirst(form.fields.filter(f => f.type !== 'section'))
   const fieldSectionsHtml = orderedFields.map(f => buildFieldSectionHtml(f, submissions, totalResponses)).join('')
   const generatedStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
 
@@ -291,7 +291,7 @@ export function exportReportToPPTX(form, submissions, filterSummary) {
   overviewSlide.addText('Overview', { x: 0.5, y: 0.4, w: 9, h: 0.6, fontSize: 24, bold: true })
   overviewSlide.addText(`Total Responses: ${totalResponses}`, { x: 0.5, y: 1.3, w: 9, h: 0.5, fontSize: 16 })
 
-  const orderedFields = orderFieldsCartFirst(form.fields)
+  const orderedFields = orderFieldsCartFirst(form.fields.filter(f => f.type !== 'section'))
 
   orderedFields.forEach(field => {
     const answered = getAnsweredFor(field, submissions)

@@ -30,7 +30,7 @@ function getPreviousDateRangeBounds(range, customStart, customEnd) {
 }
 
 function getCompletionRate(form, submissions) {
-  const nonCartFields = form.fields.filter(f => f.type !== 'cart')
+  const nonCartFields = form.fields.filter(f => f.type !== 'cart' && f.type !== 'section')
   if (nonCartFields.length === 0 || submissions.length === 0) return 0
 
   const rates = nonCartFields.map(f => {

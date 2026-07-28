@@ -48,7 +48,7 @@ function LinkedRecordConfig({ field, index, updateField }) {
           style={{ padding: '0.4rem' }}
         >
           <option value="">Field to display...</option>
-          {(linkedForm.fields || []).filter(f => f.type !== 'cart').map(f => (
+          {(linkedForm.fields || []).filter(f => f.type !== 'cart' && f.type !== 'section').map(f => (
             <option key={f.id} value={f.id}>{f.label}</option>
           ))}
         </select>

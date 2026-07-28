@@ -5,6 +5,27 @@
 // what a respondent will see without saving or leaving the editor.
 import { useState } from 'react'
 
+// Mirrors PublicForm.jsx's buildPages — kept as a separate copy rather than
+// a shared import since one lives in a modal with no data-submission
+// concerns and the other is the real respondent flow; duplicating this
+// small pure function is cheaper than coupling the two.
+function buildPages(fields) {
+  const pages = []
+  let current = null
+  fields.forEach(field => {
+    if (field.type === 'section') {
+      if (current) pages.push(current)
+      current = { section: field, fields: [] }
+    } else {
+      if (!current) current = { section: null, fields: [] }
+      current.fields.push(field)
+    }
+  })
+  if (current) pages.push(current)
+  if (pages.length === 0) pages.push({ section: null, fields: [] })
+  return pages
+}
+
 function renderPreviewInput(field, value, onChange) {
   if (field.type === 'longtext') {
     return (
@@ -176,10 +197,15 @@ function renderPreviewInput(field, value, onChange) {
 
 function FormPreviewModal({ formName, description, fields, onClose }) {
   const [answers, setAnswers] = useState({})
+  const [pageIndex, setPageIndex] = useState(0)
 
   function updateAnswer(fieldId, value) {
     setAnswers(current => ({ ...current, [fieldId]: value }))
   }
+
+  const pages = buildPages(fields)
+  const currentPage = pages[Math.min(pageIndex, pages.length - 1)]
+  const isLastPage = pageIndex >= pages.length - 1
 
   return (
     <div
@@ -212,7 +238,30 @@ function FormPreviewModal({ formName, description, fields, onClose }) {
           <p style={{ color: 'var(--color-muted)' }}>Add some fields to see them here.</p>
         )}
 
-        {fields.map(field => (
+        {fields.length > 0 && pages.length > 1 && (
+          <div style={{ margin: '0.6rem 0 1rem' }}>
+            <div style={{ fontSize: '0.78rem', color: 'var(--color-muted)', marginBottom: '0.3rem' }}>
+              Page {Math.min(pageIndex, pages.length - 1) + 1} of {pages.length}
+            </div>
+            <div style={{ height: '4px', background: '#eee', borderRadius: '2px', overflow: 'hidden' }}>
+              <div style={{
+                height: '100%', width: `${((Math.min(pageIndex, pages.length - 1) + 1) / pages.length) * 100}%`,
+                background: 'var(--color-primary)', transition: 'width 0.2s ease'
+              }} />
+            </div>
+          </div>
+        )}
+
+        {currentPage.section && (
+          <div style={{ marginBottom: '1rem' }}>
+            <h2 style={{ margin: '0 0 0.3rem', fontSize: '1.15rem' }}>{currentPage.section.title || 'Untitled Section'}</h2>
+            {currentPage.section.description && (
+              <p style={{ margin: 0, color: 'var(--color-muted)' }}>{currentPage.section.description}</p>
+            )}
+          </div>
+        )}
+
+        {currentPage.fields.map(field => (
           <div key={field.id} className="card" style={{ padding: '1rem', marginBottom: '1rem' }}>
             <label style={{ fontWeight: 600 }}>
               {field.label || 'Untitled question'}{field.required && <span style={{ color: '#c0392b' }}> *</span>}
@@ -224,9 +273,22 @@ function FormPreviewModal({ formName, description, fields, onClose }) {
         ))}
 
         {fields.length > 0 && (
-          <button disabled title="Preview only — submitting is disabled" style={{ padding: '0.7rem 1.5rem', fontSize: '1rem', opacity: 0.6, cursor: 'not-allowed' }}>
-            Submit
-          </button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.6rem' }}>
+            {pageIndex > 0 ? (
+              <button className="secondary" onClick={() => setPageIndex(i => Math.max(0, i - 1))} style={{ padding: '0.7rem 1.5rem', fontSize: '1rem' }}>
+                Back
+              </button>
+            ) : <span />}
+            {isLastPage ? (
+              <button disabled title="Preview only — submitting is disabled" style={{ padding: '0.7rem 1.5rem', fontSize: '1rem', opacity: 0.6, cursor: 'not-allowed' }}>
+                Submit
+              </button>
+            ) : (
+              <button onClick={() => setPageIndex(i => Math.min(pages.length - 1, i + 1))} style={{ padding: '0.7rem 1.5rem', fontSize: '1rem' }}>
+                Next
+              </button>
+            )}
+          </div>
         )}
       </div>
     </div>
