@@ -7,6 +7,7 @@ import FieldValidationControls from './FieldValidationControls'
 import FieldTypeConfig from './FieldTypeConfig'
 import ConfirmDialog from './ConfirmDialog'
 import FormPreviewModal from './FormPreview'
+import PackageBuilder from './PackageBuilder'
 import { COUNTRIES } from './lib/locationData'
 
 const FIELD_TYPES = [
@@ -77,6 +78,7 @@ function EditForm() {
   const fieldMenuRef = useRef(null)
   const [showPreview, setShowPreview] = useState(false)
   const [collapsedCarts, setCollapsedCarts] = useState({})
+  const [packageBuilderIndex, setPackageBuilderIndex] = useState(null)
   const [productOverrides, setProductOverrides] = useState({}) // `${fieldIndex}-${productId}` -> true/false, explicit expand/collapse
 
   useEffect(() => {
@@ -161,6 +163,17 @@ function EditForm() {
       products: [...products, { id: 'p' + Date.now(), name: '', price: '', unit: '', category: '' }]
     }
     setFields(newFields)
+  }
+
+  function addPackageProduct(fieldIndex, packageData) {
+    const newFields = [...fields]
+    const products = newFields[fieldIndex].products || []
+    newFields[fieldIndex] = {
+      ...newFields[fieldIndex],
+      products: [...products, { id: 'p' + Date.now(), ...packageData }]
+    }
+    setFields(newFields)
+    setPackageBuilderIndex(null)
   }
 
   function updateProduct(fieldIndex, productIndex, changes) {
@@ -582,9 +595,18 @@ function EditForm() {
                   })}
 
                   <div className="products-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.6rem' }}>
-                    <button className="secondary" onClick={() => addProduct(index)}>
-                      + Add Product
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button className="secondary" onClick={() => addProduct(index)}>
+                        + Add Product
+                      </button>
+                      <button
+                        type="button"
+                        className="secondary"
+                        onClick={() => setPackageBuilderIndex(packageBuilderIndex === index ? null : index)}
+                      >
+                        + Create Package
+                      </button>
+                    </div>
                     <div className="product-template-actions">
                       <button type="button" className="secondary" onClick={downloadTemplate}>
                         Download Template
@@ -604,12 +626,19 @@ function EditForm() {
                       </label>
                     </div>
                   </div>
+                  {packageBuilderIndex === index && (
+                    <PackageBuilder
+                      products={field.products || []}
+                      onCreate={(packageData) => addPackageProduct(index, packageData)}
+                      onCancel={() => setPackageBuilderIndex(null)}
+                    />
+                  )}
                   </>
                   )}
                 </div>
               )}
 
-              <FieldTypeConfig field={field} index={index} updateField={updateField} />
+              <FieldTypeConfig field={field} index={index} updateField={updateField} allFields={fields} />
 
               <FieldValidationControls field={field} index={index} updateField={updateField} />
             </div>

@@ -312,7 +312,14 @@ function FormPreviewModal({ formName, description, fields, onClose }) {
               {field.label || 'Untitled question'}{field.required && <span style={{ color: '#c0392b' }}> *</span>}
             </label>
             <div style={{ marginTop: '0.5rem' }}>
-              {renderPreviewInput(field, answers[field.id], (value) => updateAnswer(field.id, value))}
+              {field.autoFromCartFieldId ? (
+                <span style={{
+                  display: 'inline-block', padding: '0.4rem 0.8rem', borderRadius: '999px',
+                  background: '#f2f4f7', fontSize: '0.9rem', color: 'var(--color-muted)'
+                }}>
+                  Set automatically based on the respondent's cart (preview's cart isn't interactive)
+                </span>
+              ) : renderPreviewInput(field, answers[field.id], (value) => updateAnswer(field.id, value))}
             </div>
           </div>
         ))}

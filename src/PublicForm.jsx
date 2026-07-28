@@ -135,6 +135,32 @@ function PublicForm() {
     if (form) loadLinkedOptions()
   }, [form])
 
+  // Recomputes any field configured to auto-fill from a cart field's
+  // contents (see FieldTypeConfig's AutoFromCartConfig) whenever cart
+  // quantities change — 1 distinct product selected → "Single", 2+ →
+  // "Multiple", any package-type product → "Package".
+  useEffect(() => {
+    if (!form) return
+    const autoFields = form.fields.filter(f => f.autoFromCartFieldId)
+    if (autoFields.length === 0) return
+
+    setAnswers(current => {
+      let changed = false
+      const next = { ...current }
+      autoFields.forEach(field => {
+        const cartField = form.fields.find(f => f.id === field.autoFromCartFieldId && f.type === 'cart')
+        if (!cartField) return
+        const active = (cartField.products || []).filter(p => Number((cartQuantities[cartField.id] || {})[p.id]) > 0)
+        const computed = active.length === 0 ? '' : active.some(p => p.isPackage) ? 'Package' : active.length === 1 ? 'Single' : 'Multiple'
+        if (computed && next[field.id] !== computed) {
+          next[field.id] = computed
+          changed = true
+        }
+      })
+      return changed ? next : current
+    })
+  }, [cartQuantities, form])
+
   function updateAnswer(fieldId, value) {
     setAnswers({ ...answers, [fieldId]: value })
     if (errors[fieldId]) {
@@ -526,8 +552,16 @@ function PublicForm() {
                     flexDirection: 'column',
                     gap: '0.4rem'
                   }}>
-                    <div style={{ fontSize: '0.85rem', fontWeight: '600', lineHeight: 1.3 }}>
+                    <div style={{ fontSize: '0.85rem', fontWeight: '600', lineHeight: 1.3, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                       {p.name}
+                      {p.isPackage && (
+                        <span style={{
+                          fontSize: '0.62rem', fontWeight: 700, color: 'var(--color-primary)',
+                          border: '1px solid var(--color-primary)', borderRadius: '999px', padding: '0.05rem 0.4rem'
+                        }}>
+                          PACKAGE
+                        </span>
+                      )}
                     </div>
                     {p.category && (
                       <div style={{ fontSize: '0.7rem', color: 'var(--color-muted)' }}>{p.category}</div>
@@ -976,7 +1010,17 @@ function PublicForm() {
             {field.label}{field.required && <span style={{ color: '#c0392b' }}> *</span>}
           </label>
           <div style={{ marginTop: '0.5rem' }}>
-            {renderInput(field)}
+            {field.autoFromCartFieldId ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{
+                  padding: '0.4rem 0.8rem', borderRadius: '999px', background: '#f2f4f7',
+                  fontSize: '0.9rem', fontWeight: 600, color: answers[field.id] ? 'inherit' : 'var(--color-muted)'
+                }}>
+                  {answers[field.id] || 'Add items to your cart to set this'}
+                </span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--color-muted)' }}>(set automatically from your cart)</span>
+              </div>
+            ) : renderInput(field)}
           </div>
           {errors[field.id] && (
             <p style={{ color: '#c0392b', fontSize: '0.8rem', marginTop: '0.5rem', marginBottom: 0 }}>

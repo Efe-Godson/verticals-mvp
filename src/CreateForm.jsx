@@ -7,6 +7,7 @@ import FieldValidationControls from './FieldValidationControls'
 import FieldTypeConfig from './FieldTypeConfig'
 import ConfirmDialog from './ConfirmDialog'
 import FormPreviewModal from './FormPreview'
+import PackageBuilder from './PackageBuilder'
 import { COUNTRIES } from './lib/locationData'
 
 const FIELD_TYPES = [
@@ -73,6 +74,7 @@ function CreateForm() {
   const [pendingConfirm, setPendingConfirm] = useState(null) // { type: 'field', index } | { type: 'product', fieldIndex, productIndex }
   const [showPreview, setShowPreview] = useState(false)
   const [collapsedCarts, setCollapsedCarts] = useState({})
+  const [packageBuilderIndex, setPackageBuilderIndex] = useState(null)
 
   // Debounced autosave — fires shortly after formName or fields stop changing
   useEffect(() => {
@@ -149,6 +151,17 @@ function CreateForm() {
       products: [...products, { id: 'p' + Date.now(), name: '', price: '', category: '' }]
     }
     setFields(newFields)
+  }
+
+  function addPackageProduct(fieldIndex, packageData) {
+    const newFields = [...fields]
+    const products = newFields[fieldIndex].products || []
+    newFields[fieldIndex] = {
+      ...newFields[fieldIndex],
+      products: [...products, { id: 'p' + Date.now(), ...packageData }]
+    }
+    setFields(newFields)
+    setPackageBuilderIndex(null)
   }
 
   function updateProduct(fieldIndex, productIndex, changes) {
@@ -553,15 +566,31 @@ function CreateForm() {
                           </button>
                         </div>
                       ))}
-                      <button className="secondary" onClick={() => addProduct(index)} style={{ marginTop: '0.5rem' }}>
-                        + Add Product
-                      </button>
+                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                        <button className="secondary" onClick={() => addProduct(index)}>
+                          + Add Product
+                        </button>
+                        <button
+                          type="button"
+                          className="secondary"
+                          onClick={() => setPackageBuilderIndex(packageBuilderIndex === index ? null : index)}
+                        >
+                          + Create Package
+                        </button>
+                      </div>
+                      {packageBuilderIndex === index && (
+                        <PackageBuilder
+                          products={field.products || []}
+                          onCreate={(packageData) => addPackageProduct(index, packageData)}
+                          onCancel={() => setPackageBuilderIndex(null)}
+                        />
+                      )}
                     </>
                   )}
                 </div>
               )}
 
-              <FieldTypeConfig field={field} index={index} updateField={updateField} />
+              <FieldTypeConfig field={field} index={index} updateField={updateField} allFields={fields} />
 
               <FieldValidationControls field={field} index={index} updateField={updateField} />
             </div>

@@ -58,9 +58,45 @@ function LinkedRecordConfig({ field, index, updateField }) {
   )
 }
 
+// Field types this makes sense on — a single-answer-per-response field that
+// can hold one of a few short labels, which is what "Single" / "Multiple" /
+// "Package" are.
+const AUTO_FROM_CART_ELIGIBLE = ['dropdown', 'multiplechoice', 'autocomplete']
+
+// Lets a field (typically something like "Sales Category") compute its own
+// value from a Product Cart field in the same form instead of being
+// answered by hand: one distinct product in the cart → "Single", more than
+// one → "Multiple", any package-type product → "Package". Matching by
+// those exact option words is the respondent-facing app's job (PublicForm/
+// FormPreview) — this just wires which cart field to watch.
+function AutoFromCartConfig({ field, index, updateField, allFields }) {
+  const cartFields = (allFields || []).filter(f => f.type === 'cart')
+  if (cartFields.length === 0) return null
+
+  return (
+    <div style={{ marginTop: '0.3rem' }}>
+      <label style={{ fontSize: '0.78rem', color: 'var(--color-muted)' }}>Auto-fill from cart (optional)</label>
+      <select
+        value={field.autoFromCartFieldId || ''}
+        onChange={(e) => updateField(index, { autoFromCartFieldId: e.target.value || undefined })}
+        style={{ padding: '0.4rem', marginTop: '0.2rem', display: 'block' }}
+      >
+        <option value="">Manual entry</option>
+        {cartFields.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
+      </select>
+      {field.autoFromCartFieldId && (
+        <p style={{ fontSize: '0.75rem', color: 'var(--color-muted)', marginTop: '0.3rem', maxWidth: '360px' }}>
+          Automatically set to "Single" (1 distinct product in the cart), "Multiple" (2+), or "Package"
+          (any package product included) — include those exact words as options above for this to work.
+        </p>
+      )}
+    </div>
+  )
+}
+
 // Renders the extra builder inputs a field type needs beyond label/type/options —
 // grid rows & columns, scale range, star count, or upload constraints.
-function FieldTypeConfig({ field, index, updateField }) {
+function FieldTypeConfig({ field, index, updateField, allFields }) {
   if (TYPES_WITH_GRID.includes(field.type)) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.3rem' }}>
@@ -172,6 +208,10 @@ function FieldTypeConfig({ field, index, updateField }) {
         />
       </div>
     )
+  }
+
+  if (AUTO_FROM_CART_ELIGIBLE.includes(field.type)) {
+    return <AutoFromCartConfig field={field} index={index} updateField={updateField} allFields={allFields} />
   }
 
   return null
