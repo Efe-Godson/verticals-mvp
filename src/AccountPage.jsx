@@ -162,11 +162,11 @@ function AccountPage() {
 
   return (
     <div className="page" style={{ maxWidth: '760px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
         <Avatar label={initials} />
-        <div>
-          <h1 style={{ margin: 0, fontSize: '1.5rem' }}>{displayName || user.email}</h1>
-          <div style={{ color: 'var(--color-muted)', fontSize: '0.88rem' }}>
+        <div style={{ minWidth: 0 }}>
+          <h1 style={{ margin: 0, fontSize: '1.5rem', overflowWrap: 'break-word' }}>{displayName || user.email}</h1>
+          <div style={{ color: 'var(--color-muted)', fontSize: '0.88rem', overflowWrap: 'break-word' }}>
             {user.email} · Member since {new Date(user.created_at).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
           </div>
           <span style={{

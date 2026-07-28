@@ -40,7 +40,7 @@ function TemplateRow({ template, started, starting, isAdmin, onStart, onAccess, 
   return (
     <div className="template-row" style={{ display: 'flex', gap: '0.5rem', height: ROW_HEIGHT }}>
       <div
-        className="template-row-tile"
+        className="template-row-tile template-row-square"
         style={{
           width: ROW_HEIGHT, height: ROW_HEIGHT, flexShrink: 0,
           borderRadius: '8px', borderLeft: `3px solid ${color}`,
@@ -58,14 +58,14 @@ function TemplateRow({ template, started, starting, isAdmin, onStart, onAccess, 
       </div>
 
       <div
-        className="template-row-tile"
+        className="template-row-tile template-row-rect"
         style={{
           flex: 1, height: ROW_HEIGHT, minWidth: 0,
           border: '1px solid var(--color-border)', borderRadius: '8px',
           padding: '0.4rem 0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6rem'
         }}
       >
-        <div style={{ minWidth: 0, flex: 1, display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
+        <div className="template-row-detail" style={{ minWidth: 0, flex: 1, display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
           <span style={{
             fontSize: '0.68rem', fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '0.03em', flexShrink: 0
           }}>
@@ -76,7 +76,7 @@ function TemplateRow({ template, started, starting, isAdmin, onStart, onAccess, 
           </span>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.35rem', flexShrink: 0, alignItems: 'center' }}>
+        <div className="template-row-actions" style={{ display: 'flex', gap: '0.35rem', flexShrink: 0, alignItems: 'center' }}>
           {isAdmin && (
             <>
               <button className="secondary" style={{ fontSize: '0.72rem', padding: '0.25rem 0.55rem' }} onClick={onManage}>Manage</button>
@@ -286,6 +286,17 @@ function Templates() {
         .template-row-tile { transition: border-color 0.12s ease, box-shadow 0.12s ease; }
         .template-row:hover .template-row-tile { border-color: var(--color-primary); }
         .template-row:hover .template-row-tile:first-child { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+
+        /* Below ~480px there isn't room for name + category + detail +
+           every action button on one 64px-tall line — let the action
+           buttons wrap onto their own line instead of overflowing or
+           forcing the whole row to shrink illegibly. The square (name)
+           stays put so the template is still identifiable at a glance. */
+        @media (max-width: 480px) {
+          .template-row { flex-wrap: wrap; height: auto; }
+          .template-row-rect { height: auto !important; flex-wrap: wrap; row-gap: 0.4rem; padding: 0.5rem 0.7rem !important; }
+          .template-row-actions { flex: 1 1 100%; justify-content: flex-start; flex-wrap: wrap; }
+        }
       `}</style>
       <div className="card" style={{ padding: '1.4rem 1.5rem', marginBottom: '1.2rem', background: 'linear-gradient(135deg, #f9fbff 0%, #f3f7ff 100%)' }}>
         <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>

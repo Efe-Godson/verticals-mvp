@@ -49,15 +49,15 @@ function TemplateFieldEditor({ fields, onChange, linkTargets = [] }) {
         const linkedTarget = linkTargets.find(t => t.id === field.linkedFormId)
         return (
           <div key={field.id} className="card" style={{ padding: '0.7rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
               <input
                 type="text"
                 value={field.label}
                 onChange={(e) => updateField(index, { label: e.target.value })}
                 placeholder="Field label"
-                style={{ flex: 2, padding: '0.4rem' }}
+                style={{ flex: '2 1 140px', padding: '0.4rem' }}
               />
-              <select value={field.type} onChange={(e) => updateField(index, { type: e.target.value, options: undefined, linkedFormId: undefined, linkedDisplayFieldId: undefined })} style={{ flex: 1, padding: '0.4rem' }}>
+              <select value={field.type} onChange={(e) => updateField(index, { type: e.target.value, options: undefined, linkedFormId: undefined, linkedDisplayFieldId: undefined })} style={{ flex: '1 1 120px', padding: '0.4rem' }}>
                 {FIELD_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
               </select>
               <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>

@@ -64,7 +64,7 @@ function NavBar() {
       <div className="navbar-row" style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap', rowGap: '0.4rem' }}>
           <Link to="/" style={{ fontWeight: 'bold', fontSize: '1.05rem' }}>Verticals</Link>
           <Link to="/templates" style={{ color: location.pathname === '/templates' ? 'var(--color-primary)' : 'var(--color-muted)', fontSize: '0.9rem' }}>Templates</Link>
           {binTrigger && (
@@ -89,7 +89,7 @@ function NavBar() {
           )}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           {linkedForms.length > 0 && (
             <div style={{ position: 'relative' }}>
               <button className="secondary" onClick={() => setLinkedMenuOpen(!linkedMenuOpen)}>
@@ -98,10 +98,10 @@ function NavBar() {
               {linkedMenuOpen && (
                 <>
                   <div style={{ position: 'fixed', inset: 0, zIndex: 15 }} onClick={() => setLinkedMenuOpen(false)} />
-                  <div style={{
+                  <div className="dropdown-panel" style={{
                     position: 'absolute', top: '100%', right: 0, marginTop: '0.3rem',
                     background: 'white', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 20, minWidth: '180px', overflow: 'hidden'
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 20, minWidth: '180px', overflow: 'hidden', padding: 0
                   }}>
                     {linkedForms.map(f => (
                       <Link

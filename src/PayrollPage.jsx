@@ -174,7 +174,7 @@ function PayrollPage() {
         <StatTile label="Total Additions" value={`₦${totalAdditions.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} />
       </div>
 
-      <div style={{ overflowX: 'auto', marginTop: '1.5rem' }}>
+      <div className="table-scroll">
         <table style={{ borderCollapse: 'collapse', width: '100%' }}>
           <thead>
             <tr>
