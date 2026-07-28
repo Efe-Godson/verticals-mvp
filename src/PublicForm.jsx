@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { submitForm, getSubmissionByToken, updateSubmissionByToken } from './lib/submissionsClient'
+import { COUNTRIES, statesFor, citiesFor } from './lib/locationData'
 
 // Splits fields into pages at each 'section' marker, Google-Forms style —
 // fields before the first section (if any) form an unheaded first page,
@@ -222,6 +223,13 @@ function PublicForm() {
 
     if (field.type === 'linked_record') {
       if (field.required && !value?.recordId) {
+        return field.errorMessage || `${field.label} is required.`
+      }
+      return null
+    }
+
+    if (field.type === 'location') {
+      if (field.required && !(value?.country && value?.state && value?.city)) {
         return field.errorMessage || `${field.label} is required.`
       }
       return null
@@ -799,6 +807,50 @@ function PublicForm() {
           <option value="">{options.length === 0 ? 'No records available' : 'Select...'}</option>
           {options.map(o => <option key={o.recordId} value={o.recordId}>{o.label}</option>)}
         </select>
+      )
+    }
+
+    if (field.type === 'autocomplete') {
+      return (
+        <>
+          <input
+            type="text"
+            list={`autocomplete-${field.id}`}
+            value={answers[field.id] || ''}
+            onChange={(e) => updateAnswer(field.id, e.target.value)}
+            style={{ padding: '0.5rem', width: '100%' }}
+          />
+          <datalist id={`autocomplete-${field.id}`}>
+            {field.options?.map(opt => <option key={opt} value={opt} />)}
+          </datalist>
+        </>
+      )
+    }
+
+    if (field.type === 'location') {
+      const value = answers[field.id] || {}
+      const country = value.country || field.defaultCountry || COUNTRIES[0]
+      const stateOptions = statesFor(country)
+      const cityOptions = value.state ? citiesFor(country, value.state) : []
+
+      function setLocationPart(patch) {
+        updateAnswer(field.id, { country, ...value, ...patch })
+      }
+
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <select value={country} onChange={(e) => setLocationPart({ country: e.target.value, state: '', city: '' })} style={{ padding: '0.5rem' }}>
+            {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <select value={value.state || ''} onChange={(e) => setLocationPart({ state: e.target.value, city: '' })} style={{ padding: '0.5rem' }}>
+            <option value="">Select state...</option>
+            {stateOptions.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <select value={value.city || ''} onChange={(e) => setLocationPart({ city: e.target.value })} style={{ padding: '0.5rem' }} disabled={!value.state}>
+            <option value="">Select city...</option>
+            {cityOptions.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
       )
     }
 

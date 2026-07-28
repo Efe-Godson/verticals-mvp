@@ -17,9 +17,11 @@ const FIELD_TYPES = [
   { value: 'multiplechoice', label: 'Multiple Choice' },
   { value: 'checkbox', label: 'Checkboxes' },
   { value: 'linked_record', label: 'Linked Record' },
+  { value: 'autocomplete', label: 'Autocomplete' },
+  { value: 'location', label: 'Location (Country/State/City)' },
 ]
 
-const TYPES_WITH_OPTIONS = ['dropdown', 'multiplechoice', 'checkbox']
+const TYPES_WITH_OPTIONS = ['dropdown', 'multiplechoice', 'checkbox', 'autocomplete']
 
 function newField() {
   return { id: 'f' + Date.now() + Math.random().toString(36).slice(2, 6), type: 'text', label: '', required: false }

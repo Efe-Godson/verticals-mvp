@@ -30,6 +30,12 @@ function cellToText(value, field) {
     const num = Number(value)
     return isNaN(num) ? value.toString() : num.toLocaleString()
   }
+  if (field.type === 'linked_record') {
+    return value.label ? value.label.toString() : ''
+  }
+  if (field.type === 'location') {
+    return [value.city, value.state, value.country].filter(Boolean).join(', ')
+  }
   if (field.type === 'cart') {
     if (!value.items || value.items.length === 0) return ''
     const lines = value.items.map(item => {

@@ -4,7 +4,7 @@
 // usage sane and gives the model clean numbers to reason over rather than
 // re-deriving them itself.
 
-const CATEGORICAL_TYPES = ['dropdown', 'multiplechoice', 'checkbox']
+const CATEGORICAL_TYPES = ['dropdown', 'multiplechoice', 'checkbox', 'autocomplete']
 const NUMERIC_TYPES = ['number', 'rating', 'linearscale']
 const SUBMISSION_ID_BATCH_SIZE = 50
 const MAX_CONCURRENT_SUBMISSION_REQUESTS = 5

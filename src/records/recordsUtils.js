@@ -63,5 +63,9 @@ export function passesFilter(sub, field, filter) {
   if (field.type === 'linked_record') {
     return (value.label || '').toString().toLowerCase().includes((filter.value || '').toLowerCase())
   }
+  if (field.type === 'location') {
+    const combined = [value.city, value.state, value.country].filter(Boolean).join(' ').toLowerCase()
+    return combined.includes((filter.value || '').toLowerCase())
+  }
   return value.toString().toLowerCase().includes((filter.value || '').toLowerCase())
 }

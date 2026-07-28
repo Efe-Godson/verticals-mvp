@@ -43,6 +43,7 @@ function FieldReport({ field, submissions, totalResponses }) {
       // Categories
       case 'dropdown':
       case 'multiplechoice':
+      case 'autocomplete':
         return (
           <CategoryReport
             field={field}
@@ -81,6 +82,7 @@ function FieldReport({ field, submissions, totalResponses }) {
       case 'fileupload':
       case 'time':
       case 'linked_record':
+      case 'location':
         return (
           <TextReport
             field={field}

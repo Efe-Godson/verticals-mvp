@@ -16,6 +16,8 @@ export function printReceipt(form, submission) {
       return Object.entries(value).map(([row, cols]) => `${row}: ${(cols || []).join(', ')}`).join('; ')
     }
     if (field.type === 'rating') return `${value} / ${field.maxStars ?? 5} stars`
+    if (field.type === 'linked_record') return value?.label ? value.label.toString() : ''
+    if (field.type === 'location') return [value?.city, value?.state, value?.country].filter(Boolean).join(', ')
     return value.toString()
   }
 

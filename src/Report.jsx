@@ -46,7 +46,7 @@ function getCompletionRate(form, submissions) {
   return Math.round(rates.reduce((a, b) => a + b, 0) / rates.length)
 }
 
-const CATEGORICAL_TYPES = ['dropdown', 'multiplechoice', 'checkbox']
+const CATEGORICAL_TYPES = ['dropdown', 'multiplechoice', 'checkbox', 'autocomplete']
 const NUMERIC_TYPES = ['number', 'rating', 'linearscale']
 const DEMOGRAPHIC_TYPES = ['email', 'phone']
 

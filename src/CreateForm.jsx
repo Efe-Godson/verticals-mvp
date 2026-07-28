@@ -7,6 +7,7 @@ import FieldValidationControls from './FieldValidationControls'
 import FieldTypeConfig from './FieldTypeConfig'
 import ConfirmDialog from './ConfirmDialog'
 import FormPreviewModal from './FormPreview'
+import { COUNTRIES } from './lib/locationData'
 
 const FIELD_TYPES = [
   { value: 'text', label: 'Short Text' },
@@ -26,9 +27,11 @@ const FIELD_TYPES = [
   { value: 'fileupload', label: 'File Upload' },
   { value: 'cart', label: 'Product Cart' },
   { value: 'linked_record', label: 'Linked Record' },
+  { value: 'autocomplete', label: 'Autocomplete' },
+  { value: 'location', label: 'Location (Country/State/City)' },
 ]
 
-const TYPES_WITH_OPTIONS = ['dropdown', 'multiplechoice', 'checkbox']
+const TYPES_WITH_OPTIONS = ['dropdown', 'multiplechoice', 'checkbox', 'autocomplete']
 const TYPES_WITH_PRODUCTS = ['cart']
 const AUTOSAVE_DELAY = 1800 // ms of inactivity before autosaving
 
@@ -120,6 +123,17 @@ function CreateForm() {
     const newFields = [...fields]
     newFields[index] = { ...newFields[index], ...changes }
     setFields(newFields)
+  }
+
+  // Defaults a new Location field to wherever this account said it operates
+  // at signup, instead of making every respondent pick a country that's
+  // already known — see src/lib/locationData.js and SignUp.jsx.
+  function updateFieldType(index, newType) {
+    const changes = { type: newType }
+    if (newType === 'location' && !fields[index].defaultCountry) {
+      changes.defaultCountry = session.user.user_metadata?.country || COUNTRIES[0]
+    }
+    updateField(index, changes)
   }
 
   function updateFieldOptions(index, text) {
@@ -452,7 +466,7 @@ function CreateForm() {
                 />
                 <select
                   value={field.type}
-                  onChange={(e) => updateField(index, { type: e.target.value })}
+                  onChange={(e) => updateFieldType(index, e.target.value)}
                   style={{ flex: 1, padding: '0.5rem' }}
                 >
                   {FIELD_TYPES.map(t => (

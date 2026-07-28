@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from './supabaseClient'
+import { COUNTRIES } from './lib/locationData'
 
 function GoogleLogo() {
   return (
@@ -17,6 +18,7 @@ function SignUp() {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [country, setCountry] = useState(COUNTRIES[0] || '')
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
@@ -46,7 +48,13 @@ function SignUp() {
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: `${window.location.origin}/confirm-email` }
+      options: {
+        emailRedirectTo: `${window.location.origin}/confirm-email`,
+        // Lets a "Location" field on any form this account builds default
+        // its Country to wherever the business actually operates, instead
+        // of asking the respondent to pick it every time.
+        data: { country },
+      }
     })
 
     setLoading(false)
@@ -82,6 +90,13 @@ function SignUp() {
             required
             style={{ width: '100%' }}
           />
+        </div>
+
+        <div>
+          <label>Country</label><br />
+          <select value={country} onChange={(e) => setCountry(e.target.value)} style={{ width: '100%' }}>
+            {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
         </div>
 
         <button type="submit" disabled={loading}>

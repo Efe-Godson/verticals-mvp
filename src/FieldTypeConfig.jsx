@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
+import { COUNTRIES } from './lib/locationData'
 
 const TYPES_WITH_GRID = ['multiplechoicegrid', 'checkboxgrid']
 
@@ -134,6 +135,21 @@ function FieldTypeConfig({ field, index, updateField }) {
 
   if (field.type === 'linked_record') {
     return <LinkedRecordConfig field={field} index={index} updateField={updateField} />
+  }
+
+  if (field.type === 'location') {
+    return (
+      <div style={{ marginTop: '0.3rem' }}>
+        <label style={{ fontSize: '0.78rem', color: 'var(--color-muted)' }}>Default country</label>
+        <select
+          value={field.defaultCountry || COUNTRIES[0]}
+          onChange={(e) => updateField(index, { defaultCountry: e.target.value })}
+          style={{ padding: '0.4rem', marginTop: '0.2rem' }}
+        >
+          {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+      </div>
+    )
   }
 
   if (field.type === 'fileupload') {
