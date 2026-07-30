@@ -1,6 +1,6 @@
 // Place at: src/lib/locationData.js
 // Reference data for the "Location" field type's Country -> State -> City
-// cascade. Generated from the country-state-city npm package — run
+// cascade. Generated from the country-state-city npm package: run
 // `node scripts/generate-location-data.js` to regenerate or add a country
 // (edit COUNTRY_NAMES there), rather than hand-editing this file.
 export const LOCATION_DATA = {

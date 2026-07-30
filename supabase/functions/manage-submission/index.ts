@@ -1,6 +1,6 @@
 // Place at: supabase/functions/manage-submission/index.ts
 // Deploy: supabase functions deploy manage-submission
-// Public, unauthenticated by design (verify_jwt = false) — lets a respondent
+// Public, unauthenticated by design (verify_jwt = false): lets a respondent
 // who holds their own submission's edit_token (an unguessable UUID, handed
 // back once at submit time and never listed anywhere public) fetch or update
 // that one response, without needing an account. Looking a row up by

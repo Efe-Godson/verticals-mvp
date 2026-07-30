@@ -24,7 +24,7 @@ function Login() {
   async function handleGoogleLogin() {
     setGoogleLoading(true)
     setMessage('')
-    // Identity only — deliberately not requesting Sheets/Drive scopes here.
+    // Identity only: deliberately not requesting Sheets/Drive scopes here.
     // Those are requested separately, incrementally, only when the user
     // actually tries to use the Google Sheets export (see recordsExport.js).
     const { error } = await supabase.auth.signInWithOAuth({

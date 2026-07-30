@@ -50,7 +50,7 @@ function AppShell() {
         <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
         <Route path="/signup" element={<PublicOnlyRoute><SignUp /></PublicOnlyRoute>} />
         <Route path="/confirm-email" element={<PublicOnlyRoute><ConfirmEmail /></PublicOnlyRoute>} />
-        {/* No auth guard here — Supabase's reset link creates a temporary session
+        {/* No auth guard here: Supabase's reset link creates a temporary session
             on its own, and PublicOnlyRoute would incorrectly redirect it away. */}
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/" element={<PrivateRoute><Home /></PrivateRoute>} />

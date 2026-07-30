@@ -1,12 +1,12 @@
 // Place at: src/report/components/PieChart.jsx
 // Simple SVG donut/pie chart. Expects data as [{ label, count }] where
 // `count` is treated as a share (percentages work well, but any comparable
-// magnitude is fine — slices are proportional to count/total).
+// magnitude is fine, slices are proportional to count/total).
 
 import { useState } from 'react'
 import ChartTooltip, { useChartTooltip } from './ChartTooltip'
 
-// Fixed categorical order — a slot always means the same hue, and a 9th+
+// Fixed categorical order: a slot always means the same hue, and a 9th+
 // category folds into "Other" rather than generating a new color.
 const SERIES_COLORS = [
   'var(--chart-series-1)', 'var(--chart-series-2)', 'var(--chart-series-3)', 'var(--chart-series-4)',
@@ -91,7 +91,7 @@ function PieChart({ data, size = 240 }) {
             }}
           >
             <span style={{ width: '12px', height: '12px', borderRadius: '3px', background: s.color, flexShrink: 0 }} />
-            <span>{s.label} — <span style={{ fontVariantNumeric: 'tabular-nums' }}>{s.percent}%</span></span>
+            <span>{s.label}: <span style={{ fontVariantNumeric: 'tabular-nums' }}>{s.percent}%</span></span>
           </div>
         ))}
       </div>

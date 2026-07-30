@@ -31,7 +31,7 @@ Deno.serve(async req => {
       ? 'Use precise technical and analytical language, explaining abbreviations on first use.'
       : 'Use everyday plain English, avoiding technical jargon.'
 
-    const prompt = `You are a business analyst. ${languageInstruction} Using only the aggregated data below for "${form.name}", answer the user's question in 1-3 sentences. Start with the direct answer — no preamble, no restating the question, no hedging unless the data genuinely doesn't support an answer, in which case say so plainly in one sentence.
+    const prompt = `You are a business analyst. ${languageInstruction} Using only the aggregated data below for "${form.name}", answer the user's question in 1-3 sentences. Start with the direct answer: no preamble, no restating the question, no hedging unless the data genuinely doesn't support an answer, in which case say so plainly in one sentence.
 
 Data:
 ${JSON.stringify(stats, null, 2)}

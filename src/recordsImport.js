@@ -1,6 +1,6 @@
 // Place at: src/recordsImport.js
 // Bulk-fill a form's records from a spreadsheet instead of one submission at
-// a time — mirrors the "Download Template / Upload Filled Sheet" pattern
+// a time: mirrors the "Download Template / Upload Filled Sheet" pattern
 // already used for product carts in CreateForm.jsx, applied to whole
 // submissions. Import-only field types (cart, fileupload, grids) are
 // skipped since they don't have a sane single-cell spreadsheet shape.
@@ -13,7 +13,7 @@ export function isImportableField(field) {
   return !UNSUPPORTED_TYPES.includes(field.type)
 }
 
-// `linkedOptionsByFieldId`: { [fieldId]: [{ recordId, label }] } — needed to
+// `linkedOptionsByFieldId`: { [fieldId]: [{ recordId, label }] }, needed to
 // resolve a linked_record column's text value back to a record id. Fetch
 // this from the linked form's submissions before calling downloadTemplate
 // (so the example row can show a real label) or parseFile.

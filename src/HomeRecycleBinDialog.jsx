@@ -1,5 +1,5 @@
 // Place at: src/HomeRecycleBinDialog.jsx
-// Recycle Bin for deleted forms — same pattern as the submissions bin in
+// Recycle Bin for deleted forms, same pattern as the submissions bin in
 // Records.jsx, simplified since a form only needs its name and delete date.
 function HomeRecycleBinDialog({ forms, loading, onRestore, onPermanentDelete, onEmptyBin, onClose }) {
   return (

@@ -2,7 +2,7 @@ import { overlayStyle, dropdownStyle } from './recordsUiKit'
 
 export function CartCell({ value, cellKey, openCartCellKey, setOpenCartCellKey }) {
   if (!value || !value.items || value.items.length === 0) {
-    return <span style={{ color: '#ccc' }}>—</span>
+    return <span style={{ color: '#ccc' }}>-</span>
   }
 
   const isOpen = openCartCellKey === cellKey
@@ -13,7 +13,7 @@ export function CartCell({ value, cellKey, openCartCellKey, setOpenCartCellKey }
         onClick={() => setOpenCartCellKey(isOpen ? null : cellKey)}
         style={{ cursor: 'pointer', color: 'var(--color-primary)', textDecoration: 'underline dotted' }}
       >
-        {value.items.length} item{value.items.length !== 1 ? 's' : ''} — ₦{value.total.toLocaleString()}
+        {value.items.length} item{value.items.length !== 1 ? 's' : ''}: ₦{value.total.toLocaleString()}
       </span>
 
       {isOpen && (

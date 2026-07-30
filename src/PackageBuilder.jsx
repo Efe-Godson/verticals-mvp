@@ -1,6 +1,6 @@
 // Place at: src/PackageBuilder.jsx
 // Bundles 2+ existing products in a cart field into a single purchasable
-// "package" product with its own price — reused by CreateForm.jsx and
+// "package" product with its own price, reused by CreateForm.jsx and
 // EditForm.jsx. The package is just a regular product entry with
 // isPackage: true and bundleItems recording what it's made of (for
 // reference only; the respondent buys the package as one line item at the

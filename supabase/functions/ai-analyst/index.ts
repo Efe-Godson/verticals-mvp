@@ -2,12 +2,12 @@
 // Deploy:    supabase functions deploy ai-analyst
 // Secret:    supabase secrets set GEMINI_API_KEY=your_key
 // (SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are injected automatically
-// by Supabase into every edge function — no need to set them yourself.)
+// by Supabase into every edge function, no need to set them yourself.)
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { buildStats, fetchSubmissions, hashObject, jsonResponse, corsHeaders, requireFormOwner } from '../_shared/stats.ts'
 
-// Check ai.google.dev for the current recommended free-tier Flash model —
+// Check ai.google.dev for the current recommended free-tier Flash model:
 // model names get superseded, this is just today's sensible default.
 const GEMINI_MODEL = 'gemini-2.5-flash'
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
@@ -78,17 +78,17 @@ Date range: ${dateRangeLabel || 'All time'}.
 
 Writing style: ${languageInstruction}
 
-Aggregated data (already computed — do not recalculate, just reason over it):
+Aggregated data (already computed, do not recalculate, just reason over it):
 ${JSON.stringify(stats, null, 2)}
 
 Produce a business analysis with:
 - executiveSummary: 2-3 sentences, the single most important takeaway first.
-- keyInsights: 3-5 concrete observations backed by the numbers above. Each "detail" is 1 sentence, specific and to the point — no filler.
+- keyInsights: 3-5 concrete observations backed by the numbers above. Each "detail" is 1 sentence, specific and to the point, no filler.
 - recommendations: 2-4 specific, actionable suggestions tied to the data. Each "detail" is 1 sentence.
-- anomalies: unusual patterns or outliers if any genuinely stand out (empty array if none — do not invent anomalies to fill the list). Each "detail" is 1 sentence.
+- anomalies: unusual patterns or outliers if any genuinely stand out (empty array if none, do not invent anomalies to fill the list). Each "detail" is 1 sentence.
 - forecasts: 1-3 short-term predictions with a stated confidence and horizon, clearly labeled as estimates, not guarantees.
 
-Be succinct everywhere — every field should read like a headline, not a paragraph. Only state what the data supports. Do not fabricate numbers not present above.`
+Be succinct everywhere: every field should read like a headline, not a paragraph. Only state what the data supports. Do not fabricate numbers not present above.`
 }
 
 Deno.serve(async req => {
@@ -113,7 +113,7 @@ Deno.serve(async req => {
     const dataHash = await hashObject({ form_id, date_range_label, language_style, count: submissions.length, stats })
 
     // Reuse a cached analysis if nothing's changed since the last generation
-    // for this exact data slice — avoids burning free-tier quota on repeats.
+    // for this exact data slice, avoids burning free-tier quota on repeats.
     const { data: cached } = await supabase
       .from('ai_analyses').select('*')
       .eq('form_id', form_id).eq('data_hash', dataHash)

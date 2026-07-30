@@ -149,7 +149,7 @@ function Records() {
   }
 
   // linked_record fields need the other form's records to turn a typed
-  // label back into a { recordId, label } value — fetched fresh each time
+  // label back into a { recordId, label } value, fetched fresh each time
   // rather than cached, since the linked form's records can change anytime.
   async function loadLinkedFieldOptions() {
     const linkedFields = form.fields.filter(f => f.type === 'linked_record' && f.linkedFormId)
@@ -197,7 +197,7 @@ function Records() {
       }
 
       setSubmissions(current => [...(data || []), ...current])
-      const warningNote = warnings.length > 0 ? ` (${warnings.length} cell${warnings.length !== 1 ? 's' : ''} skipped — check values against field options)` : ''
+      const warningNote = warnings.length > 0 ? ` (${warnings.length} cell${warnings.length !== 1 ? 's' : ''} skipped: check values against field options)` : ''
       showToast(`Imported ${data.length} record${data.length !== 1 ? 's' : ''}.${warningNote}`, warnings.length > 0 ? 'error' : 'success')
     } catch (err) {
       showToast('Could not read that file: ' + err.message, 'error')
@@ -208,7 +208,7 @@ function Records() {
     try {
       const result = await syncFormGoogleSheet(form, visible)
       // null means syncFormGoogleSheet just kicked off a Google consent
-      // redirect (no scope yet, or the linked sheet needed re-auth) — the
+      // redirect (no scope yet, or the linked sheet needed re-auth), so the
       // browser is navigating away, so there's nothing to persist yet.
       if (!result) return
 
@@ -289,7 +289,7 @@ function Records() {
 
     if (deletedIds.length < selectedIds.length) {
       showToast(
-        `Only ${deletedIds.length} of ${selectedIds.length} record(s) were actually moved to the bin — a database permission may be missing.`,
+        `Only ${deletedIds.length} of ${selectedIds.length} record(s) were actually moved to the bin. A database permission may be missing.`,
         'error'
       )
     } else {
@@ -776,7 +776,7 @@ function Records() {
                       />
                     </td>
                     <td style={{ borderBottom: '1px solid #eee', padding: '0.75rem 0.9rem', color: '#666', whiteSpace: 'nowrap' }}>
-                      {sub.order_number ? `ORD-${String(sub.order_number).padStart(6, '0')}` : '—'}
+                      {sub.order_number ? `ORD-${String(sub.order_number).padStart(6, '0')}` : '-'}
                     </td>
                     {visibleFields.map(field => (
                       <td key={field.id} style={{
@@ -805,10 +805,10 @@ function Records() {
                     <td style={{ borderBottom: '1px solid #eee', padding: '0.75rem 0.9rem', color: '#666', whiteSpace: 'nowrap' }}>
                       {sub.updated_at ? new Date(sub.updated_at).toLocaleDateString('en-GB', {
                         day: '2-digit', month: 'short', year: 'numeric'
-                      }) : '—'}
+                      }) : '-'}
                     </td>
                     <td style={{ borderBottom: '1px solid #eee', padding: '0.75rem 0.9rem', color: '#666', whiteSpace: 'nowrap' }}>
-                      {sub.ip_address || '—'}
+                      {sub.ip_address || '-'}
                     </td>
                     <td style={{ borderBottom: '1px solid #eee', padding: '0.75rem 0.9rem', color: '#666', whiteSpace: 'nowrap', fontFamily: 'monospace', fontSize: '0.8rem' }}>
                       {sub.id.slice(0, 8)}
@@ -828,7 +828,7 @@ function Records() {
                         >
                           Copy Link
                         </button>
-                      ) : '—'}
+                      ) : '-'}
                     </td>
                   </tr>
                 ))}

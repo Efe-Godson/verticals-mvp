@@ -254,7 +254,7 @@ function AccountPage() {
         <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
           <button className="secondary" onClick={handleLogout}>Log out</button>
           <span style={{ fontSize: '0.82rem', color: 'var(--color-muted)' }}>
-            Need to delete your account? Contact support — this isn't self-serve since it permanently removes all your forms and records.
+            Need to delete your account? Contact support - this isn't self-serve since it permanently removes all your forms and records.
           </span>
         </div>
       </SectionCard>

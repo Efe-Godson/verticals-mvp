@@ -95,7 +95,7 @@ export function RecordDetail({ form, record, fields, onClose, onUpdated }) {
 
     const { error: logError } = await supabase.from('submission_logs').insert(changes)
     if (logError) {
-      // The edit itself succeeded — logging failure shouldn't block the save,
+      // The edit itself succeeded, so logging failure shouldn't block the save,
       // but we surface it so it's not silently lost.
       setSaveError('Saved, but the change log failed to record: ' + logError.message)
     }

@@ -76,7 +76,7 @@ function CreateForm() {
   const [collapsedCarts, setCollapsedCarts] = useState({})
   const [packageBuilderIndex, setPackageBuilderIndex] = useState(null)
 
-  // Debounced autosave — fires shortly after formName or fields stop changing
+  // Debounced autosave: fires shortly after formName or fields stop changing
   useEffect(() => {
     if (isFirstRun.current) {
       isFirstRun.current = false
@@ -129,7 +129,7 @@ function CreateForm() {
 
   // Defaults a new Location field to wherever this account said it operates
   // at signup, instead of making every respondent pick a country that's
-  // already known — see src/lib/locationData.js and SignUp.jsx.
+  // already known, see src/lib/locationData.js and SignUp.jsx.
   function updateFieldType(index, newType) {
     const changes = { type: newType }
     if (newType === 'location' && !fields[index].defaultCountry) {
@@ -276,8 +276,8 @@ function CreateForm() {
     }])
   }
 
-  // A section is a marker in the same `fields` array (not a separate list)
-  // — everything between one section and the next belongs to it. PublicForm
+  // A section is a marker in the same `fields` array (not a separate list):
+  // everything between one section and the next belongs to it. PublicForm
   // splits on these to paginate, Google-Forms style; Records/Report/exports
   // filter them out since they carry no data of their own.
   function addSection() {
@@ -368,7 +368,7 @@ function CreateForm() {
       <div style={{ marginBottom: '1.1rem', fontSize: '0.8rem', color: 'var(--color-muted)', minHeight: '1rem' }}>
         {autosaveStatus === 'saving' && 'Saving draft…'}
         {autosaveStatus === 'saved' && 'Draft saved automatically'}
-        {autosaveStatus === 'error' && <span style={{ color: '#c0392b' }}>Autosave failed — use Save Form to retry</span>}
+        {autosaveStatus === 'error' && <span style={{ color: '#c0392b' }}>Autosave failed, use Save Form to retry</span>}
       </div>
 
       {message && (
@@ -419,7 +419,7 @@ function CreateForm() {
               </div>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                  Section {index > 0 ? `— starts a new page` : ''}
+                  Section {index > 0 ? `- starts a new page` : ''}
                 </div>
                 <input
                   type="text"

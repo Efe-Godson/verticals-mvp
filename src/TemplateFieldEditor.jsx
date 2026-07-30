@@ -2,7 +2,7 @@
 // Compact field-list editor used when building or editing a template. Fields
 // are edited in place (no separate "pick an existing form" step) so a
 // template doesn't need a throwaway real form behind it. `linkTargets` is
-// what a "Linked Record" field on this list can point at — either the
+// what a "Linked Record" field on this list can point at: either the
 // admin's real forms (single-form templates) or sibling bundle entries
 // (multi-form templates), both shaped as [{ id, name, fields }].
 const FIELD_TYPES = [

@@ -1,7 +1,7 @@
 // Place at: src/TemplateEditorDialog.jsx
 // Used by Templates.jsx's inline "Manage"/"+ New Template" controls (admin
 // account only) to create and edit templates directly on the Templates
-// page — the access point for both starting and curating templates.
+// page, the access point for both starting and curating templates.
 import { useState } from 'react'
 import { supabase } from './supabaseClient'
 import { useToast } from './Toast'
@@ -21,7 +21,7 @@ function bundleKeyFrom(name, existingKeys) {
   return key
 }
 
-// Single source of truth for both "single form" and "bundle" templates —
+// Single source of truth for both "single form" and "bundle" templates:
 // a bundle is just a list of these, each independently field-edited, with
 // linked_record fields able to target sibling entries.
 function BundleEntryEditor({ entry, allEntries, onChange, onRemove, removable }) {

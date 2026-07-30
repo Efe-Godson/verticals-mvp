@@ -1,5 +1,5 @@
 // Place at: src/report/analysis/components/CartCategoryChart.jsx
-// Chart version of "cart revenue grouped by a categorical field" — replaces
+// Chart version of "cart revenue grouped by a categorical field", replaces
 // the old table-based CartCrossTab for this use case (no tables).
 import HorizontalBarChart from '../../components/HorizontalBarChart'
 import { getFieldValues, formatNaira } from '../../helpers/analysisUtils'

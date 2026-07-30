@@ -1,5 +1,5 @@
 // Place at: src/payroll/calculatePayroll.js
-// Pure calculation, no data fetching — takes an employee record, that
+// Pure calculation, no data fetching: takes an employee record, that
 // employee's salary events for one pay period, and the payroll settings,
 // and returns the breakdown described in the Staff Payment Tracker spec:
 //   Monthly Salary − Missed Days − Fines − Advances + Bonuses + Overtime + Extra Days = Final Salary
@@ -44,7 +44,7 @@ function eventLineItem(event, dailySalary) {
       return { type, category: 'addition', signedAmount: amount || days * dailySalary }
     case 'Extra Work Day':
       return { type, category: 'addition', signedAmount: (days || 1) * dailySalary }
-    default: // "Other Adjustment" — sign comes from whatever amount was entered
+    default: // "Other Adjustment", sign comes from whatever amount was entered
       return { type, category: amount >= 0 ? 'addition' : 'deduction', signedAmount: amount }
   }
 }

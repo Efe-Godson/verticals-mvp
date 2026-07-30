@@ -1,6 +1,6 @@
 // Place at: supabase/functions/_shared/stats.ts
 // Shared by ai-analyst and ai-ask. Builds compact aggregate stats from
-// submissions instead of dumping raw rows into the prompt — keeps token
+// submissions instead of dumping raw rows into the prompt, keeps token
 // usage sane and gives the model clean numbers to reason over rather than
 // re-deriving them itself.
 
@@ -23,7 +23,7 @@ export const corsHeaders = {
 // regardless of RLS), which means they must do their own ownership check
 // instead of relying on RLS to scope the query. This validates the caller's
 // JWT (sent by supabase-js as the Authorization header) and confirms the
-// resulting user actually owns the form they're asking about — without this,
+// resulting user actually owns the form they're asking about: without this,
 // anyone who knows a form_id (they're used in public URLs) could pull another
 // account's submission data or run up their Gemini bill.
 export async function requireFormOwner(req: Request, supabase: any, formId: string) {
@@ -128,7 +128,7 @@ export function buildStats(form: any, submissions: any[]) {
     }
   })
 
-  // Response volume bucketed by day — gives the model something to spot
+  // Response volume bucketed by day, gives the model something to spot
   // trends/anomalies in without needing every raw timestamp.
   const dayCounts: Record<string, number> = {}
   submissions.forEach(s => {

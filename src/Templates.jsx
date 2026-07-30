@@ -8,7 +8,7 @@ import TemplateEditorDialog from './TemplateEditorDialog'
 
 const ROW_HEIGHT = 64
 
-// Stable per-category color so the square reads as more than a label —
+// Stable per-category color so the square reads as more than a label,
 // consistent across sessions since it's keyed by name, not insertion order.
 const CATEGORY_COLORS = {
   'Retail': '#0ea5e9', 'Restaurant': '#f97316', 'Education': '#8b5cf6',
@@ -30,7 +30,7 @@ function TemplatesSkeleton() {
 }
 
 // Square (name) + rectangle (details + actions) pair, same height, kept
-// small enough that ~10 fit on screen without scrolling — this page is
+// small enough that ~10 fit on screen without scrolling; this page is
 // meant to be scanned quickly, not browsed like a gallery of big cards.
 function TemplateRow({ template, started, starting, isAdmin, onStart, onAccess, onManage, onDelete }) {
   const detail = template.description
@@ -106,7 +106,7 @@ function Templates() {
   const [activeCategory, setActiveCategory] = useState('All')
   const [searchText, setSearchText] = useState('')
   const [startingSlug, setStartingSlug] = useState(null)
-  const [myFormsBySlug, setMyFormsBySlug] = useState({}) // { [templateSlug]: primaryFormId } — most recent instance
+  const [myFormsBySlug, setMyFormsBySlug] = useState({}) // { [templateSlug]: primaryFormId }, most recent instance
   const [editingTemplate, setEditingTemplate] = useState(null) // null = closed, {} = new, template object = editing
   const [pendingDeleteId, setPendingDeleteId] = useState(null)
   const [allForms, setAllForms] = useState([]) // admin-only: for TemplateEditorDialog's "link to" choices
@@ -125,7 +125,7 @@ function Templates() {
 
   // "Access" vs "Start": has this user already created a form from this
   // template? Only forms with no primaryFormId count (a bundle's primary,
-  // or a single-form template's own form) — that's the one worth going
+  // or a single-form template's own form), that's the one worth going
   // back to. Picks the most recent if started more than once.
   useEffect(() => {
     async function loadMyInstances() {
@@ -186,14 +186,14 @@ function Templates() {
 
   // Bundle templates (e.g. Employees + Salary Events) create multiple forms
   // at once. A linked_record field's linkedFormId can be a placeholder like
-  // "$employees" pointing at another entry's `key` — those don't have real
+  // "$employees" pointing at another entry's `key`, those don't have real
   // ids until the forms are actually created, so this resolves them after
   // insert instead of the template storing real (and reusable) form ids.
   //
-  // The bundle's first entry becomes the "primary" form — the one that
+  // The bundle's first entry becomes the "primary" form: the one that
   // shows up in the main Home list. Every other entry gets settings.
   // primaryFormId pointing back at it, which Home filters out of the list
-  // entirely (they'd otherwise clutter it as extra, mostly-internal cards —
+  // entirely (they'd otherwise clutter it as extra, mostly-internal cards,
   // e.g. Salary Events isn't something you browse on its own, you reach it
   // from the Employees form's Payroll tab or NavBar's Linked Forms menu).
   async function startBundleTemplate(template) {
@@ -239,10 +239,10 @@ function Templates() {
     try {
       if (template.bundle?.length > 0) {
         const createdByKey = await startBundleTemplate(template)
-        showToast(`"${template.name}" created — ${template.bundle.length} forms set up and linked.`, 'success')
+        showToast(`"${template.name}" created: ${template.bundle.length} forms set up and linked.`, 'success')
         const primaryFormId = createdByKey[template.bundle[0].key]
         // Payroll-flavored bundles (settings.payrollRole === 'employees' on
-        // the primary entry) have a purpose-built Dashboard — more useful
+        // the primary entry) have a purpose-built Dashboard, more useful
         // as a landing page than the empty form builder.
         const destination = template.bundle[0].settings?.payrollRole === 'employees'
           ? `/form/${primaryFormId}/payroll`
@@ -261,7 +261,7 @@ function Templates() {
       }]).select().single()
 
       if (error || !data) throw new Error(error?.message || 'unknown error')
-      showToast(`"${template.name}" created — customize it now.`, 'success')
+      showToast(`"${template.name}" created, customize it now.`, 'success')
       setMyFormsBySlug(current => ({ ...current, [template.slug]: data.id }))
       navigate(`/form/${data.id}/edit`)
     } catch (err) {
@@ -288,7 +288,7 @@ function Templates() {
         .template-row:hover .template-row-tile:first-child { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
 
         /* Below ~480px there isn't room for name + category + detail +
-           every action button on one 64px-tall line — let the action
+           every action button on one 64px-tall line, let the action
            buttons wrap onto their own line instead of overflowing or
            forcing the whole row to shrink illegibly. The square (name)
            stays put so the template is still identifiable at a glance. */
@@ -376,7 +376,7 @@ function Templates() {
 
           {!loading && templates.length === 0 && (
             <div className="card" style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--color-muted)' }}>
-              No templates are published yet — check back soon.
+              No templates are published yet, check back soon.
             </div>
           )}
 

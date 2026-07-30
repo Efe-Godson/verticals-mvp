@@ -12,7 +12,7 @@ function updateListField(field, index, updateField, key, text) {
 
 // A dropdown whose options come from another one of your own forms' records
 // (e.g. a "Salary Events" form linking to "Employees") instead of a fixed
-// list — lets one form reference specific records in another.
+// list, lets one form reference specific records in another.
 function LinkedRecordConfig({ field, index, updateField }) {
   const { session } = useAuth()
   const [forms, setForms] = useState([])
@@ -58,7 +58,7 @@ function LinkedRecordConfig({ field, index, updateField }) {
   )
 }
 
-// Field types this makes sense on — a single-answer-per-response field that
+// Field types this makes sense on: a single-answer-per-response field that
 // can hold one of a few short labels, which is what "Single" / "Multiple" /
 // "Package" are.
 const AUTO_FROM_CART_ELIGIBLE = ['dropdown', 'multiplechoice', 'autocomplete']
@@ -68,7 +68,7 @@ const AUTO_FROM_CART_ELIGIBLE = ['dropdown', 'multiplechoice', 'autocomplete']
 // answered by hand: one distinct product in the cart → "Single", more than
 // one → "Multiple", any package-type product → "Package". Matching by
 // those exact option words is the respondent-facing app's job (PublicForm/
-// FormPreview) — this just wires which cart field to watch.
+// FormPreview), this just wires which cart field to watch.
 function AutoFromCartConfig({ field, index, updateField, allFields }) {
   const cartFields = (allFields || []).filter(f => f.type === 'cart')
   if (cartFields.length === 0) return null
@@ -87,14 +87,14 @@ function AutoFromCartConfig({ field, index, updateField, allFields }) {
       {field.autoFromCartFieldId && (
         <p style={{ fontSize: '0.75rem', color: 'var(--color-muted)', marginTop: '0.3rem', maxWidth: '360px' }}>
           Automatically set to "Single" (1 distinct product in the cart), "Multiple" (2+), or "Package"
-          (any package product included) — include those exact words as options above for this to work.
+          (any package product included). Include those exact words as options above for this to work.
         </p>
       )}
     </div>
   )
 }
 
-// Renders the extra builder inputs a field type needs beyond label/type/options —
+// Renders the extra builder inputs a field type needs beyond label/type/options:
 // grid rows & columns, scale range, star count, or upload constraints.
 function FieldTypeConfig({ field, index, updateField, allFields }) {
   if (TYPES_WITH_GRID.includes(field.type)) {

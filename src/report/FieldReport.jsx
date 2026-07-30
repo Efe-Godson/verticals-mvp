@@ -71,7 +71,7 @@ function FieldReport({ field, submissions, totalResponses }) {
           />
         )
 
-      // Fields where we only ever show a response/completion rate — no
+      // Fields where we only ever show a response/completion rate, no
       // listing of the actual answers.
       case 'text':
       case 'longtext':

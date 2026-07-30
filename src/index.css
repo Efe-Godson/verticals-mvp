@@ -10,7 +10,7 @@
   --radius: 8px;
   --shadow: 0 1px 3px rgba(0,0,0,0.06);
 
-  /* Categorical chart palette — fixed order, validated for CVD-safe adjacent
+  /* Categorical chart palette: fixed order, validated for CVD-safe adjacent
      contrast (see dataviz skill). Never cycle/reassign per filter; a series
      always keeps its slot. */
   --chart-series-1: #2a78d6; /* blue */
@@ -23,17 +23,17 @@
   --chart-series-8: #e34948; /* red */
   --chart-series-other: #9ca3af; /* gray, for the folded "Other" slice */
 
-  /* Status palette — reserved; never reused for a plain data series */
+  /* Status palette: reserved; never reused for a plain data series */
   --status-good: #0ca30c;
   --status-warning: #fab219;
   --status-serious: #ec835a;
   --status-critical: #d03b3b;
 }
 
-/* Dark mode — same roles, dark-stepped values. The media query follows the
+/* Dark mode: same roles, dark-stepped values. The media query follows the
    OS setting; the [data-theme="dark"] scope covers an in-app toggle should
    one get added later, and wins over OS-light via the :not() guard. Chart
-   series hexes are the dataviz skill's pre-validated dark column — same
+   series hexes are the dataviz skill's pre-validated dark column, the same
    eight hues re-stepped for a dark surface, not a separate palette. */
 @media (prefers-color-scheme: dark) {
   :root:where(:not([data-theme="light"])) {
@@ -231,7 +231,7 @@ input:focus, select:focus, textarea:focus {
   border-radius: var(--radius);
   background-color: var(--color-surface);
 
-  /* Pure-CSS "scroll shadow" cue on the left/right edges — each shadow
+  /* Pure-CSS "scroll shadow" cue on the left/right edges: each shadow
      only becomes visible once there's actually more content in that
      direction to scroll to, no JS required */
   background-image:
@@ -246,10 +246,10 @@ input:focus, select:focus, textarea:focus {
 }
 
 /* Only the table breaks out to use the full viewport width on larger
-   screens — everything else on the page (filters, buttons, pagination)
+   screens: everything else on the page (filters, buttons, pagination)
    stays within the normal reading-width column.
    Using margin-left/right: calc(50% - 50vw) here instead of the more
-   common `position: relative; left: 50%; margin-left: -50vw` — the
+   common `position: relative; left: 50%; margin-left: -50vw`: the
    position/left version only cancels out correctly when the parent has
    zero padding of its own. Since .page has real padding that changes
    per breakpoint, that version shifted the table left by the wrong
@@ -257,7 +257,7 @@ input:focus, select:focus, textarea:focus {
    calc() formula below correctly cancels the parent's padding at any
    breakpoint, because the percentage in `50%` resolves against the
    parent's content width (already inside its padding), not the
-   viewport — so the padding term cancels out algebraically. */
+   viewport, so the padding term cancels out algebraically. */
 .table-breakout {
   width: 100vw;
   margin-left: calc(50% - 50vw);
@@ -285,7 +285,7 @@ input:focus, select:focus, textarea:focus {
   font-size: 0.88rem;
 }
 
-/* Toolbars of buttons (Print/Download/More, form actions, etc.) —
+/* Toolbars of buttons (Print/Download/More, form actions, etc.):
    wrap onto multiple lines instead of overflowing or squishing */
 .toolbar-row {
   display: flex;
@@ -294,7 +294,7 @@ input:focus, select:focus, textarea:focus {
   align-items: center;
 }
 
-/* Dropdown/popover panels — cap width so they never exceed the viewport
+/* Dropdown/popover panels: cap width so they never exceed the viewport
    on a narrow phone, regardless of how they're positioned */
 .dropdown-panel {
   max-width: min(90vw, 320px);
@@ -305,7 +305,7 @@ input:focus, select:focus, textarea:focus {
   color: var(--color-text);
 }
 
-/* Product Cart rows — a compact main line (name, price, expand toggle,
+/* Product Cart rows: a compact main line (name, price, expand toggle,
    remove) always shown; Unit/Category only appear when the product has
    them set, or the person explicitly expands the row. */
 .product-card {
@@ -380,7 +380,7 @@ input:focus, select:focus, textarea:focus {
 
 /* Form list rows: full button row on desktop, Open + overflow menu on mobile.
    !important is required here because the row itself uses an inline
-   `display: flex` style — without it, the inline style always wins and
+   `display: flex` style, without it, the inline style always wins and
    this row never actually hides above the mobile breakpoint. */
 .list-actions-mobile {
   display: none !important;
@@ -575,7 +575,7 @@ input:focus, select:focus, textarea:focus {
   }
 
   /* Product rows: main line and details line each stay on one row and
-     shrink to fit — wrapping here would push name/price/toggle/remove
+     shrink to fit; wrapping here would push name/price/toggle/remove
      onto separate lines instead of shrinking them to share one. */
 
   /* Once Download Template / Upload Filled Sheet wrap onto their own

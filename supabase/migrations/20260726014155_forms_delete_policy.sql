@@ -2,7 +2,7 @@
 -- Level Security silently denied every delete: Supabase's delete() call
 -- doesn't error when RLS filters out the target row, it just reports 0 rows
 -- affected. The app's UI didn't check for that, so it removed the form from
--- local state optimistically while the row stayed in the database — the
+-- local state optimistically while the row stayed in the database: the
 -- form would then reappear on the next load. Adding the missing policy so
 -- owners can actually delete their own forms.
 

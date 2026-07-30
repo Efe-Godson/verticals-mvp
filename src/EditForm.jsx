@@ -108,7 +108,7 @@ function EditForm() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [openFieldMenu])
 
-  // Debounced autosave — skips the initial load, only fires once the person actually edits something
+  // Debounced autosave: skips the initial load, only fires once the person actually edits something
   useEffect(() => {
     if (loading) return
 
@@ -195,7 +195,7 @@ function EditForm() {
     const key = `${fieldIndex}-${product.id}`
     if (key in productOverrides) return productOverrides[key]
     // Products that already have a unit or category saved stay visible by
-    // default — only genuinely empty ones start collapsed.
+    // default, only genuinely empty ones start collapsed.
     return !!(product.unit || product.category)
   }
 
@@ -388,7 +388,7 @@ function EditForm() {
       <div style={{ marginBottom: '1.1rem', fontSize: '0.8rem', color: 'var(--color-muted)', minHeight: '1rem' }}>
         {autosaveStatus === 'saving' && 'Saving changes…'}
         {autosaveStatus === 'saved' && 'Changes saved automatically'}
-        {autosaveStatus === 'error' && <span style={{ color: '#c0392b' }}>Autosave failed — use Save Changes to retry</span>}
+        {autosaveStatus === 'error' && <span style={{ color: '#c0392b' }}>Autosave failed, use Save Changes to retry</span>}
       </div>
 
       {message && (
@@ -438,7 +438,7 @@ function EditForm() {
               </div>
               <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                  Section {index > 0 ? `— starts a new page` : ''}
+                  Section {index > 0 ? `- starts a new page` : ''}
                 </div>
                 <input
                   type="text"

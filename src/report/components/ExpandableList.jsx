@@ -1,7 +1,7 @@
 // Place at: src/report/components/ExpandableList.jsx
 import { useState } from 'react'
 
-// Shows the first `limit` items, with a "Show all" toggle to reveal the rest —
+// Shows the first `limit` items, with a "Show all" toggle to reveal the rest:
 // keeps long lists (text responses) from dominating the card.
 function ExpandableList({ items, limit = 5, renderItem }) {
   const [expanded, setExpanded] = useState(false)

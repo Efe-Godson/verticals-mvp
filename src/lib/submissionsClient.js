@@ -19,7 +19,7 @@ async function throwFunctionError(error) {
 // Submits a public form response. Routed through the submit-form edge
 // function (rather than inserting into `submissions` directly from the
 // browser) so the form's published/paused/archived status is enforced
-// server-side and the submitter's IP can be stamped — see submit-form's
+// server-side and the submitter's IP can be stamped, see submit-form's
 // header comment for why.
 export async function submitForm(formId, data) {
   const { data: result, error } = await supabase.functions.invoke('submit-form', {
@@ -30,7 +30,7 @@ export async function submitForm(formId, data) {
   return result
 }
 
-// Looks up a submission by its edit_token — an unguessable UUID handed back
+// Looks up a submission by its edit_token, an unguessable UUID handed back
 // once at submit time, never listed anywhere public. That token is the
 // access control, not a login.
 export async function getSubmissionByToken(editToken) {

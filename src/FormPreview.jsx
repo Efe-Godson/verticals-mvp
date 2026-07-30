@@ -1,12 +1,12 @@
 // Place at: src/FormPreview.jsx
-// A live, in-browser preview of the form being built — mirrors PublicForm's
+// A live, in-browser preview of the form being built, mirrors PublicForm's
 // layout and field rendering but never submits anywhere. Used by a floating
 // "Preview" button on the Create/Edit form pages so builders can see exactly
 // what a respondent will see without saving or leaving the editor.
 import { useState } from 'react'
 import { COUNTRIES, statesFor, citiesFor } from './lib/locationData'
 
-// Mirrors PublicForm.jsx's buildPages — kept as a separate copy rather than
+// Mirrors PublicForm.jsx's buildPages, kept as a separate copy rather than
 // a shared import since one lives in a modal with no data-submission
 // concerns and the other is the real respondent flow; duplicating this
 // small pure function is cheaper than coupling the two.
@@ -271,7 +271,7 @@ function FormPreviewModal({ formName, description, fields, onClose }) {
           marginBottom: '1rem', paddingBottom: '0.8rem', borderBottom: '1px solid var(--color-border)'
         }}>
           <span style={{ fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-muted)' }}>
-            Preview — respondent view
+            Preview - respondent view
           </span>
           <button className="secondary" onClick={onClose}>Close</button>
         </div>
@@ -332,7 +332,7 @@ function FormPreviewModal({ formName, description, fields, onClose }) {
               </button>
             ) : <span />}
             {isLastPage ? (
-              <button disabled title="Preview only — submitting is disabled" style={{ padding: '0.7rem 1.5rem', fontSize: '1rem', opacity: 0.6, cursor: 'not-allowed' }}>
+              <button disabled title="Preview only, submitting is disabled" style={{ padding: '0.7rem 1.5rem', fontSize: '1rem', opacity: 0.6, cursor: 'not-allowed' }}>
                 Submit
               </button>
             ) : (

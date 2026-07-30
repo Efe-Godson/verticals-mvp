@@ -4,7 +4,7 @@ import { supabase } from './supabaseClient'
 import { submitForm, getSubmissionByToken, updateSubmissionByToken } from './lib/submissionsClient'
 import { COUNTRIES, statesFor, citiesFor } from './lib/locationData'
 
-// Splits fields into pages at each 'section' marker, Google-Forms style —
+// Splits fields into pages at each 'section' marker, Google-Forms style:
 // fields before the first section (if any) form an unheaded first page,
 // then every section starts a new page containing its own fields. A form
 // with no sections is just one page, so this is a no-op for most forms.
@@ -46,7 +46,7 @@ function PublicForm() {
   const currentPage = pages[pageIndex] || pages[0]
   const isLastPage = pageIndex === pages.length - 1
 
-  // Prefills the builder state from a saved submission — the inverse of the
+  // Prefills the builder state from a saved submission: the inverse of the
   // { items, total } / plain-value shape submitAnswers() writes out.
   function loadAnswersFromData(fields, data) {
     const nextAnswers = {}
@@ -110,7 +110,7 @@ function PublicForm() {
 
   // Linked-record dropdowns pull their options from another form's records.
   // Only readable when the person filling this in is authenticated as that
-  // linked form's owner (RLS scopes submission reads to the owner) — for an
+  // linked form's owner (RLS scopes submission reads to the owner), so for an
   // anonymous public respondent, this quietly resolves to an empty list
   // rather than erroring, since most linked-record use cases (like Salary
   // Events → Employees) are filled in by the account owner, not the public.
@@ -137,7 +137,7 @@ function PublicForm() {
 
   // Recomputes any field configured to auto-fill from a cart field's
   // contents (see FieldTypeConfig's AutoFromCartConfig) whenever cart
-  // quantities change — 1 distinct product selected → "Single", 2+ →
+  // quantities change: 1 distinct product selected → "Single", 2+ →
   // "Multiple", any package-type product → "Package".
   useEffect(() => {
     if (!form) return
@@ -305,7 +305,7 @@ function PublicForm() {
     if (field.required && strVal === '') {
       return field.errorMessage || `${field.label} is required.`
     }
-    if (strVal === '') return null // not required and left blank — nothing further to check
+    if (strVal === '') return null // not required and left blank, nothing further to check
 
     if (field.type === 'text' || field.type === 'longtext') {
       if (field.minLength !== undefined && strVal.length < field.minLength) {
@@ -357,7 +357,7 @@ function PublicForm() {
     return null
   }
 
-  // Validates just the fields on one page — used both for the Next button
+  // Validates just the fields on one page: used both for the Next button
   // (only that page's fields should block advancing) and, with the full
   // field list, for the final submit.
   function validatePageFields(pageFields) {
@@ -533,7 +533,7 @@ function PublicForm() {
             </div>
           )}
 
-          {/* Product grid — small cards */}
+          {/* Product grid - small cards */}
           {filteredProducts.length === 0 ? (
             <p style={{ color: '#999', margin: '1rem 0' }}>No products match your search.</p>
           ) : (
@@ -819,7 +819,7 @@ function PublicForm() {
           )}
           {uploaded && !isUploading && (
             <p style={{ fontSize: '0.8rem', color: '#1a7f37', marginTop: '0.4rem' }}>
-              Uploaded — <a href={uploaded} target="_blank" rel="noreferrer">view file</a>
+              Uploaded: <a href={uploaded} target="_blank" rel="noreferrer">view file</a>
             </p>
           )}
         </div>

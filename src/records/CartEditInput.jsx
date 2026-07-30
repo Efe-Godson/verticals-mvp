@@ -26,7 +26,7 @@ export function CartEditInput({ field, value, onChange }) {
   }
 
   // Show every product in the form's catalogue (quantity 0 if not currently in the cart),
-  // plus any cart item whose product has since been removed from the catalogue —
+  // plus any cart item whose product has since been removed from the catalogue,
   // so it stays visible and adjustable rather than silently vanishing.
   const rows = products.map(p => {
     const existing = items.find(i => i.id === p.id)

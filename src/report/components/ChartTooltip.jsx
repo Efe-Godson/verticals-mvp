@@ -1,7 +1,7 @@
 // Place at: src/report/components/ChartTooltip.jsx
 // Small floating tooltip for chart hover states, shared by PieChart and
 // HorizontalBarChart. Positioned from the triggering mouse event's viewport
-// coordinates (fixed positioning) rather than a library — these charts are
+// coordinates (fixed positioning) rather than a library, these charts are
 // simple enough not to need a portal/collision engine.
 
 import { useCallback, useState } from 'react'

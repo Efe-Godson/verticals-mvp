@@ -1,5 +1,5 @@
 // Place at: src/report/ai/AIInsightCards.jsx
-// Dashboard-facing summary only — no chat, no full analysis. Manual
+// Dashboard-facing summary only, no chat, no full analysis. Manual
 // "Generate" button keeps free-tier usage predictable while still offering a
 // richer, more practical analysis experience.
 import { useEffect, useState } from 'react'

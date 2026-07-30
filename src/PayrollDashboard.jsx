@@ -1,5 +1,5 @@
 // Place at: src/PayrollDashboard.jsx
-// Route: /form/:id/payroll — the payroll vertical's landing page (spec
+// Route: /form/:id/payroll: the payroll vertical's landing page (spec
 // module 1 "Dashboard"). The per-employee Paid/Pending table lives at
 // /form/:id/payroll/payments (spec module 6 "Payment Page").
 import { useEffect, useMemo, useState } from 'react'
@@ -170,7 +170,7 @@ function PayrollDashboard() {
 
       {!eventsForm && (
         <p style={{ color: 'var(--color-muted)', marginBottom: '1rem' }}>
-          No linked Salary Events form found — deductions and additions will show as zero until one is linked.
+          No linked Salary Events form found. Deductions and additions will show as zero until one is linked.
         </p>
       )}
 

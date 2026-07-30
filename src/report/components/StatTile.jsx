@@ -1,8 +1,8 @@
 // Place at: src/report/components/StatTile.jsx
-// Compact label/value tile — for KPI grids and small stat rows.
+// Compact label/value tile, for KPI grids and small stat rows.
 // (Your actual Card.jsx is built for full chart blocks with a 360px min
-// height, so it's the wrong tool for these — this is a proper replacement.)
-// trend (optional): { direction: 'up' | 'down', percent: number } — omit
+// height, so it's the wrong tool for these - this is a proper replacement.)
+// trend (optional): { direction: 'up' | 'down', percent: number }, omit
 // entirely (rather than passing null) when there's no previous period to
 // compare against, so the tile doesn't show a misleading "no change".
 function StatTile({ label, value, trend }) {

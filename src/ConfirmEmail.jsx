@@ -24,7 +24,7 @@ function ConfirmEmail() {
 
       <p style={{ color: 'var(--color-muted)', marginTop: '1rem' }}>
         We've sent a confirmation link to{email ? <> <strong>{email}</strong></> : ' your email address'}.
-        Click the link in that email to activate your account — this page will move on by itself
+        Click the link in that email to activate your account. This page will move on by itself
         once it's confirmed.
       </p>
 

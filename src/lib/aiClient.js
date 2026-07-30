@@ -20,7 +20,7 @@ async function throwFunctionError(error) {
 }
 
 // Generates (or fetches the cached) full structured analysis for a form's
-// current filtered submission set. Manual-trigger only — call this from a
+// current filtered submission set. Manual-trigger only: call this from a
 // button click, not on mount, to keep free-tier usage predictable.
 export async function fetchAIAnalysis(formId, dateRangeLabel, submissionIds, languageStyle = 'plain') {
   const { data, error } = await supabase.functions.invoke('ai-analyst', {

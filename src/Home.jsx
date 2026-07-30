@@ -100,6 +100,7 @@ function Home() {
   const [currentPage, setCurrentPage] = useState(1)
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('verticals_view_mode') || 'grid')
   const [demoCollapsed, setDemoCollapsed] = useState(() => localStorage.getItem('verticals_demo_collapsed') !== 'false')
+  const [demoSeen, setDemoSeen] = useState(() => localStorage.getItem('verticals_demo_seen') === 'true')
   const [openMenuId, setOpenMenuId] = useState(null)
   const [pendingConfirm, setPendingConfirm] = useState(null) // { type: 'moveToBin', formId } | { type: 'bulkMoveToBin' } | { type: 'permanentDelete', formId } | { type: 'emptyBin' }
   const [selectedFormIds, setSelectedFormIds] = useState([])
@@ -138,7 +139,7 @@ function Home() {
         setForms(visibleForms)
 
         // One batched query for all forms' response counts, instead of a
-        // separate count query per card — cheaper and avoids a waterfall
+        // separate count query per card, cheaper and avoids a waterfall
         // of requests as the number of forms grows.
         const formIds = visibleForms.map(f => f.id)
         if (formIds.length > 0) {
@@ -189,7 +190,7 @@ function Home() {
   }, [openMenuId])
 
   // Publishes the bin's open handler + count to NavBar, which renders the
-  // actual button — NavBar isn't a descendant of Home, so it can't call
+  // actual button. NavBar isn't a descendant of Home, so it can't call
   // openBin() directly. Clear the trigger on unmount so the button
   // disappears once you navigate away from a page that owns a bin.
   useEffect(() => {
@@ -206,6 +207,14 @@ function Home() {
     const next = !demoCollapsed
     setDemoCollapsed(next)
     localStorage.setItem('verticals_demo_collapsed', String(next))
+  }
+
+  // Once someone's actually opened the demo (not just glanced at the
+  // collapsed teaser), it's done its job. Stop showing it on Home so it
+  // doesn't linger as clutter in every future visit.
+  function markDemoSeen() {
+    setDemoSeen(true)
+    localStorage.setItem('verticals_demo_seen', 'true')
   }
 
   function copyLink(formId) {
@@ -282,7 +291,7 @@ function Home() {
     }
     const deletedIds = (data || []).map(d => d.id)
     if (deletedIds.length === 0) {
-      showToast('These forms could not be deleted — you may not have permission to remove them.', 'error')
+      showToast('These forms could not be deleted, you may not have permission to remove them.', 'error')
       return
     }
     setForms(current => current.filter(f => !deletedIds.includes(f.id)))
@@ -387,6 +396,9 @@ function Home() {
         .form-grid-card { transition: border-color 0.15s ease, background-color 0.15s ease; }
         .form-grid-card:hover { border-color: var(--color-primary); }
         .form-grid-card.selected { border-color: var(--color-primary); background: #eff6ff; }
+        .form-list-row { transition: background-color 0.15s ease; }
+        .form-list-row:hover { background: var(--color-bg); }
+        .form-list-row:last-child { border-bottom: none !important; }
       `}</style>
 
       <div className="toolbar-row" style={{ justifyContent: 'space-between', marginBottom: '1.5rem' }}>
@@ -527,7 +539,7 @@ function Home() {
         </>
       )}
 
-      {!loading && demoForm && (
+      {!loading && demoForm && !demoSeen && (
         <div style={{ marginTop: '2.5rem', maxWidth: demoCollapsed ? '220px' : '100%' }}>
           <div
             onClick={toggleDemoCollapsed}
@@ -550,12 +562,12 @@ function Home() {
             {!demoCollapsed && (
               <div onClick={(e) => e.stopPropagation()} style={{ marginTop: '0.9rem' }}>
                 <p style={{ margin: '0 0 0.9rem 0', color: 'var(--color-muted)', fontSize: '0.88rem' }}>
-                  Explore "{demoForm.name}" — a fully built example with real submissions, so you can see what records and reports look like once a form has been collecting data for a while.
+                  Explore "{demoForm.name}", a fully built example with real submissions, so you can see what records and reports look like once a form has been collecting data for a while.
                 </p>
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  <Link to={`/form/${demoForm.id}/records`}><button className="secondary">View Records</button></Link>
-                  <Link to={`/form/${demoForm.id}/report`}><button className="secondary">View Report</button></Link>
-                  <Link to={`/form/${demoForm.id}`}><button>Open Form</button></Link>
+                  <Link to={`/form/${demoForm.id}/records`} onClick={markDemoSeen}><button className="secondary">View Records</button></Link>
+                  <Link to={`/form/${demoForm.id}/report`} onClick={markDemoSeen}><button>View Report</button></Link>
+                  <Link to={`/form/${demoForm.id}`} onClick={markDemoSeen}><button className="secondary">Open Form</button></Link>
                 </div>
               </div>
             )}
@@ -603,15 +615,15 @@ function Home() {
 
 function ListView({ pageForms, togglePin, publishForm, setFormStatus, duplicateForm, copyLink, requestDelete, selectedFormIds, toggleSelectForm, selectionMode, enterSelectionMode, openMenuId, setOpenMenuId, menuRef }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+    <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
       {pageForms.map(form => {
         const selected = selectedFormIds.includes(form.id)
         return (
-        <div key={form.id} className="card form-state-card" style={{
-          padding: '0.95rem 1.2rem', display: 'flex', justifyContent: 'space-between',
+        <div key={form.id} className="form-state-card form-list-row" style={{
+          padding: '0.75rem 1.1rem', display: 'flex', justifyContent: 'space-between',
           alignItems: 'center', flexWrap: 'wrap', gap: '0.8rem',
-          borderColor: selected ? 'var(--color-primary)' : undefined,
-          background: selected ? '#eff6ff' : undefined
+          borderBottom: '1px solid var(--color-border)',
+          background: selected ? '#eff6ff' : 'transparent'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
             {selectionMode && (

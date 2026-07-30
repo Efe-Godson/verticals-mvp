@@ -22,7 +22,7 @@ function NavBar() {
   const id = match ? match[1] : null
   const isFormContext = !!id
 
-  // Lightweight settings-only lookup per form navigation — cheap enough not
+  // Lightweight settings-only lookup per form navigation, cheap enough not
   // to be worth a shared context for a couple of booleans/a short list.
   // Only Employees forms (Staff Payment Tracker) get a Payroll tab; any
   // form that's part of a bundle template (primary or secondary) gets a

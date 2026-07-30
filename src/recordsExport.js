@@ -4,20 +4,20 @@ import autoTable from 'jspdf-autotable'
 import { supabase } from './supabaseClient'
 
 // Sheets/Drive access is requested incrementally via Supabase's Google OAuth
-// session — not at login (see Login.jsx, which only requests openid/email/
+// session, not at login (see Login.jsx, which only requests openid/email/
 // profile). The first time this scope hasn't been granted yet, we trigger a
 // fresh signInWithOAuth requesting it; once granted, session.provider_token
 // carries a usable Google access token.
 const GOOGLE_SHEETS_SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file'
 
-// Sections are page-break markers in the builder, not data fields — they
+// Sections are page-break markers in the builder, not data fields: they
 // have no submission value, so every export skips them via this instead of
 // touching form.fields directly.
 function dataFields(form) {
   return form.fields.filter(f => f.type !== 'section')
 }
 
-// Turns any field's stored value into a plain, human-readable string —
+// Turns any field's stored value into a plain, human-readable string,
 // shared by both the Excel export and the printable table below.
 function cellToText(value, field) {
   if (value === undefined || value === null || value === '') return ''
@@ -150,7 +150,7 @@ async function requestGoogleSheetsAccess() {
 }
 
 // A 403 here means the request reached Google fine, but the current
-// provider_token doesn't carry the Sheets/Drive scopes — e.g. the user's
+// provider_token doesn't carry the Sheets/Drive scopes, e.g. the user's
 // session predates ever granting them. A missing provider_token is the same
 // situation. Either way, the fix is the same incremental consent redirect.
 function isScopeError(status, body) {
@@ -206,7 +206,7 @@ async function createFormGoogleSheet(form, records, accessToken) {
 }
 
 // Overwrites the existing linked sheet's "Records" tab with the current
-// records — so re-syncing after the form has collected new submissions
+// records, so re-syncing after the form has collected new submissions
 // updates the same sheet in place rather than creating a new one.
 async function resyncFormGoogleSheet(spreadsheetId, form, records, accessToken) {
   const values = buildRecordsSheetValues(form, records)
@@ -220,7 +220,7 @@ async function resyncFormGoogleSheet(spreadsheetId, form, records, accessToken) 
   if (!clearRes.ok) {
     if (isScopeError(clearRes.status, clearBody)) return { needsConsent: true }
     // The linked sheet is gone or no longer accessible (e.g. deleted, or
-    // ownership/sharing changed) — fall back to creating a fresh one rather
+    // ownership/sharing changed), fall back to creating a fresh one rather
     // than failing the sync outright.
     if (clearRes.status === 404 || clearRes.status === 403) return { staleLink: true }
     throw new Error(clearBody.error?.message || 'Could not sync the Google Sheet.')
@@ -242,7 +242,7 @@ async function resyncFormGoogleSheet(spreadsheetId, form, records, accessToken) 
 
 // Requests Sheets/Drive access incrementally, via a fresh Supabase Google
 // OAuth grant, the first time there's no provider_token with the right
-// scopes — not at login. Once granted, subsequent syncs reuse the same
+// scopes, not at login. Once granted, subsequent syncs reuse the same
 // session's token.
 //
 // `form.settings.googleSheetId`, if present, is reused so every sync updates
@@ -332,7 +332,7 @@ export function printRecordsTable(form, records, filterSummary) {
     <html>
     <head>
       <meta charset="utf-8" />
-      <title>${escapeHtml(form.name)} — Records</title>
+      <title>${escapeHtml(form.name)}: Records</title>
       <style>
         * { box-sizing: border-box; }
         body {

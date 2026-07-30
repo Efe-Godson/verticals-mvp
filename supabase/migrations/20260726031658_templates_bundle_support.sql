@@ -4,7 +4,7 @@
 --   [{ "key": "employees", "name": "Employees", "fields": [...] },
 --    { "key": "events", "name": "Salary Events", "fields": [...] }]
 -- A linked_record field's linkedFormId may contain a placeholder like
--- "$employees" referencing another bundle entry's key — resolved to the
+-- "$employees" referencing another bundle entry's key, resolved to the
 -- real created form id client-side when the template is started, since the
 -- ids don't exist until then. `fields` stays as the single-form path.
 alter table templates

@@ -50,8 +50,8 @@ const CATEGORICAL_TYPES = ['dropdown', 'multiplechoice', 'checkbox', 'autocomple
 const NUMERIC_TYPES = ['number', 'rating', 'linearscale']
 const DEMOGRAPHIC_TYPES = ['email', 'phone']
 
-// Fields whose values are worth breaking cart revenue down by first —
-// e.g. "Sales Rep", "Salesperson", or a "Name" field — before the rest.
+// Fields whose values are worth breaking cart revenue down by first,
+// e.g. "Sales Rep", "Salesperson", or a "Name" field, before the rest.
 function isPriorityCategoryField(field) {
   const label = (field.label || '').toLowerCase()
   return /\bname\b/.test(label) ||
@@ -62,7 +62,7 @@ function isPriorityCategoryField(field) {
     /\bstaff\b/.test(label)
 }
 
-// Fields that represent how a sale reached the customer — surfaced in their
+// Fields that represent how a sale reached the customer, surfaced in their
 // own "Sales Channel" section rather than lumped in with generic breakdowns.
 function isChannelField(field) {
   const label = (field.label || '').toLowerCase()
@@ -117,7 +117,7 @@ function Report() {
   if (submissions.length === 0) {
     return (
       <div className="page">
-        <h1>{form.name} — Report</h1>
+        <h1>{form.name}: Report</h1>
         <p style={{ color: '#999', marginTop: '2rem' }}>
           No data yet. Once people submit this form, a report will appear here.
         </p>
@@ -159,7 +159,7 @@ function Report() {
     })
   })
   // "Operations" pairs (sales rep / staff / name) surface separately from
-  // "Products" pairs (channel, other category breakdowns) — see isPriorityCategoryField.
+  // "Products" pairs (channel, other category breakdowns); see isPriorityCategoryField.
   const nonOperationsPairs = salesByCategoryPairs.filter(p => !p.priority)
   const channelCategoryPairs = nonOperationsPairs.filter(p => isChannelField(p.catField))
   const otherCategoryPairs = nonOperationsPairs.filter(p => !isChannelField(p.catField))
@@ -353,7 +353,7 @@ function Report() {
 
           {otherCategoryPairs.length > 0 && (
             <div id="report-other-data" style={{ marginTop: '2rem' }}>
-              <SectionTitle subtitle="Other patterns in the data — e.g. gender, state of origin">Other Data</SectionTitle>
+              <SectionTitle subtitle="Other patterns in the data, e.g. gender, state of origin">Other Data</SectionTitle>
               {otherCategoryPairs.map(({ cartField, catField }) => (
                 <div key={`${catField.id}-${cartField.id}`} className="card" style={{ padding: '1.75rem', marginBottom: '1.2rem' }}>
                   <div style={{ fontSize: '1.15rem', fontWeight: 800, marginBottom: '0.9rem' }}>
@@ -378,7 +378,7 @@ function Report() {
           )}
 
           <div id="report-cross-analysis" style={{ marginTop: '2rem' }}>
-            <SectionTitle subtitle="Compare any two columns freely — including cart totals or item counts">Cross Analysis</SectionTitle>
+            <SectionTitle subtitle="Compare any two columns freely, including cart totals or item counts">Cross Analysis</SectionTitle>
             <CrossAnalysis fields={crossAnalysisFields} cartFields={cartFields} submissions={filteredSubmissions} />
           </div>
         </>
@@ -430,7 +430,7 @@ function OverviewCard({ form, submissions }) {
   })
 
   const totalResponses = submissions.length
-  // Keep this concise — a briefing, not a list of everything the data could say.
+  // Keep this concise: a briefing, not a list of everything the data could say.
   const insights = computeInsights(form, submissions).slice(0, 6)
 
   return (
@@ -517,7 +517,7 @@ function KPIGrid({ form, submissions, previousSubmissions = [], totalResponses }
 
   const primaryKpis = []
   // Every other computed metric lives behind "More metrics" so the grid above
-  // never gets crowded — add new KPI computations here as the report grows,
+  // never gets crowded, add new KPI computations here as the report grows,
   // and they show up in the checklist automatically.
   const moreKpis = []
 
@@ -712,7 +712,7 @@ function KPIGrid({ form, submissions, previousSubmissions = [], totalResponses }
 function computeInsights(form, submissions) {
   const insights = []
   // Dynamic on purpose: aggregates across every cart field on the form, not
-  // just the first one — a form can use the cart feature more than once.
+  // just the first one, a form can use the cart feature more than once.
   const cartFields = form.fields.filter(f => f.type === 'cart')
   const categoryFields = form.fields.filter(f => CATEGORICAL_TYPES.includes(f.type))
 
@@ -756,7 +756,7 @@ function computeInsights(form, submissions) {
       }
 
       // Revenue-weighted breakdown per category field (e.g. sales channel, rep,
-      // gender) — this is the number that actually matters to a business
+      // gender), this is the number that actually matters to a business
       // owner, versus a plain count of responses.
       categoryFields.forEach(field => {
         const map = revenueByField[field.id]
@@ -769,7 +769,7 @@ function computeInsights(form, submissions) {
       })
     }
   } else {
-    // No cart data — fall back to plain response-count share per category field.
+    // No cart data: fall back to plain response-count share per category field.
     categoryFields.forEach(field => {
       const answered = submissions.filter(s => s.data[field.id])
       if (answered.length === 0) return

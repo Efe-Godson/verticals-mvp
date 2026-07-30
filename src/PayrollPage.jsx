@@ -1,5 +1,5 @@
 // Place at: src/PayrollPage.jsx
-// Route: /form/:id/payroll/payments — :id is the Employees form. Finds its
+// Route: /form/:id/payroll/payments: :id is the Employees form. Finds its
 // paired Salary Events form via settings.linkedEmployeesFormId, computes
 // each employee's breakdown for the selected period, and lets the owner
 // mark Paid/Pending (persisted in payroll_payments; the breakdown itself is
@@ -161,7 +161,7 @@ function PayrollPage() {
 
       {!eventsForm && (
         <p style={{ color: 'var(--color-muted)', marginTop: '1rem' }}>
-          No linked Salary Events form found — deductions and additions will show as zero until one is linked.
+          No linked Salary Events form found. Deductions and additions will show as zero until one is linked.
         </p>
       )}
 

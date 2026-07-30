@@ -10,7 +10,7 @@ import { getFieldValues } from '../helpers/analysisUtils'
 const CATEGORICAL_TYPES = ['dropdown', 'multiplechoice', 'checkbox']
 const NUMERIC_TYPES = ['number', 'rating', 'linearscale']
 
-// Distinct values of a categorical field, ordered by how often they occur —
+// Distinct values of a categorical field, ordered by how often they occur:
 // used both to build the "All values" combined view and to populate the
 // segment picker.
 function distinctValuesByFrequency(field, submissions) {
@@ -58,8 +58,8 @@ function combinedToChartData(combined, combinedTotal) {
     .slice(0, 10)
 }
 
-// A cart field contributes two cross-analyzable measures — order revenue and
-// item quantity — rather than the field itself, since a cart value isn't a
+// A cart field contributes two cross-analyzable measures - order revenue and
+// item quantity - rather than the field itself, since a cart value isn't a
 // single number. `getMeasureValue` reads whichever one a given pseudo-field
 // represents.
 function buildCartMeasureFields(cartFields) {
@@ -112,7 +112,7 @@ function CrossAnalysis({ fields, cartFields = [], submissions }) {
     ...buildCartMeasureFields(cartFields),
   ]
 
-  // Nothing is pre-selected — the user builds the comparison themselves.
+  // Nothing is pre-selected, the user builds the comparison themselves.
   const [fieldAId, setFieldAId] = useState('')
   const [fieldBId, setFieldBId] = useState('')
   const [chartType, setChartType] = useState('bar')
@@ -208,7 +208,7 @@ function CrossAnalysis({ fields, cartFields = [], submissions }) {
       ) : sameField ? (
         <p style={{ color: '#999' }}>Choose two different columns to compare.</p>
       ) : !validCombo ? (
-        <p style={{ color: '#999' }}>This combination isn't supported yet — try a categorical or numeric column instead.</p>
+        <p style={{ color: '#999' }}>This combination isn't supported yet, try a categorical or numeric column instead.</p>
       ) : data.length === 0 ? (
         <p style={{ color: '#999' }}>Not enough data yet for this combination.</p>
       ) : (

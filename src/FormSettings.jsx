@@ -57,7 +57,7 @@ function FormSettings() {
 
   return (
     <div className="page">
-      <h1>{form.name} — Settings</h1>
+      <h1>{form.name}: Settings</h1>
 
       <div className="card" style={{ padding: '1.5rem', marginTop: '1.5rem' }}>
         <h3 style={{ marginTop: 0 }}>Responses</h3>

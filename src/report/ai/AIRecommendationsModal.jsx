@@ -23,7 +23,7 @@ export default function AIRecommendationsModal({ formId, dateRangeLabel, submiss
           <button onClick={onClose} className="secondary">Close</button>
         </div>
         <p style={{ fontSize: '0.85rem', color: 'var(--color-muted)', marginTop: '0.2rem', marginBottom: '1.2rem' }}>
-          Suggested actions, key takeaways, and outlook — generated from the current filter.
+          Suggested actions, key takeaways, and outlook, generated from the current filter.
         </p>
 
         <AIInsightCards

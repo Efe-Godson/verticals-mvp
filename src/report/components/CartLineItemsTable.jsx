@@ -50,7 +50,7 @@ function CartLineItemsTable({ field, answered }) {
                   {new Date(row.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                 </td>
                 <td style={tdStyle}>{row.name}</td>
-                <td style={tdStyle}>{row.category || '—'}</td>
+                <td style={tdStyle}>{row.category || '-'}</td>
                 <td style={{ ...tdStyle, textAlign: 'right' }}>{row.quantity}</td>
                 <td style={{ ...tdStyle, textAlign: 'right' }}>{row.price.toLocaleString()}</td>
                 <td style={{ ...tdStyle, textAlign: 'right', fontWeight: '600' }}>{row.lineTotal.toLocaleString()}</td>

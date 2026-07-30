@@ -10,7 +10,7 @@ const TYPES_WITHOUT_VALIDATION = ['cart']
 // Pattern borrowed from Google Forms / Jotform: Required is an always-visible
 // toggle right on the field row. Everything else (length/value/date rules,
 // custom error message) is collapsed behind "More options" and only expands
-// on click — no boxed/nested card, just plain text within the field's own card.
+// on click: no boxed/nested card, just plain text within the field's own card.
 function FieldValidationControls({ field, index, updateField }) {
   const [expanded, setExpanded] = useState(false)
 

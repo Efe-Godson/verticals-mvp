@@ -93,7 +93,7 @@ function InsightRow({ title, detail, tone, footer }) {
 }
 
 // A handful of skeleton cards while the model is thinking, instead of just a
-// button label change — makes a multi-second wait feel like something is
+// button label change, makes a multi-second wait feel like something is
 // actually happening.
 function AnalysisSkeleton() {
   return (
@@ -330,7 +330,7 @@ function AIAnalystPage() {
           <>
             {analyzing && (
               <p className="no-print" style={{ color: 'var(--color-primary)', fontSize: '0.85rem', marginTop: '1rem' }}>
-                Refreshing the report — the version below stays visible until the new one is ready.
+                Refreshing the report. The version below stays visible until the new one is ready.
               </p>
             )}
 
@@ -450,7 +450,7 @@ function AIAnalystPage() {
             {qaHistory.length === 0 && !asking && (
               <div style={{ padding: '0.2rem 0.2rem 0.6rem' }}>
                 <p style={{ color: 'var(--color-muted)', fontSize: '0.88rem', margin: '0 0 0.7rem' }}>
-                  Ask anything about this data — answers are short and to the point.
+                  Ask anything about this data: answers are short and to the point.
                 </p>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                   {EXAMPLE_QUESTIONS.map(q => (

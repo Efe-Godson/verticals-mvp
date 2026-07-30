@@ -1,5 +1,5 @@
-// Opens a preview window styled like a standard printed receipt — numbered
-// items, business details header, bold total, order number footer — with a
+// Opens a preview window styled like a standard printed receipt: numbered
+// items, business details header, bold total, order number footer, with a
 // Print button the person clicks when ready.
 
 export function printReceipt(form, submission) {
@@ -61,7 +61,7 @@ export function printReceipt(form, submission) {
   const dateStr = createdDate.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' })
   const timeStr = createdDate.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase()
 
-  // A short, receipt-style order number derived from the submission's own ID —
+  // A short, receipt-style order number derived from the submission's own ID:
   // no extra numbering system needed, just makes it look/feel like a real receipt.
   const orderNumber = submission.id.replace(/-/g, '').slice(-12).toUpperCase()
 
@@ -109,7 +109,7 @@ export function printReceipt(form, submission) {
         .toolbar .print-btn { background: #0070f3; color: white; }
         .toolbar .close-btn { background: white; color: #333; border: 1px solid #ccc; }
 
-        /* Torn-paper zigzag edge — purely decorative, screen only */
+        /* Torn-paper zigzag edge - purely decorative, screen only */
         .tear {
           width: 72mm;
           height: 10px;

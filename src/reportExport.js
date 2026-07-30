@@ -42,7 +42,7 @@ function getAnsweredFor(field, submissions) {
 }
 
 // ---------------------------------------------------------------------------
-// PRINT (unchanged) — opens a formatted HTML page; the person can print it or
+// PRINT (unchanged): opens a formatted HTML page; the person can print it or
 // use their browser's own "Save as PDF" destination if they just want a quick
 // look without a real downloadable file.
 // ---------------------------------------------------------------------------
@@ -164,7 +164,7 @@ export function printReport(form, submissions, filterSummary) {
     <html>
     <head>
       <meta charset="utf-8" />
-      <title>${escapeHtml(form.name)} — Report</title>
+      <title>${escapeHtml(form.name)}: Report</title>
       <style>
         * { box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 2rem; color: #111; }
@@ -200,7 +200,7 @@ export function printReport(form, submissions, filterSummary) {
         <button class="close-btn" onclick="window.close()">Close</button>
       </div>
 
-      <h1>${escapeHtml(form.name)} — Report</h1>
+      <h1>${escapeHtml(form.name)}: Report</h1>
       <div class="meta">
         ${totalResponses} response${totalResponses !== 1 ? 's' : ''}${filterSummary ? ' · ' + escapeHtml(filterSummary) : ''} · Generated ${generatedStr}
       </div>
@@ -225,7 +225,7 @@ export function printReport(form, submissions, filterSummary) {
 }
 
 // ---------------------------------------------------------------------------
-// PDF DOWNLOAD — captures the actual rendered report page (hero, KPI cards,
+// PDF DOWNLOAD: captures the actual rendered report page (hero, KPI cards,
 // bar charts, everything) as an image and slices it across PDF pages. This
 // is what makes the PDF visually match what's on screen, rather than a
 // reconstructed set of plain data tables (which is what jsPDF alone would
@@ -269,7 +269,7 @@ export async function exportReportToPDF(element, fileName) {
 }
 
 // ---------------------------------------------------------------------------
-// POWERPOINT DOWNLOAD (pptxgenjs) — real, editable native bar charts, one
+// POWERPOINT DOWNLOAD (pptxgenjs): real, editable native bar charts, one
 // slide per chart-friendly field. Text-heavy fields are skipped here since
 // they don't translate well to slides.
 // ---------------------------------------------------------------------------
@@ -325,7 +325,7 @@ export function exportReportToPPTX(form, submissions, filterSummary) {
       const qtyLabels = Object.keys(itemQty)
       if (qtyLabels.length > 0) {
         const slideQty = pptx.addSlide()
-        slideQty.addText(`${field.label} — Quantity Sold`, { x: 0.5, y: 0.3, w: 9, h: 0.5, fontSize: 22, bold: true })
+        slideQty.addText(`${field.label}: Quantity Sold`, { x: 0.5, y: 0.3, w: 9, h: 0.5, fontSize: 22, bold: true })
         slideQty.addChart(pptx.ChartType.bar, [{ name: 'Quantity', labels: qtyLabels, values: Object.values(itemQty) }], {
           x: 0.5, y: 1.0, w: 9, h: 4.5, barDir: 'col',
           showValue: true, showLegend: false, chartColors: ['22C55E']
@@ -335,7 +335,7 @@ export function exportReportToPPTX(form, submissions, filterSummary) {
       const revLabels = Object.keys(itemRevenue)
       if (revLabels.length > 0) {
         const slideRev = pptx.addSlide()
-        slideRev.addText(`${field.label} — Revenue`, { x: 0.5, y: 0.3, w: 9, h: 0.5, fontSize: 22, bold: true })
+        slideRev.addText(`${field.label}: Revenue`, { x: 0.5, y: 0.3, w: 9, h: 0.5, fontSize: 22, bold: true })
         slideRev.addChart(pptx.ChartType.bar, [{ name: 'Revenue', labels: revLabels, values: Object.values(itemRevenue) }], {
           x: 0.5, y: 1.0, w: 9, h: 4.5, barDir: 'col',
           showValue: true, showLegend: false, chartColors: ['F59E0B']
@@ -364,14 +364,14 @@ export function exportReportToPPTX(form, submissions, filterSummary) {
       if (labels.length === 0) return
 
       const slide = pptx.addSlide()
-      slide.addText(`${field.label} — By Day of Week`, { x: 0.5, y: 0.3, w: 9, h: 0.5, fontSize: 22, bold: true })
+      slide.addText(`${field.label}: By Day of Week`, { x: 0.5, y: 0.3, w: 9, h: 0.5, fontSize: 22, bold: true })
       slide.addChart(pptx.ChartType.bar, [{ name: 'Responses', labels, values: Object.values(dayCounts) }], {
         x: 0.5, y: 1.0, w: 9, h: 4.5, barDir: 'col',
         showValue: true, showLegend: false, chartColors: ['8B5CF6']
       })
     }
     // Text-like fields (text, longtext, email, phone, fileupload, time, grids)
-    // are intentionally skipped — they don't translate into chart slides.
+    // are intentionally skipped, they don't translate into chart slides.
   })
 
   pptx.writeFile({ fileName: `${safeFileName(form.name)}.pptx` })

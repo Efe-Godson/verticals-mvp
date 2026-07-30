@@ -1,7 +1,7 @@
 // Regenerates src/lib/locationData.js from the `country-state-city` npm
 // package instead of hand-maintaining city lists. Run: node scripts/generate-location-data.js
 //
-// To add another country, add its name to the COUNTRY_NAMES array below —
+// To add another country, add its name to the COUNTRY_NAMES array below:
 // country-state-city already has the states/cities data for it, this just
 // controls which countries actually ship in the app's Location field.
 import { Country, State, City } from 'country-state-city'
@@ -43,7 +43,7 @@ for (const countryName of COUNTRY_NAMES) {
 const lines = []
 lines.push('// Place at: src/lib/locationData.js')
 lines.push('// Reference data for the "Location" field type\'s Country -> State -> City')
-lines.push('// cascade. Generated from the country-state-city npm package — run')
+lines.push('// cascade. Generated from the country-state-city npm package, run')
 lines.push('// `node scripts/generate-location-data.js` to regenerate or add a country')
 lines.push('// (edit COUNTRY_NAMES there), rather than hand-editing this file.')
 lines.push('export const LOCATION_DATA = {')

@@ -1,6 +1,6 @@
 // Place at: supabase/functions/submit-form/index.ts
 // Deploy: supabase functions deploy submit-form
-// Public, unauthenticated by design (verify_jwt = false in config.toml) —
+// Public, unauthenticated by design (verify_jwt = false in config.toml):
 // this is what accepts form responses from anonymous respondents on
 // PublicForm.jsx. Moving submission-insert here (instead of a direct
 // supabase.from('submissions').insert() from the browser) buys two things
