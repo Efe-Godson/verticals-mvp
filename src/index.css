@@ -531,6 +531,23 @@ input:focus, select:focus, textarea:focus {
     display: flex !important;
   }
 
+  /* Grid view keeps two columns side by side on phones instead of
+     collapsing to one just because a 180px card no longer fits twice
+     in the narrower content width. */
+  .form-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.7rem !important;
+  }
+
+  .form-grid-card {
+    padding: 0.7rem !important;
+  }
+
+  .form-grid-card button {
+    padding: 0.5rem 0.6rem !important;
+    font-size: 0.82rem !important;
+  }
+
   .report-header {
     align-items: flex-start;
     padding-bottom: 1rem;

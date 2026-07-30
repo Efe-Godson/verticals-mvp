@@ -770,7 +770,7 @@ function ListView({ pageForms, togglePin, publishForm, setFormStatus, duplicateF
 
 function GridView({ pageForms, togglePin, publishForm, setFormStatus, duplicateForm, copyLink, requestDelete, responseCounts, selectedFormIds, toggleSelectForm, selectionMode, enterSelectionMode, openMenuId, setOpenMenuId, menuRef }) {
   return (
-    <div style={{
+    <div className="form-grid" style={{
       display: 'grid',
       gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
       gap: '1rem'
