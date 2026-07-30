@@ -163,7 +163,7 @@ function FieldTypeConfig({ field, index, updateField, allFields }) {
           placeholder="Number of stars (default 5)"
           value={field.maxStars ?? ''}
           onChange={(e) => updateField(index, { maxStars: e.target.value === '' ? undefined : Number(e.target.value) })}
-          style={{ padding: '0.4rem', width: '220px' }}
+          style={{ padding: '0.4rem', width: '220px', maxWidth: '100%' }}
         />
       </div>
     )
@@ -180,7 +180,7 @@ function FieldTypeConfig({ field, index, updateField, allFields }) {
         <select
           value={field.defaultCountry || COUNTRIES[0]}
           onChange={(e) => updateField(index, { defaultCountry: e.target.value })}
-          style={{ padding: '0.4rem', marginTop: '0.2rem' }}
+          style={{ padding: '0.4rem', marginTop: '0.2rem', maxWidth: '100%' }}
         >
           {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
         </select>

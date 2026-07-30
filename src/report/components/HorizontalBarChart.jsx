@@ -1,6 +1,7 @@
 // Place at: src/report/components/HorizontalBarChart.jsx
 
 import { useEffect, useState } from 'react'
+import ChartTooltip, { useChartTooltip } from './ChartTooltip'
 
 // Category chart. Renders as vertical columns when there are 5 or fewer
 // categories (easier to compare at a glance), and falls back to the
@@ -16,8 +17,8 @@ function toggleBtnStyle(active) {
         fontSize: ".72rem",
         fontWeight: 600,
         cursor: "pointer",
-        background: active ? "#fff" : "transparent",
-        color: active ? "#000" : "var(--color-muted)",
+        background: active ? "var(--color-surface)" : "transparent",
+        color: active ? "var(--color-text)" : "var(--color-muted)",
         boxShadow: active ? "0 1px 2px rgba(0,0,0,0.08)" : "none",
     }
 }
@@ -36,6 +37,8 @@ function HorizontalBarChart({
     const hasPercent = shown.some(d => d.percent !== undefined)
 
     const [showPercent, setShowPercent] = useState(false)
+    const [hovered, setHovered] = useState(null)
+    const { tooltip, showTooltip, moveTooltip, hideTooltip } = useChartTooltip()
 
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
 
@@ -78,7 +81,7 @@ function HorizontalBarChart({
                     style={{
                         display: "flex",
                         gap: "2px",
-                        background: "#f2f2f2",
+                        background: "var(--color-bg)",
                         borderRadius: "6px",
                         padding: "2px",
                         flexShrink: 0,
@@ -102,7 +105,7 @@ function HorizontalBarChart({
         content = (
             <p
                 style={{
-                    color: "#999",
+                    color: "var(--color-muted)",
                     fontSize: ".85rem",
                     margin: 0,
                 }}
@@ -131,6 +134,9 @@ function HorizontalBarChart({
 
                     <div
                         key={d.label}
+                        onMouseEnter={(e) => { setHovered(d.label); showTooltip(e, d.label, valueText(d)) }}
+                        onMouseMove={moveTooltip}
+                        onMouseLeave={() => { setHovered(null); hideTooltip() }}
                         style={{
                             display: "flex",
                             flexDirection: "column",
@@ -148,10 +154,11 @@ function HorizontalBarChart({
                         <div
                             style={{
                                 fontSize: valueFont,
-                                color: "#000",
+                                color: "var(--color-text)",
                                 marginBottom: ".4rem",
                                 whiteSpace: "nowrap",
                                 fontVariantNumeric: "tabular-nums",
+                                fontWeight: hovered === d.label ? 700 : 400,
                             }}
                         >
                             {valueText(d)}
@@ -168,6 +175,9 @@ function HorizontalBarChart({
                                 )}px`,
                                 background: "var(--chart-series-1)",
                                 borderRadius: "5px 5px 0 0",
+                                opacity: hovered === null || hovered === d.label ? 1 : 0.55,
+                                transition: "opacity .12s ease",
+                                cursor: "default",
                             }}
                         />
 
@@ -176,7 +186,7 @@ function HorizontalBarChart({
                             style={{
                                 marginTop: ".5rem",
                                 fontSize: labelFont,
-                                color: "#000",
+                                color: "var(--color-text)",
                                 textAlign: "center",
                                 overflow: "hidden",
                                 textOverflow: "ellipsis",
@@ -212,11 +222,18 @@ function HorizontalBarChart({
 
                     <div
                         key={d.label}
+                        onMouseEnter={(e) => { setHovered(d.label); showTooltip(e, d.label, valueText(d)) }}
+                        onMouseMove={moveTooltip}
+                        onMouseLeave={() => { setHovered(null); hideTooltip() }}
                         style={{
                             display: "flex",
                             alignItems: "center",
                             gap,
                             width: "100%",
+                            padding: "2px 0",
+                            borderRadius: "4px",
+                            background: hovered === d.label ? "var(--color-bg)" : "transparent",
+                            transition: "background .12s ease",
                         }}
                     >
 
@@ -228,7 +245,8 @@ function HorizontalBarChart({
                                 width: labelWidth,
                                 flexShrink: 0,
                                 fontSize: labelFont,
-                                color: "#000",
+                                color: "var(--color-text)",
+                                fontWeight: hovered === d.label ? 600 : 400,
                                 textAlign: "right",
                                 overflow: "hidden",
                                 textOverflow: "ellipsis",
@@ -244,9 +262,10 @@ function HorizontalBarChart({
                             style={{
                                 flex: 1,
                                 height: barHeight,
-                                background: "#f2f2f2",
+                                background: "var(--color-bg)",
                                 borderRadius: "6px",
                                 overflow: "hidden",
+                                cursor: "default",
                             }}
                         >
 
@@ -259,6 +278,8 @@ function HorizontalBarChart({
                                     height: "100%",
                                     background: "var(--chart-series-1)",
                                     borderRadius: "6px",
+                                    opacity: hovered === null || hovered === d.label ? 1 : 0.55,
+                                    transition: "opacity .12s ease",
                                 }}
                             />
 
@@ -271,7 +292,8 @@ function HorizontalBarChart({
                                 width: valueWidth,
                                 flexShrink: 0,
                                 fontSize: valueFont,
-                                color: "#000",
+                                color: "var(--color-text)",
+                                fontWeight: hovered === d.label ? 700 : 400,
                                 textAlign: "right",
                                 whiteSpace: "nowrap",
                                 fontVariantNumeric: "tabular-nums",
@@ -296,6 +318,7 @@ function HorizontalBarChart({
             <div>
                 {header}
                 {content}
+                <ChartTooltip tooltip={tooltip} />
             </div>
         )
 
@@ -305,13 +328,14 @@ function HorizontalBarChart({
 
         <div
             style={{
-                border: "1px solid #eee",
+                border: "1px solid var(--color-border)",
                 borderRadius: "10px",
                 padding: isMobile ? "1rem" : "1.3rem",
             }}
         >
             {header}
             {content}
+            <ChartTooltip tooltip={tooltip} />
         </div>
 
     )

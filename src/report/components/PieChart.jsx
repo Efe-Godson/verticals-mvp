@@ -3,6 +3,9 @@
 // `count` is treated as a share (percentages work well, but any comparable
 // magnitude is fine — slices are proportional to count/total).
 
+import { useState } from 'react'
+import ChartTooltip, { useChartTooltip } from './ChartTooltip'
+
 // Fixed categorical order — a slot always means the same hue, and a 9th+
 // category folds into "Other" rather than generating a new color.
 const SERIES_COLORS = [
@@ -12,6 +15,8 @@ const SERIES_COLORS = [
 const MAX_SLICES = SERIES_COLORS.length
 
 function PieChart({ data, size = 240 }) {
+  const [hovered, setHovered] = useState(null)
+  const { tooltip, showTooltip, moveTooltip, hideTooltip } = useChartTooltip()
   const sorted = [...data].sort((a, b) => b.count - a.count)
   const shown = sorted.length > MAX_SLICES ? sorted.slice(0, MAX_SLICES - 1) : sorted
   const rest = sorted.length > MAX_SLICES ? sorted.slice(MAX_SLICES - 1) : []
@@ -51,24 +56,46 @@ function PieChart({ data, size = 240 }) {
   return (
     <div style={{ display: 'flex', gap: '1.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ flexShrink: 0 }}>
-        {slices.map((s, i) => (
-          s.path
-            ? <path key={i} d={s.path} fill={s.color} stroke="var(--color-surface)" strokeWidth="2">
-                <title>{s.label} — {s.percent}%</title>
-              </path>
-            : <circle key={i} cx={center} cy={center} r={radius} fill={s.color}>
-                <title>{s.label} — {s.percent}%</title>
-              </circle>
-        ))}
+        {slices.map((s, i) => {
+          const dimmed = hovered !== null && hovered !== s.label
+          const props = {
+            key: i,
+            fill: s.color,
+            opacity: dimmed ? 0.45 : 1,
+            style: { transition: 'opacity .12s ease', cursor: 'default' },
+            onMouseEnter: (e) => { setHovered(s.label); showTooltip(e, s.label, `${s.percent}%`) },
+            onMouseMove: moveTooltip,
+            onMouseLeave: () => { setHovered(null); hideTooltip() },
+          }
+          return s.path
+            ? <path {...props} d={s.path} stroke="var(--color-surface)" strokeWidth="2" />
+            : <circle {...props} cx={center} cy={center} r={radius} />
+        })}
       </svg>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
         {slices.map((s, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
+          <div
+            key={i}
+            onMouseEnter={(e) => { setHovered(s.label); showTooltip(e, s.label, `${s.percent}%`) }}
+            onMouseMove={moveTooltip}
+            onMouseLeave={() => { setHovered(null); hideTooltip() }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              fontSize: '0.85rem',
+              opacity: hovered !== null && hovered !== s.label ? 0.55 : 1,
+              fontWeight: hovered === s.label ? 600 : 400,
+              transition: 'opacity .12s ease',
+              cursor: 'default',
+            }}
+          >
             <span style={{ width: '12px', height: '12px', borderRadius: '3px', background: s.color, flexShrink: 0 }} />
             <span>{s.label} — <span style={{ fontVariantNumeric: 'tabular-nums' }}>{s.percent}%</span></span>
           </div>
         ))}
       </div>
+      <ChartTooltip tooltip={tooltip} />
     </div>
   )
 }

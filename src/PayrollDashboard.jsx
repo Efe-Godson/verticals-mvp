@@ -17,7 +17,7 @@ function currentPeriod() {
 
 function PayrollSubNav({ id, active }) {
   return (
-    <div style={{ display: 'flex', gap: '0.4rem', marginTop: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--color-border)' }}>
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--color-border)' }}>
       {[{ key: 'dashboard', label: 'Dashboard', to: `/form/${id}/payroll` }, { key: 'payments', label: 'Payments', to: `/form/${id}/payroll/payments` }].map(tab => (
         <Link
           key={tab.key}

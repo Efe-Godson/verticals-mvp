@@ -9,6 +9,7 @@ function NavBar() {
   const { session } = useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
   const [linkedMenuOpen, setLinkedMenuOpen] = useState(false)
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false)
   const [isPayrollForm, setIsPayrollForm] = useState(false)
   const [linkedForms, setLinkedForms] = useState([]) // sibling forms in the same bundle, excluding self
   const { trigger: binTrigger } = useRecycleBinTrigger()
@@ -67,14 +68,6 @@ function NavBar() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap', rowGap: '0.4rem' }}>
           <Link to="/" style={{ fontWeight: 'bold', fontSize: '1.05rem' }}>Verticals</Link>
           <Link to="/templates" style={{ color: location.pathname === '/templates' ? 'var(--color-primary)' : 'var(--color-muted)', fontSize: '0.9rem' }}>Templates</Link>
-          {binTrigger && (
-            <span
-              onClick={binTrigger.onOpen}
-              style={{ color: 'var(--color-muted)', fontSize: '0.9rem', cursor: 'pointer' }}
-            >
-              Recycle Bin{binTrigger.count > 0 ? ` (${binTrigger.count})` : ''}
-            </span>
-          )}
 
           {isFormContext && (
             <div className="navbar-links-desktop" style={{ display: 'flex', gap: '1rem', fontSize: '0.9rem' }}>
@@ -118,20 +111,64 @@ function NavBar() {
               )}
             </div>
           )}
-          <Link
-            to="/account"
-            title="Account"
-            style={{
-              width: '30px', height: '30px', borderRadius: '50%', background: 'var(--color-primary)',
-              color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '0.8rem', fontWeight: 700, flexShrink: 0,
-              outline: location.pathname === '/account' ? '2px solid var(--color-primary)' : 'none',
-              outlineOffset: '2px'
-            }}
-          >
-            {initials}
-          </Link>
-          <button className="secondary" onClick={() => supabase.auth.signOut()}>Log out</button>
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => setAccountMenuOpen(!accountMenuOpen)}
+              title="Account menu"
+              aria-label="Account menu"
+              style={{
+                width: '30px', height: '30px', borderRadius: '50%', background: 'var(--color-primary)',
+                color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '0.8rem', fontWeight: 700, flexShrink: 0, padding: 0,
+                outline: accountMenuOpen ? '2px solid var(--color-primary)' : 'none',
+                outlineOffset: '2px'
+              }}
+            >
+              {initials}
+            </button>
+
+            {accountMenuOpen && (
+              <>
+                <div style={{ position: 'fixed', inset: 0, zIndex: 15 }} onClick={() => setAccountMenuOpen(false)} />
+                <div className="dropdown-panel" style={{
+                  position: 'absolute', top: '100%', right: 0, marginTop: '0.3rem',
+                  background: 'white', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 20, minWidth: '170px', overflow: 'hidden', padding: '0.3rem'
+                }}>
+                  <Link
+                    to="/account"
+                    onClick={() => setAccountMenuOpen(false)}
+                    style={{ display: 'block', padding: '0.5rem 0.6rem', fontSize: '0.85rem', borderRadius: '6px', color: 'var(--color-text)' }}
+                  >
+                    Profile
+                  </Link>
+                  {binTrigger && (
+                    <button
+                      className="secondary"
+                      onClick={() => { setAccountMenuOpen(false); binTrigger.onOpen() }}
+                      style={{
+                        display: 'block', width: '100%', textAlign: 'left', border: 'none', background: 'transparent',
+                        padding: '0.5rem 0.6rem', fontSize: '0.85rem'
+                      }}
+                    >
+                      Recycle Bin{binTrigger.count > 0 ? ` (${binTrigger.count})` : ''}
+                    </button>
+                  )}
+                  <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.3rem 0' }} />
+                  <button
+                    className="secondary"
+                    onClick={() => { setAccountMenuOpen(false); supabase.auth.signOut() }}
+                    style={{
+                      display: 'block', width: '100%', textAlign: 'left', border: 'none', background: 'transparent',
+                      padding: '0.5rem 0.6rem', fontSize: '0.85rem', color: '#c0392b'
+                    }}
+                  >
+                    Log out
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
 
           {isFormContext && (
             <button

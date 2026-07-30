@@ -1,4 +1,5 @@
 :root {
+  color-scheme: light;
   --color-bg: #f7f8fa;
   --color-surface: #ffffff;
   --color-border: #e5e7eb;
@@ -27,6 +28,67 @@
   --status-warning: #fab219;
   --status-serious: #ec835a;
   --status-critical: #d03b3b;
+}
+
+/* Dark mode — same roles, dark-stepped values. The media query follows the
+   OS setting; the [data-theme="dark"] scope covers an in-app toggle should
+   one get added later, and wins over OS-light via the :not() guard. Chart
+   series hexes are the dataviz skill's pre-validated dark column — same
+   eight hues re-stepped for a dark surface, not a separate palette. */
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --color-bg: #121317;
+    --color-surface: #1c1e24;
+    --color-border: #33363f;
+    --color-text: #f0f1f3;
+    --color-muted: #9aa0ab;
+    --color-primary: #4d94ff;
+    --color-primary-hover: #7ab0ff;
+    --shadow: 0 1px 3px rgba(0,0,0,0.35);
+
+    --chart-series-1: #3987e5;
+    --chart-series-2: #d95926;
+    --chart-series-3: #199e70;
+    --chart-series-4: #c98500;
+    --chart-series-5: #d55181;
+    --chart-series-6: #008300;
+    --chart-series-7: #9085e9;
+    --chart-series-8: #e66767;
+    --chart-series-other: #7b8290;
+
+    --status-good: #2fc02f;
+    --status-warning: #fab219;
+    --status-serious: #ec835a;
+    --status-critical: #ef5b5b;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-bg: #121317;
+  --color-surface: #1c1e24;
+  --color-border: #33363f;
+  --color-text: #f0f1f3;
+  --color-muted: #9aa0ab;
+  --color-primary: #4d94ff;
+  --color-primary-hover: #7ab0ff;
+  --shadow: 0 1px 3px rgba(0,0,0,0.35);
+
+  --chart-series-1: #3987e5;
+  --chart-series-2: #d95926;
+  --chart-series-3: #199e70;
+  --chart-series-4: #c98500;
+  --chart-series-5: #d55181;
+  --chart-series-6: #008300;
+  --chart-series-7: #9085e9;
+  --chart-series-8: #e66767;
+  --chart-series-other: #7b8290;
+
+  --status-good: #2fc02f;
+  --status-warning: #fab219;
+  --status-serious: #ec835a;
+  --status-critical: #ef5b5b;
 }
 
 * {
@@ -62,18 +124,18 @@ button:hover {
 }
 
 button:disabled {
-  background: #ccc;
+  background: var(--color-border);
   cursor: not-allowed;
 }
 
 button.secondary {
-  background: white;
+  background: var(--color-surface);
   color: var(--color-text);
   border: 1px solid var(--color-border);
 }
 
 button.secondary:hover {
-  background: #f3f4f6;
+  background: var(--color-bg);
 }
 
 input, select, textarea {
@@ -82,7 +144,8 @@ input, select, textarea {
   border-radius: var(--radius);
   padding: 0.55rem 0.7rem;
   font-size: 0.9rem;
-  background: white;
+  background: var(--color-surface);
+  color: var(--color-text);
 }
 
 input:focus, select:focus, textarea:focus {
@@ -164,16 +227,16 @@ input:focus, select:focus, textarea:focus {
   overflow-y: auto;
   max-height: 65vh;
   margin-top: 1rem;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border);
   border-radius: var(--radius);
-  background-color: white;
+  background-color: var(--color-surface);
 
   /* Pure-CSS "scroll shadow" cue on the left/right edges — each shadow
      only becomes visible once there's actually more content in that
      direction to scroll to, no JS required */
   background-image:
-    linear-gradient(to right, white 30%, rgba(255, 255, 255, 0)),
-    linear-gradient(to left, white 30%, rgba(255, 255, 255, 0)),
+    linear-gradient(to right, var(--color-surface) 30%, rgba(255, 255, 255, 0)),
+    linear-gradient(to left, var(--color-surface) 30%, rgba(255, 255, 255, 0)),
     radial-gradient(farthest-side at 0 50%, rgba(0, 0, 0, 0.15), rgba(0, 0, 0, 0)),
     radial-gradient(farthest-side at 100% 50%, rgba(0, 0, 0, 0.15), rgba(0, 0, 0, 0));
   background-repeat: no-repeat;
@@ -235,6 +298,11 @@ input:focus, select:focus, textarea:focus {
    on a narrow phone, regardless of how they're positioned */
 .dropdown-panel {
   max-width: min(90vw, 320px);
+  /* Overrides the inline background:'white'/border each call site sets,
+     since those are hardcoded per-usage rather than reading the theme. */
+  background: var(--color-surface) !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-text);
 }
 
 /* Product Cart rows — a compact main line (name, price, expand toggle,
