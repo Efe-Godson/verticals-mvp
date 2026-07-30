@@ -68,6 +68,7 @@ function NavBar() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap', rowGap: '0.4rem' }}>
           <Link to="/" style={{ fontWeight: 'bold', fontSize: '1.05rem' }}>Verticals</Link>
           <Link to="/" style={{ color: location.pathname === '/' ? 'var(--color-primary)' : 'var(--color-muted)', fontSize: '0.9rem' }}>Forms</Link>
+          <Link to="/reports" style={{ color: location.pathname === '/reports' ? 'var(--color-primary)' : 'var(--color-muted)', fontSize: '0.9rem' }}>Reports</Link>
           <Link to="/templates" style={{ color: location.pathname === '/templates' ? 'var(--color-primary)' : 'var(--color-muted)', fontSize: '0.9rem' }}>Templates</Link>
 
           {isFormContext && (

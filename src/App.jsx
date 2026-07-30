@@ -4,6 +4,7 @@ import { isFirstVisit } from './firstVisit'
 import { ToastProvider } from './Toast'
 import { RecycleBinProvider } from './RecycleBinContext'
 import Home from './Home'
+import Reports from './Reports'
 import CreateForm from './CreateForm'
 import EditForm from './EditForm'
 import PublicForm from './PublicForm'
@@ -54,6 +55,7 @@ function AppShell() {
             on its own, and PublicOnlyRoute would incorrectly redirect it away. */}
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/" element={<PrivateRoute><Home /></PrivateRoute>} />
+        <Route path="/reports" element={<PrivateRoute><Reports /></PrivateRoute>} />
         <Route path="/templates" element={<PrivateRoute><Templates /></PrivateRoute>} />
         <Route path="/account" element={<PrivateRoute><AccountPage /></PrivateRoute>} />
         <Route path="/create" element={<PrivateRoute><CreateForm /></PrivateRoute>} />
