@@ -100,7 +100,6 @@ function Home() {
   const [currentPage, setCurrentPage] = useState(1)
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('verticals_view_mode') || 'grid')
   const [demoCollapsed, setDemoCollapsed] = useState(() => localStorage.getItem('verticals_demo_collapsed') !== 'false')
-  const [demoSeen, setDemoSeen] = useState(() => localStorage.getItem('verticals_demo_seen') === 'true')
   const [openMenuId, setOpenMenuId] = useState(null)
   const [pendingConfirm, setPendingConfirm] = useState(null) // { type: 'moveToBin', formId } | { type: 'bulkMoveToBin' } | { type: 'permanentDelete', formId } | { type: 'emptyBin' }
   const [selectedFormIds, setSelectedFormIds] = useState([])
@@ -207,14 +206,6 @@ function Home() {
     const next = !demoCollapsed
     setDemoCollapsed(next)
     localStorage.setItem('verticals_demo_collapsed', String(next))
-  }
-
-  // Once someone's actually opened the demo (not just glanced at the
-  // collapsed teaser), it's done its job. Stop showing it on Home so it
-  // doesn't linger as clutter in every future visit.
-  function markDemoSeen() {
-    setDemoSeen(true)
-    localStorage.setItem('verticals_demo_seen', 'true')
   }
 
   function copyLink(formId) {
@@ -539,7 +530,7 @@ function Home() {
         </>
       )}
 
-      {!loading && demoForm && !demoSeen && (
+      {!loading && demoForm && (
         <div style={{ marginTop: '2.5rem', maxWidth: demoCollapsed ? '220px' : '100%' }}>
           <div
             onClick={toggleDemoCollapsed}
@@ -565,9 +556,9 @@ function Home() {
                   Explore "{demoForm.name}", a fully built example with real submissions, so you can see what records and reports look like once a form has been collecting data for a while.
                 </p>
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  <Link to={`/form/${demoForm.id}/records`} onClick={markDemoSeen}><button className="secondary">View Records</button></Link>
-                  <Link to={`/form/${demoForm.id}/report`} onClick={markDemoSeen}><button>View Report</button></Link>
-                  <Link to={`/form/${demoForm.id}`} onClick={markDemoSeen}><button className="secondary">Open Form</button></Link>
+                  <Link to={`/form/${demoForm.id}/records`}><button className="secondary">View Records</button></Link>
+                  <Link to={`/form/${demoForm.id}/report`}><button>View Report</button></Link>
+                  <Link to={`/form/${demoForm.id}`}><button className="secondary">Open Form</button></Link>
                 </div>
               </div>
             )}
