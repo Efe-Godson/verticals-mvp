@@ -47,7 +47,7 @@ export async function requireFormOwner(req: Request, supabase: any, formId: stri
 // the network/proxy to reject it. Keep each URL small and combine the results.
 export async function fetchSubmissions(supabase: any, formId: string, submissionIds?: string[]) {
   if (!submissionIds?.length) {
-    const { data, error } = await supabase.from('submissions').select('*').eq('form_id', formId)
+    const { data, error } = await supabase.from('submissions').select('*').eq('form_id', formId).is('deleted_at', null)
     if (error) throw error
     return data || []
   }
@@ -64,6 +64,7 @@ export async function fetchSubmissions(supabase: any, formId: string, submission
         .select('*')
         .eq('form_id', formId)
         .in('id', ids)
+        .is('deleted_at', null)
       if (error) throw error
       return data || []
     }))
