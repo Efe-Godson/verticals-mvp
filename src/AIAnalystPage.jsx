@@ -143,7 +143,7 @@ function AIAnalystPage() {
       const { data: formData } = await supabase.from('forms').select('*').eq('id', id).single()
       setForm(formData)
       const { data: subsData } = await supabase
-        .from('submissions').select('*').eq('form_id', id).order('created_at', { ascending: true })
+        .from('submissions').select('*').eq('form_id', id).is('deleted_at', null).order('created_at', { ascending: true })
       setSubmissions(subsData || [])
       setLoading(false)
     }

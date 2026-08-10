@@ -114,6 +114,7 @@ function Report() {
 
       const { data: subsData, error: subsError } = await supabase
         .from('submissions').select('*').eq('form_id', id)
+        .is('deleted_at', null)
         .order('created_at', { ascending: true })
 
       if (subsError) {

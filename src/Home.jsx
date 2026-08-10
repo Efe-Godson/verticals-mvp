@@ -145,6 +145,7 @@ function Home() {
             .from('submissions')
             .select('form_id')
             .in('form_id', formIds)
+            .is('deleted_at', null)
 
           if (!subsError && subsData) {
             const counts = {}

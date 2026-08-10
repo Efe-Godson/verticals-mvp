@@ -11,7 +11,7 @@ export function printReceipt(form, submission) {
   // the common thermal roll size) - content is a few mm narrower than the
   // page itself, see the @page comment below for why.
   const pageWidthMm = Number(settings.receiptPaperWidth) || 80
-  const contentWidthMm = Math.max(pageWidthMm - 6, 30)
+  const contentWidthMm = Math.max(pageWidthMm - 10, 30)
 
   function formatFieldValue(field, value) {
     if (Array.isArray(value)) return value.join(', ')
@@ -143,10 +143,10 @@ export function printReceipt(form, submission) {
         .tear.bottom { transform: rotate(180deg); }
 
         .receipt {
-          font-family: 'Courier New', monospace;
+          font-family: Arial, Helvetica, sans-serif;
           width: ${contentWidthMm}mm;
           background: white;
-          padding: 5mm 4mm;
+          padding: 9mm 5mm 6mm;
           font-size: 13px;
           color: #000;
           box-shadow: 0 2px 10px rgba(0,0,0,0.12);
@@ -173,7 +173,7 @@ export function printReceipt(form, submission) {
           justify-content: space-between;
         }
         .divider {
-          border-top: 1px dashed #000;
+          border-top: 1px solid #000;
           margin: 8px 0;
         }
         .double-divider {
@@ -222,7 +222,12 @@ export function printReceipt(form, submission) {
         @media print {
           body { background: white; padding: 0; }
           .toolbar, .tear { display: none; }
-          .receipt { box-shadow: none; padding: 0; }
+          /* Padding used to be zeroed out here, which dropped the receipt's
+             only safety margin right when it mattered most - the printed
+             version ended up flush against the paper's edges (and top),
+             clipping a bit of the leftmost/rightmost characters on every
+             line. Keep the same padding .receipt already has on screen. */
+          .receipt { box-shadow: none; }
         }
       </style>
     </head>
