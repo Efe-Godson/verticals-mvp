@@ -1,7 +1,8 @@
 // Place at: src/Report.jsx
 import { useState, useEffect, useRef } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
+import PosSidePanel from './PosSidePanel'
 import { printReport, exportReportToPDF, exportReportToPPTX } from './reportExport'
 
 import StatTile from './report/components/StatTile'
@@ -71,6 +72,8 @@ function isChannelField(field) {
 
 function Report() {
   const { id } = useParams()
+  const [searchParams] = useSearchParams()
+  const isFocusMode = searchParams.get('focus') === '1'
   const [form, setForm] = useState(null)
   const [submissions, setSubmissions] = useState([])
   const [loading, setLoading] = useState(true)
@@ -80,6 +83,8 @@ function Report() {
   const [customStart, setCustomStart] = useState('')
   const [customEnd, setCustomEnd] = useState('')
   const [optionsMenuOpen, setOptionsMenuOpen] = useState(false)
+  const [includeDelivery, setIncludeDelivery] = useState(true)
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false)
   const [showAIPanel, setShowAIPanel] = useState(false)
   const reportContentRef = useRef(null)
 
@@ -186,6 +191,7 @@ function Report() {
 
   return (
     <div className="page" style={{ maxWidth: '960px' }} ref={reportContentRef}>
+      {isFocusMode && <PosSidePanel formId={form.id} hasCartField={cartFields.length > 0} />}
       <style>{`
         .kpi-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.8rem; }
         .kpi-add-tile { transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease; }
@@ -229,7 +235,29 @@ function Report() {
           )}
         </div>
 
-        <div style={{ position: 'relative', flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          {form.fields.some(f => f.type === 'cart') && (
+            <div style={{ display: 'flex', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
+              <button
+                type="button"
+                className={includeDelivery ? '' : 'secondary'}
+                onClick={() => setIncludeDelivery(true)}
+                style={{ borderRadius: 0, border: 'none', padding: '0.5rem 0.8rem', fontSize: '0.85rem' }}
+              >
+                With Delivery
+              </button>
+              <button
+                type="button"
+                className={!includeDelivery ? '' : 'secondary'}
+                onClick={() => setIncludeDelivery(false)}
+                style={{ borderRadius: 0, border: 'none', padding: '0.5rem 0.8rem', fontSize: '0.85rem' }}
+              >
+                Without Delivery
+              </button>
+            </div>
+          )}
+
+          <div style={{ position: 'relative', flexShrink: 0 }}>
           <button className="secondary" onClick={() => setOptionsMenuOpen(!optionsMenuOpen)}>
             Options ▾
           </button>
@@ -276,9 +304,18 @@ function Report() {
                 >
                   Download PowerPoint
                 </button>
+                <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.3rem 0' }} />
+                <button
+                  className="secondary"
+                  onClick={() => { setMoreMenuOpen(true); setOptionsMenuOpen(false) }}
+                  style={{ display: 'block', width: '100%', textAlign: 'left', border: 'none', background: 'transparent', padding: '0.45rem 0.3rem', fontSize: '0.85rem' }}
+                >
+                  + Add Metric
+                </button>
               </div>
             </>
           )}
+        </div>
         </div>
       </div>
 
@@ -293,22 +330,23 @@ function Report() {
       ) : (
         <>
           <div id="report-overview">
-            <OverviewCard form={form} submissions={filteredSubmissions} />
+            <OverviewCard form={form} submissions={filteredSubmissions} includeDelivery={includeDelivery} />
           </div>
 
           <div id="report-performance" style={{ marginTop: '2rem' }}>
-            <SectionTitle subtitle="Key measures for this view, compared to the previous period">Performance</SectionTitle>
             <KPIGrid
               form={form}
               submissions={filteredSubmissions}
               previousSubmissions={previousFilteredSubmissions}
               totalResponses={totalResponses}
+              includeDelivery={includeDelivery}
+              moreMenuOpen={moreMenuOpen}
+              setMoreMenuOpen={setMoreMenuOpen}
             />
           </div>
 
           {cartFields.length > 0 && (
             <div id="report-product-distribution" style={{ marginTop: '2rem' }}>
-              <SectionTitle subtitle="What's selling, by units and by revenue">Product Distribution</SectionTitle>
               {cartFields.map(field => {
                 const answered = filteredSubmissions.filter(s => {
                   const v = s.data[field.id]
@@ -325,7 +363,6 @@ function Report() {
 
           {channelCategoryPairs.length > 0 && (
             <div id="report-sales-channel" style={{ marginTop: '2rem' }}>
-              <SectionTitle subtitle="Where your sales are coming from">Sales Channel</SectionTitle>
               {channelCategoryPairs.map(({ cartField, catField }) => (
                 <div key={`${catField.id}-${cartField.id}`} className="card" style={{ padding: '1.75rem', marginBottom: '1.2rem' }}>
                   <div style={{ fontSize: '1.15rem', fontWeight: 800, marginBottom: '0.9rem' }}>
@@ -339,7 +376,6 @@ function Report() {
 
           {operationsCategoryPairs.length > 0 && (
             <div id="report-operations" style={{ marginTop: '2rem' }}>
-              <SectionTitle subtitle="How your team is performing">Operations</SectionTitle>
               {operationsCategoryPairs.map(({ cartField, catField }) => (
                 <div key={`${catField.id}-${cartField.id}`} className="card" style={{ padding: '1.75rem', marginBottom: '1.2rem' }}>
                   <div style={{ fontSize: '1.15rem', fontWeight: 800, marginBottom: '0.9rem' }}>
@@ -353,7 +389,6 @@ function Report() {
 
           {otherCategoryPairs.length > 0 && (
             <div id="report-other-data" style={{ marginTop: '2rem' }}>
-              <SectionTitle subtitle="Other patterns in the data, e.g. gender, state of origin">Other Data</SectionTitle>
               {otherCategoryPairs.map(({ cartField, catField }) => (
                 <div key={`${catField.id}-${cartField.id}`} className="card" style={{ padding: '1.75rem', marginBottom: '1.2rem' }}>
                   <div style={{ fontSize: '1.15rem', fontWeight: 800, marginBottom: '0.9rem' }}>
@@ -367,7 +402,6 @@ function Report() {
 
           {demographicFields.length > 0 && (
             <div id="report-customers" style={{ marginTop: '2rem' }}>
-              <SectionTitle subtitle="Who you're hearing from">Customers</SectionTitle>
               <DetailedAnalysis
                 fields={demographicFields}
                 submissions={filteredSubmissions}
@@ -378,7 +412,6 @@ function Report() {
           )}
 
           <div id="report-cross-analysis" style={{ marginTop: '2rem' }}>
-            <SectionTitle subtitle="Compare any two columns freely, including cart totals or item counts">Cross Analysis</SectionTitle>
             <CrossAnalysis fields={crossAnalysisFields} cartFields={cartFields} submissions={filteredSubmissions} />
           </div>
         </>
@@ -396,25 +429,7 @@ function Report() {
   )
 }
 
-function SectionTitle({ children, subtitle }) {
-  return (
-    <div style={{ marginBottom: '1rem' }}>
-      <h2 style={{
-        margin: 0, fontSize: '0.8rem', color: 'var(--color-muted)',
-        textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 700
-      }}>
-        {children}
-      </h2>
-      {subtitle && (
-        <div style={{ marginTop: '0.25rem', fontSize: '0.82rem', color: 'var(--color-muted)', lineHeight: 1.4 }}>
-          {subtitle}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function OverviewCard({ form, submissions }) {
+function OverviewCard({ form, submissions, includeDelivery = true }) {
   const cartFields = form.fields.filter(f => f.type === 'cart')
   let totalRevenue = 0
   let hasCartData = false
@@ -424,17 +439,17 @@ function OverviewCard({ form, submissions }) {
       const v = s.data[field.id]
       if (v && v.items && v.items.length > 0) {
         hasCartData = true
-        totalRevenue += v.total
+        totalRevenue += v.total + (includeDelivery ? (v.deliveryFee || 0) : 0)
       }
     })
   })
 
   const totalResponses = submissions.length
   // Keep this concise: a briefing, not a list of everything the data could say.
-  const insights = computeInsights(form, submissions).slice(0, 6)
+  const insights = computeInsights(form, submissions, includeDelivery).slice(0, 6)
 
   return (
-    <div className="card" style={{ padding: '1.5rem', marginBottom: '1.2rem', background: 'linear-gradient(135deg, #fbfdff 0%, #f5f8ff 100%)' }}>
+    <div className="card" style={{ padding: '1.5rem', marginBottom: '1.2rem', background: 'linear-gradient(135deg, var(--color-surface) 0%, var(--color-primary-soft) 100%)' }}>
       {hasCartData ? (
         <div style={{ fontSize: '1.15rem', color: '#000', lineHeight: 1.5 }}>
           Your business generated{' '}
@@ -475,7 +490,7 @@ function OverviewCard({ form, submissions }) {
 // Aggregates the numbers a trend comparison needs from a set of submissions,
 // shared between the current and previous period so the two are computed
 // identically.
-function computeCartTotals(cartFields, submissions) {
+function computeCartTotals(cartFields, submissions, includeDelivery = true) {
   let totalRevenue = 0
   let totalOrders = 0
   let totalItems = 0
@@ -485,9 +500,10 @@ function computeCartTotals(cartFields, submissions) {
     submissions.forEach(s => {
       const v = s.data[field.id]
       if (v && v.items && v.items.length > 0) {
-        totalRevenue += v.total
+        const grandTotal = v.total + (includeDelivery ? (v.deliveryFee || 0) : 0)
+        totalRevenue += grandTotal
         totalOrders += 1
-        orderTotals.push(v.total)
+        orderTotals.push(grandTotal)
         totalItems += v.items.reduce((sum, item) => sum + item.quantity, 0)
       }
     })
@@ -504,8 +520,7 @@ function computeTrend(current, previous) {
   return { direction: current >= previous ? 'up' : 'down', percent }
 }
 
-function KPIGrid({ form, submissions, previousSubmissions = [], totalResponses }) {
-  const [moreMenuOpen, setMoreMenuOpen] = useState(false)
+function KPIGrid({ form, submissions, previousSubmissions = [], totalResponses, includeDelivery = true, moreMenuOpen, setMoreMenuOpen }) {
   const [selectedMore, setSelectedMore] = useState([])
   const [metricSearch, setMetricSearch] = useState('')
   const cartFields = form.fields.filter(f => f.type === 'cart')
@@ -522,8 +537,8 @@ function KPIGrid({ form, submissions, previousSubmissions = [], totalResponses }
   const moreKpis = []
 
   // ---- Cart / revenue metrics ----
-  const { totalRevenue, totalOrders, totalItems, orderTotals } = computeCartTotals(cartFields, submissions)
-  const previousCart = hasPreviousPeriod ? computeCartTotals(cartFields, previousSubmissions) : null
+  const { totalRevenue, totalOrders, totalItems, orderTotals } = computeCartTotals(cartFields, submissions, includeDelivery)
+  const previousCart = hasPreviousPeriod ? computeCartTotals(cartFields, previousSubmissions, includeDelivery) : null
   const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0
 
   if (cartFields.length > 0) {
@@ -555,7 +570,7 @@ function KPIGrid({ form, submissions, previousSubmissions = [], totalResponses }
     })
   }
 
-  primaryKpis.push({
+  moreKpis.push({
     label: 'Total Responses', value: totalResponses.toLocaleString(),
     trend: computeTrend(totalResponses, hasPreviousPeriod ? previousSubmissions.length : undefined)
   })
@@ -643,73 +658,65 @@ function KPIGrid({ form, submissions, previousSubmissions = [], totalResponses }
   }
 
   return (
-    <div className="kpi-grid">
-      {primaryKpis.map(k => <StatTile key={k.label} label={k.label} value={k.value} trend={k.trend} />)}
-      {visibleMoreKpis.map(k => <StatTile key={k.label} label={k.label} value={k.value} />)}
+    <>
+      <div className="kpi-grid">
+        {primaryKpis.map(k => <StatTile key={k.label} label={k.label} value={k.value} trend={k.trend} />)}
+        {visibleMoreKpis.map(k => <StatTile key={k.label} label={k.label} value={k.value} />)}
+      </div>
 
-      {moreKpis.length > 0 && (
-        <div style={{ position: 'relative' }}>
-          <button
-            onClick={() => setMoreMenuOpen(!moreMenuOpen)}
-            aria-label="Add metric"
-            className="kpi-add-tile"
-            style={{
-              width: '100%', minWidth: '150px', minHeight: '68px', padding: '1rem 1.25rem',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.3rem',
-              background: 'transparent', border: '1.5px dashed var(--color-border)', borderRadius: 'var(--radius)',
-              color: 'var(--color-muted)', cursor: 'pointer'
-            }}
+      {moreMenuOpen && (
+        <div
+          onClick={() => setMoreMenuOpen(false)}
+          style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: '1rem'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="card"
+            style={{ background: 'white', padding: '1.2rem', width: '320px', maxWidth: '100%' }}
           >
-            <span style={{ fontSize: '1.1rem', lineHeight: 1, fontWeight: 700 }}>+</span>
-            <span style={{ fontSize: '0.78rem', fontWeight: 600 }}>Add metric</span>
-          </button>
-
-          {moreMenuOpen && (
-            <>
-              <div
-                style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 15 }}
-                onClick={() => setMoreMenuOpen(false)}
-              />
-              <div className="dropdown-panel" style={{
-                position: 'absolute', top: '100%', left: 0, marginTop: '0.3rem',
-                background: 'white', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
-                boxShadow: '0 8px 24px rgba(15,23,42,0.14)', zIndex: 20, minWidth: '240px', maxWidth: '280px',
-                padding: '0.5rem'
-              }}>
-                <input
-                  type="text"
-                  autoFocus
-                  placeholder="Search metrics..."
-                  value={metricSearch}
-                  onChange={(e) => setMetricSearch(e.target.value)}
-                  style={{ width: '100%', padding: '0.4rem 0.5rem', fontSize: '0.82rem', marginBottom: '0.4rem' }}
-                />
-                <div style={{ maxHeight: '260px', overflowY: 'auto' }}>
-                  {filteredMoreKpis.length === 0 ? (
-                    <p style={{ fontSize: '0.8rem', color: 'var(--color-muted)', padding: '0.4rem 0.3rem', margin: 0 }}>
-                      No metrics match "{metricSearch}".
-                    </p>
-                  ) : filteredMoreKpis.map(k => (
-                    <label key={k.label} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.35rem 0.3rem', fontSize: '0.85rem', cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={selectedMore.includes(k.label)}
-                        onChange={() => toggleMore(k.label)}
-                      />
-                      {k.label}
-                    </label>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+              <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Add Metric</span>
+              <button className="secondary" onClick={() => setMoreMenuOpen(false)} style={{ padding: '0.25rem 0.6rem' }}>Close</button>
+            </div>
+            <input
+              type="text"
+              autoFocus
+              placeholder="Search metrics..."
+              value={metricSearch}
+              onChange={(e) => setMetricSearch(e.target.value)}
+              style={{ width: '100%', padding: '0.4rem 0.5rem', fontSize: '0.82rem', marginBottom: '0.4rem' }}
+            />
+            <div style={{ maxHeight: '260px', overflowY: 'auto' }}>
+              {moreKpis.length === 0 ? (
+                <p style={{ fontSize: '0.8rem', color: 'var(--color-muted)', padding: '0.4rem 0.3rem', margin: 0 }}>
+                  No more metrics available for this data yet.
+                </p>
+              ) : filteredMoreKpis.length === 0 ? (
+                <p style={{ fontSize: '0.8rem', color: 'var(--color-muted)', padding: '0.4rem 0.3rem', margin: 0 }}>
+                  No metrics match "{metricSearch}".
+                </p>
+              ) : filteredMoreKpis.map(k => (
+                <label key={k.label} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.35rem 0.3rem', fontSize: '0.85rem', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedMore.includes(k.label)}
+                    onChange={() => toggleMore(k.label)}
+                  />
+                  {k.label}
+                </label>
+              ))}
+            </div>
+          </div>
         </div>
       )}
-    </div>
+    </>
   )
 }
 
-function computeInsights(form, submissions) {
+function computeInsights(form, submissions, includeDelivery = true) {
   const insights = []
   // Dynamic on purpose: aggregates across every cart field on the form, not
   // just the first one, a form can use the cart feature more than once.
@@ -728,7 +735,8 @@ function computeInsights(form, submissions) {
         const v = s.data[cartField.id]
         if (!v || !v.items || v.items.length === 0) return
         hasCartData = true
-        totalRevenue += v.total
+        const grandTotal = v.total + (includeDelivery ? (v.deliveryFee || 0) : 0)
+        totalRevenue += grandTotal
         v.items.forEach(item => {
           itemQty[item.name] = (itemQty[item.name] || 0) + item.quantity
           itemRevenue[item.name] = (itemRevenue[item.name] || 0) + item.price * item.quantity
@@ -740,7 +748,7 @@ function computeInsights(form, submissions) {
           const vals = Array.isArray(val) ? val : [val]
           revenueByField[field.id] = revenueByField[field.id] || {}
           vals.forEach(vv => {
-            revenueByField[field.id][vv] = (revenueByField[field.id][vv] || 0) + v.total
+            revenueByField[field.id][vv] = (revenueByField[field.id][vv] || 0) + grandTotal
           })
         })
       })

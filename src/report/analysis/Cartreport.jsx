@@ -42,20 +42,6 @@ function CartReport({ field, answered, showStats = true }) {
       )}
 
       <div style={{ display: 'grid', gap: '2.2rem' }}>
-        {topByQty.length > 0 && (
-          <div>
-            <div style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '0.9rem' }}>
-              Units Sold by Product{topByQty.length > 10 ? ' (top 10)' : ''}
-            </div>
-            <HorizontalBarChart data={topByQty.slice(0, 10)} bare />
-            {bestSeller && (
-              <p style={{ fontSize: '0.85rem', color: 'var(--color-muted)', marginTop: '0.8rem' }}>
-                {bestSeller.label} is the best seller, with {bestSeller.count.toLocaleString()} units sold.
-              </p>
-            )}
-          </div>
-        )}
-
         {topByRevenue.length > 0 && (
           <div>
             <div style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '0.9rem' }}>
@@ -65,6 +51,20 @@ function CartReport({ field, answered, showStats = true }) {
             {topEarner && (
               <p style={{ fontSize: '0.85rem', color: 'var(--color-muted)', marginTop: '0.8rem' }}>
                 {topEarner.label} generates the most revenue, at {formatNaira(topEarner.count)}.
+              </p>
+            )}
+          </div>
+        )}
+
+        {topByQty.length > 0 && (
+          <div>
+            <div style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '0.9rem' }}>
+              Units Sold by Product{topByQty.length > 10 ? ' (top 10)' : ''}
+            </div>
+            <HorizontalBarChart data={topByQty.slice(0, 10)} bare />
+            {bestSeller && (
+              <p style={{ fontSize: '0.85rem', color: 'var(--color-muted)', marginTop: '0.8rem' }}>
+                {bestSeller.label} is the best seller, with {bestSeller.count.toLocaleString()} units sold.
               </p>
             )}
           </div>

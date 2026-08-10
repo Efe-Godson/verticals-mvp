@@ -411,7 +411,7 @@ function CreateForm() {
               style={{
                 padding: '1rem', display: 'flex', alignItems: 'flex-start', gap: '0.8rem',
                 opacity: dragIndex === index ? 0.5 : 1, cursor: 'grab',
-                borderLeft: '4px solid var(--color-primary)', background: 'linear-gradient(135deg, #f8faff 0%, #f3f7ff 100%)'
+                borderLeft: '4px solid var(--color-primary)', background: 'linear-gradient(135deg, var(--color-surface) 0%, var(--color-primary-soft) 100%)'
               }}
             >
               <div style={{ fontSize: '1.2rem', color: '#bbb', paddingTop: '0.5rem', userSelect: 'none', lineHeight: 1 }} title="Drag to reorder">

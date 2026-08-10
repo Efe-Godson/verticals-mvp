@@ -1,13 +1,13 @@
-import { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
-import * as XLSX from 'xlsx'
+import { useState, useEffect, useRef, Fragment } from 'react'
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
+import PosSidePanel from './PosSidePanel'
 import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
 import FieldValidationControls from './FieldValidationControls'
 import FieldTypeConfig from './FieldTypeConfig'
 import ConfirmDialog from './ConfirmDialog'
 import FormPreviewModal from './FormPreview'
-import PackageBuilder from './PackageBuilder'
+import ProductManager from './ProductManager'
 import { COUNTRIES } from './lib/locationData'
 
 const FIELD_TYPES = [
@@ -57,6 +57,8 @@ function EditForm() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { session } = useAuth()
+  const [searchParams] = useSearchParams()
+  const isFocusMode = searchParams.get('focus') === '1'
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -73,13 +75,15 @@ function EditForm() {
 
   const [recentlyRemoved, setRecentlyRemoved] = useState(null) // { field, index }
   const undoTimeoutRef = useRef(null)
-  const [pendingConfirm, setPendingConfirm] = useState(null) // { type: 'field', index } | { type: 'product', fieldIndex, productIndex }
+  const [pendingConfirm, setPendingConfirm] = useState(null) // { type: 'field', index }
   const [openFieldMenu, setOpenFieldMenu] = useState(null) // field.id of the open "more options" menu, or null
   const fieldMenuRef = useRef(null)
   const [showPreview, setShowPreview] = useState(false)
-  const [collapsedCarts, setCollapsedCarts] = useState({})
-  const [packageBuilderIndex, setPackageBuilderIndex] = useState(null)
-  const [productOverrides, setProductOverrides] = useState({}) // `${fieldIndex}-${productId}` -> true/false, explicit expand/collapse
+  const [manageProductsIndex, setManageProductsIndex] = useState(null)
+  // Collapsed by default on cart forms so a business owner poking at the
+  // menu doesn't stumble into editing/deleting the checkout questions by
+  // accident - they're still fully editable once intentionally expanded.
+  const [showAdditionalInfo, setShowAdditionalInfo] = useState(false)
 
   useEffect(() => {
     async function loadForm() {
@@ -155,110 +159,10 @@ function EditForm() {
     updateField(index, { optionsText: text, options })
   }
 
-  function addProduct(fieldIndex) {
+  function updateFieldProducts(fieldIndex, products) {
     const newFields = [...fields]
-    const products = newFields[fieldIndex].products || []
-    newFields[fieldIndex] = {
-      ...newFields[fieldIndex],
-      products: [...products, { id: 'p' + Date.now(), name: '', price: '', unit: '', category: '' }]
-    }
-    setFields(newFields)
-  }
-
-  function addPackageProduct(fieldIndex, packageData) {
-    const newFields = [...fields]
-    const products = newFields[fieldIndex].products || []
-    newFields[fieldIndex] = {
-      ...newFields[fieldIndex],
-      products: [...products, { id: 'p' + Date.now(), ...packageData }]
-    }
-    setFields(newFields)
-    setPackageBuilderIndex(null)
-  }
-
-  function updateProduct(fieldIndex, productIndex, changes) {
-    const newFields = [...fields]
-    const products = [...(newFields[fieldIndex].products || [])]
-    products[productIndex] = { ...products[productIndex], ...changes }
     newFields[fieldIndex] = { ...newFields[fieldIndex], products }
     setFields(newFields)
-  }
-
-  function removeProduct(fieldIndex, productIndex) {
-    const newFields = [...fields]
-    const products = (newFields[fieldIndex].products || []).filter((_, i) => i !== productIndex)
-    newFields[fieldIndex] = { ...newFields[fieldIndex], products }
-    setFields(newFields)
-  }
-
-  function isProductExpanded(fieldIndex, product) {
-    const key = `${fieldIndex}-${product.id}`
-    if (key in productOverrides) return productOverrides[key]
-    // Products that already have a unit or category saved stay visible by
-    // default, only genuinely empty ones start collapsed.
-    return !!(product.unit || product.category)
-  }
-
-  function toggleProductExpanded(fieldIndex, product) {
-    const key = `${fieldIndex}-${product.id}`
-    const current = isProductExpanded(fieldIndex, product)
-    setProductOverrides(prev => ({ ...prev, [key]: !current }))
-  }
-
-  function getFieldCategories(fieldIndex) {
-    const products = fields[fieldIndex].products || []
-    return Array.from(new Set(products.map(p => p.category).filter(c => c && c.trim() !== '')))
-  }
-
-  function downloadTemplate() {
-    const worksheet = XLSX.utils.json_to_sheet([
-      { Name: 'Sample Product', Price: 1000, Unit: 'kg', Category: 'Category Name' },
-      { Name: 'Another Product', Price: 2500, Unit: 'pcs', Category: 'Category Name' }
-    ])
-    worksheet['!cols'] = [{ wch: 28 }, { wch: 12 }, { wch: 10 }, { wch: 20 }]
-    const workbook = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Products')
-    XLSX.writeFile(workbook, 'product-catalogue-template.xlsx')
-  }
-
-  function handleFileUpload(fieldIndex, event) {
-    const file = event.target.files[0]
-    if (!file) return
-
-    const reader = new FileReader()
-    reader.onload = (evt) => {
-      try {
-        const data = new Uint8Array(evt.target.result)
-        const workbook = XLSX.read(data, { type: 'array' })
-        const sheet = workbook.Sheets[workbook.SheetNames[0]]
-        const rows = XLSX.utils.sheet_to_json(sheet)
-
-        const importedProducts = rows
-          .filter(row => row.Name && row.Name.toString().trim() !== '')
-          .map(row => ({
-            id: 'p' + Date.now() + Math.random().toString(36).slice(2, 7),
-            name: row.Name.toString().trim(),
-            price: Number(row.Price) || 0,
-            unit: row.Unit ? row.Unit.toString().trim() : '',
-            category: row.Category ? row.Category.toString().trim() : ''
-          }))
-
-        if (importedProducts.length === 0) {
-          setMessage('No valid products found in that file. Make sure the "Name" column is filled in.')
-          return
-        }
-
-        const newFields = [...fields]
-        const existing = newFields[fieldIndex].products || []
-        newFields[fieldIndex] = { ...newFields[fieldIndex], products: [...existing, ...importedProducts] }
-        setFields(newFields)
-        setMessage(`Imported ${importedProducts.length} product${importedProducts.length !== 1 ? 's' : ''}.`)
-      } catch (err) {
-        setMessage('Could not read that file. Make sure it\'s a valid .xlsx file.')
-      }
-    }
-    reader.readAsArrayBuffer(file)
-    event.target.value = ''
   }
 
   function removeField(index) {
@@ -289,8 +193,6 @@ function EditForm() {
     if (!pendingConfirm) return
     if (pendingConfirm.type === 'field') {
       removeField(pendingConfirm.index)
-    } else if (pendingConfirm.type === 'product') {
-      removeProduct(pendingConfirm.fieldIndex, pendingConfirm.productIndex)
     }
     setPendingConfirm(null)
   }
@@ -371,14 +273,24 @@ function EditForm() {
   if (loading) return <div className="page">Loading form...</div>
   if (error) return <div className="page" style={{ color: 'red' }}>{error}</div>
 
+  const hasCartField = fields.some(f => f.type === 'cart')
+  // On a cart form, everything after the menu reads as one undifferentiated
+  // list otherwise - nothing marks it as "questions asked at checkout"
+  // rather than more menu configuration.
+  const firstNonCartFieldIndex = hasCartField ? fields.findIndex(f => f.type !== 'cart') : -1
+  const additionalInfoCount = firstNonCartFieldIndex === -1 ? 0 : fields.length - firstNonCartFieldIndex
+
   return (
     <div className="page">
+      {isFocusMode && <PosSidePanel formId={id} hasCartField={hasCartField} />}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-        <h1 style={{ margin: 0 }}>Edit Form</h1>
+        <h1 style={{ margin: 0 }}>{hasCartField ? 'Add Product' : 'Edit Form'}</h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <Link to={`/form/${id}`} style={{ fontSize: '0.9rem', color: 'var(--color-primary)' }}>
-            View public form →
-          </Link>
+          {!hasCartField && (
+            <Link to={`/form/${id}`} style={{ fontSize: '0.9rem', color: 'var(--color-primary)' }}>
+              View public form →
+            </Link>
+          )}
           <button onClick={saveChanges} disabled={saving}>
             {saving ? 'Saving...' : 'Save Changes'}
           </button>
@@ -397,31 +309,59 @@ function EditForm() {
         </p>
       )}
 
-      <div style={{ marginBottom: '1.5rem' }}>
-        <label style={{ fontSize: '0.85rem', color: 'var(--color-muted)' }}>Form Name</label>
-        <input
-          type="text"
-          value={formName}
-          onChange={(e) => setFormName(e.target.value)}
-          style={{ padding: '0.6rem', width: '100%', fontSize: '1rem', marginTop: '0.3rem' }}
-        />
-        <label style={{ fontSize: '0.85rem', color: 'var(--color-muted)', marginTop: '0.8rem', display: 'block' }}>
-          Description <span style={{ fontWeight: 400 }}>(optional)</span>
-        </label>
-        <textarea
-          value={formDescription}
-          onChange={(e) => setFormDescription(e.target.value)}
-          placeholder="Shown to respondents under the title"
-          rows={2}
-          style={{ padding: '0.6rem', width: '100%', fontSize: '0.92rem', marginTop: '0.3rem' }}
-        />
-      </div>
+      {!hasCartField && (
+        <div style={{ marginBottom: '1.5rem' }}>
+          <label style={{ fontSize: '0.85rem', color: 'var(--color-muted)' }}>Form Name</label>
+          <input
+            type="text"
+            value={formName}
+            onChange={(e) => setFormName(e.target.value)}
+            style={{ padding: '0.6rem', width: '100%', fontSize: '1rem', marginTop: '0.3rem' }}
+          />
+          <label style={{ fontSize: '0.85rem', color: 'var(--color-muted)', marginTop: '0.8rem', display: 'block' }}>
+            Description <span style={{ fontWeight: 400 }}>(optional)</span>
+          </label>
+          <textarea
+            value={formDescription}
+            onChange={(e) => setFormDescription(e.target.value)}
+            placeholder="Shown to respondents under the title"
+            rows={2}
+            style={{ padding: '0.6rem', width: '100%', fontSize: '0.92rem', marginTop: '0.3rem' }}
+          />
+        </div>
+      )}
+
+      {hasCartField && (
+        <div
+          onClick={() => setShowAdditionalInfo(v => !v)}
+          style={{
+            marginTop: '0.4rem', paddingBottom: '1rem',
+            cursor: 'pointer', userSelect: 'none', display: 'flex', alignItems: 'center', gap: '0.5rem'
+          }}
+        >
+          <span style={{
+            fontSize: '0.7rem', color: 'var(--color-muted)', transform: showAdditionalInfo ? 'rotate(0deg)' : 'rotate(-90deg)',
+            transition: 'transform 0.15s', display: 'inline-block'
+          }}>
+            ▾
+          </span>
+          <div>
+            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Additional Information · {additionalInfoCount} field{additionalInfoCount !== 1 ? 's' : ''}
+            </div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)', marginTop: '0.2rem' }}>
+              Asked at checkout, alongside the order. Collapsed by default so the menu stays front and center - click to edit.
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
         {fields.map((field, index) => (
+          <Fragment key={field.id}>
+          {(field.type === 'cart' || !hasCartField || showAdditionalInfo) && (
           field.type === 'section' ? (
             <div
-              key={field.id}
               draggable
               onDragStart={() => handleDragStart(index)}
               onDragOver={(e) => handleDragOver(e, index)}
@@ -430,7 +370,7 @@ function EditForm() {
               style={{
                 padding: '1rem', display: 'flex', alignItems: 'flex-start', gap: '0.8rem',
                 opacity: dragIndex === index ? 0.5 : 1, cursor: 'grab',
-                borderLeft: '4px solid var(--color-primary)', background: 'linear-gradient(135deg, #f8faff 0%, #f3f7ff 100%)'
+                borderLeft: '4px solid var(--color-primary)', background: 'linear-gradient(135deg, var(--color-surface) 0%, var(--color-primary-soft) 100%)'
               }}
             >
               <div style={{ fontSize: '1.2rem', color: '#bbb', paddingTop: '0.5rem', userSelect: 'none', lineHeight: 1 }} title="Drag to reorder">
@@ -465,7 +405,6 @@ function EditForm() {
             </div>
           ) : (
           <div
-            key={field.id}
             draggable
             onDragStart={() => handleDragStart(index)}
             onDragOver={(e) => handleDragOver(e, index)}
@@ -477,7 +416,8 @@ function EditForm() {
               alignItems: 'flex-start',
               gap: '0.8rem',
               opacity: dragIndex === index ? 0.5 : 1,
-              cursor: 'grab'
+              cursor: 'grab',
+              background: field.type === 'cart' ? 'var(--color-primary-soft)' : undefined
             }}
           >
             <div className="field-drag-handle" style={{
@@ -488,24 +428,26 @@ function EditForm() {
             </div>
 
             <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-              <div className="field-row" style={{ display: 'flex', gap: '0.6rem' }}>
-                <input
-                  type="text"
-                  value={field.label}
-                  onChange={(e) => updateField(index, { label: e.target.value })}
-                  placeholder="Field name"
-                  style={{ flex: 2 }}
-                />
-                <select
-                  value={field.type}
-                  onChange={(e) => updateFieldType(index, e.target.value)}
-                  style={{ flex: 1 }}
-                >
-                  {FIELD_TYPES.map(t => (
-                    <option key={t.value} value={t.value}>{t.label}</option>
-                  ))}
-                </select>
-              </div>
+              {field.type !== 'cart' && (
+                <div className="field-row" style={{ display: 'flex', gap: '0.6rem' }}>
+                  <input
+                    type="text"
+                    value={field.label}
+                    onChange={(e) => updateField(index, { label: e.target.value })}
+                    placeholder="Field name"
+                    style={{ flex: 2 }}
+                  />
+                  <select
+                    value={field.type}
+                    onChange={(e) => updateFieldType(index, e.target.value)}
+                    style={{ flex: 1 }}
+                  >
+                    {FIELD_TYPES.map(t => (
+                      <option key={t.value} value={t.value}>{t.label}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {TYPES_WITH_OPTIONS.includes(field.type) && (
                 <input
@@ -517,162 +459,67 @@ function EditForm() {
               )}
 
               {TYPES_WITH_PRODUCTS.includes(field.type) && (
-                <div style={{ marginTop: '0.3rem' }}>
-                  <label
-                    onClick={() => setCollapsedCarts(current => ({ ...current, [field.id]: !current[field.id] }))}
-                    style={{ fontSize: '0.8rem', color: 'var(--color-muted)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}
-                  >
-                    <span style={{ display: 'inline-block', transition: 'transform 0.15s ease', transform: collapsedCarts[field.id] ? 'rotate(-90deg)' : 'rotate(0deg)' }}>▾</span>
-                    Products ({(field.products || []).length})
-                  </label>
-
-                  {!collapsedCarts[field.id] && (
-                  <>
-                  <datalist id={`categories-${field.id}`}>
-                    {getFieldCategories(index).map(cat => (
-                      <option key={cat} value={cat} />
-                    ))}
-                  </datalist>
-
-                  {(field.products || []).map((product, pIndex) => {
-                    const expanded = isProductExpanded(index, product)
-                    return (
-                      <div key={product.id} className="product-card">
-                        <div className="product-row-main">
-                          <input
-                            type="text"
-                            value={product.name}
-                            onChange={(e) => updateProduct(index, pIndex, { name: e.target.value })}
-                            placeholder="Item name"
-                            className="product-name"
-                          />
-                          <input
-                            type="number"
-                            value={product.price}
-                            onChange={(e) => updateProduct(index, pIndex, { price: e.target.value })}
-                            placeholder="Price"
-                            className="product-price"
-                          />
-                          <button
-                            type="button"
-                            className="secondary product-toggle"
-                            onClick={() => toggleProductExpanded(index, product)}
-                            title={expanded ? 'Hide unit & category' : 'Add unit & category'}
-                          >
-                            {expanded ? '▾' : '▸'}
-                          </button>
-                          <button
-                            className="secondary product-remove"
-                            aria-label="Remove product"
-                            title="Remove product"
-                            onClick={() => setPendingConfirm({ type: 'product', fieldIndex: index, productIndex: pIndex })}
-                          >
-                            ✕
-                          </button>
-                        </div>
-
-                        {expanded && (
-                          <div className="product-row-details">
-                            <input
-                              type="text"
-                              value={product.unit || ''}
-                              onChange={(e) => updateProduct(index, pIndex, { unit: e.target.value })}
-                              placeholder="Unit e.g. kg, pcs"
-                              className="product-unit"
-                            />
-                            <input
-                              type="text"
-                              list={`categories-${field.id}`}
-                              value={product.category || ''}
-                              onChange={(e) => updateProduct(index, pIndex, { category: e.target.value })}
-                              placeholder="Category"
-                              className="product-category"
-                            />
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-
-                  <div className="products-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.6rem' }}>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <button className="secondary" onClick={() => addProduct(index)}>
-                        + Add Product
-                      </button>
-                      <button
-                        type="button"
-                        className="secondary"
-                        onClick={() => setPackageBuilderIndex(packageBuilderIndex === index ? null : index)}
-                      >
-                        + Create Package
-                      </button>
-                    </div>
-                    <div className="product-template-actions">
-                      <button type="button" className="secondary" onClick={downloadTemplate}>
-                        Download Template
-                      </button>
-                      <label className="secondary" style={{
-                        borderRadius: 'var(--radius)', border: '1px solid var(--color-border)',
-                        cursor: 'pointer', display: 'inline-flex', alignItems: 'center',
-                        padding: '0.55rem 1.1rem', fontSize: '0.9rem'
-                      }}>
-                        Upload Filled Sheet
-                        <input
-                          type="file"
-                          accept=".xlsx,.xls"
-                          onChange={(e) => handleFileUpload(index, e)}
-                          style={{ display: 'none' }}
-                        />
-                      </label>
-                    </div>
+                <div>
+                  <div style={{ marginTop: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
+                    <span style={{ fontSize: '0.85rem' }}>
+                      ✓ {(field.products || []).length} Product{(field.products || []).length !== 1 ? 's' : ''}
+                    </span>
+                    <button type="button" onClick={() => setManageProductsIndex(manageProductsIndex === index ? null : index)}>
+                      {manageProductsIndex === index ? 'Hide Products' : 'Manage Products →'}
+                    </button>
                   </div>
-                  {packageBuilderIndex === index && (
-                    <PackageBuilder
+                  {manageProductsIndex === index && (
+                    <ProductManager
+                      inline
                       products={field.products || []}
-                      onCreate={(packageData) => addPackageProduct(index, packageData)}
-                      onCancel={() => setPackageBuilderIndex(null)}
+                      onChange={(products) => updateFieldProducts(index, products)}
                     />
                   )}
-                  </>
-                  )}
                 </div>
               )}
 
-              <FieldTypeConfig field={field} index={index} updateField={updateField} allFields={fields} />
-
-              <FieldValidationControls field={field} index={index} updateField={updateField} />
-            </div>
-
-            <div style={{ position: 'relative', flexShrink: 0 }} ref={openFieldMenu === field.id ? fieldMenuRef : null}>
-              <button
-                className="secondary"
-                onClick={() => setOpenFieldMenu(openFieldMenu === field.id ? null : field.id)}
-                title="More options"
-              >
-                ⋮
-              </button>
-
-              {openFieldMenu === field.id && (
-                <div className="dropdown-panel" style={{
-                  position: 'absolute', top: '100%', right: 0, marginTop: '0.3rem',
-                  background: 'white', border: '1px solid var(--color-border)',
-                  borderRadius: 'var(--radius)', boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
-                  zIndex: 20, minWidth: '140px', overflow: 'hidden'
-                }}>
-                  <MenuItem
-                    danger
-                    onClick={() => {
-                      setOpenFieldMenu(null)
-                      setPendingConfirm({ type: 'field', index })
-                    }}
-                  >
-                    Remove Field
-                  </MenuItem>
-                </div>
+              {field.type !== 'cart' && (
+                <>
+                  <FieldTypeConfig field={field} index={index} updateField={updateField} allFields={fields} />
+                  <FieldValidationControls field={field} index={index} updateField={updateField} />
+                </>
               )}
             </div>
+
+            {field.type !== 'cart' && (
+              <div style={{ position: 'relative', flexShrink: 0 }} ref={openFieldMenu === field.id ? fieldMenuRef : null}>
+                <button
+                  className="secondary"
+                  onClick={() => setOpenFieldMenu(openFieldMenu === field.id ? null : field.id)}
+                  title="More options"
+                >
+                  ⋮
+                </button>
+
+                {openFieldMenu === field.id && (
+                  <div className="dropdown-panel" style={{
+                    position: 'absolute', top: '100%', right: 0, marginTop: '0.3rem',
+                    background: 'white', border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius)', boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+                    zIndex: 20, minWidth: '140px', overflow: 'hidden'
+                  }}>
+                    <MenuItem
+                      danger
+                      onClick={() => {
+                        setOpenFieldMenu(null)
+                        setPendingConfirm({ type: 'field', index })
+                      }}
+                    >
+                      Remove Field
+                    </MenuItem>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           )
+          )}
+          </Fragment>
         ))}
 
         {fields.length === 0 && (
@@ -680,14 +527,24 @@ function EditForm() {
         )}
       </div>
 
-      <div style={{ display: 'flex', gap: '0.6rem', marginTop: '1rem', flexWrap: 'wrap' }}>
-        <button className="secondary" onClick={addField}>
-          + Add Field
-        </button>
-        <button className="secondary" onClick={addSection}>
-          + Add Section
-        </button>
-      </div>
+      {!hasCartField && (
+        <div style={{ display: 'flex', gap: '0.6rem', marginTop: '1rem', flexWrap: 'wrap' }}>
+          <button className="secondary" onClick={addField}>
+            + Add Field
+          </button>
+          <button className="secondary" onClick={addSection}>
+            + Add Section
+          </button>
+        </div>
+      )}
+
+      {hasCartField && showAdditionalInfo && (
+        <div style={{ marginTop: '1rem' }}>
+          <button className="secondary" onClick={addField}>
+            + Add Field
+          </button>
+        </div>
+      )}
 
       {recentlyRemoved && (
         <div style={{
@@ -708,12 +565,8 @@ function EditForm() {
 
       {pendingConfirm && (
         <ConfirmDialog
-          title={pendingConfirm.type === 'field' ? 'Remove this field?' : 'Remove this product?'}
-          message={
-            pendingConfirm.type === 'field'
-              ? 'This will remove the field from your form. You can undo this for a few seconds right after removing it.'
-              : 'This will remove the product from your list.'
-          }
+          title="Remove this field?"
+          message="This will remove the field from your form. You can undo this for a few seconds right after removing it."
           confirmLabel="Remove"
           danger
           onConfirm={handleConfirmRemove}
@@ -721,18 +574,20 @@ function EditForm() {
         />
       )}
 
-      <button
-        type="button"
-        onClick={() => setShowPreview(true)}
-        title="Preview form"
-        style={{
-          position: 'fixed', bottom: '2rem', right: '2rem', zIndex: 150,
-          borderRadius: '999px', padding: '0.8rem 1.3rem', fontSize: '0.9rem',
-          boxShadow: '0 6px 18px rgba(0,0,0,0.22)'
-        }}
-      >
-        Preview
-      </button>
+      {!hasCartField && (
+        <button
+          type="button"
+          onClick={() => setShowPreview(true)}
+          title="Preview form"
+          style={{
+            position: 'fixed', bottom: '2rem', right: '2rem', zIndex: 150,
+            borderRadius: '999px', padding: '0.8rem 1.3rem', fontSize: '0.9rem',
+            boxShadow: '0 6px 18px rgba(0,0,0,0.22)'
+          }}
+        >
+          Preview
+        </button>
+      )}
 
       {showPreview && (
         <FormPreviewModal

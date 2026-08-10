@@ -1,19 +1,27 @@
 import { overlayStyle, dropdownStyle } from './recordsUiKit'
+import { printReceipt } from '../receiptPrint'
 
-export function CartCell({ value, cellKey, openCartCellKey, setOpenCartCellKey }) {
+export function CartCell({ value, cellKey, openCartCellKey, setOpenCartCellKey, form, submission }) {
   if (!value || !value.items || value.items.length === 0) {
     return <span style={{ color: '#ccc' }}>-</span>
   }
 
   const isOpen = openCartCellKey === cellKey
 
+  const summary = value.items.map(item => `${item.name}${item.quantity > 1 ? ` ×${item.quantity}` : ''}`).join(', ')
+
   return (
     <span style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
       <span
         onClick={() => setOpenCartCellKey(isOpen ? null : cellKey)}
-        style={{ cursor: 'pointer', color: 'var(--color-primary)', textDecoration: 'underline dotted' }}
+        title={summary}
+        style={{
+          cursor: 'pointer', color: 'var(--color-primary)', fontWeight: 600,
+          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+          overflow: 'hidden', maxWidth: '280px', lineHeight: 1.3
+        }}
       >
-        {value.items.length} item{value.items.length !== 1 ? 's' : ''}: ₦{value.total.toLocaleString()}
+        {summary}
       </span>
 
       {isOpen && (
@@ -36,6 +44,15 @@ export function CartCell({ value, cellKey, openCartCellKey, setOpenCartCellKey }
               <span>Total</span>
               <span>₦{value.total.toLocaleString()}</span>
             </div>
+            {form && submission && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); printReceipt(form, submission) }}
+                style={{ width: '100%', marginTop: '0.7rem', fontSize: '0.8rem' }}
+              >
+                Print
+              </button>
+            )}
           </div>
         </>
       )}

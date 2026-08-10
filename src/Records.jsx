@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
-import { useParams } from 'react-router-dom'
+import { useState, useEffect, Fragment } from 'react'
+import { useParams, useSearchParams } from 'react-router-dom'
+import PosSidePanel from './PosSidePanel'
 import { supabase } from './supabaseClient'
 import { exportRecordsToExcel, exportRecordsToCSV, exportRecordsToPDF, printRecordsTable, syncFormGoogleSheet } from './recordsExport'
 import { downloadRecordsTemplate, parseRecordsFile, readWorkbookRows } from './recordsImport'
@@ -14,9 +15,17 @@ import ConfirmDialog from './ConfirmDialog'
 import { useToast } from './Toast'
 
 const PAGE_SIZE = 10
+const META_COLUMNS = [
+  { id: '__orderId', label: 'Order ID' },
+  { id: '__lastUpdate', label: 'Last Update Date' },
+  { id: '__ip', label: 'IP' },
+  { id: '__submissionId', label: 'Submission ID' },
+]
 
 function Records() {
   const { id } = useParams()
+  const [searchParams] = useSearchParams()
+  const isFocusMode = searchParams.get('focus') === '1'
   const { showToast } = useToast()
   const [pendingConfirm, setPendingConfirm] = useState(null) // { type: 'deleteSelected' } | { type: 'permanentlyDelete', subId } | { type: 'emptyBin' }
   const [form, setForm] = useState(null)
@@ -32,8 +41,24 @@ function Records() {
   const [openFilterId, setOpenFilterId] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedRecord, setSelectedRecord] = useState(null)
+  const [openRecordEditing, setOpenRecordEditing] = useState(false)
   const [selectedIds, setSelectedIds] = useState([])
   const [hiddenFieldIds, setHiddenFieldIds] = useState([])
+  const [columnsExpanded, setColumnsExpanded] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [tilesRevealed, setTilesRevealed] = useState(false)
+  const [showRevealHint, setShowRevealHint] = useState(true)
+
+  function toggleTilesRevealed() {
+    setTilesRevealed(current => !current)
+    setShowRevealHint(false)
+  }
+
+  useEffect(() => {
+    const hintTimeout = setTimeout(() => setShowRevealHint(false), 5000)
+    return () => clearTimeout(hintTimeout)
+  }, [])
+  const [editIframeUrl, setEditIframeUrl] = useState(null)
   const [activeMenu, setActiveMenu] = useState(null) // null | 'download' | 'more'
   const [showSaveDialog, setShowSaveDialog] = useState(false)
   const [openCartCellKey, setOpenCartCellKey] = useState(null)
@@ -55,7 +80,12 @@ function Records() {
         return
       }
       setForm(formData)
-      setHiddenFieldIds(formData.settings?.hiddenColumns || [])
+      // POS/restaurant order forms start with the debugging-grade meta
+      // columns hidden (still toggleable from Options > Columns), unless
+      // the account has already customized column visibility before.
+      const isCartForm = formData.fields.some(f => f.type === 'cart')
+      const defaultHidden = isCartForm ? ['__orderId', '__lastUpdate', '__ip', '__submissionId'] : []
+      setHiddenFieldIds(formData.settings?.hiddenColumns ?? defaultHidden)
 
       const { data: subsData, error: subsError } = await supabase
         .from('submissions').select('*').eq('form_id', id)
@@ -86,6 +116,30 @@ function Records() {
     setSelectedRecord(updatedRecord)
   }
 
+  async function reloadSubmissions() {
+    const { data } = await supabase
+      .from('submissions').select('*').eq('form_id', id)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false })
+    if (data) setSubmissions(data)
+  }
+
+  // The Edit popup embeds the real order-entry screen in an iframe (the POS
+  // catalogue/checkout flow, not just a quantity list) so a correction goes
+  // through the same UI the order was placed in. It posts back here once
+  // saved, since window.close() doesn't apply to something embedded on this page.
+  useEffect(() => {
+    function handleMessage(e) {
+      if (e.origin !== window.location.origin) return
+      if (e.data === 'verticals-order-saved') {
+        setEditIframeUrl(null)
+        reloadSubmissions()
+      }
+    }
+    window.addEventListener('message', handleMessage)
+    return () => window.removeEventListener('message', handleMessage)
+  }, [id])
+
   if (loading) return <div className="page">Loading records...</div>
   if (error) return <div className="page" style={{ color: 'red' }}>{error}</div>
 
@@ -99,11 +153,13 @@ function Records() {
   })
 
   visible = visible.filter(sub => {
-    if (searchText.trim() === '') return true
+    const search = searchText.trim().toLowerCase()
+    if (search === '') return true
+    if (sub.order_number && `#${sub.order_number}`.includes(search.replace('#', ''))) return true
     return form.fields.some(field => {
       const val = sub.data[field.id]
       if (field.type === 'cart') return false
-      return val && val.toString().toLowerCase().includes(searchText.toLowerCase())
+      return val && val.toString().toLowerCase().includes(search)
     })
   })
 
@@ -122,6 +178,68 @@ function Records() {
   const pageRows = visible.slice(startIndex, startIndex + PAGE_SIZE)
 
   const visibleFields = form.fields.filter(f => f.type !== 'section' && !hiddenFieldIds.includes(f.id))
+  // POS/restaurant order forms keep the table lean - Last Update, IP, and
+  // Submission ID are debugging-grade columns nobody's checking out orders needs.
+  const cartField = form.fields.find(f => f.type === 'cart')
+  const hasCartField = !!cartField
+
+  // Order stats reflect whatever's currently filtered/searched (e.g. "Today"),
+  // not the whole history, so the tiles stay meaningful as filters change.
+  let revenue = 0, deliveryFeesTotal = 0
+  if (hasCartField) {
+    visible.forEach(sub => {
+      const cartData = sub.data[cartField.id] || {}
+      revenue += Number(cartData.total || 0) + Number(cartData.deliveryFee || 0)
+      deliveryFeesTotal += Number(cartData.deliveryFee || 0)
+    })
+  }
+  const orderCount = visible.length
+  const avgOrder = orderCount > 0 ? revenue / orderCount : 0
+
+  const dateHeaderCell = (
+    <th
+      onMouseEnter={() => setHoveredHeaderId('__submitted')}
+      onMouseLeave={() => setHoveredHeaderId(null)}
+      style={{
+        textAlign: 'left', borderBottom: '2px solid #e5e7eb', padding: '0.75rem 0.9rem',
+        position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap',
+        background: hoveredHeaderId === '__submitted' ? '#eef6ff' : '#fafafa',
+        transition: 'background 0.1s ease'
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+        <span title="date">
+          <CubeIcon color={hoveredHeaderId === '__submitted' ? 'var(--color-primary)' : '#94a3b8'} />
+        </span>
+        <span>Date</span>
+      </div>
+    </th>
+  )
+
+  function dateCell(sub) {
+    return (
+      <td style={{ borderBottom: '1px solid #eee', padding: '0.75rem 0.9rem', color: '#666', whiteSpace: 'nowrap' }}>
+        {new Date(sub.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+      </td>
+    )
+  }
+
+  const orderIdHeaderCell = (
+    <th style={{
+      textAlign: 'left', borderBottom: '2px solid #e5e7eb', padding: '0.75rem 0.9rem',
+      position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap', background: '#fafafa'
+    }}>
+      Order ID
+    </th>
+  )
+
+  function orderIdCell(sub) {
+    return (
+      <td style={{ borderBottom: '1px solid #eee', padding: '0.75rem 0.9rem', color: '#666', whiteSpace: 'nowrap' }}>
+        {sub.order_number ? `Order #${sub.order_number}` : '-'}
+      </td>
+    )
+  }
   const presets = form.settings?.recordPresets || []
   const activeFilterCount = Object.keys(filters).length
   const hasActiveFilters = activeFilterCount > 0 || searchText.trim() !== '' || dateRange !== 'all'
@@ -416,8 +534,14 @@ function Records() {
   }
 
   return (
-    <div className="page">
+    <div className="page" style={{ paddingLeft: '2.5rem' }}>
       <style>{`
+        @keyframes fadeInOut {
+          0% { opacity: 0; transform: translateY(4px); }
+          15% { opacity: 1; transform: translateY(0); }
+          85% { opacity: 1; }
+          100% { opacity: 0; }
+        }
         .records-search { flex: 1 1 auto; min-width: 0; max-width: 400px; }
         @media (max-width: 640px) {
           .records-search { max-width: none; }
@@ -466,16 +590,111 @@ function Records() {
           }
         }
       `}</style>
-      <h1>{form.name}</h1>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem' }}>
-        <input
-          type="text"
-          className="records-search"
-          placeholder="Search all records..."
-          value={searchText}
-          onChange={(e) => { setSearchText(e.target.value); setCurrentPage(1) }}
-          style={{ padding: '0.5rem' }}
-        />
+      {isFocusMode && <PosSidePanel formId={form.id} hasCartField={hasCartField} />}
+      <h1 style={{ margin: 0 }}>{form.name}</h1>
+
+      {hasCartField && (
+        <div style={{ position: 'relative', margin: '1rem 0' }}>
+          {showRevealHint && (
+            <div style={{
+              position: 'absolute', top: '-1.9rem', left: 0, fontSize: '0.78rem', color: 'var(--color-primary)',
+              background: 'var(--color-primary-soft)', border: '1px solid var(--color-primary)', borderRadius: '999px',
+              padding: '0.25rem 0.75rem', animation: 'fadeInOut 5s ease forwards', pointerEvents: 'none',
+              display: 'flex', alignItems: 'center', gap: '0.35rem'
+            }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" />
+              </svg>
+              Click to reveal
+            </div>
+          )}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.7rem' }}>
+            {[
+              { label: 'Revenue', value: `₦${revenue.toLocaleString()}` },
+              { label: 'Orders', value: orderCount.toLocaleString() },
+              { label: 'Avg Order', value: `₦${avgOrder.toLocaleString(undefined, { maximumFractionDigits: 2 })}` },
+              { label: 'Delivery Fees', value: `₦${deliveryFeesTotal.toLocaleString()}` },
+            ].map(tile => (
+              <div
+                key={tile.label}
+                className="card"
+                onClick={toggleTilesRevealed}
+                style={{ padding: '0.9rem 1rem', background: 'var(--color-primary-soft)', cursor: 'pointer', userSelect: 'none' }}
+                title={tilesRevealed ? '' : 'Click to reveal'}
+              >
+                <div style={{ fontSize: '0.75rem', color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '0.3rem' }}>
+                  {tile.label}
+                </div>
+                <div style={{
+                  fontSize: '1.25rem', fontWeight: 700,
+                  filter: tilesRevealed ? 'none' : 'blur(6px)', transition: 'filter 0.15s'
+                }}>
+                  {tilesRevealed ? tile.value : '₦••••'}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem', marginTop: '0.8rem' }}>
+        {searchOpen ? (
+          <input
+            type="text"
+            autoFocus
+            className="records-search"
+            placeholder="Search all records..."
+            value={searchText}
+            onChange={(e) => { setSearchText(e.target.value); setCurrentPage(1) }}
+            onBlur={() => { if (!searchText.trim()) setSearchOpen(false) }}
+            style={{ padding: '0.5rem' }}
+          />
+        ) : (
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => setSearchOpen(true)}
+            aria-label="Search"
+            title="Search"
+            style={{ padding: '0.5rem 0.65rem', display: 'flex', alignItems: 'center' }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <circle cx="11" cy="11" r="7" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+          </button>
+        )}
+
+        <div className="date-range-row">
+          <select
+            value={dateRange}
+            onChange={(e) => { setDateRange(e.target.value); setCurrentPage(1) }}
+            style={{ padding: '0.5rem' }}
+          >
+            {DATE_RANGE_OPTIONS.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+
+          {dateRange === 'custom' && (
+            <div className="date-range-group">
+              <input
+                type="date"
+                value={customStart}
+                onChange={(e) => { setCustomStart(e.target.value); setCurrentPage(1) }}
+                style={{ padding: '0.5rem' }}
+              />
+              <span style={{ color: 'var(--color-muted)', fontSize: '0.9rem', flexShrink: 0 }}>to</span>
+              <input
+                type="date"
+                value={customEnd}
+                onChange={(e) => { setCustomEnd(e.target.value); setCurrentPage(1) }}
+                style={{ padding: '0.5rem' }}
+              />
+            </div>
+          )}
+        </div>
 
         <div style={{ position: 'relative', flexShrink: 0 }}>
           <button className="secondary" onClick={() => setActiveMenu(activeMenu === 'options' ? null : 'options')}>
@@ -485,20 +704,24 @@ function Records() {
             <>
               <div style={overlayStyle} onClick={() => setActiveMenu(null)} />
               <div className="dropdown-panel" style={{ ...dropdownStyle, minWidth: '220px' }} onClick={(e) => e.stopPropagation()}>
-                <DropdownItem onClick={() => { handleDownloadFillTemplate(); setActiveMenu(null) }}>
-                  Download Fill-In Template (.xlsx)
-                </DropdownItem>
-                <label
-                  className="secondary"
-                  style={{
-                    display: 'block', width: '100%', textAlign: 'left', border: 'none',
-                    padding: '0.45rem 0.3rem', fontSize: '0.85rem', background: 'transparent', cursor: 'pointer'
-                  }}
-                >
-                  Upload Filled Sheet (.xlsx)
-                  <input type="file" accept=".xlsx,.xls" onChange={(e) => { handleUploadFilledSheet(e); setActiveMenu(null) }} style={{ display: 'none' }} />
-                </label>
-                <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.7rem 0 0.5rem' }} />
+                {!hasCartField && (
+                  <>
+                    <DropdownItem onClick={() => { handleDownloadFillTemplate(); setActiveMenu(null) }}>
+                      Download Fill-In Template (.xlsx)
+                    </DropdownItem>
+                    <label
+                      className="secondary"
+                      style={{
+                        display: 'block', width: '100%', textAlign: 'left', border: 'none',
+                        padding: '0.45rem 0.3rem', fontSize: '0.85rem', background: 'transparent', cursor: 'pointer'
+                      }}
+                    >
+                      Upload Filled Sheet (.xlsx)
+                      <input type="file" accept=".xlsx,.xls" onChange={(e) => { handleUploadFilledSheet(e); setActiveMenu(null) }} style={{ display: 'none' }} />
+                    </label>
+                    <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.7rem 0 0.5rem' }} />
+                  </>
+                )}
 
                 {visible.length > 0 && (
                   <>
@@ -518,19 +741,41 @@ function Records() {
                   </>
                 )}
 
-                <div style={{ fontWeight: 600, fontSize: '0.75rem', color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '0.4rem' }}>
-                  Columns
+                <div
+                  onClick={() => setColumnsExpanded(e => !e)}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer',
+                    fontWeight: 600, fontSize: '0.75rem', color: 'var(--color-muted)',
+                    textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '0.4rem'
+                  }}
+                >
+                  <span>Columns</span>
+                  <span style={{ transform: columnsExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>▾</span>
                 </div>
-                {form.fields.filter(f => f.type !== 'section').map(field => (
-                  <label key={field.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.3rem 0', fontSize: '0.85rem', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={!hiddenFieldIds.includes(field.id)}
-                      onChange={() => toggleColumnVisibility(field.id)}
-                    />
-                    {field.label}
-                  </label>
-                ))}
+                {columnsExpanded && (
+                  <>
+                    {form.fields.filter(f => f.type !== 'section').map(field => (
+                      <label key={field.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.3rem 0', fontSize: '0.85rem', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={!hiddenFieldIds.includes(field.id)}
+                          onChange={() => toggleColumnVisibility(field.id)}
+                        />
+                        {field.label}
+                      </label>
+                    ))}
+                    {META_COLUMNS.map(col => (
+                      <label key={col.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.3rem 0', fontSize: '0.85rem', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={!hiddenFieldIds.includes(col.id)}
+                          onChange={() => toggleColumnVisibility(col.id)}
+                        />
+                        {col.label}
+                      </label>
+                    ))}
+                  </>
+                )}
 
                 <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.7rem 0 0.5rem' }} />
 
@@ -595,36 +840,6 @@ function Records() {
         </div>
       )}
 
-      <div className="date-range-row" style={{ marginTop: '0.6rem', marginBottom: '0.8rem' }}>
-        <select
-          value={dateRange}
-          onChange={(e) => { setDateRange(e.target.value); setCurrentPage(1) }}
-          style={{ padding: '0.5rem' }}
-        >
-          {DATE_RANGE_OPTIONS.map(opt => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
-
-        {dateRange === 'custom' && (
-          <div className="date-range-group">
-            <input
-              type="date"
-              value={customStart}
-              onChange={(e) => { setCustomStart(e.target.value); setCurrentPage(1) }}
-              style={{ padding: '0.5rem' }}
-            />
-            <span style={{ color: 'var(--color-muted)', fontSize: '0.9rem', flexShrink: 0 }}>to</span>
-            <input
-              type="date"
-              value={customEnd}
-              onChange={(e) => { setCustomEnd(e.target.value); setCurrentPage(1) }}
-              style={{ padding: '0.5rem' }}
-            />
-          </div>
-        )}
-      </div>
-
       {submissions.length === 0 ? (
         <div className="card" style={{ marginTop: '1.4rem', padding: '1.8rem', textAlign: 'center', color: 'var(--color-muted)' }}>
           <h3 style={{ marginTop: 0, marginBottom: '0.45rem' }}>No records yet</h3>
@@ -656,17 +871,14 @@ function Records() {
                       onChange={toggleSelectAllOnPage}
                     />
                   </th>
-                  <th style={{
-                    textAlign: 'left', borderBottom: '2px solid #e5e7eb', padding: '0.75rem 0.9rem',
-                    position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap', background: '#fafafa'
-                  }}>
-                    Order ID
-                  </th>
+                  {hasCartField && dateHeaderCell}
+                  {hasCartField && !hiddenFieldIds.includes('__orderId') && orderIdHeaderCell}
+                  {!hasCartField && !hiddenFieldIds.includes('__orderId') && orderIdHeaderCell}
                   {visibleFields.map(field => {
                     const isHovered = hoveredHeaderId === field.id
                     return (
+                    <Fragment key={field.id}>
                     <th
-                      key={field.id}
                       onMouseEnter={() => setHoveredHeaderId(field.id)}
                       onMouseLeave={() => setHoveredHeaderId(null)}
                       style={{
@@ -684,7 +896,7 @@ function Records() {
                           </span>
 
                           <span style={{ whiteSpace: 'nowrap' }}>
-                            {field.label}
+                            {field.type === 'cart' ? 'Items' : field.label}
                           </span>
                         </div>
 
@@ -713,48 +925,61 @@ function Records() {
                         />
                       )}
                     </th>
+                    {field.type === 'cart' && hasCartField && (
+                      <>
+                        <th style={{
+                          textAlign: 'left', borderBottom: '2px solid #e5e7eb', padding: '0.75rem 0.9rem',
+                          position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap', background: '#fafafa'
+                        }}>
+                          Grand Total
+                        </th>
+                        <th style={{
+                          textAlign: 'left', borderBottom: '2px solid #e5e7eb', padding: '0.75rem 0.9rem',
+                          position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap', background: '#fafafa'
+                        }}>
+                          Total
+                        </th>
+                        <th style={{
+                          textAlign: 'left', borderBottom: '2px solid #e5e7eb', padding: '0.75rem 0.9rem',
+                          position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap', background: '#fafafa'
+                        }}>
+                          Delivery
+                        </th>
+                      </>
+                    )}
+                    </Fragment>
                     )
                   })}
-                  <th
-                    onMouseEnter={() => setHoveredHeaderId('__submitted')}
-                    onMouseLeave={() => setHoveredHeaderId(null)}
-                    style={{
+                  {!hasCartField && dateHeaderCell}
+                  {!hiddenFieldIds.includes('__lastUpdate') && (
+                    <th style={{
                       textAlign: 'left', borderBottom: '2px solid #e5e7eb', padding: '0.75rem 0.9rem',
-                      position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap',
-                      background: hoveredHeaderId === '__submitted' ? '#eef6ff' : '#fafafa',
-                      transition: 'background 0.1s ease'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <span title="date">
-                        <CubeIcon color={hoveredHeaderId === '__submitted' ? 'var(--color-primary)' : '#94a3b8'} />
-                      </span>
-                      <span>Submission Date</span>
-                    </div>
-                  </th>
+                      position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap', background: '#fafafa'
+                    }}>
+                      Last Update Date
+                    </th>
+                  )}
+                  {!hiddenFieldIds.includes('__ip') && (
+                    <th style={{
+                      textAlign: 'left', borderBottom: '2px solid #e5e7eb', padding: '0.75rem 0.9rem',
+                      position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap', background: '#fafafa'
+                    }}>
+                      IP
+                    </th>
+                  )}
+                  {!hiddenFieldIds.includes('__submissionId') && (
+                    <th style={{
+                      textAlign: 'left', borderBottom: '2px solid #e5e7eb', padding: '0.75rem 0.9rem',
+                      position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap', background: '#fafafa'
+                    }}>
+                      Submission ID
+                    </th>
+                  )}
                   <th style={{
                     textAlign: 'left', borderBottom: '2px solid #e5e7eb', padding: '0.75rem 0.9rem',
                     position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap', background: '#fafafa'
                   }}>
-                    Last Update Date
-                  </th>
-                  <th style={{
-                    textAlign: 'left', borderBottom: '2px solid #e5e7eb', padding: '0.75rem 0.9rem',
-                    position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap', background: '#fafafa'
-                  }}>
-                    IP
-                  </th>
-                  <th style={{
-                    textAlign: 'left', borderBottom: '2px solid #e5e7eb', padding: '0.75rem 0.9rem',
-                    position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap', background: '#fafafa'
-                  }}>
-                    Submission ID
-                  </th>
-                  <th style={{
-                    textAlign: 'left', borderBottom: '2px solid #e5e7eb', padding: '0.75rem 0.9rem',
-                    position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap', background: '#fafafa'
-                  }}>
-                    Edit Link
+                    Edit
                   </th>
                 </tr>
               </thead>
@@ -775,14 +1000,16 @@ function Records() {
                         onChange={() => toggleSelectRow(sub.id)}
                       />
                     </td>
-                    <td style={{ borderBottom: '1px solid #eee', padding: '0.75rem 0.9rem', color: '#666', whiteSpace: 'nowrap' }}>
-                      {sub.order_number ? `ORD-${String(sub.order_number).padStart(6, '0')}` : '-'}
-                    </td>
+                    {hasCartField && dateCell(sub)}
+                    {hasCartField && !hiddenFieldIds.includes('__orderId') && orderIdCell(sub)}
+                    {!hasCartField && !hiddenFieldIds.includes('__orderId') && orderIdCell(sub)}
                     {visibleFields.map(field => (
-                      <td key={field.id} style={{
+                      <Fragment key={field.id}>
+                      <td style={{
                         borderBottom: '1px solid #eee', padding: '0.75rem 0.9rem',
                         textAlign: field.type === 'number' ? 'right' : 'left',
-                        whiteSpace: field.type === 'cart' ? 'nowrap' : 'normal',
+                        whiteSpace: 'normal',
+                        maxWidth: field.type === 'cart' ? '300px' : undefined,
                         verticalAlign: 'top'
                       }}>
                         {field.type === 'cart' ? (
@@ -791,44 +1018,63 @@ function Records() {
                             cellKey={`${sub.id}-${field.id}`}
                             openCartCellKey={openCartCellKey}
                             setOpenCartCellKey={setOpenCartCellKey}
+                            form={form}
+                            submission={sub}
                           />
                         ) : (
                           formatCell(sub.data[field.id], field)
                         )}
                       </td>
+                      {field.type === 'cart' && hasCartField && (
+                        <>
+                          <td style={{ borderBottom: '1px solid #eee', padding: '0.75rem 0.9rem', color: 'var(--color-primary)', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                            ₦{(Number(sub.data[field.id]?.total || 0) + Number(sub.data[field.id]?.deliveryFee || 0)).toLocaleString()}
+                          </td>
+                          <td style={{ borderBottom: '1px solid #eee', padding: '0.75rem 0.9rem', color: '#666', whiteSpace: 'nowrap' }}>
+                            ₦{Number(sub.data[field.id]?.total || 0).toLocaleString()}
+                          </td>
+                          <td style={{ borderBottom: '1px solid #eee', padding: '0.75rem 0.9rem', color: '#666', whiteSpace: 'nowrap' }}>
+                            ₦{Number(sub.data[field.id]?.deliveryFee || 0).toLocaleString()}
+                          </td>
+                        </>
+                      )}
+                      </Fragment>
                     ))}
-                    <td style={{ borderBottom: '1px solid #eee', padding: '0.75rem 0.9rem', color: '#666', whiteSpace: 'nowrap' }}>
-                      {new Date(sub.created_at).toLocaleDateString('en-GB', {
-                        day: '2-digit', month: 'short', year: 'numeric'
-                      })}
-                    </td>
-                    <td style={{ borderBottom: '1px solid #eee', padding: '0.75rem 0.9rem', color: '#666', whiteSpace: 'nowrap' }}>
-                      {sub.updated_at ? new Date(sub.updated_at).toLocaleDateString('en-GB', {
-                        day: '2-digit', month: 'short', year: 'numeric'
-                      }) : '-'}
-                    </td>
-                    <td style={{ borderBottom: '1px solid #eee', padding: '0.75rem 0.9rem', color: '#666', whiteSpace: 'nowrap' }}>
-                      {sub.ip_address || '-'}
-                    </td>
-                    <td style={{ borderBottom: '1px solid #eee', padding: '0.75rem 0.9rem', color: '#666', whiteSpace: 'nowrap', fontFamily: 'monospace', fontSize: '0.8rem' }}>
-                      {sub.id.slice(0, 8)}
-                    </td>
+                    {!hasCartField && dateCell(sub)}
+                    {!hiddenFieldIds.includes('__lastUpdate') && (
+                      <td style={{ borderBottom: '1px solid #eee', padding: '0.75rem 0.9rem', color: '#666', whiteSpace: 'nowrap' }}>
+                        {sub.updated_at ? new Date(sub.updated_at).toLocaleDateString('en-GB', {
+                          day: '2-digit', month: 'short', year: 'numeric'
+                        }) : '-'}
+                      </td>
+                    )}
+                    {!hiddenFieldIds.includes('__ip') && (
+                      <td style={{ borderBottom: '1px solid #eee', padding: '0.75rem 0.9rem', color: '#666', whiteSpace: 'nowrap' }}>
+                        {sub.ip_address || '-'}
+                      </td>
+                    )}
+                    {!hiddenFieldIds.includes('__submissionId') && (
+                      <td style={{ borderBottom: '1px solid #eee', padding: '0.75rem 0.9rem', color: '#666', whiteSpace: 'nowrap', fontFamily: 'monospace', fontSize: '0.8rem' }}>
+                        {sub.id.slice(0, 8)}
+                      </td>
+                    )}
                     <td
                       style={{ borderBottom: '1px solid #eee', padding: '0.75rem 0.9rem', whiteSpace: 'nowrap' }}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      {sub.edit_token ? (
-                        <button
-                          className="secondary"
-                          style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem' }}
-                          onClick={() => {
-                            navigator.clipboard.writeText(`${window.location.origin}/form/${form.id}/response/${sub.edit_token}`)
-                            showToast('Edit link copied!', 'success')
-                          }}
-                        >
-                          Copy Link
-                        </button>
-                      ) : '-'}
+                      <span
+                        onClick={() => {
+                          if (hasCartField && sub.edit_token) {
+                            setEditIframeUrl(`/form/${form.id}/response/${sub.edit_token}`)
+                          } else {
+                            setSelectedRecord(sub)
+                            setOpenRecordEditing(true)
+                          }
+                        }}
+                        style={{ fontSize: '0.85rem', color: 'var(--color-primary)', fontWeight: 600, cursor: 'pointer' }}
+                      >
+                        Edit
+                      </span>
                     </td>
                   </tr>
                 ))}
@@ -856,9 +1102,43 @@ function Records() {
           form={form}
           record={selectedRecord}
           fields={form.fields.filter(f => f.type !== 'section')}
-          onClose={() => setSelectedRecord(null)}
+          onClose={() => { setSelectedRecord(null); setOpenRecordEditing(false) }}
           onUpdated={handleRecordUpdated}
+          initialEditing={openRecordEditing}
+          hideEdit={hasCartField && !openRecordEditing}
         />
+      )}
+
+      {editIframeUrl && (
+        <div
+          onClick={() => setEditIframeUrl(null)}
+          style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: '1.5rem'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'white', borderRadius: '10px', width: '900px', maxWidth: '100%',
+              height: '85vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+              boxShadow: '0 18px 45px rgba(0,0,0,0.25)'
+            }}
+          >
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '0.7rem 1rem', borderBottom: '1px solid var(--color-border)'
+            }}>
+              <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Correct Order</span>
+              <button className="secondary" onClick={() => setEditIframeUrl(null)}>Close</button>
+            </div>
+            <iframe
+              src={editIframeUrl}
+              title="Correct Order"
+              style={{ flex: 1, border: 'none', width: '100%' }}
+            />
+          </div>
+        </div>
       )}
 
       {showSaveDialog && (

@@ -5,93 +5,58 @@ import { useAuth } from './AuthContext'
 import { useToast } from './Toast'
 import { TEMPLATE_ADMIN_USER_ID } from './adminAccount'
 import TemplateEditorDialog from './TemplateEditorDialog'
-
-const ROW_HEIGHT = 64
-
-// Stable per-category color so the square reads as more than a label,
-// consistent across sessions since it's keyed by name, not insertion order.
-const CATEGORY_COLORS = {
-  'Retail': '#0ea5e9', 'Restaurant': '#f97316', 'Education': '#8b5cf6',
-  'Healthcare': '#ef4444', 'Nonprofit': '#16a34a', 'Events': '#d946ef',
-  'HR & Operations': '#0070f3', 'Other': '#6b7280',
-}
-function categoryColor(category) {
-  return CATEGORY_COLORS[category] || '#6b7280'
-}
+import { categoryColor, CategoryIcon } from './templateVisuals'
+import { createLocationForm, locationDestination } from './locations'
 
 function TemplatesSkeleton() {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-      {[0, 1, 2, 3, 4].map(i => (
-        <div key={i} className="card" style={{ height: ROW_HEIGHT }} />
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.8rem' }}>
+      {[0, 1, 2, 3, 4, 5].map(i => (
+        <div key={i} className="card" style={{ aspectRatio: '1' }} />
       ))}
     </div>
   )
 }
 
-// Square (name) + rectangle (details + actions) pair, same height, kept
-// small enough that ~10 fit on screen without scrolling; this page is
-// meant to be scanned quickly, not browsed like a gallery of big cards.
-function TemplateRow({ template, started, starting, isAdmin, onStart, onAccess, onManage, onDelete }) {
-  const detail = template.description
-    || (template.bundle?.length > 0 ? `${template.bundle.length} linked forms` : `${template.fields?.length || 0} field${template.fields?.length !== 1 ? 's' : ''}`)
+// One simple square tile per template: icon, name, one action. Started
+// templates show "Manage" (back into that instance, side panel already
+// open); not-yet-started ones show "Add". Kept deliberately plain so a
+// whole gallery of these reads as a clean grid, not a wall of copy.
+function TemplateTile({ template, started, starting, onAdd, onManage }) {
   const color = categoryColor(template.category)
 
   return (
-    <div className="template-row" style={{ display: 'flex', gap: '0.5rem', height: ROW_HEIGHT }}>
-      <div
-        className="template-row-tile template-row-square"
-        style={{
-          width: ROW_HEIGHT, height: ROW_HEIGHT, flexShrink: 0,
-          borderRadius: '8px', borderLeft: `3px solid ${color}`,
-          background: `${color}14`,
-          padding: '0.3rem 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          textAlign: 'center', overflow: 'hidden'
-        }}
-      >
-        <span style={{
-          fontSize: '0.68rem', fontWeight: 700, lineHeight: 1.25, color: 'var(--color-text)',
-          display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden'
-        }}>
-          {template.name}
-        </span>
+    <div
+      className="template-tile"
+      style={{
+        position: 'relative', aspectRatio: '1', border: '1px solid var(--color-border)', borderRadius: '12px',
+        background: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center',
+        justifyContent: 'center', gap: '0.5rem', padding: '0.9rem', textAlign: 'center'
+      }}
+    >
+      <div style={{
+        width: '44px', height: '44px', borderRadius: '10px', background: `${color}16`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center'
+      }}>
+        <CategoryIcon category={template.category} color={color} />
       </div>
 
-      <div
-        className="template-row-tile template-row-rect"
-        style={{
-          flex: 1, height: ROW_HEIGHT, minWidth: 0,
-          border: '1px solid var(--color-border)', borderRadius: '8px',
-          padding: '0.4rem 0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6rem'
-        }}
-      >
-        <div className="template-row-detail" style={{ minWidth: 0, flex: 1, display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
-          <span style={{
-            fontSize: '0.68rem', fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '0.03em', flexShrink: 0
-          }}>
-            {template.category}
-          </span>
-          <span style={{ fontSize: '0.8rem', color: 'var(--color-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {detail}
-          </span>
-        </div>
+      <span style={{
+        fontSize: '0.8rem', fontWeight: 600, lineHeight: 1.25,
+        display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+      }}>
+        {template.name}
+      </span>
 
-        <div className="template-row-actions" style={{ display: 'flex', gap: '0.35rem', flexShrink: 0, alignItems: 'center' }}>
-          {isAdmin && (
-            <>
-              <button className="secondary" style={{ fontSize: '0.72rem', padding: '0.25rem 0.55rem' }} onClick={onManage}>Manage</button>
-              <button className="secondary" style={{ fontSize: '0.72rem', padding: '0.25rem 0.55rem', color: '#c0392b' }} onClick={onDelete}>Delete</button>
-            </>
-          )}
-          {started ? (
-            <button className="secondary" style={{ fontSize: '0.8rem', padding: '0.3rem 0.75rem', whiteSpace: 'nowrap' }} onClick={onAccess}>Access</button>
-          ) : (
-            <button style={{ fontSize: '0.8rem', padding: '0.3rem 0.75rem', whiteSpace: 'nowrap' }} disabled={starting} onClick={onStart}>
-              {starting ? '…' : 'Start'}
-            </button>
-          )}
-        </div>
-      </div>
+      {started ? (
+        <button className="secondary" style={{ fontSize: '0.78rem', padding: '0.3rem 0.8rem', width: '100%' }} onClick={onManage}>
+          Manage
+        </button>
+      ) : (
+        <button style={{ fontSize: '0.78rem', padding: '0.3rem 0.8rem', width: '100%' }} disabled={starting} onClick={onAdd}>
+          {starting ? '…' : 'Add'}
+        </button>
+      )}
     </div>
   )
 }
@@ -107,8 +72,10 @@ function Templates() {
   const [searchText, setSearchText] = useState('')
   const [startingSlug, setStartingSlug] = useState(null)
   const [myFormsBySlug, setMyFormsBySlug] = useState({}) // { [templateSlug]: primaryFormId }, most recent instance
-  const [editingTemplate, setEditingTemplate] = useState(null) // null = closed, {} = new, template object = editing
-  const [pendingDeleteId, setPendingDeleteId] = useState(null)
+  const [editingTemplate, setEditingTemplate] = useState(null) // null = closed, {} = new (template edits/deletes happen elsewhere in admin)
+  const [locationModalTemplate, setLocationModalTemplate] = useState(null) // template awaiting a location name for its first location
+  const [locationNameInput, setLocationNameInput] = useState('')
+  const [creatingLocation, setCreatingLocation] = useState(false)
   const [allForms, setAllForms] = useState([]) // admin-only: for TemplateEditorDialog's "link to" choices
   const [galleryExpanded, setGalleryExpanded] = useState(true)
 
@@ -155,18 +122,6 @@ function Templates() {
       .order('name', { ascending: true })
       .then(({ data }) => setAllForms(data || []))
   }, [session, isAdmin])
-
-  async function confirmDeleteTemplate() {
-    const id = pendingDeleteId
-    setPendingDeleteId(null)
-    const { error } = await supabase.from('templates').delete().eq('id', id)
-    if (error) {
-      showToast('Could not delete template: ' + error.message, 'error')
-      return
-    }
-    setTemplates(current => current.filter(t => t.id !== id))
-    showToast('Template deleted.', 'success')
-  }
 
   const categories = useMemo(() => {
     const set = new Set(templates.map(t => t.category))
@@ -234,6 +189,10 @@ function Templates() {
     return createdByKey
   }
 
+  // Bundle templates (multi-form, e.g. Employees + Salary Events) keep the
+  // old single-instance behavior - locations are a per-form concept, and a
+  // bundle is already several linked forms, so layering locations on top
+  // of that is its own project, not folded in here.
   async function startTemplate(template) {
     setStartingSlug(template.slug)
     try {
@@ -245,60 +204,61 @@ function Templates() {
         // the primary entry) have a purpose-built Dashboard, more useful
         // as a landing page than the empty form builder.
         const destination = template.bundle[0].settings?.payrollRole === 'employees'
-          ? `/form/${primaryFormId}/payroll`
-          : `/form/${primaryFormId}/edit`
+          ? `/form/${primaryFormId}/payroll?panel=1`
+          : `/form/${primaryFormId}/edit?panel=1`
         setMyFormsBySlug(current => ({ ...current, [template.slug]: primaryFormId }))
         navigate(destination)
         return
       }
 
-      const { data, error } = await supabase.from('forms').insert([{
-        name: template.name,
-        fields: template.fields,
-        status: 'draft',
-        user_id: session.user.id,
-        settings: { templateSlug: template.slug },
-      }]).select().single()
-
-      if (error || !data) throw new Error(error?.message || 'unknown error')
-      showToast(`"${template.name}" created, customize it now.`, 'success')
-      setMyFormsBySlug(current => ({ ...current, [template.slug]: data.id }))
-      navigate(`/form/${data.id}/edit`)
-    } catch (err) {
-      showToast('Could not start this template: ' + err.message, 'error')
+      // Single-form templates: this is really "add the first location" -
+      // TemplateLocations.jsx's own addLocation() handles every location
+      // after this one the same way.
+      setLocationNameInput(template.name)
+      setLocationModalTemplate(template)
     } finally {
       setStartingSlug(null)
     }
   }
 
-  function accessTemplate(template) {
-    const formId = myFormsBySlug[template.slug]
-    if (!formId) return
-    const destination = template.bundle?.[0]?.settings?.payrollRole === 'employees'
-      ? `/form/${formId}/payroll`
-      : `/form/${formId}/records`
-    navigate(destination)
+  async function confirmCreateFirstLocation(e) {
+    e.preventDefault()
+    if (!locationNameInput.trim()) return
+    setCreatingLocation(true)
+    try {
+      const form = await createLocationForm({ session, template: locationModalTemplate, locationName: locationNameInput })
+      showToast(`"${form.name}" created, customize it now.`, 'success')
+      setMyFormsBySlug(current => ({ ...current, [locationModalTemplate.slug]: form.id }))
+      const destination = locationDestination(locationModalTemplate, form.id)
+      setLocationModalTemplate(null)
+      navigate(destination)
+    } catch (err) {
+      showToast('Could not create this location: ' + err.message, 'error')
+    } finally {
+      setCreatingLocation(false)
+    }
+  }
+
+  function manageTemplate(template) {
+    if (template.bundle?.length > 0) {
+      const formId = myFormsBySlug[template.slug]
+      if (!formId) return
+      const destination = template.bundle[0]?.settings?.payrollRole === 'employees'
+        ? `/form/${formId}/payroll?panel=1`
+        : `/form/${formId}/edit?panel=1`
+      navigate(destination)
+      return
+    }
+    navigate(`/templates/${template.slug}/locations`)
   }
 
   return (
     <div className="page" style={{ maxWidth: '860px' }}>
       <style>{`
-        .template-row-tile { transition: border-color 0.12s ease, box-shadow 0.12s ease; }
-        .template-row:hover .template-row-tile { border-color: var(--color-primary); }
-        .template-row:hover .template-row-tile:first-child { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-
-        /* Below ~480px there isn't room for name + category + detail +
-           every action button on one 64px-tall line, let the action
-           buttons wrap onto their own line instead of overflowing or
-           forcing the whole row to shrink illegibly. The square (name)
-           stays put so the template is still identifiable at a glance. */
-        @media (max-width: 480px) {
-          .template-row { flex-wrap: wrap; height: auto; }
-          .template-row-rect { height: auto !important; flex-wrap: wrap; row-gap: 0.4rem; padding: 0.5rem 0.7rem !important; }
-          .template-row-actions { flex: 1 1 100%; justify-content: flex-start; flex-wrap: wrap; }
-        }
+        .template-tile { transition: border-color 0.12s ease, box-shadow 0.12s ease; }
+        .template-tile:hover { border-color: var(--color-primary); box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
       `}</style>
-      <div className="card" style={{ padding: '1.4rem 1.5rem', marginBottom: '1.2rem', background: 'linear-gradient(135deg, #f9fbff 0%, #f3f7ff 100%)' }}>
+      <div className="card" style={{ padding: '1.4rem 1.5rem', marginBottom: '1.2rem', background: 'linear-gradient(135deg, var(--color-surface) 0%, var(--color-primary-soft) 100%)' }}>
         <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
           Templates
         </div>
@@ -313,13 +273,13 @@ function Templates() {
           <h3 style={{ margin: '0 0 0.7rem', fontSize: '0.85rem', color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
             Templates in Use
           </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.8rem' }}>
             {inUseTemplates.map(template => (
-              <TemplateRow
+              <TemplateTile
                 key={template.id}
                 template={template}
                 started
-                onAccess={() => accessTemplate(template)}
+                onManage={() => manageTemplate(template)}
               />
             ))}
           </div>
@@ -385,18 +345,15 @@ function Templates() {
           )}
 
           {!loading && visible.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.8rem' }}>
               {visible.map((template) => (
-                <TemplateRow
+                <TemplateTile
                   key={template.id}
                   template={template}
                   started={!!myFormsBySlug[template.slug]}
                   starting={startingSlug === template.slug}
-                  isAdmin={isAdmin}
-                  onStart={() => startTemplate(template)}
-                  onAccess={() => accessTemplate(template)}
-                  onManage={() => setEditingTemplate(template)}
-                  onDelete={() => setPendingDeleteId(template.id)}
+                  onAdd={() => startTemplate(template)}
+                  onManage={() => manageTemplate(template)}
                 />
               ))}
             </div>
@@ -413,20 +370,27 @@ function Templates() {
         />
       )}
 
-      {pendingDeleteId && (
+      {locationModalTemplate && (
         <div
-          onClick={() => setPendingDeleteId(null)}
+          onClick={() => setLocationModalTemplate(null)}
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '1rem' }}
         >
           <div onClick={(e) => e.stopPropagation()} style={{ background: 'white', borderRadius: '8px', padding: '1.5rem', width: '380px', maxWidth: '100%' }}>
-            <h3 style={{ margin: '0 0 0.7rem' }}>Delete this template?</h3>
-            <p style={{ color: 'var(--color-muted)', fontSize: '0.9rem', margin: '0 0 1.3rem' }}>
-              This removes it from the Templates page for everyone. Forms already created from it are unaffected.
+            <h3 style={{ margin: '0 0 0.4rem' }}>Name this location</h3>
+            <p style={{ color: 'var(--color-muted)', fontSize: '0.85rem', margin: '0 0 1rem' }}>
+              "{locationModalTemplate.name}" for e.g. your first branch, shop, or site. You can add more locations later.
             </p>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem' }}>
-              <button className="secondary" onClick={() => setPendingDeleteId(null)}>Cancel</button>
-              <button style={{ background: '#c0392b' }} onClick={confirmDeleteTemplate}>Delete</button>
-            </div>
+            <form onSubmit={confirmCreateFirstLocation}>
+              <input
+                type="text" required autoFocus value={locationNameInput}
+                onChange={(e) => setLocationNameInput(e.target.value)}
+                style={{ width: '100%', padding: '0.5rem', marginBottom: '1rem' }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem' }}>
+                <button type="button" className="secondary" onClick={() => setLocationModalTemplate(null)}>Cancel</button>
+                <button type="submit" disabled={creatingLocation}>{creatingLocation ? 'Creating...' : 'Create'}</button>
+              </div>
+            </form>
           </div>
         </div>
       )}

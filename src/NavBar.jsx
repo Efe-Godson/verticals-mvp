@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
 import { useRecycleBinTrigger } from './RecycleBinContext'
+import { TEMPLATE_ADMIN_USER_ID } from './adminAccount'
 
 function NavBar() {
   const location = useLocation()
@@ -14,6 +15,7 @@ function NavBar() {
   const [linkedForms, setLinkedForms] = useState([]) // sibling forms in the same bundle, excluding self
   const { trigger: binTrigger } = useRecycleBinTrigger()
 
+  const isAdmin = session?.user?.id === TEMPLATE_ADMIN_USER_ID
   const displayName = session?.user?.user_metadata?.full_name || ''
   const initials = (displayName || session?.user?.email || '?').trim().slice(0, 1).toUpperCase()
 
@@ -67,9 +69,12 @@ function NavBar() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap', rowGap: '0.4rem' }}>
           <Link to="/" style={{ fontWeight: 'bold', fontSize: '1.05rem' }}>Verticals</Link>
-          <Link to="/" style={{ color: location.pathname === '/' ? 'var(--color-primary)' : 'var(--color-muted)', fontSize: '0.9rem' }}>Forms</Link>
+          <Link to="/" style={{ color: location.pathname === '/' ? 'var(--color-primary)' : 'var(--color-muted)', fontSize: '0.9rem' }}>Home</Link>
           <Link to="/reports" style={{ color: location.pathname === '/reports' ? 'var(--color-primary)' : 'var(--color-muted)', fontSize: '0.9rem' }}>Reports</Link>
           <Link to="/templates" style={{ color: location.pathname === '/templates' ? 'var(--color-primary)' : 'var(--color-muted)', fontSize: '0.9rem' }}>Templates</Link>
+          {isAdmin && (
+            <Link to="/lab" style={{ color: location.pathname === '/lab' ? 'var(--color-primary)' : 'var(--color-muted)', fontSize: '0.9rem' }}>Lab</Link>
+          )}
 
           {isFormContext && (
             <div className="navbar-links-desktop" style={{ display: 'flex', gap: '1rem', fontSize: '0.9rem' }}>

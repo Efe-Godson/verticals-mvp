@@ -120,7 +120,7 @@ function AIInsightCards({ formId, dateRangeLabel, submissionIds, hideExecutiveSu
       {hasAnalysis && (
         <>
           {!hideExecutiveSummary && (
-            <div className="card" style={{ padding: '1.1rem 1.2rem', marginBottom: '1rem', background: 'linear-gradient(135deg, #f8faff 0%, #f3f7ff 100%)' }}>
+            <div className="card" style={{ padding: '1.1rem 1.2rem', marginBottom: '1rem', background: 'linear-gradient(135deg, var(--color-surface) 0%, var(--color-primary-soft) 100%)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap' }}>
                 <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
                   Executive summary

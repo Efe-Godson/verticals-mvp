@@ -8,6 +8,7 @@ import { useToast } from './Toast'
 import StatTile from './report/components/StatTile'
 import PieChart from './report/components/PieChart'
 import HorizontalBarChart from './report/components/HorizontalBarChart'
+import { THEME_COLORS, saveThemeColor } from './theme'
 
 const STATUS_LABEL = { draft: 'Draft', published: 'Live', paused: 'Paused', archived: 'Archived' }
 
@@ -55,6 +56,19 @@ function AccountPage() {
   const [forms, setForms] = useState([])
   const [submissions, setSubmissions] = useState([])
   const [loadingAnalytics, setLoadingAnalytics] = useState(true)
+
+  const [themeColor, setThemeColor] = useState(THEME_COLORS[0].hex)
+
+  useEffect(() => {
+    supabase.from('account_settings').select('theme_color').eq('user_id', user.id).maybeSingle()
+      .then(({ data }) => { if (data?.theme_color) setThemeColor(data.theme_color) })
+  }, [user.id])
+
+  async function chooseThemeColor(hex) {
+    setThemeColor(hex)
+    const { error } = await saveThemeColor(supabase, user.id, hex)
+    if (error) showToast('Could not save theme color: ' + error.message, 'error')
+  }
 
   useEffect(() => {
     async function loadAnalytics() {
@@ -215,6 +229,30 @@ function AccountPage() {
           </form>
         </SectionCard>
       )}
+
+      <SectionCard title="Appearance">
+        <div style={{ fontSize: '0.85rem', color: 'var(--color-muted)', marginBottom: '0.8rem' }}>
+          Theme color - applies everywhere the app uses its accent color, including the softer tinted cards and highlights.
+        </div>
+        <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+          {THEME_COLORS.map(({ name, hex }) => (
+            <button
+              key={hex}
+              type="button"
+              onClick={() => chooseThemeColor(hex)}
+              title={name}
+              aria-label={`Use ${name} as the theme color`}
+              aria-pressed={themeColor === hex}
+              style={{
+                width: '34px', height: '34px', padding: 0, borderRadius: '50%',
+                background: hex, border: themeColor === hex ? '3px solid var(--color-text)' : '1px solid var(--color-border)',
+                boxShadow: themeColor === hex ? '0 0 0 2px var(--color-surface)' : 'none',
+                cursor: 'pointer'
+              }}
+            />
+          ))}
+        </div>
+      </SectionCard>
 
       <SectionCard title="Your Analytics">
         {loadingAnalytics ? (

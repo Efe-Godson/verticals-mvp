@@ -47,7 +47,7 @@ function PackageBuilder({ products, onCreate, onCancel }) {
   }
 
   return (
-    <div className="card" style={{ padding: '1rem', marginTop: '0.5rem', background: 'linear-gradient(135deg, #f8faff 0%, #f3f7ff 100%)' }}>
+    <div className="card" style={{ padding: '1rem', marginTop: '0.5rem', background: 'linear-gradient(135deg, var(--color-surface) 0%, var(--color-primary-soft) 100%)' }}>
       <div style={{ fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.6rem' }}>Create Package</div>
 
       <input

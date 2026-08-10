@@ -76,7 +76,16 @@ export function printReceipt(form, submission) {
       <meta charset="utf-8" />
       <title>Receipt Preview</title>
       <style>
-        @page { size: 80mm auto; margin: 4mm; }
+        /* Many 80mm thermal printer drivers apply their own default page
+           margin on top of whatever @page requests (or ignore @page margin
+           entirely), so a receipt sized to exactly fill "80mm minus our own
+           margin" ends up losing a few more mm than expected on each side -
+           reads as a couple of characters clipped off both edges. Zeroing
+           the page margin here and doing all the spacing inside .receipt
+           instead means there's only one source of truth for it, and a few
+           mm of built-in slack (80mm page, 74mm content) absorbs whatever
+           the driver still trims. */
+        @page { size: 80mm auto; margin: 0; }
         * { box-sizing: border-box; }
 
         body {
@@ -90,7 +99,7 @@ export function printReceipt(form, submission) {
         }
 
         .toolbar {
-          width: 72mm;
+          width: 74mm;
           display: flex;
           justify-content: center;
           gap: 0.6rem;
@@ -111,7 +120,7 @@ export function printReceipt(form, submission) {
 
         /* Torn-paper zigzag edge - purely decorative, screen only */
         .tear {
-          width: 72mm;
+          width: 74mm;
           height: 10px;
           background:
             linear-gradient(135deg, #eef0f2 50%, transparent 50%) 0 0,
@@ -124,9 +133,9 @@ export function printReceipt(form, submission) {
 
         .receipt {
           font-family: 'Courier New', monospace;
-          width: 72mm;
+          width: 74mm;
           background: white;
-          padding: 5mm 6mm;
+          padding: 5mm 4mm;
           font-size: 12px;
           color: #000;
           box-shadow: 0 2px 10px rgba(0,0,0,0.12);
@@ -166,7 +175,11 @@ export function printReceipt(form, submission) {
           gap: 8px;
           margin: 4px 0;
         }
-        .item-name { flex: 1; }
+        /* min-width: 0 lets these shrink below their content's natural
+           width (flex items default to min-width: auto, which otherwise
+           forces the row to overflow the receipt's edge instead of
+           wrapping a long product name or detail value). */
+        .line span:first-child, .item-name { flex: 1; min-width: 0; overflow-wrap: break-word; }
         .item-price { white-space: nowrap; }
         .total-row {
           display: flex;

@@ -7,6 +7,11 @@
   --color-muted: #6b7280;
   --color-primary: #0070f3;
   --color-primary-hover: #0058c4;
+  /* Light tint of --color-primary, for "soft" surfaces (selected rows,
+     gradient header cards) that should follow the chosen theme color too.
+     Recomputed by theme.js whenever that color changes; this is just the
+     matching default for the initial blue. */
+  --color-primary-soft: #eff6ff;
   --radius: 8px;
   --shadow: 0 1px 3px rgba(0,0,0,0.06);
 
@@ -45,6 +50,7 @@
     --color-muted: #9aa0ab;
     --color-primary: #4d94ff;
     --color-primary-hover: #7ab0ff;
+    --color-primary-soft: #25334b;
     --shadow: 0 1px 3px rgba(0,0,0,0.35);
 
     --chart-series-1: #3987e5;
@@ -277,7 +283,7 @@ input:focus, select:focus, textarea:focus {
 }
 
 .records-table tbody tr:hover {
-  background: #eef4ff;
+  background: var(--color-primary-soft);
 }
 
 .records-table th,

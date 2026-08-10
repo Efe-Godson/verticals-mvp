@@ -1,8 +1,12 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useParams } from 'react-router-dom'
+import PosSidePanel from './PosSidePanel'
 import { supabase } from './supabaseClient'
 import { submitForm, getSubmissionByToken, updateSubmissionByToken } from './lib/submissionsClient'
 import { COUNTRIES, statesFor, citiesFor } from './lib/locationData'
+const PAYMENT_METHODS = ['Cash', 'Card', 'Bank Transfer', 'QR Code', 'Split']
+const QUICK_CASH_AMOUNTS = [100, 200, 500, 1000, 2000]
+const TOP_CATEGORY_COUNT = 6 // category pills shown before collapsing the rest behind "+N more"
 
 // Splits fields into pages at each 'section' marker, Google-Forms style:
 // fields before the first section (if any) form an unheaded first page,
@@ -32,6 +36,20 @@ function PublicForm() {
   const [cartQuantities, setCartQuantities] = useState({})
   const [cartSearch, setCartSearch] = useState({})
   const [cartCategory, setCartCategory] = useState({})
+  const [expandedCategories, setExpandedCategories] = useState({}) // { [fieldId]: true } - reveals the rest of the category pills past the top few
+  const [cartPayment, setCartPayment] = useState({}) // { [fieldId]: { method, amountReceived?, change? } } - confirmed payment
+  const [checkoutFieldId, setCheckoutFieldId] = useState(null) // which cart field's checkout modal is open
+  const [showMoreCheckoutFields, setShowMoreCheckoutFields] = useState(false) // reveals fields flagged collapsedInCheckout
+  const [checkoutMethod, setCheckoutMethod] = useState(null) // method chosen inside the open checkout modal
+  const [amountReceived, setAmountReceived] = useState({}) // { [fieldId]: string } - cash tendered, modal-only
+  const [deliveryFee, setDeliveryFee] = useState({}) // { [fieldId]: string } - only asked when the order is Takeout
+  const [showKeypad, setShowKeypad] = useState(false)
+  const [splitDraft, setSplitDraft] = useState([{ method: 'Cash', amount: '' }, { method: 'Card', amount: '' }])
+  const [orderNumber, setOrderNumber] = useState(() => Math.floor(1000 + Math.random() * 9000))
+  const [addedFlash, setAddedFlash] = useState({}) // { [productId]: true } - briefly shows "Added" after tapping Add
+  const [heldOrders, setHeldOrders] = useState({}) // { [fieldId]: [{ id, orderNumber, quantities, answers, itemCount, total, createdAt }] }
+  const [heldPanelFieldId, setHeldPanelFieldId] = useState(null) // which cart field's held-orders panel is open
+  const [receipt, setReceipt] = useState(null) // { orderNumber, items, total, details } - in-page print preview after checkout
   const [respondentEmail, setRespondentEmail] = useState('')
   const [loading, setLoading] = useState(true)
   const [submitted, setSubmitted] = useState(false)
@@ -44,6 +62,7 @@ function PublicForm() {
 
   const pages = useMemo(() => buildPages(form?.fields || []), [form])
   const currentPage = pages[pageIndex] || pages[0]
+  const hasCartOnPage = currentPage.fields.some(f => f.type === 'cart')
   const isLastPage = pageIndex === pages.length - 1
 
   // Prefills the builder state from a saved submission: the inverse of the
@@ -51,6 +70,8 @@ function PublicForm() {
   function loadAnswersFromData(fields, data) {
     const nextAnswers = {}
     const nextCartQuantities = {}
+    const nextCartPayment = {}
+    const nextDeliveryFee = {}
     fields.forEach(field => {
       if (field.type === 'section') return
       if (field.type === 'cart') {
@@ -60,12 +81,16 @@ function PublicForm() {
           if (product) quantities[product.id] = item.quantity
         })
         nextCartQuantities[field.id] = quantities
+        if (data[field.id]?.payment) nextCartPayment[field.id] = data[field.id].payment
+        if (data[field.id]?.deliveryFee) nextDeliveryFee[field.id] = String(data[field.id].deliveryFee)
       } else {
         nextAnswers[field.id] = data[field.id]
       }
     })
     setAnswers(nextAnswers)
     setCartQuantities(nextCartQuantities)
+    setCartPayment(nextCartPayment)
+    setDeliveryFee(nextDeliveryFee)
     if (data._respondent_email) setRespondentEmail(data._respondent_email)
   }
 
@@ -107,6 +132,56 @@ function PublicForm() {
     if (token) loadForEdit()
     else loadForm()
   }, [id, token])
+
+  // Held orders (POS "park this table, start another") persist per-device in
+  // localStorage, keyed by form id - there's no backend table for these,
+  // they're a cashier convenience, not a record worth syncing across devices.
+  useEffect(() => {
+    if (!form) return
+    try {
+      const raw = localStorage.getItem(`verticals_held_orders_${form.id}`)
+      if (raw) setHeldOrders(JSON.parse(raw))
+    } catch {}
+  }, [form?.id])
+
+  function saveHeldOrders(next) {
+    setHeldOrders(next)
+    try {
+      localStorage.setItem(`verticals_held_orders_${form.id}`, JSON.stringify(next))
+    } catch {}
+  }
+
+  function holdOrder(fieldId) {
+    const field = form.fields.find(f => f.id === fieldId)
+    const quantities = cartQuantities[fieldId] || {}
+    const items = (field.products || [])
+      .map(p => ({ ...p, quantity: Number(quantities[p.id]) || 0 }))
+      .filter(p => p.quantity > 0)
+    if (items.length === 0) return
+    const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+    const itemCount = items.reduce((sum, item) => sum + item.quantity, 0)
+    const snapshot = {
+      id: 'held-' + Date.now(), orderNumber, quantities, answers: { ...answers },
+      itemCount, total, createdAt: Date.now(),
+    }
+    saveHeldOrders({ ...heldOrders, [fieldId]: [...(heldOrders[fieldId] || []), snapshot] })
+    setCartQuantities(current => ({ ...current, [fieldId]: {} }))
+    setOrderNumber(Math.floor(1000 + Math.random() * 9000))
+  }
+
+  function resumeHeldOrder(fieldId, heldId) {
+    const held = (heldOrders[fieldId] || []).find(h => h.id === heldId)
+    if (!held) return
+    setCartQuantities(current => ({ ...current, [fieldId]: held.quantities }))
+    setAnswers(current => ({ ...current, ...held.answers }))
+    setOrderNumber(held.orderNumber)
+    saveHeldOrders({ ...heldOrders, [fieldId]: (heldOrders[fieldId] || []).filter(h => h.id !== heldId) })
+    setHeldPanelFieldId(null)
+  }
+
+  function discardHeldOrder(fieldId, heldId) {
+    saveHeldOrders({ ...heldOrders, [fieldId]: (heldOrders[fieldId] || []).filter(h => h.id !== heldId) })
+  }
 
   // Linked-record dropdowns pull their options from another form's records.
   // Only readable when the person filling this in is authenticated as that
@@ -193,6 +268,12 @@ function PublicForm() {
     updateCartQuantity(fieldId, productId, current + 1)
   }
 
+  function addToCart(fieldId, productId) {
+    incrementCartItem(fieldId, productId)
+    setAddedFlash(current => ({ ...current, [productId]: true }))
+    setTimeout(() => setAddedFlash(current => ({ ...current, [productId]: false })), 500)
+  }
+
   function decrementCartItem(fieldId, productId) {
     const current = Number((cartQuantities[fieldId] || {})[productId]) || 0
     updateCartQuantity(fieldId, productId, Math.max(0, current - 1))
@@ -205,6 +286,72 @@ function PublicForm() {
 
   function removeCartItem(fieldId, productId) {
     updateCartQuantity(fieldId, productId, 0)
+  }
+
+  function clearCart(fieldId) {
+    setCartQuantities(current => ({ ...current, [fieldId]: {} }))
+  }
+
+  function openCheckout(fieldId) {
+    setCheckoutMethod(null)
+    setShowKeypad(false)
+    setSplitDraft([{ method: 'Cash', amount: '' }, { method: 'Card', amount: '' }])
+    setAmountReceived(current => ({ ...current, [fieldId]: '' }))
+    setShowMoreCheckoutFields(false)
+    setCheckoutFieldId(fieldId)
+  }
+
+  function closeCheckout() {
+    setCheckoutFieldId(null)
+  }
+
+  function pressKeypad(fieldId, key) {
+    setAmountReceived(current => {
+      const value = current[fieldId] || ''
+      if (key === 'C') return { ...current, [fieldId]: '' }
+      if (key === '⌫') return { ...current, [fieldId]: value.slice(0, -1) }
+      if (key === '.' && value.includes('.')) return current
+      return { ...current, [fieldId]: value + key }
+    })
+  }
+
+  function pressQuickCash(fieldId, amount, total) {
+    if (amount === 'exact') {
+      setAmountReceived(current => ({ ...current, [fieldId]: String(total) }))
+      return
+    }
+    setAmountReceived(current => ({ ...current, [fieldId]: String((Number(current[fieldId]) || 0) + amount) }))
+  }
+
+  async function completePayment(fieldId, total) {
+    let finalPayment
+    if (checkoutMethod === 'Cash') {
+      const received = Number(amountReceived[fieldId]) || 0
+      if (received < total) return
+      finalPayment = { method: 'Cash', amountReceived: received, change: received - total }
+    } else if (checkoutMethod === 'Split') {
+      const splits = splitDraft
+        .filter(s => s.method && Number(s.amount) > 0)
+        .map(s => ({ method: s.method, amount: Number(s.amount) }))
+      const splitTotal = splits.reduce((sum, s) => sum + s.amount, 0)
+      if (splitTotal !== total || splits.length < 2) return
+      finalPayment = { method: 'Split', splits }
+    } else {
+      finalPayment = { method: checkoutMethod }
+    }
+    setCartPayment(current => ({ ...current, [fieldId]: finalPayment }))
+    setCheckoutFieldId(null)
+    // Paying finalizes the order - submit it right here instead of relying
+    // on the page's own Back/Next/Submit row, which this POS flow hides.
+    await submitAnswers({ [fieldId]: finalPayment })
+  }
+
+  function clearPayment(fieldId) {
+    setCartPayment(current => {
+      const next = { ...current }
+      delete next[fieldId]
+      return next
+    })
   }
 
   async function handleFileSelect(fieldId, event) {
@@ -387,7 +534,7 @@ function PublicForm() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  async function submitAnswers() {
+  async function submitAnswers(paymentOverride) {
     if (Object.values(uploading).some(v => v)) {
       setMessage('Please wait for the file upload to finish.')
       return
@@ -415,7 +562,11 @@ function PublicForm() {
           .map(p => ({ name: p.name, price: p.price, category: p.category || '', quantity: Number(quantities[p.id]) || 0 }))
           .filter(item => item.quantity > 0)
         const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
-        finalData[field.id] = { items, total }
+        finalData[field.id] = {
+          items, total,
+          payment: (paymentOverride && paymentOverride[field.id]) || cartPayment[field.id] || null,
+          deliveryFee: Number(deliveryFee[field.id]) || 0,
+        }
       } else {
         finalData[field.id] = answers[field.id]
       }
@@ -426,13 +577,67 @@ function PublicForm() {
     }
 
     try {
+      let submissionId = null
+      let realOrderNumber = orderNumber
       if (token) {
         await updateSubmissionByToken(token, finalData)
+        // Opened from the Records "Edit" link (either as a popup tab or,
+        // for POS orders, embedded in an iframe) to make a quick correction.
+        // Report back to whoever opened this and stop - the POS
+        // receipt/reset flow below is for taking a new order, not this.
+        if (window.opener) {
+          window.close()
+          return
+        }
+        if (window.self !== window.top) {
+          window.parent.postMessage('verticals-order-saved', window.location.origin)
+          return
+        }
       } else {
         const result = await submitForm(form.id, finalData)
         setEditLink(`${window.location.origin}/form/${form.id}/response/${result.edit_token}`)
+        submissionId = result.id
+        // The receipt should show the real, persisted order number (also
+        // what Records searches/filters by) rather than the random one
+        // generated client-side just to label the order while building it.
+        if (result.order_number) realOrderNumber = result.order_number
       }
-      setSubmitted(true)
+
+      // Orders go straight to an in-page print preview of the receipt
+      // instead of the generic "thanks for submitting" page - then the
+      // order screen resets itself for the next customer, since this is a
+      // POS flow, not a one-and-done form.
+      if (hasCartOnPage) {
+        const cartField = currentPage.fields.find(f => f.type === 'cart')
+        const cartData = finalData[cartField.id]
+        setReceipt({
+          orderNumber: realOrderNumber,
+          items: cartData.items,
+          total: cartData.total,
+          deliveryFee: cartData.deliveryFee || 0,
+          grandTotal: cartData.total + (cartData.deliveryFee || 0),
+        })
+
+        setCartQuantities(current => ({ ...current, [cartField.id]: {} }))
+        setCartPayment(current => {
+          const next = { ...current }
+          delete next[cartField.id]
+          return next
+        })
+        setDeliveryFee(current => ({ ...current, [cartField.id]: '' }))
+        currentPage.fields.forEach(f => {
+          if (f.id !== cartField.id && f.type !== 'section') {
+            setAnswers(current => {
+              const next = { ...current }
+              delete next[f.id]
+              return next
+            })
+          }
+        })
+        setOrderNumber(Math.floor(1000 + Math.random() * 9000))
+      } else {
+        setSubmitted(true)
+      }
     } catch (err) {
       setMessage('Error submitting: ' + err.message)
     }
@@ -489,9 +694,27 @@ function PublicForm() {
       const activeCategory = cartCategory[field.id] || 'All'
       const allProducts = field.products || []
 
-      const categories = ['All', ...Array.from(new Set(
+      const categoryNames = Array.from(new Set(
         allProducts.map(p => p.category).filter(c => c && c.trim() !== '')
-      ))]
+      ))
+      const categoryCounts = { All: allProducts.length }
+      categoryNames.forEach(cat => { categoryCounts[cat] = allProducts.filter(p => p.category === cat).length })
+
+      // A menu with a dozen-plus categories turns the filter row into its
+      // own wall of pills to wade through before even reaching the search
+      // box. Lead with the biggest ones and tuck the long tail behind
+      // "+N more" instead of showing every category at once.
+      const sortedCategoryNames = [...categoryNames].sort((a, b) => categoryCounts[b] - categoryCounts[a])
+      const isCategoryFilterExpanded = expandedCategories[field.id]
+      let visibleCategoryNames = isCategoryFilterExpanded ? sortedCategoryNames : sortedCategoryNames.slice(0, TOP_CATEGORY_COUNT)
+      // Whatever's currently selected always gets a visible pill, even
+      // collapsed - otherwise picking a "tail" category makes its own
+      // filter pill disappear the moment something else re-renders.
+      if (activeCategory !== 'All' && !visibleCategoryNames.includes(activeCategory)) {
+        visibleCategoryNames = [...visibleCategoryNames, activeCategory]
+      }
+      const hiddenCategoryCount = sortedCategoryNames.length - visibleCategoryNames.length
+      const categories = ['All', ...visibleCategoryNames]
 
       const filteredProducts = allProducts.filter(p => {
         const matchesSearch = p.name.toLowerCase().includes(search)
@@ -504,137 +727,601 @@ function PublicForm() {
         .filter(p => p.quantity > 0)
 
       const total = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
+      const deliveryFeeAmount = Number(deliveryFee[field.id]) || 0
+      const grandTotal = total + deliveryFeeAmount
+      const payment = cartPayment[field.id]
+      const received = Number(amountReceived[field.id]) || 0
+      const change = received - grandTotal
+      const splitTotal = splitDraft.reduce((sum, s) => sum + (Number(s.amount) || 0), 0)
+      // Non-cart questions on this page (e.g. Dine-in/Takeout) move into the
+      // checkout modal instead of the main order screen, since this page is
+      // the POS order flow and those answers belong to checkout, not the menu.
+      const checkoutQuestions = currentPage.fields.filter(f => f.id !== field.id && f.type !== 'section')
 
       return (
         <div>
-          {/* Search box */}
-          <input
-            type="text"
-            value={cartSearch[field.id] || ''}
-            onChange={(e) => setCartSearchText(field.id, e.target.value)}
-            placeholder="Search products..."
-            style={{ width: '100%', padding: '0.6rem', marginBottom: '0.7rem' }}
-          />
+          <style>{`
+            @media print {
+              body * { visibility: hidden; }
+              .receipt-print-area, .receipt-print-area * { visibility: visible; }
+              .receipt-print-area { position: fixed; top: 0; left: 0; width: 100%; }
+            }
+            /* A big menu can have a dozen+ categories - scrolling them in one
+               row keeps the pills from pushing the actual menu grid off the
+               bottom of the screen, which is what happened when they wrapped
+               onto 3-4 rows instead. */
+            .category-scroll {
+              scrollbar-width: thin;
+              -webkit-overflow-scrolling: touch;
+            }
+            .category-scroll::-webkit-scrollbar {
+              height: 4px;
+            }
+            .category-scroll::-webkit-scrollbar-thumb {
+              background: var(--color-border);
+              border-radius: 4px;
+            }
+          `}</style>
 
-          {/* Category filter pills */}
-          {categories.length > 1 && (
-            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.9rem' }}>
-              {categories.map(cat => (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => setCartCategoryFilter(field.id, cat)}
-                  className={activeCategory === cat ? '' : 'secondary'}
-                  style={{ fontSize: '0.8rem', padding: '0.35rem 0.8rem', borderRadius: '20px' }}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Product grid - small cards */}
-          {filteredProducts.length === 0 ? (
-            <p style={{ color: '#999', margin: '1rem 0' }}>No products match your search.</p>
-          ) : (
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-              gap: '0.6rem',
-              marginBottom: '1rem'
-            }}>
-              {filteredProducts.map(p => {
-                const qty = Number(quantities[p.id]) || 0
-                return (
-                  <div key={p.id} className="card" style={{
-                    padding: '0.7rem',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.4rem'
-                  }}>
-                    <div style={{ fontSize: '0.85rem', fontWeight: '600', lineHeight: 1.3, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                      {p.name}
-                      {p.isPackage && (
-                        <span style={{
-                          fontSize: '0.62rem', fontWeight: 700, color: 'var(--color-primary)',
-                          border: '1px solid var(--color-primary)', borderRadius: '999px', padding: '0.05rem 0.4rem'
-                        }}>
-                          PACKAGE
-                        </span>
-                      )}
-                    </div>
-                    {p.category && (
-                      <div style={{ fontSize: '0.7rem', color: 'var(--color-muted)' }}>{p.category}</div>
-                    )}
-                    <div style={{ fontSize: '0.8rem', color: 'var(--color-primary)', fontWeight: '600' }}>
-                      ₦{Number(p.price).toLocaleString()}
-                    </div>
-
-                    {qty === 0 ? (
-                      <button
-                        onClick={() => incrementCartItem(field.id, p.id)}
-                        style={{ fontSize: '0.8rem', padding: '0.4rem 0.5rem', marginTop: '0.2rem' }}
-                      >
-                        Add to Cart
-                      </button>
-                    ) : (
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.2rem' }}>
-                        <button className="secondary" onClick={() => decrementCartItem(field.id, p.id)} style={{ padding: '0.25rem 0.6rem', fontSize: '0.85rem' }}>−</button>
-                        <input
-                          type="number"
-                          min="0"
-                          value={qty}
-                          onChange={(e) => setCartItemQuantity(field.id, p.id, e.target.value)}
-                          style={{
-                            width: '40px', padding: '0.2rem', fontSize: '0.85rem',
-                            textAlign: 'center', border: '1px solid var(--color-border)', borderRadius: '4px'
-                          }}
-                        />
-                        <button className="secondary" onClick={() => incrementCartItem(field.id, p.id)} style={{ padding: '0.25rem 0.6rem', fontSize: '0.85rem' }}>+</button>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          )}
-
-          {/* Cart summary */}
-          <div className="card" style={{ padding: '1rem' }}>
-            <div style={{ fontWeight: '600', marginBottom: '0.6rem' }}>
-              Your Cart {cartItems.length > 0 && `(${cartItems.length})`}
+          {/* Order box - lives on its own at the top, above the menu */}
+          <div className="card" style={{ padding: '1rem', marginBottom: '1rem', background: 'var(--color-primary-soft)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.6rem' }}>
+              <div style={{ fontWeight: '600' }}>Current Order</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
+                {(heldOrders[field.id] || []).length > 0 && (
+                  <span
+                    onClick={() => setHeldPanelFieldId(field.id)}
+                    style={{ fontSize: '0.8rem', color: 'var(--color-primary)', cursor: 'pointer', fontWeight: 600 }}
+                  >
+                    Held ({heldOrders[field.id].length})
+                  </span>
+                )}
+                <span style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>Order #{orderNumber}</span>
+              </div>
             </div>
 
             {cartItems.length === 0 ? (
-              <p style={{ color: '#999', margin: 0, fontSize: '0.9rem' }}>No items added yet.</p>
+              <div style={{ color: '#999', fontSize: '0.9rem' }}>
+                <p style={{ margin: 0 }}>No items added yet.</p>
+                <p style={{ margin: '0.2rem 0 0' }}>Select items below to begin.</p>
+              </div>
             ) : (
-              <>
+              <div style={{ marginBottom: '0.3rem' }}>
+                <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)', marginBottom: '0.4rem' }}>
+                  {cartItems.reduce((sum, i) => sum + i.quantity, 0)} Item{cartItems.reduce((sum, i) => sum + i.quantity, 0) !== 1 ? 's' : ''}
+                </div>
                 {cartItems.map(item => (
                   <div key={item.id} style={{
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    padding: '0.5rem 0', borderBottom: '1px solid #f0f0f0', fontSize: '0.9rem'
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6rem',
+                    padding: '0.45rem 0', borderBottom: '1px solid rgba(0,0,0,0.06)', fontSize: '0.85rem'
                   }}>
-                    <div>
-                      {item.name} <span style={{ color: '#999' }}>× {item.quantity}</span>
+                    <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexShrink: 0 }}>
+                      <button className="secondary" onClick={() => decrementCartItem(field.id, item.id)} style={{ padding: '0.1rem 0.5rem', fontSize: '0.8rem' }}>−</button>
+                      <span style={{ minWidth: '1.2rem', textAlign: 'center' }}>{item.quantity}</span>
+                      <button className="secondary" onClick={() => incrementCartItem(field.id, item.id)} style={{ padding: '0.1rem 0.5rem', fontSize: '0.8rem' }}>+</button>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                      <span>₦{(item.price * item.quantity).toLocaleString()}</span>
-                      <span
-                        onClick={() => removeCartItem(field.id, item.id)}
-                        style={{ color: '#c0392b', cursor: 'pointer', fontSize: '0.85rem' }}
-                      >
-                        Remove
-                      </span>
-                    </div>
+                    <span style={{ width: '72px', textAlign: 'right', fontWeight: 600, color: 'var(--color-primary)' }}>
+                      ₦{(item.price * item.quantity).toLocaleString()}
+                    </span>
+                    <span
+                      onClick={() => removeCartItem(field.id, item.id)}
+                      title="Remove"
+                      style={{ color: '#c0392b', cursor: 'pointer', fontSize: '0.85rem', flexShrink: 0 }}
+                    >
+                      🗑
+                    </span>
                   </div>
                 ))}
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.7rem', fontWeight: 'bold' }}>
-                  <span>Total</span>
-                  <span>₦{total.toLocaleString()}</span>
-                </div>
-              </>
+              </div>
             )}
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', marginTop: '0.9rem' }}>
+              <div style={{ fontWeight: 'bold', fontSize: '1.05rem', whiteSpace: 'nowrap', transition: 'color 0.2s' }}>
+                Total <span style={{ marginLeft: '0.5rem' }}>₦{total.toLocaleString()}</span>
+              </div>
+
+              {payment && !token ? (
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.8rem', flex: 1,
+                  background: 'white', border: '1px solid var(--color-primary)', borderRadius: '6px',
+                  padding: '0.6rem 0.8rem', fontSize: '0.85rem'
+                }}>
+                  <span>✓ Paid via {payment.method}</span>
+                  <span onClick={() => clearPayment(field.id)} style={{ color: 'var(--color-primary)', cursor: 'pointer' }}>Change</span>
+                </div>
+              ) : (
+                <>
+                  {cartItems.length > 0 && (
+                    <button type="button" className="secondary" onClick={() => holdOrder(field.id)} style={{ padding: '0.8rem 1rem' }}>
+                      Hold
+                    </button>
+                  )}
+                  {cartItems.length > 0 && (
+                    <button type="button" className="secondary" onClick={() => clearCart(field.id)} style={{ padding: '0.8rem 1rem' }}>
+                      Clear
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    disabled={total === 0}
+                    onClick={() => openCheckout(field.id)}
+                    style={{ flex: 1, padding: '0.8rem', fontSize: '1rem', fontWeight: 600 }}
+                  >
+                    Checkout{total > 0 ? ` • ₦${total.toLocaleString()}` : ''}
+                  </button>
+                </>
+              )}
+            </div>
           </div>
+
+          {/* Catalogue box - search + categories stay pinned while the menu below scrolls */}
+          <div className="card" style={{ padding: 0, background: 'var(--color-primary-soft)', maxHeight: '70vh', overflowY: 'auto' }}>
+            <div style={{ position: 'sticky', top: 0, zIndex: 5, background: 'var(--color-primary-soft)', padding: '1rem 1rem 0' }}>
+              <input
+                type="text"
+                value={cartSearch[field.id] || ''}
+                onChange={(e) => setCartSearchText(field.id, e.target.value)}
+                placeholder="Search menu..."
+                style={{ width: '100%', padding: '0.6rem', marginBottom: '0.7rem' }}
+              />
+
+              {categories.length > 1 && (
+                <div
+                  className="category-scroll"
+                  style={{ display: 'flex', gap: '0.4rem', flexWrap: 'nowrap', overflowX: 'auto', paddingBottom: '0.9rem' }}
+                >
+                  {categories.map(cat => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setCartCategoryFilter(field.id, cat)}
+                      className={activeCategory === cat ? '' : 'secondary'}
+                      style={{ fontSize: '0.8rem', padding: '0.35rem 0.8rem', borderRadius: '20px', whiteSpace: 'nowrap', flexShrink: 0 }}
+                    >
+                      {cat} ({categoryCounts[cat] || 0})
+                    </button>
+                  ))}
+                  {hiddenCategoryCount > 0 && (
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => setExpandedCategories(current => ({ ...current, [field.id]: true }))}
+                      style={{ fontSize: '0.8rem', padding: '0.35rem 0.8rem', borderRadius: '20px', whiteSpace: 'nowrap', flexShrink: 0 }}
+                    >
+                      +{hiddenCategoryCount} more
+                    </button>
+                  )}
+                  {isCategoryFilterExpanded && sortedCategoryNames.length > TOP_CATEGORY_COUNT && (
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => setExpandedCategories(current => ({ ...current, [field.id]: false }))}
+                      style={{ fontSize: '0.8rem', padding: '0.35rem 0.8rem', borderRadius: '20px', whiteSpace: 'nowrap', flexShrink: 0 }}
+                    >
+                      Show less
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div style={{ padding: '0 1rem 1rem' }}>
+              {filteredProducts.length === 0 ? (
+                <p style={{ color: '#999', margin: '1rem 0' }}>No items match your search.</p>
+              ) : (
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+                  gap: '0.6rem',
+                }}>
+                  {filteredProducts.map(p => {
+                    const qty = Number(quantities[p.id]) || 0
+                    return (
+                      <div key={p.id} className="card" style={{
+                        padding: '0.7rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.4rem',
+                        background: 'var(--color-surface)'
+                      }}>
+                        <div style={{ fontSize: '0.85rem', fontWeight: '600', lineHeight: 1.3, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          {p.name}
+                          {p.isPackage && (
+                            <span style={{
+                              fontSize: '0.62rem', fontWeight: 700, color: 'var(--color-primary)',
+                              border: '1px solid var(--color-primary)', borderRadius: '999px', padding: '0.05rem 0.4rem'
+                            }}>
+                              PACKAGE
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: '0.95rem', color: 'var(--color-primary)', fontWeight: '700' }}>
+                          ₦{Number(p.price).toLocaleString()}
+                        </div>
+                        {p.category && (
+                          <div style={{ fontSize: '0.7rem', color: 'var(--color-muted)' }}>{p.category}</div>
+                        )}
+
+                        {qty === 0 ? (
+                          <button
+                            onClick={() => addToCart(field.id, p.id)}
+                            style={{ fontSize: '0.8rem', padding: '0.4rem 0.5rem', marginTop: '0.2rem' }}
+                          >
+                            {addedFlash[p.id] ? '✓ Added' : 'Add'}
+                          </button>
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.2rem' }}>
+                            <button className="secondary" onClick={() => decrementCartItem(field.id, p.id)} style={{ padding: '0.25rem 0.6rem', fontSize: '0.85rem' }}>−</button>
+                            <input
+                              type="number"
+                              min="0"
+                              value={qty}
+                              onChange={(e) => setCartItemQuantity(field.id, p.id, e.target.value)}
+                              style={{
+                                width: '40px', padding: '0.2rem', fontSize: '0.85rem',
+                                textAlign: 'center', border: '1px solid var(--color-border)', borderRadius: '4px'
+                              }}
+                            />
+                            <button className="secondary" onClick={() => incrementCartItem(field.id, p.id)} style={{ padding: '0.25rem 0.6rem', fontSize: '0.85rem' }}>+</button>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Held orders panel */}
+          {heldPanelFieldId === field.id && (
+            <div
+              onClick={() => setHeldPanelFieldId(null)}
+              style={{
+                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: '1rem'
+              }}
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="card"
+                style={{ background: 'white', padding: '1.5rem', width: '420px', maxWidth: '100%', maxHeight: '80vh', overflowY: 'auto' }}
+              >
+                <h3 style={{ margin: '0 0 1rem' }}>Held Orders</h3>
+
+                {(heldOrders[field.id] || []).length === 0 ? (
+                  <p style={{ color: 'var(--color-muted)', fontSize: '0.9rem' }}>No held orders right now.</p>
+                ) : (
+                  (heldOrders[field.id] || []).map(held => (
+                    <div key={held.id} style={{ border: '1px solid var(--color-border)', borderRadius: '6px', padding: '0.8rem', marginBottom: '0.7rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                        <span style={{ fontWeight: 600 }}>Order #{held.orderNumber}</span>
+                        <span style={{ color: 'var(--color-muted)', fontSize: '0.85rem' }}>{held.itemCount} item{held.itemCount !== 1 ? 's' : ''} · ₦{held.total.toLocaleString()}</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                        <button
+                          type="button"
+                          className="secondary"
+                          style={{ color: '#c0392b' }}
+                          onClick={() => discardHeldOrder(field.id, held.id)}
+                        >
+                          Discard
+                        </button>
+                        <button
+                          type="button"
+                          disabled={cartItems.length > 0}
+                          title={cartItems.length > 0 ? 'Hold or clear the current order first' : ''}
+                          onClick={() => resumeHeldOrder(field.id, held.id)}
+                        >
+                          Resume
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                  <button type="button" className="secondary" onClick={() => setHeldPanelFieldId(null)}>Close</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Checkout modal */}
+          {checkoutFieldId === field.id && (
+            <div
+              onClick={closeCheckout}
+              style={{
+                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: '1rem'
+              }}
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="card"
+                style={{ background: 'white', padding: '1.5rem', width: '420px', maxWidth: '100%', maxHeight: '92vh', overflowY: 'auto' }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '1rem' }}>
+                  <h3 style={{ margin: 0 }}>Checkout</h3>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--color-muted)' }}>Order #{orderNumber}</span>
+                </div>
+
+                {/* Order summary - always visible, at the top */}
+                <div style={{ border: '1px solid var(--color-border)', borderRadius: '6px', padding: '0.8rem', marginBottom: '1rem', background: 'var(--color-primary-soft)' }}>
+                  <div style={{ fontSize: '0.88rem', fontWeight: 600, marginBottom: '0.5rem' }}>Order Summary ({cartItems.length})</div>
+                  {cartItems.map(item => (
+                    <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', margin: '0.3rem 0' }}>
+                      <span>{item.name} × {item.quantity}</span>
+                      <span>₦{(item.price * item.quantity).toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {checkoutQuestions.length > 0 && (
+                  <div style={{ border: '1px solid var(--color-border)', borderRadius: '6px', padding: '0.8rem', marginBottom: '1rem', background: 'var(--color-primary-soft)' }}>
+                    {checkoutQuestions.filter(q => !q.collapsedInCheckout).map(q => (
+                      <div key={q.id} style={{ marginBottom: '0.7rem' }}>
+                        <label style={{ fontWeight: 600, fontSize: '0.85rem' }}>
+                          {q.label}{q.required && <span style={{ color: '#c0392b' }}> *</span>}
+                        </label>
+                        <div style={{ marginTop: '0.4rem' }}>{renderInput(q)}</div>
+                      </div>
+                    ))}
+
+                    {checkoutQuestions.some(q => q.collapsedInCheckout) && (
+                      <div style={{ marginBottom: showMoreCheckoutFields ? '0.7rem' : 0 }}>
+                        <span
+                          onClick={() => setShowMoreCheckoutFields(v => !v)}
+                          style={{ fontSize: '0.82rem', color: 'var(--color-primary)', cursor: 'pointer', fontWeight: 600 }}
+                        >
+                          {showMoreCheckoutFields ? '− Fewer details' : '+ More details'}
+                        </span>
+                      </div>
+                    )}
+
+                    {showMoreCheckoutFields && checkoutQuestions.filter(q => q.collapsedInCheckout).map(q => (
+                      <div key={q.id} style={{ marginBottom: '0.7rem' }}>
+                        <label style={{ fontWeight: 600, fontSize: '0.85rem' }}>
+                          {q.label}{q.required && <span style={{ color: '#c0392b' }}> *</span>}
+                        </label>
+                        <div style={{ marginTop: '0.4rem' }}>{renderInput(q)}</div>
+                      </div>
+                    ))}
+
+                    {checkoutQuestions.some(q => answers[q.id] === 'Takeout') && (
+                      <div>
+                        <label style={{ fontWeight: 600, fontSize: '0.85rem' }}>Delivery Fee</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={deliveryFee[field.id] || ''}
+                          onChange={(e) => setDeliveryFee(current => ({ ...current, [field.id]: e.target.value }))}
+                          placeholder="0"
+                          style={{ width: '100%', padding: '0.5rem', marginTop: '0.4rem' }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {deliveryFeeAmount > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--color-muted)', marginBottom: '0.4rem' }}>
+                    <span>Delivery Fee</span>
+                    <span>₦{deliveryFeeAmount.toLocaleString()}</span>
+                  </div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.2rem', marginBottom: '1rem' }}>
+                  <span>Total Due</span>
+                  <span>₦{grandTotal.toLocaleString()}</span>
+                </div>
+
+                <div style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.5rem' }}>Payment Method</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '1rem' }}>
+                  {PAYMENT_METHODS.map(method => (
+                    <button
+                      key={method}
+                      type="button"
+                      className={checkoutMethod === method ? '' : 'secondary'}
+                      onClick={() => { setCheckoutMethod(method); setShowKeypad(false) }}
+                      style={{ padding: '0.7rem 0.5rem' }}
+                    >
+                      {method}
+                    </button>
+                  ))}
+                </div>
+
+                {checkoutMethod === 'Cash' && (
+                  <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '0.9rem', marginBottom: '0.9rem' }}>
+                    <label style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>Amount Received</label>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={amountReceived[field.id] || ''}
+                      onFocus={() => setShowKeypad(true)}
+                      onChange={(e) => setAmountReceived(current => ({ ...current, [field.id]: e.target.value.replace(/[^0-9.]/g, '') }))}
+                      placeholder="0"
+                      style={{ width: '100%', padding: '0.7rem', fontSize: '1.2rem', fontFamily: 'monospace', margin: '0.4rem 0 0.7rem' }}
+                    />
+
+                    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.7rem' }}>
+                      <button type="button" className="secondary" style={{ fontSize: '0.8rem', padding: '0.4rem 0.7rem' }} onClick={() => pressQuickCash(field.id, 'exact', grandTotal)}>
+                        Exact Amount
+                      </button>
+                      {QUICK_CASH_AMOUNTS.map(amount => (
+                        <button
+                          key={amount}
+                          type="button"
+                          className="secondary"
+                          style={{ fontSize: '0.8rem', padding: '0.4rem 0.7rem' }}
+                          onClick={() => pressQuickCash(field.id, amount, total)}
+                        >
+                          ₦{amount.toLocaleString()}
+                        </button>
+                      ))}
+                    </div>
+
+                    {!showKeypad && (
+                      <button type="button" className="secondary" onClick={() => setShowKeypad(true)} style={{ width: '100%', marginBottom: '0.7rem', fontSize: '0.85rem' }}>
+                        Use Keypad
+                      </button>
+                    )}
+
+                    {showKeypad && (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.4rem', marginBottom: '0.7rem' }}>
+                        {['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '⌫'].map(key => (
+                          <button
+                            key={key}
+                            type="button"
+                            className="secondary"
+                            onClick={() => pressKeypad(field.id, key)}
+                            style={{ padding: '0.7rem 0', fontSize: '1rem' }}
+                          >
+                            {key}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem', fontWeight: 600 }}>
+                      <span>Change Due</span>
+                      <span style={{ color: change < 0 ? '#c0392b' : 'inherit' }}>₦{Math.max(change, 0).toLocaleString()}</span>
+                    </div>
+                  </div>
+                )}
+
+                {checkoutMethod === 'Split' && (
+                  <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '0.9rem', marginBottom: '0.9rem' }}>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.5rem' }}>Split between methods</div>
+                    {splitDraft.map((row, i) => (
+                      <div key={i} style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.5rem' }}>
+                        <select
+                          value={row.method}
+                          onChange={(e) => setSplitDraft(current => current.map((r, ri) => ri === i ? { ...r, method: e.target.value } : r))}
+                          style={{ flex: 1, padding: '0.4rem' }}
+                        >
+                          {PAYMENT_METHODS.filter(m => m !== 'Split').map(m => <option key={m} value={m}>{m}</option>)}
+                        </select>
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="Amount"
+                          value={row.amount}
+                          onChange={(e) => setSplitDraft(current => current.map((r, ri) => ri === i ? { ...r, amount: e.target.value } : r))}
+                          style={{ width: '110px', padding: '0.4rem' }}
+                        />
+                        <button
+                          type="button"
+                          className="secondary"
+                          style={{ color: '#c0392b', padding: '0.4rem 0.6rem' }}
+                          disabled={splitDraft.length <= 1}
+                          onClick={() => setSplitDraft(current => current.filter((_, ri) => ri !== i))}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => setSplitDraft(current => [...current, { method: 'Cash', amount: '' }])}
+                      style={{ marginBottom: '0.7rem' }}
+                    >
+                      + Add payment method
+                    </button>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', fontWeight: 600, color: splitTotal === total ? 'inherit' : '#c0392b' }}>
+                      <span>Remaining</span>
+                      <span>₦{Math.max(total - splitTotal, 0).toLocaleString()}</span>
+                    </div>
+                  </div>
+                )}
+
+                {checkoutMethod && checkoutMethod !== 'Cash' && checkoutMethod !== 'Split' && (
+                  <p style={{ color: 'var(--color-muted)', fontSize: '0.85rem', marginBottom: '0.9rem' }}>
+                    Collect payment via {checkoutMethod}, then complete the order below.
+                  </p>
+                )}
+
+                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                  <button type="button" className="secondary" onClick={closeCheckout}>Cancel</button>
+                  <button
+                    type="button"
+                    disabled={
+                      !checkoutMethod ||
+                      (checkoutMethod === 'Cash' && received < grandTotal) ||
+                      (checkoutMethod === 'Split' && (splitTotal !== grandTotal || splitDraft.filter(s => Number(s.amount) > 0).length < 2)) ||
+                      checkoutQuestions.some(q => q.required && !answers[q.id])
+                    }
+                    onClick={() => completePayment(field.id, grandTotal)}
+                  >
+                    Checkout
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Receipt print preview - shown in-page right after checkout, instead of a separate browser popup */}
+          {receipt && (
+            <div
+              onClick={() => setReceipt(null)}
+              style={{
+                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: '1rem'
+              }}
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="card"
+                style={{ background: 'white', padding: '1.5rem', width: '380px', maxWidth: '100%', maxHeight: '92vh', overflowY: 'auto' }}
+              >
+                <div className="receipt-print-area" style={{ fontFamily: "'Courier New', monospace", fontSize: '0.8rem', color: '#000' }}>
+                  <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '1.05rem', textTransform: 'uppercase', marginBottom: '0.3rem' }}>
+                    {form.settings?.companyName?.trim() || form.name}
+                  </div>
+                  <div style={{ textAlign: 'center', fontSize: '0.75rem', color: '#333' }}>
+                    Order #{receipt.orderNumber}
+                  </div>
+                  <div style={{ textAlign: 'center', fontSize: '0.75rem', margin: '0.5rem 0' }}>
+                    {new Date().toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' })}
+                    {' '}{new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase()}
+                  </div>
+
+                  <div style={{ borderTop: '1px dashed #000', margin: '0.5rem 0' }} />
+                  {receipt.items.map((item, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', margin: '0.25rem 0' }}>
+                      <span>{i + 1}. {item.name}{item.quantity > 1 ? ` ×${item.quantity}` : ''}</span>
+                      <span>{(item.price * item.quantity).toLocaleString()}</span>
+                    </div>
+                  ))}
+                  <div style={{ borderTop: '2px solid #000', margin: '0.5rem 0' }} />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', margin: '0.25rem 0' }}>
+                    <span>Subtotal</span>
+                    <span>{receipt.total.toLocaleString()}</span>
+                  </div>
+                  {receipt.deliveryFee > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', margin: '0.25rem 0' }}>
+                      <span>Delivery Fee</span>
+                      <span>{receipt.deliveryFee.toLocaleString()}</span>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '0.95rem' }}>
+                    <span>TOTAL</span>
+                    <span>{receipt.grandTotal.toLocaleString()}</span>
+                  </div>
+                  <div style={{ textAlign: 'center', fontSize: '0.7rem', color: '#999', marginTop: '0.8rem' }}>
+                    Powered by Verticals
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
+                  <button type="button" className="secondary" onClick={() => setReceipt(null)}>Close</button>
+                  <button type="button" onClick={() => window.print()}>Print</button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )
     }
@@ -956,6 +1643,8 @@ function PublicForm() {
 
   return (
     <div className="page">
+      {!token && <PosSidePanel formId={form.id} hasCartField={form.fields.some(f => f.type === 'cart')} />}
+
       <h1>{form.name}</h1>
       {form.description && <p>{form.description}</p>}
 
@@ -1004,12 +1693,14 @@ function PublicForm() {
         </div>
       )}
 
-      {currentPage.fields.map(field => (
-        <div key={field.id} className="card" style={{ padding: '1rem', marginBottom: '1rem' }}>
-          <label style={{ fontWeight: '600' }}>
-            {field.label}{field.required && <span style={{ color: '#c0392b' }}> *</span>}
-          </label>
-          <div style={{ marginTop: '0.5rem' }}>
+      {currentPage.fields.filter(field => field.type === 'cart' || !hasCartOnPage).map(field => (
+        <div key={field.id} className={field.type === 'cart' ? '' : 'card'} style={field.type === 'cart' ? { marginBottom: '1rem' } : { padding: '1rem', marginBottom: '1rem' }}>
+          {field.type !== 'cart' && (
+            <label style={{ fontWeight: '600' }}>
+              {field.label}{field.required && <span style={{ color: '#c0392b' }}> *</span>}
+            </label>
+          )}
+          <div style={field.type === 'cart' ? {} : { marginTop: '0.5rem' }}>
             {field.autoFromCartFieldId ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <span style={{
@@ -1030,6 +1721,7 @@ function PublicForm() {
         </div>
       ))}
 
+      {!hasCartOnPage && (
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem' }}>
         {pageIndex > 0 ? (
           <button className="secondary" onClick={goBack} style={{ padding: '0.7rem 1.5rem', fontSize: '1rem' }}>
@@ -1038,7 +1730,7 @@ function PublicForm() {
         ) : <span />}
 
         {isLastPage ? (
-          <button onClick={submitAnswers} style={{ padding: '0.7rem 1.5rem', fontSize: '1rem' }}>
+          <button onClick={() => submitAnswers()} style={{ padding: '0.7rem 1.5rem', fontSize: '1rem' }}>
             {token ? 'Save Changes' : 'Submit'}
           </button>
         ) : (
@@ -1047,6 +1739,7 @@ function PublicForm() {
           </button>
         )}
       </div>
+      )}
 
       {message && <p style={{ marginTop: '1rem', color: 'red' }}>{message}</p>}
 

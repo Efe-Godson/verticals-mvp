@@ -99,7 +99,6 @@ function Home() {
   const [searchText, setSearchText] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('verticals_view_mode') || 'grid')
-  const [demoCollapsed, setDemoCollapsed] = useState(() => localStorage.getItem('verticals_demo_collapsed') !== 'false')
   const [openMenuId, setOpenMenuId] = useState(null)
   const [pendingConfirm, setPendingConfirm] = useState(null) // { type: 'moveToBin', formId } | { type: 'bulkMoveToBin' } | { type: 'permanentDelete', formId } | { type: 'emptyBin' }
   const [selectedFormIds, setSelectedFormIds] = useState([])
@@ -200,12 +199,6 @@ function Home() {
   function changeViewMode(mode) {
     setViewMode(mode)
     localStorage.setItem('verticals_view_mode', mode)
-  }
-
-  function toggleDemoCollapsed() {
-    const next = !demoCollapsed
-    setDemoCollapsed(next)
-    localStorage.setItem('verticals_demo_collapsed', String(next))
   }
 
   function copyLink(formId) {
@@ -386,7 +379,7 @@ function Home() {
       <style>{`
         .form-grid-card { transition: border-color 0.15s ease, background-color 0.15s ease; }
         .form-grid-card:hover { border-color: var(--color-primary); }
-        .form-grid-card.selected { border-color: var(--color-primary); background: #eff6ff; }
+        .form-grid-card.selected { border-color: var(--color-primary); background: var(--color-primary-soft); }
         .form-list-row { transition: background-color 0.15s ease; }
         .form-list-row:hover { background: var(--color-bg); }
         .form-list-row:last-child { border-bottom: none !important; }
@@ -419,10 +412,27 @@ function Home() {
         </div>
       </div>
 
+      {!loading && demoForm && (
+        <div className="card" style={{ padding: '1.2rem 1.5rem', marginBottom: '1.5rem', background: 'white' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.6rem' }}>
+            <PinIcon size={13} />
+            <span style={{ fontWeight: 600, fontSize: '0.92rem' }}>Try Demo</span>
+          </div>
+          <p style={{ margin: '0 0 0.9rem 0', color: 'var(--color-muted)', fontSize: '0.88rem' }}>
+            Explore "{demoForm.name}", a fully built example with real submissions, so you can see what records and reports look like once a form has been collecting data for a while.
+          </p>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <Link to={`/form/${demoForm.id}/records`}><button className="secondary">View Records</button></Link>
+            <Link to={`/form/${demoForm.id}/report`}><button>View Report</button></Link>
+            <Link to={`/form/${demoForm.id}`}><button className="secondary">Open Form</button></Link>
+          </div>
+        </div>
+      )}
+
       {selectionMode && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: '0.8rem', marginBottom: '1.2rem',
-          padding: '0.6rem 1rem', background: '#eff6ff', border: '1px solid var(--color-primary)', borderRadius: 'var(--radius)'
+          padding: '0.6rem 1rem', background: 'var(--color-primary-soft)', border: '1px solid var(--color-primary)', borderRadius: 'var(--radius)'
         }}>
           <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>{selectedFormIds.length} selected</span>
           <button className="secondary" style={{ color: '#c0392b' }} disabled={selectedFormIds.length === 0} onClick={requestBulkDelete}>
@@ -530,42 +540,6 @@ function Home() {
         </>
       )}
 
-      {!loading && demoForm && (
-        <div style={{ marginTop: '2.5rem', maxWidth: demoCollapsed ? '220px' : '100%' }}>
-          <div
-            onClick={toggleDemoCollapsed}
-            className="card"
-            style={{
-              padding: demoCollapsed ? '0.9rem 1.1rem' : '1.2rem 1.5rem',
-              cursor: 'pointer', userSelect: 'none', background: 'white'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6rem' }}>
-              <span style={{ fontWeight: 600, fontSize: '0.92rem' }}>Try Demo</span>
-              <span style={{
-                display: 'inline-block', fontSize: '0.7rem', color: 'var(--color-muted)',
-                transform: demoCollapsed ? 'rotate(0deg)' : 'rotate(180deg)', transition: 'transform 0.15s'
-              }}>
-                ▾
-              </span>
-            </div>
-
-            {!demoCollapsed && (
-              <div onClick={(e) => e.stopPropagation()} style={{ marginTop: '0.9rem' }}>
-                <p style={{ margin: '0 0 0.9rem 0', color: 'var(--color-muted)', fontSize: '0.88rem' }}>
-                  Explore "{demoForm.name}", a fully built example with real submissions, so you can see what records and reports look like once a form has been collecting data for a while.
-                </p>
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  <Link to={`/form/${demoForm.id}/records`}><button className="secondary">View Records</button></Link>
-                  <Link to={`/form/${demoForm.id}/report`}><button>View Report</button></Link>
-                  <Link to={`/form/${demoForm.id}`}><button className="secondary">Open Form</button></Link>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {showBin && (
         <HomeRecycleBinDialog
           forms={trashedForms}
@@ -614,7 +588,7 @@ function ListView({ pageForms, togglePin, publishForm, setFormStatus, duplicateF
           padding: '0.75rem 1.1rem', display: 'flex', justifyContent: 'space-between',
           alignItems: 'center', flexWrap: 'wrap', gap: '0.8rem',
           borderBottom: '1px solid var(--color-border)',
-          background: selected ? '#eff6ff' : 'transparent'
+          background: selected ? 'var(--color-primary-soft)' : 'transparent'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
             {selectionMode && (

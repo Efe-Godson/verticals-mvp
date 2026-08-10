@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { supabase } from './supabaseClient'
+import PosSidePanel from './PosSidePanel'
 
 function FormSettings() {
   const { id } = useParams()
+  const [searchParams] = useSearchParams()
+  const isFocusMode = searchParams.get('focus') === '1'
   const [form, setForm] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -55,41 +58,50 @@ function FormSettings() {
   if (loading) return <div className="page">Loading settings...</div>
   if (error) return <div className="page" style={{ color: 'red' }}>{error}</div>
 
+  const hasCartField = form.fields?.some(f => f.type === 'cart')
+
   return (
     <div className="page">
+      {isFocusMode && <PosSidePanel formId={form.id} hasCartField={hasCartField} />}
       <h1>{form.name}: Settings</h1>
 
-      <div className="card" style={{ padding: '1.5rem', marginTop: '1.5rem' }}>
-        <h3 style={{ marginTop: 0 }}>Responses</h3>
+      {/* "Submit another response" and email collection are about a public
+          respondent filling this form out themselves - meaningless for a
+          POS/restaurant-style form, where orders are entered by staff via
+          the order screen, not submitted by the customer. */}
+      {!hasCartField && (
+        <div className="card" style={{ padding: '1.5rem', marginTop: '1.5rem' }}>
+          <h3 style={{ marginTop: 0 }}>Responses</h3>
 
-        <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.2rem', cursor: 'pointer' }}>
-          <input
-            type="checkbox"
-            checked={allowMultipleResponses}
-            onChange={(e) => setAllowMultipleResponses(e.target.checked)}
-          />
-          <span>
-            Allow respondents to submit another response
-            <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>
-              Shows a "Submit another response" option after someone submits the form.
-            </div>
-          </span>
-        </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.2rem', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={allowMultipleResponses}
+              onChange={(e) => setAllowMultipleResponses(e.target.checked)}
+            />
+            <span>
+              Allow respondents to submit another response
+              <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>
+                Shows a "Submit another response" option after someone submits the form.
+              </div>
+            </span>
+          </label>
 
-        <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer' }}>
-          <input
-            type="checkbox"
-            checked={collectEmail}
-            onChange={(e) => setCollectEmail(e.target.checked)}
-          />
-          <span>
-            Automatically collect respondent email addresses
-            <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>
-              Adds a required email field at the top of the form, separate from your custom fields.
-            </div>
-          </span>
-        </label>
-      </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={collectEmail}
+              onChange={(e) => setCollectEmail(e.target.checked)}
+            />
+            <span>
+              Automatically collect respondent email addresses
+              <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>
+                Adds a required email field at the top of the form, separate from your custom fields.
+              </div>
+            </span>
+          </label>
+        </div>
+      )}
 
       <div className="card" style={{ padding: '1.5rem', marginTop: '1.5rem' }}>
         <h3 style={{ marginTop: 0 }}>Receipt Details</h3>

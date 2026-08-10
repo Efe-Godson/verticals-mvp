@@ -349,7 +349,7 @@ function AIAnalystPage() {
 
             <SectionHeader>Executive Summary</SectionHeader>
             <div className="card" style={{
-              padding: '1.6rem', background: 'linear-gradient(135deg, #f8faff 0%, #f3f7ff 100%)',
+              padding: '1.6rem', background: 'linear-gradient(135deg, var(--color-surface) 0%, var(--color-primary-soft) 100%)',
               borderLeft: '4px solid var(--color-primary)'
             }}>
               <p style={{ margin: 0, lineHeight: 1.65, fontSize: '1.02rem' }}>{analysis.executiveSummary}</p>

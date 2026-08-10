@@ -6,11 +6,11 @@ import { formatCell } from './recordsUiKit'
 import { CartEditInput } from './CartEditInput'
 import { RecordEditInput } from './RecordEditInput'
 
-export function RecordDetail({ form, record, fields, onClose, onUpdated }) {
+export function RecordDetail({ form, record, fields, onClose, onUpdated, initialEditing = false, hideEdit = false }) {
   const { session } = useAuth()
   const hasCartField = fields.some(f => f.type === 'cart')
 
-  const [isEditing, setIsEditing] = useState(false)
+  const [isEditing, setIsEditing] = useState(initialEditing)
   const [editedValues, setEditedValues] = useState(record.data)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
@@ -150,7 +150,9 @@ export function RecordDetail({ form, record, fields, onClose, onUpdated }) {
                   <button className="secondary" onClick={() => printReceipt(form, record)}>Print Receipt</button>
                 )}
                 <button className="secondary" onClick={openHistory}>History</button>
-                <button className="secondary" onClick={startEditing}>Edit</button>
+                {!hideEdit && (
+                  <button className="secondary" onClick={startEditing}>Edit</button>
+                )}
               </>
             )}
             {isEditing && (
