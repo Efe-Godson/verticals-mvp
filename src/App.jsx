@@ -34,16 +34,18 @@ function PrivateRoute({ children }) {
 }
 
 // Staff accounts (see AdminStaff.jsx) only ever get Order Screen, Add
-// Products, and Records for the one form they're assigned to - everything
-// else in the app (Home, Reports, Settings, other forms, Admin itself)
+// Products, Records, and Reports for the one form they're assigned to -
+// everything else in the app (Home, Settings, other forms, Admin itself)
 // bounces them back to their order screen. staffFormId is undefined while
 // AuthContext is still checking, so this only enforces once it's resolved.
+// Report.jsx itself further caps what date range Reports shows them, see
+// settings.staffReportRange.
 function StaffScopedRoute({ children }) {
   const { staffFormId } = useAuth()
   const location = useLocation()
   if (staffFormId === undefined) return <div className="page">Loading...</div>
   if (!staffFormId) return children
-  const allowed = new RegExp(`^/form/${staffFormId}(/edit|/records)?/?$`).test(location.pathname)
+  const allowed = new RegExp(`^/form/${staffFormId}(/edit|/records|/report)?/?$`).test(location.pathname)
   if (!allowed) return <Navigate to={`/form/${staffFormId}`} replace />
   return children
 }

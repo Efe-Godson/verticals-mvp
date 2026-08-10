@@ -20,6 +20,7 @@ function FormSettings() {
   const [companyPhone, setCompanyPhone] = useState('')
   const [companyAddress, setCompanyAddress] = useState('')
   const [receiptPaperWidth, setReceiptPaperWidth] = useState(80)
+  const [staffReportRange, setStaffReportRange] = useState('today')
 
   useEffect(() => {
     async function loadForm() {
@@ -34,6 +35,7 @@ function FormSettings() {
         setCompanyPhone(data.settings?.companyPhone ?? '')
         setCompanyAddress(data.settings?.companyAddress ?? '')
         setReceiptPaperWidth(data.settings?.receiptPaperWidth ?? 80)
+        setStaffReportRange(data.settings?.staffReportRange ?? 'today')
       }
       setLoading(false)
     }
@@ -53,6 +55,7 @@ function FormSettings() {
     const newSettings = {
       ...form.settings,
       allowMultipleResponses, collectEmail, companyName, companyPhone, companyAddress, receiptPaperWidth,
+      staffReportRange,
     }
 
     const { error } = await supabase
@@ -204,6 +207,23 @@ function FormSettings() {
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="card" style={{ padding: '1.5rem', marginTop: '1.5rem' }}>
+        <h3 style={{ marginTop: 0 }}>Staff Access</h3>
+        <p style={{ fontSize: '0.85rem', color: 'var(--color-muted)', marginTop: '-0.5rem', marginBottom: '1rem' }}>
+          Staff logins can now open Reports for this form - this caps how far back they're allowed to look. You (the owner) always see everything regardless of this setting.
+        </p>
+        <label style={{ fontSize: '0.85rem', color: 'var(--color-muted)' }}>Staff Report Range</label>
+        <select
+          value={staffReportRange}
+          onChange={(e) => setStaffReportRange(e.target.value)}
+          style={{ padding: '0.5rem', width: '100%', marginTop: '0.3rem' }}
+        >
+          <option value="today">Today</option>
+          <option value="7days">Last 7 days</option>
+          <option value="all">All time</option>
+        </select>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '1.5rem', flexWrap: 'wrap' }}>

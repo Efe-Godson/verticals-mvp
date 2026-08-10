@@ -17,9 +17,11 @@ function PosSidePanel({ formId, hasCartField = false }) {
   const [searchParams] = useSearchParams()
   const [open, setOpen] = useState(searchParams.get('panel') === '1')
   const { staffFormId } = useAuth()
-  // Staff accounts only get these three - Reports, Settings, and Admin stay
-  // owner-only (see AdminStaff.jsx and StaffScopedRoute in App.jsx, which
-  // enforce this server- and route-side too, this is just the matching UI).
+  // Staff accounts get Order Screen/View Form, Add Products, Records, and
+  // Reports - Settings and Admin stay owner-only (see AdminStaff.jsx and
+  // StaffScopedRoute in App.jsx, which enforce this server- and route-side
+  // too, this is just the matching UI). Report.jsx itself further caps what
+  // date range staff can see there.
   const isStaff = !!staffFormId
 
   // Where "back" goes: a template's own Locations page if this form is one
@@ -49,8 +51,8 @@ function PosSidePanel({ formId, hasCartField = false }) {
     { label: hasCartField ? 'Order Screen' : 'View Form', to: `/form/${formId}` },
     ...(hasCartField ? [{ label: 'Add Products', to: `/form/${formId}/edit?focus=1` }] : []),
     { label: 'Records', to: `/form/${formId}/records?focus=1` },
+    { label: 'Reports', to: `/form/${formId}/report?focus=1` },
     ...(isStaff ? [] : [
-      { label: 'Reports', to: `/form/${formId}/report?focus=1` },
       { label: 'Settings', to: `/form/${formId}/settings?focus=1` },
       { label: 'Admin', to: `/form/${formId}/admin?focus=1` },
     ]),

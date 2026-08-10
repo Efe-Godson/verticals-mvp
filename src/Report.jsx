@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
+import { useAuth } from './AuthContext'
 import PosSidePanel from './PosSidePanel'
 import { printReport, exportReportToPDF, exportReportToPPTX } from './reportExport'
 
@@ -74,6 +75,13 @@ function Report() {
   const { id } = useParams()
   const [searchParams] = useSearchParams()
   const isFocusMode = searchParams.get('focus') === '1'
+  const { staffFormId } = useAuth()
+  // The owner always sees everything; a staff login sees at most whatever
+  // range the owner capped Reports to in Settings (default "Today") - this
+  // is a UI-level cap, not an RLS one, matching how the rest of this app's
+  // settings work (staff already have full read access to this form's
+  // submissions once they're scoped to it at all).
+  const isStaffView = staffFormId === id
   const [form, setForm] = useState(null)
   const [submissions, setSubmissions] = useState([])
   const [loading, setLoading] = useState(true)
@@ -100,6 +108,9 @@ function Report() {
         return
       }
       setForm(formData)
+      if (staffFormId === id) {
+        setDateRange(formData.settings?.staffReportRange || 'today')
+      }
 
       const { data: subsData, error: subsError } = await supabase
         .from('submissions').select('*').eq('form_id', id)
@@ -114,7 +125,7 @@ function Report() {
       setLoading(false)
     }
     loadData()
-  }, [id])
+  }, [id, staffFormId])
 
   if (loading) return <div className="page">Loading report...</div>
   if (error) return <div style={{ padding: '2rem', fontFamily: 'sans-serif', color: 'red' }}>{error}</div>
@@ -221,16 +232,30 @@ function Report() {
       }}>
         <div className="report-filter-group" style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <label htmlFor="report-date-range">Date range</label>
-          <select id="report-date-range" value={dateRange} onChange={(e) => setDateRange(e.target.value)} style={{ padding: '0.5rem' }}>
-            {DATE_RANGE_OPTIONS.map(opt => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-          {dateRange === 'custom' && (
+          {isStaffView ? (
+            <span
+              title="Set by the owner in Settings > Staff Access"
+              style={{
+                padding: '0.5rem 0.8rem', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
+                fontSize: '0.9rem', color: 'var(--color-muted)', background: 'var(--color-bg)'
+              }}
+            >
+              {getDateRangeLabel(dateRange, customStart, customEnd)}
+            </span>
+          ) : (
             <>
-              <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} style={{ padding: '0.5rem' }} />
-              <span style={{ color: 'var(--color-muted)', fontSize: '0.9rem' }}>to</span>
-              <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} style={{ padding: '0.5rem' }} />
+              <select id="report-date-range" value={dateRange} onChange={(e) => setDateRange(e.target.value)} style={{ padding: '0.5rem' }}>
+                {DATE_RANGE_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+              {dateRange === 'custom' && (
+                <>
+                  <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} style={{ padding: '0.5rem' }} />
+                  <span style={{ color: 'var(--color-muted)', fontSize: '0.9rem' }}>to</span>
+                  <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} style={{ padding: '0.5rem' }} />
+                </>
+              )}
             </>
           )}
         </div>
