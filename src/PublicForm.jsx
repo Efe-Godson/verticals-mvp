@@ -4,6 +4,7 @@ import PosSidePanel from './PosSidePanel'
 import { supabase } from './supabaseClient'
 import { submitForm, getSubmissionByToken, updateSubmissionByToken } from './lib/submissionsClient'
 import { COUNTRIES, statesFor, citiesFor } from './lib/locationData'
+import { printReceipt } from './receiptPrint'
 const PAYMENT_METHODS = ['Cash', 'Card', 'Bank Transfer', 'Split']
 const TOP_CATEGORY_COUNT = 6 // category pills shown before collapsing the rest behind "+N more"
 
@@ -46,7 +47,6 @@ function PublicForm() {
   const [addedFlash, setAddedFlash] = useState({}) // { [productId]: true } - briefly shows "Added" after tapping Add
   const [heldOrders, setHeldOrders] = useState({}) // { [fieldId]: [{ id, orderNumber, quantities, answers, itemCount, total, createdAt }] }
   const [heldPanelFieldId, setHeldPanelFieldId] = useState(null) // which cart field's held-orders panel is open
-  const [receipt, setReceipt] = useState(null) // { orderNumber, items, total, details } - in-page print preview after checkout
   const [respondentEmail, setRespondentEmail] = useState('')
   const [loading, setLoading] = useState(true)
   const [submitted, setSubmitted] = useState(false)
@@ -580,19 +580,21 @@ function PublicForm() {
         if (result.order_number) realOrderNumber = result.order_number
       }
 
-      // Orders go straight to an in-page print preview of the receipt
-      // instead of the generic "thanks for submitting" page - then the
-      // order screen resets itself for the next customer, since this is a
-      // POS flow, not a one-and-done form.
+      // Orders go straight to a print preview of the receipt instead of the
+      // generic "thanks for submitting" page, then the order screen resets
+      // itself for the next customer, since this is a POS flow, not a
+      // one-and-done form. Reuses the exact same popup-window renderer as
+      // Records' "Print Receipt" button (see receiptPrint.js) instead of a
+      // second, in-page implementation - that one only ever has the receipt
+      // itself on the page, so there's no "rest of the page" to accidentally
+      // print alongside it and nothing here has to fight print CSS for it.
       if (hasCartOnPage) {
         const cartField = currentPage.fields.find(f => f.type === 'cart')
-        const cartData = finalData[cartField.id]
-        setReceipt({
-          orderNumber: realOrderNumber,
-          items: cartData.items,
-          total: cartData.total,
-          deliveryFee: cartData.deliveryFee || 0,
-          grandTotal: cartData.total + (cartData.deliveryFee || 0),
+        printReceipt(form, {
+          id: submissionId,
+          order_number: realOrderNumber,
+          data: finalData,
+          created_at: new Date().toISOString(),
         })
 
         setCartQuantities(current => ({ ...current, [cartField.id]: {} }))
@@ -714,44 +716,9 @@ function PublicForm() {
       // checkout modal instead of the main order screen, since this page is
       // the POS order flow and those answers belong to checkout, not the menu.
       const checkoutQuestions = currentPage.fields.filter(f => f.id !== field.id && f.type !== 'section')
-      // Matches whatever the owner picked in Settings > Receipt (default
-      // 80mm). This @page rule was missing entirely before, so printing
-      // this in-page receipt fell back to the browser's default page size
-      // (usually A4/Letter) instead of the thermal roll actually loaded -
-      // exactly the kind of mismatch that makes some printer drivers just
-      // not print anything.
-      const receiptPageWidthMm = Number(form.settings?.receiptPaperWidth) || 80
 
       return (
         <div>
-          <style>{`
-            @media print {
-              @page { size: ${receiptPageWidthMm}mm auto; margin: 0; }
-              .no-print { display: none !important; }
-              /* Strip the modal chrome (dark backdrop, centering, card
-                 shadow/scroll clamp) down to a plain page flowing from the
-                 top - a fixed-position, height-clamped modal is still
-                 sized/positioned for screen viewing, not a print page. */
-              .receipt-modal-overlay {
-                position: static !important; background: none !important;
-                display: block !important; padding: 0 !important;
-              }
-              .receipt-modal-card {
-                box-shadow: none !important; padding: 0 !important;
-                width: auto !important; max-width: none !important;
-                max-height: none !important; overflow: visible !important;
-              }
-              .receipt-print-area { padding: 4mm; box-sizing: border-box; }
-            }
-          `}</style>
-
-          {/* Printing used to hide everything else with visibility:hidden,
-              which still occupies layout space (and position:fixed isn't
-              reliably honored during print in every browser) - the result
-              was a tall blank page with the receipt content only appearing
-              after a long strip of empty space. display:none actually
-              removes this whole block from the print layout instead. */}
-          <div className="no-print">
           {/* Order box - lives on its own at the top, above the menu */}
           <div className="card" style={{ padding: '1rem', marginBottom: '1rem', background: 'var(--color-primary-soft)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.6rem' }}>
@@ -1187,82 +1154,6 @@ function PublicForm() {
                   >
                     {submitting ? 'Submitting...' : 'Checkout'}
                   </button>
-                </div>
-              </div>
-            </div>
-          )}
-          </div>
-
-          {/* Receipt print preview - shown in-page right after checkout, instead of a separate browser popup */}
-          {receipt && (
-            <div
-              onClick={() => setReceipt(null)}
-              className="receipt-modal-overlay"
-              style={{
-                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: '1rem'
-              }}
-            >
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className="card receipt-modal-card"
-                style={{ background: 'white', padding: '1.5rem', width: '380px', maxWidth: '100%', maxHeight: '92vh', overflowY: 'auto' }}
-              >
-                <div className="receipt-print-area" style={{ fontFamily: "'Courier New', monospace", fontSize: '0.88rem', color: '#000' }}>
-                  <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '1.05rem', textTransform: 'uppercase', marginBottom: '0.3rem' }}>
-                    {form.settings?.companyName?.trim() || form.name}
-                  </div>
-                  {form.settings?.companyAddress?.trim() && (
-                    <div style={{ textAlign: 'center', fontSize: '0.72rem', color: '#333' }}>
-                      {form.settings.companyAddress}
-                    </div>
-                  )}
-                  {form.settings?.companyPhone?.trim() && (
-                    <div style={{ textAlign: 'center', fontSize: '0.72rem', color: '#333' }}>
-                      {form.settings.companyPhone}
-                    </div>
-                  )}
-                  <div style={{ textAlign: 'center', fontSize: '0.75rem', color: '#333', marginTop: '0.2rem' }}>
-                    Order #{receipt.orderNumber}
-                  </div>
-                  <div style={{ textAlign: 'center', fontSize: '0.75rem', margin: '0.5rem 0' }}>
-                    {new Date().toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' })}
-                    {' '}{new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase()}
-                  </div>
-
-                  <div style={{ borderTop: '1px dashed #000', margin: '0.5rem 0' }} />
-                  {receipt.items.map((item, i) => (
-                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', margin: '0.3rem 0', fontWeight: 600 }}>
-                      <span>{i + 1}. {item.name}{item.quantity > 1 ? ` ×${item.quantity}` : ''}</span>
-                      <span>{(item.price * item.quantity).toLocaleString()}</span>
-                    </div>
-                  ))}
-                  <div style={{ borderTop: '2px solid #000', margin: '0.5rem 0' }} />
-                  <div style={{ display: 'flex', justifyContent: 'space-between', margin: '0.25rem 0', fontWeight: 600 }}>
-                    <span>Subtotal</span>
-                    <span>{receipt.total.toLocaleString()}</span>
-                  </div>
-                  {receipt.deliveryFee > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', margin: '0.25rem 0', fontWeight: 600 }}>
-                      <span>Delivery Fee</span>
-                      <span>{receipt.deliveryFee.toLocaleString()}</span>
-                    </div>
-                  )}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.1rem' }}>
-                    <span>TOTAL</span>
-                    <span>{receipt.grandTotal.toLocaleString()}</span>
-                  </div>
-                  <div style={{ textAlign: 'center', fontSize: '0.78rem', fontWeight: 600, marginTop: '0.8rem' }}>
-                    Thank you for coming!
-                  </div>
-                  <div style={{ textAlign: 'center', fontSize: '0.7rem', color: '#999', marginTop: '0.3rem' }}>
-                    Powered by Verticals
-                  </div>
-                </div>
-
-                <div className="no-print" style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                  <button type="button" className="secondary" onClick={() => setReceipt(null)}>Close</button>
-                  <button type="button" onClick={() => window.print()}>Print</button>
                 </div>
               </div>
             </div>

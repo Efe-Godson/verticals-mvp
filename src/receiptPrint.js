@@ -67,9 +67,14 @@ export function printReceipt(form, submission) {
   const dateStr = createdDate.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' })
   const timeStr = createdDate.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase()
 
-  // A short, receipt-style order number derived from the submission's own ID:
-  // no extra numbering system needed, just makes it look/feel like a real receipt.
-  const orderNumber = submission.id.replace(/-/g, '').slice(-12).toUpperCase()
+  // Prefer the real order_number (the same one Records searches/displays by)
+  // so a reprinted receipt matches what the owner sees there - falling back
+  // to something derived from the submission's own ID only if that column
+  // isn't populated (e.g. a synthetic submission object built client-side
+  // right at checkout, before Records has anything to look up).
+  const orderNumber = submission.order_number
+    ? String(submission.order_number)
+    : submission.id.replace(/-/g, '').slice(-12).toUpperCase()
 
   const businessName = settings.companyName?.trim() || form.name
   const businessPhone = settings.companyPhone?.trim()
