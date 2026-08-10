@@ -142,7 +142,7 @@ export function printReceipt(form, submission) {
           width: ${contentWidthMm}mm;
           background: white;
           padding: 5mm 4mm;
-          font-size: 12px;
+          font-size: 13px;
           color: #000;
           box-shadow: 0 2px 10px rgba(0,0,0,0.12);
         }
@@ -179,8 +179,9 @@ export function printReceipt(form, submission) {
           display: flex;
           justify-content: space-between;
           gap: 8px;
-          margin: 4px 0;
+          margin: 5px 0;
         }
+        .item-row { font-weight: 600; }
         /* min-width: 0 lets these shrink below their content's natural
            width (flex items default to min-width: auto, which otherwise
            forces the row to overflow the receipt's edge instead of
@@ -191,7 +192,7 @@ export function printReceipt(form, submission) {
           display: flex;
           justify-content: space-between;
           font-weight: bold;
-          font-size: 15px;
+          font-size: 17px;
           margin: 4px 0;
         }
         .thank-you {

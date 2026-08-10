@@ -1078,7 +1078,7 @@ function PublicForm() {
                       </div>
                     ))}
 
-                    {checkoutQuestions.some(q => answers[q.id] === 'Takeout') && (
+                    {checkoutQuestions.some(q => answers[q.id] === 'Delivery') && (
                       <div>
                         <label style={{ fontWeight: 600, fontSize: '0.85rem' }}>Delivery Fee</label>
                         <input
@@ -1208,7 +1208,7 @@ function PublicForm() {
                 className="card receipt-modal-card"
                 style={{ background: 'white', padding: '1.5rem', width: '380px', maxWidth: '100%', maxHeight: '92vh', overflowY: 'auto' }}
               >
-                <div className="receipt-print-area" style={{ fontFamily: "'Courier New', monospace", fontSize: '0.8rem', color: '#000' }}>
+                <div className="receipt-print-area" style={{ fontFamily: "'Courier New', monospace", fontSize: '0.88rem', color: '#000' }}>
                   <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '1.05rem', textTransform: 'uppercase', marginBottom: '0.3rem' }}>
                     {form.settings?.companyName?.trim() || form.name}
                   </div>
@@ -1232,23 +1232,23 @@ function PublicForm() {
 
                   <div style={{ borderTop: '1px dashed #000', margin: '0.5rem 0' }} />
                   {receipt.items.map((item, i) => (
-                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', margin: '0.25rem 0' }}>
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', margin: '0.3rem 0', fontWeight: 600 }}>
                       <span>{i + 1}. {item.name}{item.quantity > 1 ? ` ×${item.quantity}` : ''}</span>
                       <span>{(item.price * item.quantity).toLocaleString()}</span>
                     </div>
                   ))}
                   <div style={{ borderTop: '2px solid #000', margin: '0.5rem 0' }} />
-                  <div style={{ display: 'flex', justifyContent: 'space-between', margin: '0.25rem 0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', margin: '0.25rem 0', fontWeight: 600 }}>
                     <span>Subtotal</span>
                     <span>{receipt.total.toLocaleString()}</span>
                   </div>
                   {receipt.deliveryFee > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', margin: '0.25rem 0' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', margin: '0.25rem 0', fontWeight: 600 }}>
                       <span>Delivery Fee</span>
                       <span>{receipt.deliveryFee.toLocaleString()}</span>
                     </div>
                   )}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '0.95rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.1rem' }}>
                     <span>TOTAL</span>
                     <span>{receipt.grandTotal.toLocaleString()}</span>
                   </div>
@@ -1588,13 +1588,17 @@ function PublicForm() {
 
   return (
     <div className="page">
-      {!token && <PosSidePanel formId={form.id} hasCartField={form.fields.some(f => f.type === 'cart')} />}
+      {!token && (
+        <div className="no-print">
+          <PosSidePanel formId={form.id} hasCartField={form.fields.some(f => f.type === 'cart')} />
+        </div>
+      )}
 
-      <h1>{form.name}</h1>
-      {form.description && <p>{form.description}</p>}
+      <h1 className="no-print">{form.name}</h1>
+      {form.description && <p className="no-print">{form.description}</p>}
 
       {pages.length > 1 && (
-        <div style={{ margin: '0.8rem 0 1.2rem' }}>
+        <div className="no-print" style={{ margin: '0.8rem 0 1.2rem' }}>
           <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)', marginBottom: '0.4rem' }}>
             Page {pageIndex + 1} of {pages.length}
           </div>
@@ -1608,7 +1612,7 @@ function PublicForm() {
       )}
 
       {pageIndex === 0 && form.settings?.collectEmail && (
-        <div className="card" style={{ padding: '1rem', marginBottom: '1rem' }}>
+        <div className="card no-print" style={{ padding: '1rem', marginBottom: '1rem' }}>
           <label>Your Email</label><br />
           <input
             type="email"
@@ -1630,7 +1634,7 @@ function PublicForm() {
       )}
 
       {currentPage.section && (
-        <div style={{ marginBottom: '1.2rem' }}>
+        <div className="no-print" style={{ marginBottom: '1.2rem' }}>
           <h2 style={{ margin: '0 0 0.3rem', fontSize: '1.25rem' }}>{currentPage.section.title || 'Untitled Section'}</h2>
           {currentPage.section.description && (
             <p style={{ margin: 0, color: 'var(--color-muted)' }}>{currentPage.section.description}</p>
@@ -1667,7 +1671,7 @@ function PublicForm() {
       ))}
 
       {!hasCartOnPage && (
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem' }}>
+      <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem' }}>
         {pageIndex > 0 ? (
           <button className="secondary" onClick={goBack} style={{ padding: '0.7rem 1.5rem', fontSize: '1rem' }}>
             Back
@@ -1686,9 +1690,9 @@ function PublicForm() {
       </div>
       )}
 
-      {message && <p style={{ marginTop: '1rem', color: 'red' }}>{message}</p>}
+      {message && <p className="no-print" style={{ marginTop: '1rem', color: 'red' }}>{message}</p>}
 
-      <p style={{ marginTop: '3rem', color: '#999', fontSize: '0.85rem' }}>
+      <p className="no-print" style={{ marginTop: '3rem', color: '#999', fontSize: '0.85rem' }}>
         Powered by Verticals
       </p>
     </div>
