@@ -19,6 +19,7 @@ function FormSettings() {
   const [companyName, setCompanyName] = useState('')
   const [companyPhone, setCompanyPhone] = useState('')
   const [companyAddress, setCompanyAddress] = useState('')
+  const [receiptPaperWidth, setReceiptPaperWidth] = useState(80)
 
   useEffect(() => {
     async function loadForm() {
@@ -32,6 +33,7 @@ function FormSettings() {
         setCompanyName(data.settings?.companyName ?? '')
         setCompanyPhone(data.settings?.companyPhone ?? '')
         setCompanyAddress(data.settings?.companyAddress ?? '')
+        setReceiptPaperWidth(data.settings?.receiptPaperWidth ?? 80)
       }
       setLoading(false)
     }
@@ -50,7 +52,7 @@ function FormSettings() {
     // used to silently delete all of those the moment this page saved.
     const newSettings = {
       ...form.settings,
-      allowMultipleResponses, collectEmail, companyName, companyPhone, companyAddress,
+      allowMultipleResponses, collectEmail, companyName, companyPhone, companyAddress, receiptPaperWidth,
     }
 
     const { error } = await supabase
@@ -144,7 +146,7 @@ function FormSettings() {
           />
         </div>
 
-        <div>
+        <div style={{ marginBottom: '1.2rem' }}>
           <label style={{ fontSize: '0.85rem', color: 'var(--color-muted)' }}>Address</label>
           <input
             type="text"
@@ -153,6 +155,54 @@ function FormSettings() {
             placeholder="e.g. 12 Airport Road, Benin City"
             style={{ padding: '0.5rem', width: '100%', marginTop: '0.3rem' }}
           />
+        </div>
+
+        <div style={{ marginBottom: '1.2rem' }}>
+          <label style={{ fontSize: '0.85rem', color: 'var(--color-muted)' }}>Printer Width</label>
+          <select
+            value={receiptPaperWidth}
+            onChange={(e) => setReceiptPaperWidth(Number(e.target.value))}
+            style={{ padding: '0.5rem', width: '100%', marginTop: '0.3rem' }}
+          >
+            <option value={58}>58mm (small thermal printers)</option>
+            <option value={80}>80mm (standard thermal printers)</option>
+          </select>
+        </div>
+
+        <div>
+          <label style={{ fontSize: '0.85rem', color: 'var(--color-muted)', display: 'block', marginBottom: '0.5rem' }}>
+            Preview
+          </label>
+          <div style={{ background: '#eef0f2', padding: '1.2rem', borderRadius: 'var(--radius)', display: 'flex', justifyContent: 'center' }}>
+            <div style={{
+              fontFamily: "'Courier New', monospace", fontSize: '12px', color: '#000',
+              width: `${receiptPaperWidth}mm`, background: 'white', padding: '5mm 4mm',
+              boxShadow: '0 2px 10px rgba(0,0,0,0.12)'
+            }}>
+              <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '17px', letterSpacing: '0.5px', marginBottom: '4px', textTransform: 'uppercase' }}>
+                {companyName.trim() || form.name}
+              </div>
+              {companyAddress.trim() && <div style={{ textAlign: 'center', fontSize: '10px', color: '#333' }}>{companyAddress}</div>}
+              {companyPhone.trim() && <div style={{ textAlign: 'center', fontSize: '10px', color: '#333' }}>{companyPhone}</div>}
+              <div style={{ textAlign: 'center', fontSize: '10px', margin: '8px 0 4px' }}>Sat 10/08/2026 · 7:45 PM</div>
+              <div style={{ borderTop: '1px dashed #000', margin: '8px 0' }} />
+              {[{ n: 'Grilled Chicken', q: 2, p: 12.99 }, { n: 'Soft Drink', q: 1, p: 2.50 }].map((item, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', margin: '4px 0' }}>
+                  <span>{i + 1}. {item.n} ×{item.q}</span>
+                  <span>{(item.p * item.q).toLocaleString()}</span>
+                </div>
+              ))}
+              <div style={{ borderTop: '2px solid #000', margin: '6px 0' }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '15px', margin: '4px 0' }}>
+                <span>TOTAL</span>
+                <span>28.48</span>
+              </div>
+              <div style={{ borderTop: '1px dashed #000', margin: '8px 0' }} />
+              <div style={{ textAlign: 'center', fontSize: '11px', fontWeight: 'bold', marginTop: '10px' }}>Thank you for coming!</div>
+              <div style={{ textAlign: 'center', fontSize: '9px', letterSpacing: '1px', marginTop: '6px' }}>#ABC123456789#</div>
+              <div style={{ textAlign: 'center', fontSize: '9px', color: '#999', marginTop: '4px' }}>Powered by Verticals</div>
+            </div>
+          </div>
         </div>
       </div>
 

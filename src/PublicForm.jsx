@@ -714,14 +714,22 @@ function PublicForm() {
       // checkout modal instead of the main order screen, since this page is
       // the POS order flow and those answers belong to checkout, not the menu.
       const checkoutQuestions = currentPage.fields.filter(f => f.id !== field.id && f.type !== 'section')
+      // Matches whatever the owner picked in Settings > Receipt (default
+      // 80mm). This @page rule was missing entirely before, so printing
+      // this in-page receipt fell back to the browser's default page size
+      // (usually A4/Letter) instead of the thermal roll actually loaded -
+      // exactly the kind of mismatch that makes some printer drivers just
+      // not print anything.
+      const receiptPageWidthMm = Number(form.settings?.receiptPaperWidth) || 80
 
       return (
         <div>
           <style>{`
             @media print {
+              @page { size: ${receiptPageWidthMm}mm auto; margin: 0; }
               body * { visibility: hidden; }
               .receipt-print-area, .receipt-print-area * { visibility: visible; }
-              .receipt-print-area { position: fixed; top: 0; left: 0; width: 100%; }
+              .receipt-print-area { position: fixed; top: 0; left: 0; width: 100%; padding: 4mm; box-sizing: border-box; }
             }
           `}</style>
 
@@ -1213,7 +1221,10 @@ function PublicForm() {
                     <span>TOTAL</span>
                     <span>{receipt.grandTotal.toLocaleString()}</span>
                   </div>
-                  <div style={{ textAlign: 'center', fontSize: '0.7rem', color: '#999', marginTop: '0.8rem' }}>
+                  <div style={{ textAlign: 'center', fontSize: '0.78rem', fontWeight: 600, marginTop: '0.8rem' }}>
+                    Thank you for coming!
+                  </div>
+                  <div style={{ textAlign: 'center', fontSize: '0.7rem', color: '#999', marginTop: '0.3rem' }}>
                     Powered by Verticals
                   </div>
                 </div>

@@ -28,7 +28,7 @@ set fields = $tmpl$[
       ]
     },
     { "id": "order_type", "type": "dropdown", "label": "Order Type", "required": true, "options": ["Dine-in", "Takeout", "Delivery"] },
-    { "id": "sales_person", "type": "text", "label": "Sales Person", "required": true },
+    { "id": "sales_person", "type": "text", "label": "Sales Person", "required": false, "collapsedInCheckout": true },
     { "id": "customer_name", "type": "text", "label": "Customer / Table Name", "required": false, "collapsedInCheckout": true },
     { "id": "table_number", "type": "text", "label": "Table Number", "required": false, "collapsedInCheckout": true },
     { "id": "phone", "type": "phone", "label": "Phone (for takeout/delivery)", "required": false, "collapsedInCheckout": true },

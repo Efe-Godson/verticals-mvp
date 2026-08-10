@@ -7,6 +7,12 @@ export function printReceipt(form, submission) {
   const otherFields = form.fields.filter(f => f.type !== 'cart' && f.type !== 'section')
   const settings = form.settings || {}
 
+  // Matches whatever the owner picked in Settings > Receipt (default 80mm,
+  // the common thermal roll size) - content is a few mm narrower than the
+  // page itself, see the @page comment below for why.
+  const pageWidthMm = Number(settings.receiptPaperWidth) || 80
+  const contentWidthMm = Math.max(pageWidthMm - 6, 30)
+
   function formatFieldValue(field, value) {
     if (Array.isArray(value)) return value.join(', ')
     if (field.type === 'multiplechoicegrid' && value && typeof value === 'object') {
@@ -85,7 +91,7 @@ export function printReceipt(form, submission) {
            instead means there's only one source of truth for it, and a few
            mm of built-in slack (80mm page, 74mm content) absorbs whatever
            the driver still trims. */
-        @page { size: 80mm auto; margin: 0; }
+        @page { size: ${pageWidthMm}mm auto; margin: 0; }
         * { box-sizing: border-box; }
 
         body {
@@ -99,7 +105,7 @@ export function printReceipt(form, submission) {
         }
 
         .toolbar {
-          width: 74mm;
+          width: ${contentWidthMm}mm;
           display: flex;
           justify-content: center;
           gap: 0.6rem;
@@ -120,7 +126,7 @@ export function printReceipt(form, submission) {
 
         /* Torn-paper zigzag edge - purely decorative, screen only */
         .tear {
-          width: 74mm;
+          width: ${contentWidthMm}mm;
           height: 10px;
           background:
             linear-gradient(135deg, #eef0f2 50%, transparent 50%) 0 0,
@@ -133,7 +139,7 @@ export function printReceipt(form, submission) {
 
         .receipt {
           font-family: 'Courier New', monospace;
-          width: 74mm;
+          width: ${contentWidthMm}mm;
           background: white;
           padding: 5mm 4mm;
           font-size: 12px;
@@ -188,10 +194,16 @@ export function printReceipt(form, submission) {
           font-size: 15px;
           margin: 4px 0;
         }
+        .thank-you {
+          text-align: center;
+          font-size: 11px;
+          font-weight: bold;
+          margin-top: 10px;
+        }
         .footer {
           text-align: center;
           font-size: 9px;
-          margin-top: 12px;
+          margin-top: 6px;
           letter-spacing: 1px;
         }
         .powered-by {
@@ -238,6 +250,7 @@ export function printReceipt(form, submission) {
           <div class="divider"></div>
         ` : ''}
 
+        <div class="thank-you">Thank you for coming!</div>
         <div class="footer">#${orderNumber}#</div>
         <div class="powered-by">Powered by Verticals</div>
       </div>
