@@ -727,12 +727,31 @@ function PublicForm() {
           <style>{`
             @media print {
               @page { size: ${receiptPageWidthMm}mm auto; margin: 0; }
-              body * { visibility: hidden; }
-              .receipt-print-area, .receipt-print-area * { visibility: visible; }
-              .receipt-print-area { position: fixed; top: 0; left: 0; width: 100%; padding: 4mm; box-sizing: border-box; }
+              .no-print { display: none !important; }
+              /* Strip the modal chrome (dark backdrop, centering, card
+                 shadow/scroll clamp) down to a plain page flowing from the
+                 top - a fixed-position, height-clamped modal is still
+                 sized/positioned for screen viewing, not a print page. */
+              .receipt-modal-overlay {
+                position: static !important; background: none !important;
+                display: block !important; padding: 0 !important;
+              }
+              .receipt-modal-card {
+                box-shadow: none !important; padding: 0 !important;
+                width: auto !important; max-width: none !important;
+                max-height: none !important; overflow: visible !important;
+              }
+              .receipt-print-area { padding: 4mm; box-sizing: border-box; }
             }
           `}</style>
 
+          {/* Printing used to hide everything else with visibility:hidden,
+              which still occupies layout space (and position:fixed isn't
+              reliably honored during print in every browser) - the result
+              was a tall blank page with the receipt content only appearing
+              after a long strip of empty space. display:none actually
+              removes this whole block from the print layout instead. */}
+          <div className="no-print">
           {/* Order box - lives on its own at the top, above the menu */}
           <div className="card" style={{ padding: '1rem', marginBottom: '1rem', background: 'var(--color-primary-soft)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.6rem' }}>
@@ -1172,11 +1191,13 @@ function PublicForm() {
               </div>
             </div>
           )}
+          </div>
 
           {/* Receipt print preview - shown in-page right after checkout, instead of a separate browser popup */}
           {receipt && (
             <div
               onClick={() => setReceipt(null)}
+              className="receipt-modal-overlay"
               style={{
                 position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: '1rem'
@@ -1184,14 +1205,24 @@ function PublicForm() {
             >
               <div
                 onClick={(e) => e.stopPropagation()}
-                className="card"
+                className="card receipt-modal-card"
                 style={{ background: 'white', padding: '1.5rem', width: '380px', maxWidth: '100%', maxHeight: '92vh', overflowY: 'auto' }}
               >
                 <div className="receipt-print-area" style={{ fontFamily: "'Courier New', monospace", fontSize: '0.8rem', color: '#000' }}>
                   <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '1.05rem', textTransform: 'uppercase', marginBottom: '0.3rem' }}>
                     {form.settings?.companyName?.trim() || form.name}
                   </div>
-                  <div style={{ textAlign: 'center', fontSize: '0.75rem', color: '#333' }}>
+                  {form.settings?.companyAddress?.trim() && (
+                    <div style={{ textAlign: 'center', fontSize: '0.72rem', color: '#333' }}>
+                      {form.settings.companyAddress}
+                    </div>
+                  )}
+                  {form.settings?.companyPhone?.trim() && (
+                    <div style={{ textAlign: 'center', fontSize: '0.72rem', color: '#333' }}>
+                      {form.settings.companyPhone}
+                    </div>
+                  )}
+                  <div style={{ textAlign: 'center', fontSize: '0.75rem', color: '#333', marginTop: '0.2rem' }}>
                     Order #{receipt.orderNumber}
                   </div>
                   <div style={{ textAlign: 'center', fontSize: '0.75rem', margin: '0.5rem 0' }}>
@@ -1229,7 +1260,7 @@ function PublicForm() {
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
+                <div className="no-print" style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
                   <button type="button" className="secondary" onClick={() => setReceipt(null)}>Close</button>
                   <button type="button" onClick={() => window.print()}>Print</button>
                 </div>
