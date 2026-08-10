@@ -68,6 +68,37 @@ function CreateForm() {
   const debounceRef = useRef(null)
   const isFirstRun = useRef(true)
   const formIdRef = useRef(null) // avoids stale closures inside the debounce timer
+  const insertPromiseRef = useRef(null) // in-flight "create the row" request, shared so autosave and Save Form can never insert two rows
+  // Holds the not-yet-fired autosave for the *latest* render, or null once
+  // it's run. Navigating away inside the debounce window used to just
+  // cancel the pending timer via this effect's own cleanup - silently
+  // dropping (or on a brand-new form, entirely losing) whatever was typed
+  // in the last ~2s. The unmount-only effect below flushes this instead.
+  const pendingSaveRef = useRef(null)
+
+  // Both the autosave path and the explicit Save Form button need "the
+  // form's row id, creating it first if needed" - sharing one in-flight
+  // insert promise means a Save-Form click landing while autosave's first
+  // insert is still in the air reuses that same request instead of firing
+  // a second insert (which used to create two draft rows).
+  async function ensureFormId(nameToSave, description, cleanedFields) {
+    if (formIdRef.current) return formIdRef.current
+    if (!insertPromiseRef.current) {
+      insertPromiseRef.current = supabase
+        .from('forms')
+        .insert([{ name: nameToSave, description, fields: cleanedFields, status: 'draft', user_id: session.user.id }])
+        .select()
+        .single()
+        .then(({ data, error }) => {
+          if (error || !data) throw error || new Error('Could not create the form')
+          formIdRef.current = data.id
+          setFormId(data.id)
+          return data.id
+        })
+        .finally(() => { insertPromiseRef.current = null })
+    }
+    return insertPromiseRef.current
+  }
 
   const [recentlyRemoved, setRecentlyRemoved] = useState(null) // { field, index }
   const undoTimeoutRef = useRef(null)
@@ -89,37 +120,42 @@ function CreateForm() {
 
     if (debounceRef.current) clearTimeout(debounceRef.current)
 
-    debounceRef.current = setTimeout(async () => {
+    async function doSave() {
+      pendingSaveRef.current = null // this save is running/done - nothing left to flush on unmount
       setAutosaveStatus('saving')
       const cleanedFields = cleanFieldsForSave(fields)
       const nameToSave = formName.trim() === '' ? 'Untitled Form' : formName
 
-      if (!formIdRef.current) {
-        const { data, error } = await supabase
-          .from('forms')
-          .insert([{ name: nameToSave, description: formDescription.trim() || null, fields: cleanedFields, status: 'draft', user_id: session.user.id }])
-          .select()
-          .single()
-
-        if (!error && data) {
-          formIdRef.current = data.id
-          setFormId(data.id)
-          setAutosaveStatus('saved')
-        } else {
-          setAutosaveStatus('error')
-        }
-      } else {
+      try {
+        const id = await ensureFormId(nameToSave, formDescription.trim() || null, cleanedFields)
         const { error } = await supabase
           .from('forms')
           .update({ name: nameToSave, description: formDescription.trim() || null, fields: cleanedFields })
-          .eq('id', formIdRef.current)
-
-        setAutosaveStatus(error ? 'error' : 'saved')
+          .eq('id', id)
+        if (error) throw error
+        setAutosaveStatus('saved')
+      } catch {
+        setAutosaveStatus('error')
       }
-    }, AUTOSAVE_DELAY)
+    }
+
+    debounceRef.current = setTimeout(doSave, AUTOSAVE_DELAY)
+    // Always points at the most recent still-pending save (this closure's
+    // formName/fields), so a true unmount can flush exactly what's owed.
+    pendingSaveRef.current = doSave
 
     return () => clearTimeout(debounceRef.current)
   }, [formName, formDescription, fields, session])
+
+  // Runs only on true unmount (empty deps), unlike the effect above whose
+  // cleanup also fires on every keystroke as the debounce resets - this is
+  // the one place it's correct to flush a still-pending save instead of
+  // just letting it be cancelled.
+  useEffect(() => {
+    return () => {
+      if (pendingSaveRef.current) pendingSaveRef.current()
+    }
+  }, [])
 
   function updateField(index, changes) {
     const newFields = [...fields]
@@ -327,32 +363,28 @@ function CreateForm() {
 
     // Cancel any pending autosave so it doesn't race with this explicit save
     if (debounceRef.current) clearTimeout(debounceRef.current)
+    pendingSaveRef.current = null // this explicit save supersedes any pending autosave flush
 
     const cleanedFields = cleanFieldsForSave(fields)
     setSaving(true)
 
-    let error
-    if (!formIdRef.current) {
-      const result = await supabase
-        .from('forms')
-        .insert([{ name: formName, description: formDescription.trim() || null, fields: cleanedFields, status: 'draft', user_id: session.user.id }])
-        .select()
-      error = result.error
-    } else {
-      const result = await supabase
+    try {
+      const id = await ensureFormId(formName, formDescription.trim() || null, cleanedFields)
+      const { error } = await supabase
         .from('forms')
         .update({ name: formName, description: formDescription.trim() || null, fields: cleanedFields })
-        .eq('id', formIdRef.current)
-      error = result.error
-    }
+        .eq('id', id)
+      setSaving(false)
 
-    setSaving(false)
-
-    if (error) {
-      setMessage('Error saving: ' + error.message)
-    } else {
+      if (error) {
+        setMessage('Error saving: ' + error.message)
+        return
+      }
       setMessage('Form saved as draft.')
       setTimeout(() => navigate('/'), 700)
+    } catch (err) {
+      setSaving(false)
+      setMessage('Error saving: ' + (err?.message || 'Unknown error'))
     }
   }
 

@@ -16,7 +16,10 @@ function newProductId() {
   return 'p' + Date.now() + Math.random().toString(36).slice(2, 7)
 }
 
+const TOP_CATEGORY_COUNT = 6 // category pills shown before collapsing the rest behind "+N more"
+
 function ProductForm({ product, onSave, onCancel }) {
+  const [showMore, setShowMore] = useState(false)
   const [values, setValues] = useState({
     name: product?.name || '',
     price: product?.price ?? '',
@@ -100,54 +103,69 @@ function ProductForm({ product, onSave, onCancel }) {
           placeholder="e.g. Mains" style={{ width: '100%', padding: '0.5rem', margin: '0.3rem 0 0.8rem' }}
         />
 
-        <label style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>Image URL (optional)</label>
-        <input
-          type="text" value={values.imageUrl} onChange={(e) => set({ imageUrl: e.target.value })}
-          placeholder="https://..." style={{ width: '100%', padding: '0.5rem', margin: '0.3rem 0 0.8rem' }}
-        />
-
-        <label style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>Description (optional)</label>
-        <textarea
-          value={values.description} onChange={(e) => set({ description: e.target.value })}
-          placeholder="Short description shown to customers" style={{ width: '100%', padding: '0.5rem', margin: '0.3rem 0 0.8rem', minHeight: '60px' }}
-        />
-
-        <div style={{ display: 'flex', gap: '0.6rem', marginBottom: '0.8rem' }}>
-          <div style={{ flex: 1 }}>
-            <label style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>Tax %</label>
-            <input
-              type="number" min="0" value={values.taxPercent} onChange={(e) => set({ taxPercent: e.target.value })}
-              placeholder="0" style={{ width: '100%', padding: '0.5rem', marginTop: '0.3rem' }}
-            />
-          </div>
-          <div style={{ flex: 1 }}>
-            <label style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>SKU</label>
-            <input
-              type="text" value={values.sku} onChange={(e) => set({ sku: e.target.value })}
-              style={{ width: '100%', padding: '0.5rem', marginTop: '0.3rem' }}
-            />
-          </div>
+        <div
+          onClick={() => setShowMore(v => !v)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', userSelect: 'none',
+            fontSize: '0.85rem', color: 'var(--color-primary)', fontWeight: 600, marginBottom: showMore ? '0.8rem' : '0.5rem'
+          }}
+        >
+          <span style={{ transform: showMore ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.15s', fontSize: '0.7rem' }}>▾</span>
+          {showMore ? 'Fewer options' : 'More options'}
         </div>
 
-        <label style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>Barcode</label>
-        <input
-          type="text" value={values.barcode} onChange={(e) => set({ barcode: e.target.value })}
-          style={{ width: '100%', padding: '0.5rem', margin: '0.3rem 0 0.8rem' }}
-        />
-
-        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', marginBottom: '0.8rem', cursor: 'pointer' }}>
-          <input type="checkbox" checked={values.trackInventory} onChange={(e) => set({ trackInventory: e.target.checked })} />
-          Enable Inventory Tracking
-        </label>
-
-        {values.trackInventory && (
-          <div style={{ marginBottom: '0.8rem' }}>
-            <label style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>Stock Quantity</label>
+        {showMore && (
+          <>
+            <label style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>Image URL (optional)</label>
             <input
-              type="number" min="0" value={values.stockQuantity} onChange={(e) => set({ stockQuantity: e.target.value })}
-              style={{ width: '100%', padding: '0.5rem', marginTop: '0.3rem' }}
+              type="text" value={values.imageUrl} onChange={(e) => set({ imageUrl: e.target.value })}
+              placeholder="https://..." style={{ width: '100%', padding: '0.5rem', margin: '0.3rem 0 0.8rem' }}
             />
-          </div>
+
+            <label style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>Description (optional)</label>
+            <textarea
+              value={values.description} onChange={(e) => set({ description: e.target.value })}
+              placeholder="Short description shown to customers" style={{ width: '100%', padding: '0.5rem', margin: '0.3rem 0 0.8rem', minHeight: '60px' }}
+            />
+
+            <div style={{ display: 'flex', gap: '0.6rem', marginBottom: '0.8rem' }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>Tax %</label>
+                <input
+                  type="number" min="0" value={values.taxPercent} onChange={(e) => set({ taxPercent: e.target.value })}
+                  placeholder="0" style={{ width: '100%', padding: '0.5rem', marginTop: '0.3rem' }}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>SKU</label>
+                <input
+                  type="text" value={values.sku} onChange={(e) => set({ sku: e.target.value })}
+                  style={{ width: '100%', padding: '0.5rem', marginTop: '0.3rem' }}
+                />
+              </div>
+            </div>
+
+            <label style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>Barcode</label>
+            <input
+              type="text" value={values.barcode} onChange={(e) => set({ barcode: e.target.value })}
+              style={{ width: '100%', padding: '0.5rem', margin: '0.3rem 0 0.8rem' }}
+            />
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', marginBottom: '0.8rem', cursor: 'pointer' }}>
+              <input type="checkbox" checked={values.trackInventory} onChange={(e) => set({ trackInventory: e.target.checked })} />
+              Enable Inventory Tracking
+            </label>
+
+            {values.trackInventory && (
+              <div style={{ marginBottom: '0.8rem' }}>
+                <label style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>Stock Quantity</label>
+                <input
+                  type="number" min="0" value={values.stockQuantity} onChange={(e) => set({ stockQuantity: e.target.value })}
+                  style={{ width: '100%', padding: '0.5rem', marginTop: '0.3rem' }}
+                />
+              </div>
+            )}
+          </>
         )}
 
         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
@@ -168,10 +186,22 @@ function ProductManager({ products, onChange, onClose, inline = false }) {
   const [importMenuOpen, setImportMenuOpen] = useState(false)
   const [pendingDeleteId, setPendingDeleteId] = useState(null)
   const [confirmingClearAll, setConfirmingClearAll] = useState(false)
+  const [categoriesExpanded, setCategoriesExpanded] = useState(false)
 
-  const categories = ['All', ...Array.from(new Set(products.map(p => p.category).filter(c => c && c.trim() !== '')))]
+  const categoryNames = Array.from(new Set(products.map(p => p.category).filter(c => c && c.trim() !== '')))
   const categoryCounts = { All: products.length }
-  categories.slice(1).forEach(cat => { categoryCounts[cat] = products.filter(p => p.category === cat).length })
+  categoryNames.forEach(cat => { categoryCounts[cat] = products.filter(p => p.category === cat).length })
+
+  // Same treatment as the customer-facing menu (PublicForm.jsx): lead with
+  // the biggest categories and tuck the long tail behind "+N more" instead
+  // of wrapping a dozen-plus pills across several rows.
+  const sortedCategoryNames = [...categoryNames].sort((a, b) => categoryCounts[b] - categoryCounts[a])
+  let visibleCategoryNames = categoriesExpanded ? sortedCategoryNames : sortedCategoryNames.slice(0, TOP_CATEGORY_COUNT)
+  if (activeCategory !== 'All' && !visibleCategoryNames.includes(activeCategory)) {
+    visibleCategoryNames = [...visibleCategoryNames, activeCategory]
+  }
+  const hiddenCategoryCount = sortedCategoryNames.length - visibleCategoryNames.length
+  const categories = ['All', ...visibleCategoryNames]
 
   const filtered = products.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase())
@@ -301,16 +331,32 @@ function ProductManager({ products, onChange, onClose, inline = false }) {
         />
 
         {categories.length > 1 && (
-          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.9rem' }}>
+          <div className="category-scroll" style={{ display: 'flex', gap: '0.4rem', flexWrap: 'nowrap', overflowX: 'auto', marginBottom: '0.9rem' }}>
             {categories.map(cat => (
               <button
                 key={cat} type="button" onClick={() => setActiveCategory(cat)}
                 className={activeCategory === cat ? '' : 'secondary'}
-                style={{ fontSize: '0.8rem', padding: '0.35rem 0.8rem', borderRadius: '20px' }}
+                style={{ fontSize: '0.8rem', padding: '0.35rem 0.8rem', borderRadius: '20px', whiteSpace: 'nowrap', flexShrink: 0 }}
               >
                 {cat} ({categoryCounts[cat] || 0})
               </button>
             ))}
+            {hiddenCategoryCount > 0 && (
+              <button
+                type="button" className="secondary" onClick={() => setCategoriesExpanded(true)}
+                style={{ fontSize: '0.8rem', padding: '0.35rem 0.8rem', borderRadius: '20px', whiteSpace: 'nowrap', flexShrink: 0 }}
+              >
+                +{hiddenCategoryCount} more
+              </button>
+            )}
+            {categoriesExpanded && sortedCategoryNames.length > TOP_CATEGORY_COUNT && (
+              <button
+                type="button" className="secondary" onClick={() => setCategoriesExpanded(false)}
+                style={{ fontSize: '0.8rem', padding: '0.35rem 0.8rem', borderRadius: '20px', whiteSpace: 'nowrap', flexShrink: 0 }}
+              >
+                Show less
+              </button>
+            )}
           </div>
         )}
 

@@ -68,6 +68,40 @@ function timeAgo(dateString) {
   return `${Math.round(hours / 24)}d ago`
 }
 
+// A typed password is otherwise fully masked the whole way through - no way
+// to double-check what was actually typed before handing it to the staff
+// member. This only toggles what's on screen right now; there's no stored
+// password to "reveal" later (GoTrue hashes it, and this app never keeps a
+// plaintext copy - Reset Password sets a new one, it can't show the old one).
+function PasswordInput({ value, onChange, placeholder, autoFocus, style }) {
+  const [visible, setVisible] = useState(false)
+  return (
+    <div style={{ position: 'relative' }}>
+      <input
+        type={visible ? 'text' : 'password'}
+        required minLength={6}
+        autoFocus={autoFocus}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        style={{ ...style, paddingRight: '3.2rem' }}
+      />
+      <button
+        type="button"
+        onClick={() => setVisible(v => !v)}
+        aria-label={visible ? 'Hide password' : 'Show password'}
+        style={{
+          position: 'absolute', right: '0.3rem', top: '50%', transform: 'translateY(-50%)',
+          background: 'transparent', border: 'none', color: 'var(--color-primary)', cursor: 'pointer',
+          padding: '0.2rem 0.4rem', fontSize: '0.78rem', fontWeight: 600, lineHeight: 1
+        }}
+      >
+        {visible ? 'Hide' : 'Show'}
+      </button>
+    </div>
+  )
+}
+
 function StaffStatusBadge({ lastSeenAt }) {
   const active = lastSeenAt && (Date.now() - new Date(lastSeenAt).getTime()) < ACTIVE_WITHIN_MS
   return (
@@ -205,10 +239,12 @@ function AdminStaff() {
             Letters, numbers, dots, dashes, and underscores only.
           </div>
           <label style={{ fontSize: '0.85rem', color: 'var(--color-muted)' }}>Password</label>
-          <input
-            type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)}
-            style={{ width: '100%', padding: '0.5rem', margin: '0.3rem 0 1rem' }}
-          />
+          <div style={{ margin: '0.3rem 0 1rem' }}>
+            <PasswordInput
+              value={password} onChange={(e) => setPassword(e.target.value)}
+              style={{ width: '100%', padding: '0.5rem' }}
+            />
+          </div>
           <button type="submit" disabled={creating}>{creating ? 'Creating...' : 'Create Login'}</button>
         </form>
       </div>
@@ -249,12 +285,14 @@ function AdminStaff() {
           <div onClick={(e) => e.stopPropagation()} className="card" style={{ background: 'white', padding: '1.5rem', width: '360px', maxWidth: '100%' }}>
             <h3 style={{ margin: '0 0 1rem' }}>Reset Password for {resetTarget.email.split('@')[0]}</h3>
             <form onSubmit={submitResetPassword}>
-              <input
-                type="password" required minLength={6} autoFocus value={resetPassword}
-                onChange={(e) => setResetPassword(e.target.value)}
-                placeholder="New password"
-                style={{ width: '100%', padding: '0.5rem', marginBottom: '1rem' }}
-              />
+              <div style={{ marginBottom: '1rem' }}>
+                <PasswordInput
+                  autoFocus value={resetPassword}
+                  onChange={(e) => setResetPassword(e.target.value)}
+                  placeholder="New password"
+                  style={{ width: '100%', padding: '0.5rem' }}
+                />
+              </div>
               <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
                 <button type="button" className="secondary" onClick={() => setResetTarget(null)}>Cancel</button>
                 <button type="submit">Save</button>

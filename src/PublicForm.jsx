@@ -4,8 +4,7 @@ import PosSidePanel from './PosSidePanel'
 import { supabase } from './supabaseClient'
 import { submitForm, getSubmissionByToken, updateSubmissionByToken } from './lib/submissionsClient'
 import { COUNTRIES, statesFor, citiesFor } from './lib/locationData'
-const PAYMENT_METHODS = ['Cash', 'Card', 'Bank Transfer', 'QR Code', 'Split']
-const QUICK_CASH_AMOUNTS = [100, 200, 500, 1000, 2000]
+const PAYMENT_METHODS = ['Cash', 'Card', 'Bank Transfer', 'Split']
 const TOP_CATEGORY_COUNT = 6 // category pills shown before collapsing the rest behind "+N more"
 
 // Splits fields into pages at each 'section' marker, Google-Forms style:
@@ -37,13 +36,11 @@ function PublicForm() {
   const [cartSearch, setCartSearch] = useState({})
   const [cartCategory, setCartCategory] = useState({})
   const [expandedCategories, setExpandedCategories] = useState({}) // { [fieldId]: true } - reveals the rest of the category pills past the top few
-  const [cartPayment, setCartPayment] = useState({}) // { [fieldId]: { method, amountReceived?, change? } } - confirmed payment
+  const [cartPayment, setCartPayment] = useState({}) // { [fieldId]: { method } } - confirmed payment
   const [checkoutFieldId, setCheckoutFieldId] = useState(null) // which cart field's checkout modal is open
   const [showMoreCheckoutFields, setShowMoreCheckoutFields] = useState(false) // reveals fields flagged collapsedInCheckout
   const [checkoutMethod, setCheckoutMethod] = useState(null) // method chosen inside the open checkout modal
-  const [amountReceived, setAmountReceived] = useState({}) // { [fieldId]: string } - cash tendered, modal-only
   const [deliveryFee, setDeliveryFee] = useState({}) // { [fieldId]: string } - only asked when the order is Takeout
-  const [showKeypad, setShowKeypad] = useState(false)
   const [splitDraft, setSplitDraft] = useState([{ method: 'Cash', amount: '' }, { method: 'Card', amount: '' }])
   const [orderNumber, setOrderNumber] = useState(() => Math.floor(1000 + Math.random() * 9000))
   const [addedFlash, setAddedFlash] = useState({}) // { [productId]: true } - briefly shows "Added" after tapping Add
@@ -53,6 +50,7 @@ function PublicForm() {
   const [respondentEmail, setRespondentEmail] = useState('')
   const [loading, setLoading] = useState(true)
   const [submitted, setSubmitted] = useState(false)
+  const [submitting, setSubmitting] = useState(false) // guards against a double-click/slow-network duplicate order
   const [message, setMessage] = useState('')
   const [errors, setErrors] = useState({})
   const [uploading, setUploading] = useState({})
@@ -294,9 +292,7 @@ function PublicForm() {
 
   function openCheckout(fieldId) {
     setCheckoutMethod(null)
-    setShowKeypad(false)
     setSplitDraft([{ method: 'Cash', amount: '' }, { method: 'Card', amount: '' }])
-    setAmountReceived(current => ({ ...current, [fieldId]: '' }))
     setShowMoreCheckoutFields(false)
     setCheckoutFieldId(fieldId)
   }
@@ -305,31 +301,10 @@ function PublicForm() {
     setCheckoutFieldId(null)
   }
 
-  function pressKeypad(fieldId, key) {
-    setAmountReceived(current => {
-      const value = current[fieldId] || ''
-      if (key === 'C') return { ...current, [fieldId]: '' }
-      if (key === '⌫') return { ...current, [fieldId]: value.slice(0, -1) }
-      if (key === '.' && value.includes('.')) return current
-      return { ...current, [fieldId]: value + key }
-    })
-  }
-
-  function pressQuickCash(fieldId, amount, total) {
-    if (amount === 'exact') {
-      setAmountReceived(current => ({ ...current, [fieldId]: String(total) }))
-      return
-    }
-    setAmountReceived(current => ({ ...current, [fieldId]: String((Number(current[fieldId]) || 0) + amount) }))
-  }
-
   async function completePayment(fieldId, total) {
+    if (submitting) return // guards the brief window before the modal actually closes
     let finalPayment
-    if (checkoutMethod === 'Cash') {
-      const received = Number(amountReceived[fieldId]) || 0
-      if (received < total) return
-      finalPayment = { method: 'Cash', amountReceived: received, change: received - total }
-    } else if (checkoutMethod === 'Split') {
+    if (checkoutMethod === 'Split') {
       const splits = splitDraft
         .filter(s => s.method && Number(s.amount) > 0)
         .map(s => ({ method: s.method, amount: Number(s.amount) }))
@@ -535,6 +510,7 @@ function PublicForm() {
   }
 
   async function submitAnswers(paymentOverride) {
+    if (submitting) return // already in flight - a double-click/slow network shouldn't create a second order
     if (Object.values(uploading).some(v => v)) {
       setMessage('Please wait for the file upload to finish.')
       return
@@ -576,6 +552,7 @@ function PublicForm() {
       finalData._respondent_email = respondentEmail
     }
 
+    setSubmitting(true)
     try {
       let submissionId = null
       let realOrderNumber = orderNumber
@@ -640,6 +617,8 @@ function PublicForm() {
       }
     } catch (err) {
       setMessage('Error submitting: ' + err.message)
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -730,8 +709,6 @@ function PublicForm() {
       const deliveryFeeAmount = Number(deliveryFee[field.id]) || 0
       const grandTotal = total + deliveryFeeAmount
       const payment = cartPayment[field.id]
-      const received = Number(amountReceived[field.id]) || 0
-      const change = received - grandTotal
       const splitTotal = splitDraft.reduce((sum, s) => sum + (Number(s.amount) || 0), 0)
       // Non-cart questions on this page (e.g. Dine-in/Takeout) move into the
       // checkout modal instead of the main order screen, since this page is
@@ -745,21 +722,6 @@ function PublicForm() {
               body * { visibility: hidden; }
               .receipt-print-area, .receipt-print-area * { visibility: visible; }
               .receipt-print-area { position: fixed; top: 0; left: 0; width: 100%; }
-            }
-            /* A big menu can have a dozen+ categories - scrolling them in one
-               row keeps the pills from pushing the actual menu grid off the
-               bottom of the screen, which is what happened when they wrapped
-               onto 3-4 rows instead. */
-            .category-scroll {
-              scrollbar-width: thin;
-              -webkit-overflow-scrolling: touch;
-            }
-            .category-scroll::-webkit-scrollbar {
-              height: 4px;
-            }
-            .category-scroll::-webkit-scrollbar-thumb {
-              background: var(--color-border);
-              border-radius: 4px;
             }
           `}</style>
 
@@ -1131,65 +1093,6 @@ function PublicForm() {
                   ))}
                 </div>
 
-                {checkoutMethod === 'Cash' && (
-                  <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '0.9rem', marginBottom: '0.9rem' }}>
-                    <label style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>Amount Received</label>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={amountReceived[field.id] || ''}
-                      onFocus={() => setShowKeypad(true)}
-                      onChange={(e) => setAmountReceived(current => ({ ...current, [field.id]: e.target.value.replace(/[^0-9.]/g, '') }))}
-                      placeholder="0"
-                      style={{ width: '100%', padding: '0.7rem', fontSize: '1.2rem', fontFamily: 'monospace', margin: '0.4rem 0 0.7rem' }}
-                    />
-
-                    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.7rem' }}>
-                      <button type="button" className="secondary" style={{ fontSize: '0.8rem', padding: '0.4rem 0.7rem' }} onClick={() => pressQuickCash(field.id, 'exact', grandTotal)}>
-                        Exact Amount
-                      </button>
-                      {QUICK_CASH_AMOUNTS.map(amount => (
-                        <button
-                          key={amount}
-                          type="button"
-                          className="secondary"
-                          style={{ fontSize: '0.8rem', padding: '0.4rem 0.7rem' }}
-                          onClick={() => pressQuickCash(field.id, amount, total)}
-                        >
-                          ₦{amount.toLocaleString()}
-                        </button>
-                      ))}
-                    </div>
-
-                    {!showKeypad && (
-                      <button type="button" className="secondary" onClick={() => setShowKeypad(true)} style={{ width: '100%', marginBottom: '0.7rem', fontSize: '0.85rem' }}>
-                        Use Keypad
-                      </button>
-                    )}
-
-                    {showKeypad && (
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.4rem', marginBottom: '0.7rem' }}>
-                        {['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '⌫'].map(key => (
-                          <button
-                            key={key}
-                            type="button"
-                            className="secondary"
-                            onClick={() => pressKeypad(field.id, key)}
-                            style={{ padding: '0.7rem 0', fontSize: '1rem' }}
-                          >
-                            {key}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem', fontWeight: 600 }}>
-                      <span>Change Due</span>
-                      <span style={{ color: change < 0 ? '#c0392b' : 'inherit' }}>₦{Math.max(change, 0).toLocaleString()}</span>
-                    </div>
-                  </div>
-                )}
-
                 {checkoutMethod === 'Split' && (
                   <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '0.9rem', marginBottom: '0.9rem' }}>
                     <div style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.5rem' }}>Split between methods</div>
@@ -1237,7 +1140,7 @@ function PublicForm() {
                   </div>
                 )}
 
-                {checkoutMethod && checkoutMethod !== 'Cash' && checkoutMethod !== 'Split' && (
+                {checkoutMethod && checkoutMethod !== 'Split' && (
                   <p style={{ color: 'var(--color-muted)', fontSize: '0.85rem', marginBottom: '0.9rem' }}>
                     Collect payment via {checkoutMethod}, then complete the order below.
                   </p>
@@ -1248,14 +1151,14 @@ function PublicForm() {
                   <button
                     type="button"
                     disabled={
+                      submitting ||
                       !checkoutMethod ||
-                      (checkoutMethod === 'Cash' && received < grandTotal) ||
                       (checkoutMethod === 'Split' && (splitTotal !== grandTotal || splitDraft.filter(s => Number(s.amount) > 0).length < 2)) ||
                       checkoutQuestions.some(q => q.required && !answers[q.id])
                     }
                     onClick={() => completePayment(field.id, grandTotal)}
                   >
-                    Checkout
+                    {submitting ? 'Submitting...' : 'Checkout'}
                   </button>
                 </div>
               </div>
@@ -1730,8 +1633,8 @@ function PublicForm() {
         ) : <span />}
 
         {isLastPage ? (
-          <button onClick={() => submitAnswers()} style={{ padding: '0.7rem 1.5rem', fontSize: '1rem' }}>
-            {token ? 'Save Changes' : 'Submit'}
+          <button onClick={() => submitAnswers()} disabled={submitting} style={{ padding: '0.7rem 1.5rem', fontSize: '1rem' }}>
+            {submitting ? 'Submitting...' : (token ? 'Save Changes' : 'Submit')}
           </button>
         ) : (
           <button onClick={goNext} style={{ padding: '0.7rem 1.5rem', fontSize: '1rem' }}>

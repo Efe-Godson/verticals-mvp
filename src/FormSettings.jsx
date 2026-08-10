@@ -12,6 +12,7 @@ function FormSettings() {
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [saveError, setSaveError] = useState('')
 
   const [allowMultipleResponses, setAllowMultipleResponses] = useState(true)
   const [collectEmail, setCollectEmail] = useState(false)
@@ -40,8 +41,17 @@ function FormSettings() {
   async function saveSettings() {
     setSaving(true)
     setSaved(false)
+    setSaveError('')
 
-    const newSettings = { allowMultipleResponses, collectEmail, companyName, companyPhone, companyAddress }
+    // `settings` is a shared JSONB bag - other pages stash their own keys in
+    // it (templateSlug/locationName from locations.js, primaryFormId/
+    // payrollRole from Templates.jsx, hiddenColumns/recordPresets from
+    // Records.jsx, payroll from PayrollPage.jsx...). Replacing it outright
+    // used to silently delete all of those the moment this page saved.
+    const newSettings = {
+      ...form.settings,
+      allowMultipleResponses, collectEmail, companyName, companyPhone, companyAddress,
+    }
 
     const { error } = await supabase
       .from('forms')
@@ -49,10 +59,13 @@ function FormSettings() {
       .eq('id', id)
 
     setSaving(false)
-    if (!error) {
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
+    if (error) {
+      setSaveError('Could not save: ' + error.message)
+      return
     }
+    setForm(current => ({ ...current, settings: newSettings }))
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
   }
 
   if (loading) return <div className="page">Loading settings...</div>
@@ -148,6 +161,7 @@ function FormSettings() {
           {saving ? 'Saving...' : 'Save Settings'}
         </button>
         {saved && <span style={{ color: '#1a7f37', fontSize: '0.9rem' }}>Saved</span>}
+        {saveError && <span style={{ color: '#c0392b', fontSize: '0.9rem' }}>{saveError}</span>}
         <Link to={`/form/${id}`} style={{ marginLeft: 'auto', fontSize: '0.9rem', color: 'var(--color-primary)' }}>
           View public form →
         </Link>

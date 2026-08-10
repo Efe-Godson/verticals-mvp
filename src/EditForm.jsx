@@ -72,6 +72,12 @@ function EditForm() {
   const [autosaveStatus, setAutosaveStatus] = useState('idle') // idle | saving | saved | error
   const debounceRef = useRef(null)
   const isFirstRun = useRef(true)
+  // Holds the not-yet-fired autosave for the *latest* render, or null once
+  // it's run. Navigating away inside the debounce window used to just
+  // cancel the pending timer via this effect's own cleanup - silently
+  // dropping whatever was typed in the last ~2s. The unmount-only effect
+  // below flushes this instead of losing it.
+  const pendingSaveRef = useRef(null)
 
   const [recentlyRemoved, setRecentlyRemoved] = useState(null) // { field, index }
   const undoTimeoutRef = useRef(null)
@@ -123,7 +129,8 @@ function EditForm() {
 
     if (debounceRef.current) clearTimeout(debounceRef.current)
 
-    debounceRef.current = setTimeout(async () => {
+    async function doSave() {
+      pendingSaveRef.current = null // this save is running/done - nothing left to flush on unmount
       if (formName.trim() === '') return // don't autosave over a name that's mid-clear
 
       setAutosaveStatus('saving')
@@ -135,10 +142,25 @@ function EditForm() {
         .eq('id', id)
 
       setAutosaveStatus(error ? 'error' : 'saved')
-    }, AUTOSAVE_DELAY)
+    }
+
+    debounceRef.current = setTimeout(doSave, AUTOSAVE_DELAY)
+    // Always points at the most recent still-pending save (this closure's
+    // formName/fields), so a true unmount can flush exactly what's owed.
+    pendingSaveRef.current = doSave
 
     return () => clearTimeout(debounceRef.current)
   }, [formName, formDescription, fields, loading, id])
+
+  // Runs only on true unmount (empty deps), unlike the effect above whose
+  // cleanup also fires on every keystroke as the debounce resets - this is
+  // the one place it's correct to flush a still-pending save instead of
+  // just letting it be cancelled.
+  useEffect(() => {
+    return () => {
+      if (pendingSaveRef.current) pendingSaveRef.current()
+    }
+  }, [])
 
   function updateField(index, changes) {
     const newFields = [...fields]
@@ -251,6 +273,7 @@ function EditForm() {
     }
 
     if (debounceRef.current) clearTimeout(debounceRef.current)
+    pendingSaveRef.current = null // this explicit save supersedes any pending autosave flush
 
     const cleanedFields = cleanFieldsForSave(fields)
 
@@ -328,31 +351,6 @@ function EditForm() {
             rows={2}
             style={{ padding: '0.6rem', width: '100%', fontSize: '0.92rem', marginTop: '0.3rem' }}
           />
-        </div>
-      )}
-
-      {hasCartField && (
-        <div
-          onClick={() => setShowAdditionalInfo(v => !v)}
-          style={{
-            marginTop: '0.4rem', paddingBottom: '1rem',
-            cursor: 'pointer', userSelect: 'none', display: 'flex', alignItems: 'center', gap: '0.5rem'
-          }}
-        >
-          <span style={{
-            fontSize: '0.7rem', color: 'var(--color-muted)', transform: showAdditionalInfo ? 'rotate(0deg)' : 'rotate(-90deg)',
-            transition: 'transform 0.15s', display: 'inline-block'
-          }}>
-            ▾
-          </span>
-          <div>
-            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              Additional Information · {additionalInfoCount} field{additionalInfoCount !== 1 ? 's' : ''}
-            </div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)', marginTop: '0.2rem' }}>
-              Asked at checkout, alongside the order. Collapsed by default so the menu stays front and center - click to edit.
-            </div>
-          </div>
         </div>
       )}
 
@@ -526,6 +524,31 @@ function EditForm() {
           <p style={{ color: 'var(--color-muted)' }}>No fields yet.</p>
         )}
       </div>
+
+      {hasCartField && (
+        <div
+          onClick={() => setShowAdditionalInfo(v => !v)}
+          style={{
+            marginTop: '1.1rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)',
+            cursor: 'pointer', userSelect: 'none', display: 'flex', alignItems: 'center', gap: '0.5rem'
+          }}
+        >
+          <span style={{
+            fontSize: '0.7rem', color: 'var(--color-muted)', transform: showAdditionalInfo ? 'rotate(0deg)' : 'rotate(-90deg)',
+            transition: 'transform 0.15s', display: 'inline-block'
+          }}>
+            ▾
+          </span>
+          <div>
+            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Additional Information · {additionalInfoCount} field{additionalInfoCount !== 1 ? 's' : ''}
+            </div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)', marginTop: '0.2rem' }}>
+              Asked at checkout, alongside the order. Collapsed by default so the menu stays front and center - click to edit.
+            </div>
+          </div>
+        </div>
+      )}
 
       {!hasCartField && (
         <div style={{ display: 'flex', gap: '0.6rem', marginTop: '1rem', flexWrap: 'wrap' }}>

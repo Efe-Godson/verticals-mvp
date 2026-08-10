@@ -43,11 +43,18 @@ Deno.serve(async req => {
       if (!data || typeof data !== 'object') return jsonResponse({ error: 'data is required' }, 400)
 
       const { data: existing, error: findError } = await supabase
-        .from('submissions').select('id').eq('edit_token', edit_token).single()
+        .from('submissions').select('id, data').eq('edit_token', edit_token).single()
       if (findError || !existing) return jsonResponse({ error: 'Submission not found' }, 404)
 
+      // Merge rather than replace: the client only knows about the form's
+      // *current* fields, so a plain overwrite would silently drop any key
+      // that was on this submission but isn't on the form anymore (a field
+      // removed since it was submitted, or _respondent_email if email
+      // collection has since been turned off).
+      const mergedData = { ...(existing.data || {}), ...data }
+
       const { error: updateError } = await supabase
-        .from('submissions').update({ data }).eq('id', existing.id)
+        .from('submissions').update({ data: mergedData }).eq('id', existing.id)
       if (updateError) throw updateError
 
       return jsonResponse({ ok: true })

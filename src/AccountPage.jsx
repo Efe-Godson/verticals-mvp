@@ -8,7 +8,7 @@ import { useToast } from './Toast'
 import StatTile from './report/components/StatTile'
 import PieChart from './report/components/PieChart'
 import HorizontalBarChart from './report/components/HorizontalBarChart'
-import { THEME_COLORS, saveThemeColor } from './theme'
+import { THEME_COLORS, saveThemeColor, applyThemeColor } from './theme'
 
 const STATUS_LABEL = { draft: 'Draft', published: 'Live', paused: 'Paused', archived: 'Archived' }
 
@@ -65,9 +65,18 @@ function AccountPage() {
   }, [user.id])
 
   async function chooseThemeColor(hex) {
+    const previous = themeColor
     setThemeColor(hex)
     const { error } = await saveThemeColor(supabase, user.id, hex)
-    if (error) showToast('Could not save theme color: ' + error.message, 'error')
+    if (error) {
+      showToast('Could not save theme color: ' + error.message, 'error')
+      // saveThemeColor already applied+cached the new color optimistically -
+      // since the database write failed, put the actual saved color back
+      // rather than leaving the UI (and every page's CSS) showing one that
+      // was never persisted.
+      setThemeColor(previous)
+      applyThemeColor(previous)
+    }
   }
 
   useEffect(() => {

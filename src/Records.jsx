@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment } from 'react'
+import { useState, useEffect, useRef, Fragment } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import PosSidePanel from './PosSidePanel'
 import { supabase } from './supabaseClient'
@@ -110,6 +110,28 @@ function Records() {
     }
     loadData()
   }, [id])
+
+  const formRef = useRef(form)
+  useEffect(() => { formRef.current = form }, [form])
+
+  // Shared read-modify-write for the settings JSONB bag, used by every
+  // action on this page that persists a preference there (hidden columns,
+  // saved presets, the linked Google Sheet id). Reads from a ref instead of
+  // the `form` closure so two of these firing close together can't drop
+  // each other's change, and always surfaces a failed write instead of
+  // silently leaving the UI looking saved when it wasn't.
+  async function updateFormSettings(patch) {
+    const updatedSettings = { ...(formRef.current.settings || {}), ...patch }
+    const { error } = await supabase.from('forms').update({ settings: updatedSettings }).eq('id', formRef.current.id)
+    if (error) {
+      showToast('Could not save: ' + error.message, 'error')
+      return { error }
+    }
+    const updatedForm = { ...formRef.current, settings: updatedSettings }
+    formRef.current = updatedForm
+    setForm(updatedForm)
+    return { error: null }
+  }
 
   function handleRecordUpdated(updatedRecord) {
     setSubmissions(submissions.map(s => s.id === updatedRecord.id ? updatedRecord : s))
@@ -330,10 +352,8 @@ function Records() {
       // browser is navigating away, so there's nothing to persist yet.
       if (!result) return
 
-      if (result.created || result.spreadsheetId !== form.settings?.googleSheetId) {
-        const updatedSettings = { ...(form.settings || {}), googleSheetId: result.spreadsheetId }
-        const { error } = await supabase.from('forms').update({ settings: updatedSettings }).eq('id', form.id)
-        if (!error) setForm({ ...form, settings: updatedSettings })
+      if (result.created || result.spreadsheetId !== formRef.current.settings?.googleSheetId) {
+        await updateFormSettings({ googleSheetId: result.spreadsheetId })
       }
     } catch (error) {
       console.error(error)
@@ -350,14 +370,14 @@ function Records() {
   }
 
   async function toggleColumnVisibility(fieldId) {
+    const previous = hiddenFieldIds
     const updated = hiddenFieldIds.includes(fieldId)
       ? hiddenFieldIds.filter(id => id !== fieldId)
       : [...hiddenFieldIds, fieldId]
     setHiddenFieldIds(updated)
 
-    const updatedSettings = { ...(form.settings || {}), hiddenColumns: updated }
-    const { error } = await supabase.from('forms').update({ settings: updatedSettings }).eq('id', form.id)
-    if (!error) setForm({ ...form, settings: updatedSettings })
+    const { error } = await updateFormSettings({ hiddenColumns: updated })
+    if (error) setHiddenFieldIds(previous) // revert the optimistic toggle - it never actually saved
   }
 
   function toggleSelectRow(subId) {
@@ -493,13 +513,8 @@ function Records() {
   async function savePreset(name) {
     const newPreset = { name: name.trim(), searchText, dateRange, customStart, customEnd, filters }
     const updatedPresets = [...presets, newPreset]
-    const updatedSettings = { ...(form.settings || {}), recordPresets: updatedPresets }
-
-    const { error } = await supabase.from('forms').update({ settings: updatedSettings }).eq('id', form.id)
-    if (!error) {
-      setForm({ ...form, settings: updatedSettings })
-      setShowSaveDialog(false)
-    }
+    const { error } = await updateFormSettings({ recordPresets: updatedPresets })
+    if (!error) setShowSaveDialog(false)
   }
 
   function applyPreset(preset) {
@@ -514,9 +529,7 @@ function Records() {
 
   async function deletePreset(index) {
     const updatedPresets = presets.filter((_, i) => i !== index)
-    const updatedSettings = { ...(form.settings || {}), recordPresets: updatedPresets }
-    const { error } = await supabase.from('forms').update({ settings: updatedSettings }).eq('id', form.id)
-    if (!error) setForm({ ...form, settings: updatedSettings })
+    await updateFormSettings({ recordPresets: updatedPresets })
   }
 
   function applyFilter(fieldId, filterData) {

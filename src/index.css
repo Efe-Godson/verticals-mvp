@@ -291,6 +291,23 @@ input:focus, select:focus, textarea:focus {
   font-size: 0.88rem;
 }
 
+/* Category filter pills (customer-facing menu in PublicForm.jsx, and the
+   Manage Products editor in ProductManager.jsx): a catalogue can have a
+   dozen-plus categories, scrolling them in one row keeps the pills from
+   pushing the actual product list off the bottom of the screen, which is
+   what happened when they wrapped onto several rows instead. */
+.category-scroll {
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+.category-scroll::-webkit-scrollbar {
+  height: 4px;
+}
+.category-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
+}
+
 /* Toolbars of buttons (Print/Download/More, form actions, etc.):
    wrap onto multiple lines instead of overflowing or squishing */
 .toolbar-row {
