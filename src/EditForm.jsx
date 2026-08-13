@@ -8,6 +8,7 @@ import FieldTypeConfig from './FieldTypeConfig'
 import ConfirmDialog from './ConfirmDialog'
 import FormPreviewModal from './FormPreview'
 import ProductManager from './ProductManager'
+import MoreDetailsManager from './MoreDetailsManager'
 import { COUNTRIES } from './lib/locationData'
 
 const FIELD_TYPES = [
@@ -225,6 +226,23 @@ function EditForm() {
       label: '',
       type: 'text',
     }])
+  }
+
+  // Adds a recommended field (Location, Customer Name, ...) from
+  // MoreDetailsManager's tile tray, straight into the pinned/main list -
+  // same defaultCountry convenience updateFieldType already applies when a
+  // field is switched to Location by hand.
+  function addPresetField(preset) {
+    const newField = {
+      id: 'f' + Date.now() + Math.random().toString(36).slice(2, 6),
+      label: preset.label,
+      type: preset.type,
+      required: false,
+    }
+    if (preset.type === 'location') {
+      newField.defaultCountry = session.user.user_metadata?.country || COUNTRIES[0]
+    }
+    setFields([...fields, newField])
   }
 
   function addSection() {
@@ -524,6 +542,10 @@ function EditForm() {
           <p style={{ color: 'var(--color-muted)' }}>No fields yet.</p>
         )}
       </div>
+
+      {hasCartField && (
+        <MoreDetailsManager fields={fields} setFields={setFields} addField={addField} addPresetField={addPresetField} />
+      )}
 
       {hasCartField && (
         <div

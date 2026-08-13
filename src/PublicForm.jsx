@@ -40,6 +40,7 @@ function PublicForm() {
   const [cartPayment, setCartPayment] = useState({}) // { [fieldId]: { method } } - confirmed payment
   const [checkoutFieldId, setCheckoutFieldId] = useState(null) // which cart field's checkout modal is open
   const [showMoreCheckoutFields, setShowMoreCheckoutFields] = useState(false) // reveals fields flagged collapsedInCheckout
+  const [showMoreFields, setShowMoreFields] = useState(false) // same reveal, for deferCheckout forms rendering fields on the page instead of a modal
   const [checkoutMethod, setCheckoutMethod] = useState(null) // method chosen inside the open checkout modal
   const [deliveryFee, setDeliveryFee] = useState({}) // { [fieldId]: string } - only asked when the order is Takeout
   const [splitDraft, setSplitDraft] = useState([{ method: 'Cash', amount: '' }, { method: 'Card', amount: '' }])
@@ -57,10 +58,40 @@ function PublicForm() {
   const [editLink, setEditLink] = useState(null)
   const [linkedOptions, setLinkedOptions] = useState({}) // { [fieldId]: [{ recordId, label }] }
   const [pageIndex, setPageIndex] = useState(0)
+  // Same isMobile-via-resize pattern as HorizontalBarChart.jsx: the product
+  // catalogue swaps from a 2-column card grid (fine on a tablet/desktop
+  // width) to a single-column list of slim rows on a phone, where a grid of
+  // padded cards burns too much vertical space per item to browse quickly.
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
 
   const pages = useMemo(() => buildPages(form?.fields || []), [form])
   const currentPage = pages[pageIndex] || pages[0]
   const hasCartOnPage = currentPage.fields.some(f => f.type === 'cart')
+  // Retail-style forms (deferCheckout on the cart field) skip the embedded
+  // checkout modal entirely: the cart is just one field among others, and
+  // the whole page (cart + everything else) submits together via the
+  // normal Back/Next/Submit row at the bottom, same as a cart-less form.
+  const cartDefersCheckout = currentPage.fields.some(f => f.type === 'cart' && f.deferCheckout)
+  // Mobile-first: on a deferCheckout page, the Submit button lives in a bar
+  // pinned to the bottom of the viewport instead of at the end of a long
+  // scroll (catalogue + customer fields) - it needs the running total from
+  // here, at page level, since renderFieldRow's own cart branch computes its
+  // total in a scope this bar can't reach.
+  const deferCheckoutCartTotal = useMemo(() => {
+    if (!cartDefersCheckout) return 0
+    return currentPage.fields
+      .filter(f => f.type === 'cart' && f.deferCheckout)
+      .reduce((sum, f) => {
+        const quantities = cartQuantities[f.id] || {}
+        return sum + (f.products || []).reduce((s, p) => s + (Number(quantities[p.id]) || 0) * Number(p.price), 0)
+      }, 0)
+  }, [cartDefersCheckout, currentPage.fields, cartQuantities])
   const isLastPage = pageIndex === pages.length - 1
 
   // Prefills the builder state from a saved submission: the inverse of the
@@ -737,10 +768,11 @@ function PublicForm() {
             </div>
 
             {cartItems.length === 0 ? (
-              <div style={{ color: '#999', fontSize: '0.9rem' }}>
-                <p style={{ margin: 0 }}>No items added yet.</p>
-                <p style={{ margin: '0.2rem 0 0' }}>Select items below to begin.</p>
-              </div>
+              // Compact on purpose: an empty cart shouldn't claim as much
+              // vertical space as a full order summary, since it just pushes
+              // the actual catalogue further down the screen before a
+              // shopper has added anything.
+              <p style={{ color: '#999', fontSize: '0.85rem', margin: 0 }}>No items yet - select items below to begin.</p>
             ) : (
               <div style={{ marginBottom: '0.3rem' }}>
                 <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)', marginBottom: '0.4rem' }}>
@@ -753,9 +785,9 @@ function PublicForm() {
                   }}>
                     <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexShrink: 0 }}>
-                      <button className="secondary" onClick={() => decrementCartItem(field.id, item.id)} style={{ padding: '0.1rem 0.5rem', fontSize: '0.8rem' }}>−</button>
+                      <button className="secondary" onClick={() => decrementCartItem(field.id, item.id)} style={{ padding: '0.35rem 0.7rem', fontSize: '0.9rem', minWidth: '34px' }}>−</button>
                       <span style={{ minWidth: '1.2rem', textAlign: 'center' }}>{item.quantity}</span>
-                      <button className="secondary" onClick={() => incrementCartItem(field.id, item.id)} style={{ padding: '0.1rem 0.5rem', fontSize: '0.8rem' }}>+</button>
+                      <button className="secondary" onClick={() => incrementCartItem(field.id, item.id)} style={{ padding: '0.35rem 0.7rem', fontSize: '0.9rem', minWidth: '34px' }}>+</button>
                     </div>
                     <span style={{ width: '72px', textAlign: 'right', fontWeight: 600, color: 'var(--color-primary)' }}>
                       ₦{(item.price * item.quantity).toLocaleString()}
@@ -786,6 +818,18 @@ function PublicForm() {
                   <span>✓ Paid via {payment.method}</span>
                   <span onClick={() => clearPayment(field.id)} style={{ color: 'var(--color-primary)', cursor: 'pointer' }}>Change</span>
                 </div>
+              ) : field.deferCheckout ? (
+                // No separate checkout step - items just sit in the cart
+                // until the page's own Submit button (below every field,
+                // same as a cart-less form) sends the whole thing at once.
+                // Hold doesn't apply either: resuming a held order would
+                // only restore the cart, not whatever else was filled in
+                // below it on the same page.
+                cartItems.length > 0 && (
+                  <button type="button" className="secondary" onClick={() => clearCart(field.id)} style={{ padding: '0.8rem 1rem' }}>
+                    Clear
+                  </button>
+                )
               ) : (
                 <>
                   {cartItems.length > 0 && (
@@ -865,6 +909,53 @@ function PublicForm() {
             <div style={{ padding: '0 1rem 1rem' }}>
               {filteredProducts.length === 0 ? (
                 <p style={{ color: '#999', margin: '1rem 0' }}>No items match your search.</p>
+              ) : isMobile ? (
+                // Square tiles, 3 per row, in a grid capped to roughly two
+                // rows (about 6 tiles) with its own internal scroll - no
+                // "show all" prompt needed, the rest of the catalogue is
+                // just a scroll away inside this same box, same as any
+                // normal scrollable list.
+                <div style={{
+                  display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem',
+                  maxHeight: '200px', overflowY: 'auto', paddingRight: '0.15rem',
+                }}>
+                  {filteredProducts.map(p => {
+                    const qty = Number(quantities[p.id]) || 0
+                    return (
+                      <div key={p.id} className="card" style={{
+                        aspectRatio: '1 / 0.62', padding: '0.4rem', background: 'var(--color-surface)',
+                        display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+                      }}>
+                        <div style={{ minHeight: 0, overflow: 'hidden' }}>
+                          <div style={{
+                            fontSize: '0.7rem', fontWeight: 600, lineHeight: 1.15,
+                            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                          }}>
+                            {p.name}
+                          </div>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--color-primary)', fontWeight: 700 }}>
+                            ₦{Number(p.price).toLocaleString()}
+                          </div>
+                        </div>
+
+                        {qty === 0 ? (
+                          <button
+                            onClick={() => addToCart(field.id, p.id)}
+                            style={{ fontSize: '0.65rem', padding: '0.25rem', width: '100%' }}
+                          >
+                            {addedFlash[p.id] ? '✓' : 'Add'}
+                          </button>
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <button className="secondary" onClick={() => decrementCartItem(field.id, p.id)} style={{ padding: '0.1rem 0.35rem', fontSize: '0.72rem' }}>−</button>
+                            <span style={{ fontSize: '0.7rem' }}>{qty}</span>
+                            <button className="secondary" onClick={() => incrementCartItem(field.id, p.id)} style={{ padding: '0.1rem 0.35rem', fontSize: '0.72rem' }}>+</button>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
               ) : (
                 <div style={{
                   display: 'grid',
@@ -911,6 +1002,7 @@ function PublicForm() {
                             <button className="secondary" onClick={() => decrementCartItem(field.id, p.id)} style={{ padding: '0.25rem 0.6rem', fontSize: '0.85rem' }}>−</button>
                             <input
                               type="number"
+                              inputMode="numeric"
                               min="0"
                               value={qty}
                               onChange={(e) => setCartItemQuantity(field.id, p.id, e.target.value)}
@@ -1477,8 +1569,51 @@ function PublicForm() {
     )
   }
 
+  // One field's normal (non-checkout-modal) row: the cart itself, or any
+  // plain field. Pulled out of the page's field list so it can be called
+  // for the "primary" and "more details" groups separately on a
+  // deferCheckout form, instead of one flat .map() over every field.
+  function renderFieldRow(field) {
+    return (
+      <div key={field.id} className={field.type === 'cart' ? '' : 'card'} style={field.type === 'cart' ? { marginBottom: '1rem' } : { padding: '1rem', marginBottom: '1rem' }}>
+        {field.type !== 'cart' && (
+          <label style={{ fontWeight: '600' }}>
+            {field.label}{field.required && <span style={{ color: '#c0392b' }}> *</span>}
+          </label>
+        )}
+        <div style={field.type === 'cart' ? {} : { marginTop: '0.5rem' }}>
+          {field.autoFromCartFieldId ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{
+                padding: '0.4rem 0.8rem', borderRadius: '999px', background: '#f2f4f7',
+                fontSize: '0.9rem', fontWeight: 600, color: answers[field.id] ? 'inherit' : 'var(--color-muted)'
+              }}>
+                {answers[field.id] || 'Add items to your cart to set this'}
+              </span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--color-muted)' }}>(set automatically from your cart)</span>
+            </div>
+          ) : renderInput(field)}
+        </div>
+        {errors[field.id] && (
+          <p style={{ color: '#c0392b', fontSize: '0.8rem', marginTop: '0.5rem', marginBottom: 0 }}>
+            {errors[field.id]}
+          </p>
+        )}
+      </div>
+    )
+  }
+
   return (
-    <div className="page">
+    <div className="page" style={{
+      // PosSidePanel's hamburger button is position:fixed at top:1rem/
+      // left:1rem, 42px square - with no reserved space it sits directly on
+      // top of the title below (the button is a later paint layer, so it
+      // wins visually and clips the first few characters of the form name).
+      // Only needed when the panel actually renders (a saved-response edit
+      // link, `token`, skips it entirely).
+      ...(!token ? { paddingTop: '4rem' } : {}),
+      ...(cartDefersCheckout ? { paddingBottom: 'calc(6.5rem + env(safe-area-inset-bottom))' } : {}),
+    }}>
       {!token && (
         <div className="no-print">
           <PosSidePanel formId={form.id} hasCartField={form.fields.some(f => f.type === 'cart')} />
@@ -1533,51 +1668,95 @@ function PublicForm() {
         </div>
       )}
 
-      {currentPage.fields.filter(field => field.type === 'cart' || !hasCartOnPage).map(field => (
-        <div key={field.id} className={field.type === 'cart' ? '' : 'card'} style={field.type === 'cart' ? { marginBottom: '1rem' } : { padding: '1rem', marginBottom: '1rem' }}>
-          {field.type !== 'cart' && (
-            <label style={{ fontWeight: '600' }}>
-              {field.label}{field.required && <span style={{ color: '#c0392b' }}> *</span>}
-            </label>
-          )}
-          <div style={field.type === 'cart' ? {} : { marginTop: '0.5rem' }}>
-            {field.autoFromCartFieldId ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{
-                  padding: '0.4rem 0.8rem', borderRadius: '999px', background: '#f2f4f7',
-                  fontSize: '0.9rem', fontWeight: 600, color: answers[field.id] ? 'inherit' : 'var(--color-muted)'
-                }}>
-                  {answers[field.id] || 'Add items to your cart to set this'}
+      {(() => {
+        const visibleFields = currentPage.fields.filter(field => field.type === 'cart' || !hasCartOnPage || cartDefersCheckout)
+        const cartField = visibleFields.find(f => f.type === 'cart')
+        const otherFields = visibleFields.filter(f => f.type !== 'cart')
+        // On a plain (no-cart) form or a normal embedded-checkout cart form,
+        // collapsedInCheckout has nowhere to apply here - every field is
+        // "primary". Only a deferCheckout cart splits the page itself into
+        // primary vs. "more details", the same grouping the checkout modal
+        // already does for collapsedInCheckout fields (see checkoutQuestions
+        // above), just rendered inline instead of inside a modal.
+        const primaryFields = cartDefersCheckout ? otherFields.filter(f => !f.collapsedInCheckout) : otherFields
+        const moreFields = cartDefersCheckout ? otherFields.filter(f => f.collapsedInCheckout) : []
+
+        return (
+          <>
+            {cartField && renderFieldRow(cartField)}
+            {primaryFields.map(renderFieldRow)}
+            {moreFields.length > 0 && (
+              <div className="no-print" style={{ margin: '0 0 1rem' }}>
+                <span
+                  onClick={() => setShowMoreFields(v => !v)}
+                  style={{
+                    display: 'inline-block', padding: '0.5rem 0', fontSize: '0.85rem',
+                    color: 'var(--color-primary)', cursor: 'pointer', userSelect: 'none', fontWeight: 600,
+                  }}
+                >
+                  {showMoreFields ? '− Fewer details' : '+ More details'}
                 </span>
-                <span style={{ fontSize: '0.75rem', color: 'var(--color-muted)' }}>(set automatically from your cart)</span>
               </div>
-            ) : renderInput(field)}
-          </div>
-          {errors[field.id] && (
-            <p style={{ color: '#c0392b', fontSize: '0.8rem', marginTop: '0.5rem', marginBottom: 0 }}>
-              {errors[field.id]}
-            </p>
+            )}
+            {showMoreFields && moreFields.map(renderFieldRow)}
+          </>
+        )
+      })()}
+
+      {(!hasCartOnPage || cartDefersCheckout) && (
+      <div
+        className="no-print"
+        style={cartDefersCheckout ? {
+          position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 50,
+          background: 'var(--color-bg)', borderTop: '1px solid var(--color-border)',
+          boxShadow: '0 -2px 10px rgba(0,0,0,0.08)',
+        } : undefined}
+      >
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem',
+          maxWidth: cartDefersCheckout ? '800px' : undefined,
+          margin: cartDefersCheckout ? '0 auto' : undefined,
+          // Extra bottom padding on top of the usual amount so the bar's
+          // buttons don't sit under an iPhone's home-indicator strip -
+          // env() resolves to 0 (a no-op) on devices/browsers without one.
+          padding: cartDefersCheckout ? '0.8rem 1.5rem calc(0.8rem + env(safe-area-inset-bottom))' : undefined,
+        }}>
+          {/* Mobile-first: this bar is what makes Retail's "cart + fields +
+              one Submit at the end" flow actually usable one-handed - the
+              running total and the Submit button stay reachable without
+              scrolling back down past the whole catalogue and customer
+              fields every time. Only shown for deferCheckout forms; a
+              normal embedded-checkout cart (Restaurant) never reaches this
+              row at all (hasCartOnPage suppresses it, same as before). */}
+          {cartDefersCheckout && (
+            <div style={{ fontWeight: 700, fontSize: '1.05rem', whiteSpace: 'nowrap' }}>
+              Total <span style={{ marginLeft: '0.4rem', color: 'var(--color-primary)' }}>₦{deferCheckoutCartTotal.toLocaleString()}</span>
+            </div>
+          )}
+
+          {pageIndex > 0 ? (
+            <button className="secondary" onClick={goBack} style={{ padding: '0.7rem 1.5rem', fontSize: '1rem' }}>
+              Back
+            </button>
+          ) : cartDefersCheckout ? null : <span />}
+
+          {isLastPage ? (
+            <button
+              onClick={() => submitAnswers()}
+              disabled={submitting}
+              style={{ padding: '0.7rem 1.5rem', fontSize: '1rem', flex: cartDefersCheckout ? '1 1 auto' : undefined }}
+            >
+              {submitting ? 'Submitting...' : (token ? 'Save Changes' : 'Submit')}
+            </button>
+          ) : (
+            <button
+              onClick={goNext}
+              style={{ padding: '0.7rem 1.5rem', fontSize: '1rem', flex: cartDefersCheckout ? '1 1 auto' : undefined }}
+            >
+              Next
+            </button>
           )}
         </div>
-      ))}
-
-      {!hasCartOnPage && (
-      <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem' }}>
-        {pageIndex > 0 ? (
-          <button className="secondary" onClick={goBack} style={{ padding: '0.7rem 1.5rem', fontSize: '1rem' }}>
-            Back
-          </button>
-        ) : <span />}
-
-        {isLastPage ? (
-          <button onClick={() => submitAnswers()} disabled={submitting} style={{ padding: '0.7rem 1.5rem', fontSize: '1rem' }}>
-            {submitting ? 'Submitting...' : (token ? 'Save Changes' : 'Submit')}
-          </button>
-        ) : (
-          <button onClick={goNext} style={{ padding: '0.7rem 1.5rem', fontSize: '1rem' }}>
-            Next
-          </button>
-        )}
       </div>
       )}
 

@@ -18,18 +18,20 @@ function FieldValidationControls({ field, index, updateField }) {
 
   return (
     <div style={{ marginTop: '0.4rem', paddingTop: '0.5rem', borderTop: '1px solid var(--color-border)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.85rem', cursor: 'pointer' }}>
-          <span className="toggle">
-            <input
-              type="checkbox"
-              checked={!!field.required}
-              onChange={(e) => updateField(index, { required: e.target.checked })}
-            />
-            <span className="toggle-slider" />
-          </span>
-          Required
-        </label>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.6rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1.2rem', flexWrap: 'wrap' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.85rem', cursor: 'pointer' }}>
+            <span className="toggle">
+              <input
+                type="checkbox"
+                checked={!!field.required}
+                onChange={(e) => updateField(index, { required: e.target.checked })}
+              />
+              <span className="toggle-slider" />
+            </span>
+            Required
+          </label>
+        </div>
 
         <span
           onClick={() => setExpanded(!expanded)}
