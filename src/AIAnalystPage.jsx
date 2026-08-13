@@ -284,11 +284,17 @@ function AIAnalystPage() {
           <select value={dateRange} onChange={(e) => setDateRange(e.target.value)} style={{ padding: '0.5rem' }}>
             {DATE_RANGE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
           </select>
+          {dateRange === 'specific' && (
+            <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} style={{ padding: '0.5rem' }} />
+          )}
           {dateRange === 'custom' && (
             <>
               <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} style={{ padding: '0.5rem' }} />
               <span style={{ color: 'var(--color-muted)', fontSize: '0.9rem' }}>to</span>
-              <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} style={{ padding: '0.5rem' }} />
+              <input
+                type="date" value={customEnd} title="Leave blank to filter to just the start date"
+                onChange={(e) => setCustomEnd(e.target.value)} style={{ padding: '0.5rem' }}
+              />
             </>
           )}
           <select value={languageStyle} onChange={(e) => setLanguageStyle(e.target.value)} style={{ padding: '0.5rem' }} aria-label="Analysis language style">
