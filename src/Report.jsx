@@ -9,7 +9,6 @@ import { printReport, exportReportToPDF, exportReportToPPTX } from './reportExpo
 import StatTile from './report/components/StatTile'
 import CartReport from './report/analysis/Cartreport'
 import CartCategoryChart from './report/analysis/components/CartCategoryChart'
-import DetailedAnalysis from './report/DetailedAnalysis'
 import CrossAnalysis from './report/analysis/CrossAnalysis'
 import AIRecommendationsModal from './report/ai/AIRecommendationsModal'
 import { formatNaira, median } from './report/helpers/analysisUtils'
@@ -163,7 +162,6 @@ function Report() {
 
   const cartFields = form.fields.filter(f => f.type === 'cart')
   const categoryFields = form.fields.filter(f => CATEGORICAL_TYPES.includes(f.type))
-  const demographicFields = form.fields.filter(f => DEMOGRAPHIC_TYPES.includes(f.type))
 
   const crossAnalysisFields = form.fields.filter(f =>
     CATEGORICAL_TYPES.includes(f.type) || NUMERIC_TYPES.includes(f.type)
@@ -202,7 +200,10 @@ function Report() {
   }
 
   return (
-    <div className="page" style={{ maxWidth: '960px' }} ref={reportContentRef}>
+    <div className="page" style={{ maxWidth: '960px', ...(isFocusMode ? { paddingTop: '4rem' } : {}) }} ref={reportContentRef}>
+      {/* Reserves room for PosSidePanel's fixed top-left hamburger so it
+          doesn't paint over the title below - see the same fix in
+          PublicForm.jsx/Records.jsx. */}
       {isFocusMode && <PosSidePanel formId={form.id} hasCartField={cartFields.length > 0} />}
       <style>{`
         .kpi-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.8rem; }
@@ -423,17 +424,6 @@ function Report() {
                   <CartCategoryChart categoryField={catField} cartField={cartField} submissions={filteredSubmissions} />
                 </div>
               ))}
-            </div>
-          )}
-
-          {demographicFields.length > 0 && (
-            <div id="report-customers" style={{ marginTop: '2rem' }}>
-              <DetailedAnalysis
-                fields={demographicFields}
-                submissions={filteredSubmissions}
-                totalResponses={totalResponses}
-                title="Demographics"
-              />
             </div>
           )}
 

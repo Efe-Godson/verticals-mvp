@@ -1,6 +1,6 @@
 // Place at: src/report/analysis/CrossAnalysis.jsx
-// Fully user-driven: nothing is pre-selected. Pick any two columns, pick a
-// chart type, and (for two categorical columns) pick which segment to
+// Fully user-driven: nothing is pre-selected. Pick any two data points, pick
+// a chart type, and (for two categorical ones) pick which segment to
 // drill into.
 import { useState } from 'react'
 import HorizontalBarChart from '../components/HorizontalBarChart'
@@ -123,6 +123,7 @@ function CrossAnalysis({ fields, cartFields = [], submissions }) {
   const fieldA = eligible.find(f => f.id === fieldAId)
   const fieldB = eligible.find(f => f.id === fieldBId)
   const sameField = fieldA && fieldB && fieldA.id === fieldB.id
+  const isNumericField = (f) => NUMERIC_TYPES.includes(f.type) || f.type === 'cart_measure'
 
   let data = []
   let validCombo = false
@@ -166,16 +167,25 @@ function CrossAnalysis({ fields, cartFields = [], submissions }) {
     <div className="card" style={{ padding: '1.75rem' }}>
       <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '1rem' }}>
         <select value={fieldAId} onChange={(e) => { setFieldAId(e.target.value); setSegment('__all__') }} style={{ padding: '0.5rem' }}>
-          <option value="">Choose a column…</option>
+          <option value="">Choose data…</option>
           {eligible.map(f => (
-            <option key={f.id} value={f.id} disabled={f.id === fieldBId}>{f.label}</option>
+            // Two numeric measures (e.g. Item Count × Revenue) can't be
+            // cross-tabbed against each other - graying those out here,
+            // once the other side is already numeric, stops you from
+            // landing on the dead-end "not supported" message in the
+            // first place instead of just explaining it after the fact.
+            <option key={f.id} value={f.id} disabled={f.id === fieldBId || (fieldB && isNumericField(f) && isNumericField(fieldB))}>
+              {f.label}
+            </option>
           ))}
         </select>
         <span style={{ color: 'var(--color-muted)' }}>×</span>
         <select value={fieldBId} onChange={(e) => { setFieldBId(e.target.value); setSegment('__all__') }} style={{ padding: '0.5rem' }}>
-          <option value="">Choose a column…</option>
+          <option value="">Choose data…</option>
           {eligible.map(f => (
-            <option key={f.id} value={f.id} disabled={f.id === fieldAId}>{f.label}</option>
+            <option key={f.id} value={f.id} disabled={f.id === fieldAId || (fieldA && isNumericField(f) && isNumericField(fieldA))}>
+              {f.label}
+            </option>
           ))}
         </select>
 
@@ -204,11 +214,11 @@ function CrossAnalysis({ fields, cartFields = [], submissions }) {
       )}
 
       {!fieldA || !fieldB ? (
-        <p style={{ color: '#999' }}>Pick two columns above to compare them.</p>
+        <p style={{ color: '#999' }}>Pick two data points above to compare them.</p>
       ) : sameField ? (
-        <p style={{ color: '#999' }}>Choose two different columns to compare.</p>
+        <p style={{ color: '#999' }}>Choose two different data points to compare.</p>
       ) : !validCombo ? (
-        <p style={{ color: '#999' }}>This combination isn't supported yet, try a categorical or numeric column instead.</p>
+        <p style={{ color: '#999' }}>{fieldA.label} and {fieldB.label} are both numbers - pick one number and one category (like Order Type or a dropdown answer) to compare them.</p>
       ) : data.length === 0 ? (
         <p style={{ color: '#999' }}>Not enough data yet for this combination.</p>
       ) : (
