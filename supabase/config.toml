@@ -38,3 +38,63 @@ enabled = true
 verify_jwt = true
 import_map = "./functions/manage-staff/deno.json"
 entrypoint = "./functions/manage-staff/index.ts"
+
+[functions.create-quiz-room]
+enabled = true
+verify_jwt = true
+import_map = "./functions/create-quiz-room/deno.json"
+entrypoint = "./functions/create-quiz-room/index.ts"
+
+[functions.generate-quiz-questions]
+enabled = true
+verify_jwt = true
+import_map = "./functions/generate-quiz-questions/deno.json"
+entrypoint = "./functions/generate-quiz-questions/index.ts"
+
+[functions.manage-quiz-questions]
+enabled = true
+verify_jwt = true
+import_map = "./functions/manage-quiz-questions/deno.json"
+entrypoint = "./functions/manage-quiz-questions/index.ts"
+
+[functions.get-quiz-room-state]
+enabled = true
+verify_jwt = true
+import_map = "./functions/get-quiz-room-state/deno.json"
+entrypoint = "./functions/get-quiz-room-state/index.ts"
+
+[functions.join-quiz-room]
+enabled = true
+verify_jwt = false
+import_map = "./functions/join-quiz-room/deno.json"
+entrypoint = "./functions/join-quiz-room/index.ts"
+
+[functions.set-player-ready]
+enabled = true
+verify_jwt = false
+import_map = "./functions/set-player-ready/deno.json"
+entrypoint = "./functions/set-player-ready/index.ts"
+
+[functions.get-quiz-question]
+enabled = true
+verify_jwt = false
+import_map = "./functions/get-quiz-question/deno.json"
+entrypoint = "./functions/get-quiz-question/index.ts"
+
+[functions.submit-quiz-answer]
+enabled = true
+verify_jwt = false
+import_map = "./functions/submit-quiz-answer/deno.json"
+entrypoint = "./functions/submit-quiz-answer/index.ts"
+
+[functions.advance-quiz-room]
+enabled = true
+verify_jwt = false
+import_map = "./functions/advance-quiz-room/deno.json"
+entrypoint = "./functions/advance-quiz-room/index.ts"
+
+[functions.get-player-quiz-history]
+enabled = true
+verify_jwt = false
+import_map = "./functions/get-player-quiz-history/deno.json"
+entrypoint = "./functions/get-player-quiz-history/index.ts"

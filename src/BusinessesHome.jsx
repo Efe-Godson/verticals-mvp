@@ -12,7 +12,6 @@ import { useToast } from './Toast'
 import ConfirmDialog from './ConfirmDialog'
 import HomeRecycleBinDialog from './HomeRecycleBinDialog'
 import { useRecycleBinTrigger } from './RecycleBinContext'
-import { TEMPLATE_ADMIN_USER_ID } from './adminAccount'
 import { categoryColor, CategoryIcon } from './templateVisuals'
 
 // Bundle templates (Employees + Salary Events, etc.) have no Locations
@@ -115,7 +114,6 @@ function BusinessesHome() {
   const navigate = useNavigate()
   const { showToast } = useToast()
   const { setTrigger } = useRecycleBinTrigger()
-  const isAdmin = session.user.id === TEMPLATE_ADMIN_USER_ID
 
   const [usedTemplates, setUsedTemplates] = useState([]) // [{ template, locationCount, singleFormId, isBundle }]
   const [loading, setLoading] = useState(true)
@@ -273,9 +271,6 @@ function BusinessesHome() {
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.3rem' }}>
         <h1 style={{ margin: 0 }}>Your Businesses</h1>
-        {isAdmin && (
-          <Link to="/lab" style={{ fontSize: '0.85rem', color: 'var(--color-muted)' }}>Lab →</Link>
-        )}
       </div>
       <p style={{ color: 'var(--color-muted)', marginTop: 0, marginBottom: '1.5rem' }}>
         Everything you've set up from a template, in one place.

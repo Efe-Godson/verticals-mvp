@@ -16,6 +16,12 @@ import Report from './Report'
 import AIAnalystPage from './AIAnalystPage'
 import FormSettings from './FormSettings'
 import AdminStaff from './AdminStaff'
+import QuizHome from './QuizHome'
+import CreateQuizRoom from './CreateQuizRoom'
+import JoinQuizRoom from './JoinQuizRoom'
+import QuizRoom from './QuizRoom'
+import QuizAdminDashboard from './QuizAdminDashboard'
+import QuizPointHistory from './QuizPointHistory'
 import PayrollPage from './PayrollPage'
 import PayrollDashboard from './PayrollDashboard'
 import Login from './Login'
@@ -70,6 +76,10 @@ function PublicOnlyRoute({ children }) {
 function AppShell() {
   const location = useLocation()
   const isPublicForm = /^\/form\/[^/]+(\/response\/[^/]+)?$/.test(location.pathname)
+  // Anonymous quiz players (no Verticals account, see quizIdentity.js) land
+  // straight on these two pages from a shared room link/code - same reason
+  // isPublicForm hides the app shell for form respondents below.
+  const isQuizPlayer = /^\/lab\/quiz\/(join|room\/[^/]+\/play)/.test(location.pathname)
   const isLogin = location.pathname === '/login'
   const isSignUp = location.pathname === '/signup'
   const isConfirmEmail = location.pathname === '/confirm-email'
@@ -81,7 +91,7 @@ function AppShell() {
 
   return (
     <>
-      {!isPublicForm && !isLogin && !isSignUp && !isConfirmEmail && !isResetPassword && !isFocusMode && <NavBar />}
+      {!isPublicForm && !isQuizPlayer && !isLogin && !isSignUp && !isConfirmEmail && !isResetPassword && !isFocusMode && <NavBar />}
       <Routes>
         <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
         <Route path="/signup" element={<PublicOnlyRoute><SignUp /></PublicOnlyRoute>} />
@@ -91,6 +101,20 @@ function AppShell() {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/" element={<PrivateRoute><StaffScopedRoute><BusinessesHome /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/lab" element={<PrivateRoute><StaffScopedRoute><AdminOnlyRoute><Home /></AdminOnlyRoute></StaffScopedRoute></PrivateRoute>} />
+        {/* Quiz: real-time multiplayer AI quiz game. Hosting (create/admin/
+            history) stays Lab-only - still an admin-curated MVP tool, same
+            as the rest of /lab. Joining and playing are deliberately NOT
+            gated: players have no Verticals account at all (see
+            quizIdentity.js), so requiring a login here would defeat the
+            point of sharing a room code. The real access control for a
+            room's data lives server-side (RLS + the quiz-* edge functions),
+            not in this route guard - see the quiz_tables migration. */}
+        <Route path="/lab/quiz" element={<PrivateRoute><StaffScopedRoute><AdminOnlyRoute><QuizHome /></AdminOnlyRoute></StaffScopedRoute></PrivateRoute>} />
+        <Route path="/lab/quiz/create" element={<PrivateRoute><StaffScopedRoute><AdminOnlyRoute><CreateQuizRoom /></AdminOnlyRoute></StaffScopedRoute></PrivateRoute>} />
+        <Route path="/lab/quiz/join" element={<JoinQuizRoom />} />
+        <Route path="/lab/quiz/room/:roomId/play" element={<QuizRoom />} />
+        <Route path="/lab/quiz/room/:roomId/admin" element={<PrivateRoute><StaffScopedRoute><AdminOnlyRoute><QuizAdminDashboard /></AdminOnlyRoute></StaffScopedRoute></PrivateRoute>} />
+        <Route path="/lab/quiz/history" element={<PrivateRoute><StaffScopedRoute><AdminOnlyRoute><QuizPointHistory /></AdminOnlyRoute></StaffScopedRoute></PrivateRoute>} />
         <Route path="/reports" element={<PrivateRoute><StaffScopedRoute><Reports /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/templates" element={<PrivateRoute><StaffScopedRoute><Templates /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/templates/:slug/locations" element={<PrivateRoute><StaffScopedRoute><TemplateLocations /></StaffScopedRoute></PrivateRoute>} />
