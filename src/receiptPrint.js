@@ -29,6 +29,7 @@ export function printReceipt(form, submission) {
 
   let itemsHtml = ''
   let grandTotal = 0
+  let deliveryFeeTotal = 0
   let itemNumber = 0
 
   cartFields.forEach(field => {
@@ -45,6 +46,10 @@ export function printReceipt(form, submission) {
           </div>
         `
       })
+      // Only ever asked for Takeout (see PublicForm.jsx) but stored per
+      // cart field regardless, so summing across fields here is safe even
+      // for forms with more than one cart.
+      deliveryFeeTotal += Number(cartData.deliveryFee) || 0
     }
   })
 
@@ -254,9 +259,19 @@ export function printReceipt(form, submission) {
           <div class="divider"></div>
           ${itemsHtml}
           <div class="double-divider"></div>
+          ${deliveryFeeTotal > 0 ? `
+            <div class="line">
+              <span>Subtotal</span>
+              <span>${grandTotal.toLocaleString()}</span>
+            </div>
+            <div class="line">
+              <span>Delivery Fee</span>
+              <span>${deliveryFeeTotal.toLocaleString()}</span>
+            </div>
+          ` : ''}
           <div class="total-row">
             <span>TOTAL</span>
-            <span>${grandTotal.toLocaleString()}</span>
+            <span>${(grandTotal + deliveryFeeTotal).toLocaleString()}</span>
           </div>
           <div class="divider"></div>
         ` : ''}
