@@ -101,6 +101,15 @@
   box-sizing: border-box;
 }
 
+html, body {
+  /* Safety net against any element that overflows its container width
+     (long unwrapped text forcing a grid track wider than 1fr, a stray fixed
+     pixel width, etc.) turning into page-wide horizontal scroll on a phone -
+     elements that scroll on purpose (.category-scroll, .table-scroll) use
+     their own local overflow-x and are unaffected by this. */
+  overflow-x: hidden;
+}
+
 body {
   margin: 0;
   background: var(--color-bg);

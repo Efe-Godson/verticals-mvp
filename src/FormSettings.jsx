@@ -79,7 +79,9 @@ function FormSettings() {
   const hasCartField = form.fields?.some(f => f.type === 'cart')
 
   return (
-    <div className="page">
+    <div className="page" style={isFocusMode ? { paddingTop: '4rem' } : undefined}>
+      {/* Reserves room for PosSidePanel's fixed top-left hamburger - see the
+          same fix in PublicForm.jsx/Records.jsx. */}
       {isFocusMode && <PosSidePanel formId={form.id} hasCartField={hasCartField} />}
       <h1>{form.name}: Settings</h1>
 

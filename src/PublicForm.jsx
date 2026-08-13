@@ -40,7 +40,6 @@ function PublicForm() {
   const [cartPayment, setCartPayment] = useState({}) // { [fieldId]: { method } } - confirmed payment
   const [checkoutFieldId, setCheckoutFieldId] = useState(null) // which cart field's checkout modal is open
   const [showMoreCheckoutFields, setShowMoreCheckoutFields] = useState(false) // reveals fields flagged collapsedInCheckout
-  const [showMoreFields, setShowMoreFields] = useState(false) // same reveal, for deferCheckout forms rendering fields on the page instead of a modal
   const [checkoutMethod, setCheckoutMethod] = useState(null) // method chosen inside the open checkout modal
   const [deliveryFee, setDeliveryFee] = useState({}) // { [fieldId]: string } - only asked when the order is Takeout
   const [splitDraft, setSplitDraft] = useState([{ method: 'Cash', amount: '' }, { method: 'Card', amount: '' }])
@@ -398,7 +397,17 @@ function PublicForm() {
   }
 
   function validateField(field, value) {
-    if (field.type === 'cart') return null
+    // value is a pre-computed item count for a cart field (see
+    // validatePageFields) rather than answers[field.id] - a cart field
+    // never writes into `answers`, its data only gets assembled at submit
+    // time from cartQuantities, so `required` here used to be a total
+    // no-op and an order with zero items would submit as a blank record.
+    if (field.type === 'cart') {
+      if (field.required && (!value || value <= 0)) {
+        return field.errorMessage || `Add at least one item before submitting.`
+      }
+      return null
+    }
 
     if (field.type === 'linked_record') {
       if (field.required && !value?.recordId) {
@@ -510,6 +519,11 @@ function PublicForm() {
     return null
   }
 
+  function cartItemCount(field) {
+    const quantities = cartQuantities[field.id] || {}
+    return (field.products || []).reduce((sum, p) => sum + (Number(quantities[p.id]) || 0), 0)
+  }
+
   // Validates just the fields on one page: used both for the Next button
   // (only that page's fields should block advancing) and, with the full
   // field list, for the final submit.
@@ -517,7 +531,8 @@ function PublicForm() {
     const newErrors = {}
     pageFields.forEach(field => {
       if (field.type === 'section') return
-      const err = validateField(field, answers[field.id])
+      const value = field.type === 'cart' ? cartItemCount(field) : answers[field.id]
+      const err = validateField(field, value)
       if (err) newErrors[field.id] = err
     })
     return newErrors
@@ -925,8 +940,15 @@ function PublicForm() {
                       <div key={p.id} className="card" style={{
                         aspectRatio: '1 / 0.62', padding: '0.4rem', background: 'var(--color-surface)',
                         display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+                        // Grid items default to min-width: auto, meaning
+                        // they won't shrink below their content's intrinsic
+                        // size - the nowrap product name below would force
+                        // this tile's column wider than its 1fr share
+                        // (dragging the whole grid, and the page, wider than
+                        // the phone screen) without this override.
+                        minWidth: 0,
                       }}>
-                        <div style={{ minHeight: 0, overflow: 'hidden' }}>
+                        <div style={{ minHeight: 0, minWidth: 0, overflow: 'hidden' }}>
                           <div style={{
                             fontSize: '0.7rem', fontWeight: 600, lineHeight: 1.15,
                             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
@@ -1612,7 +1634,7 @@ function PublicForm() {
       // Only needed when the panel actually renders (a saved-response edit
       // link, `token`, skips it entirely).
       ...(!token ? { paddingTop: '4rem' } : {}),
-      ...(cartDefersCheckout ? { paddingBottom: 'calc(6.5rem + env(safe-area-inset-bottom))' } : {}),
+      ...(cartDefersCheckout ? { paddingBottom: 'calc(7.5rem + env(safe-area-inset-bottom))' } : {}),
     }}>
       {!token && (
         <div className="no-print">
@@ -1674,31 +1696,17 @@ function PublicForm() {
         const otherFields = visibleFields.filter(f => f.type !== 'cart')
         // On a plain (no-cart) form or a normal embedded-checkout cart form,
         // collapsedInCheckout has nowhere to apply here - every field is
-        // "primary". Only a deferCheckout cart splits the page itself into
-        // primary vs. "more details", the same grouping the checkout modal
-        // already does for collapsedInCheckout fields (see checkoutQuestions
-        // above), just rendered inline instead of inside a modal.
+        // "primary". On a deferCheckout cart, which fields the order screen
+        // shows is decided entirely up front in the builder (see
+        // MoreDetailsManager) - a collapsedInCheckout field just isn't part
+        // of this screen at all, there's no "+ More details" reveal here
+        // anymore for whoever's taking the order to second-guess that call.
         const primaryFields = cartDefersCheckout ? otherFields.filter(f => !f.collapsedInCheckout) : otherFields
-        const moreFields = cartDefersCheckout ? otherFields.filter(f => f.collapsedInCheckout) : []
 
         return (
           <>
             {cartField && renderFieldRow(cartField)}
             {primaryFields.map(renderFieldRow)}
-            {moreFields.length > 0 && (
-              <div className="no-print" style={{ margin: '0 0 1rem' }}>
-                <span
-                  onClick={() => setShowMoreFields(v => !v)}
-                  style={{
-                    display: 'inline-block', padding: '0.5rem 0', fontSize: '0.85rem',
-                    color: 'var(--color-primary)', cursor: 'pointer', userSelect: 'none', fontWeight: 600,
-                  }}
-                >
-                  {showMoreFields ? '− Fewer details' : '+ More details'}
-                </span>
-              </div>
-            )}
-            {showMoreFields && moreFields.map(renderFieldRow)}
           </>
         )
       })()}
@@ -1716,10 +1724,7 @@ function PublicForm() {
           display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem',
           maxWidth: cartDefersCheckout ? '800px' : undefined,
           margin: cartDefersCheckout ? '0 auto' : undefined,
-          // Extra bottom padding on top of the usual amount so the bar's
-          // buttons don't sit under an iPhone's home-indicator strip -
-          // env() resolves to 0 (a no-op) on devices/browsers without one.
-          padding: cartDefersCheckout ? '0.8rem 1.5rem calc(0.8rem + env(safe-area-inset-bottom))' : undefined,
+          padding: cartDefersCheckout ? '0.8rem 1.5rem 0.3rem' : undefined,
         }}>
           {/* Mobile-first: this bar is what makes Retail's "cart + fields +
               one Submit at the end" flow actually usable one-handed - the
@@ -1757,14 +1762,32 @@ function PublicForm() {
             </button>
           )}
         </div>
+
+        {/* This fixed bar IS the bottom of the screen on a deferCheckout
+            form - "Powered by Verticals" belongs here, as its own last
+            line, not stranded earlier in the scrollable content above a
+            bar that visually covers whatever would normally follow it.
+            The safe-area padding that used to sit on the button row above
+            moves down to here instead, since this is now the true last
+            thing on screen, closest to an iPhone's home-indicator strip. */}
+        {cartDefersCheckout && (
+          <p style={{
+            textAlign: 'center', fontStyle: 'italic', color: '#999', fontSize: '0.75rem',
+            margin: 0, padding: '0 0 calc(0.5rem + env(safe-area-inset-bottom))',
+          }}>
+            Powered by Verticals
+          </p>
+        )}
       </div>
       )}
 
       {message && <p className="no-print" style={{ marginTop: '1rem', color: 'red' }}>{message}</p>}
 
-      <p className="no-print" style={{ marginTop: '3rem', color: '#999', fontSize: '0.85rem' }}>
-        Powered by Verticals
-      </p>
+      {!cartDefersCheckout && (
+        <p className="no-print" style={{ marginTop: '3rem', color: '#999', fontSize: '0.85rem' }}>
+          Powered by Verticals
+        </p>
+      )}
     </div>
   )
 }

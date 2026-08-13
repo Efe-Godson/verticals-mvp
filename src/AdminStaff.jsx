@@ -219,7 +219,9 @@ function AdminStaff() {
   if (error) return <div className="page" style={{ color: 'red' }}>{error}</div>
 
   return (
-    <div className="page">
+    <div className="page" style={isFocusMode ? { paddingTop: '4rem' } : undefined}>
+      {/* Reserves room for PosSidePanel's fixed top-left hamburger - see the
+          same fix in PublicForm.jsx/Records.jsx. */}
       {isFocusMode && <PosSidePanel formId={form.id} hasCartField={form.fields?.some(f => f.type === 'cart')} />}
       <h1>Create New Location Login</h1>
       <p style={{ color: 'var(--color-muted)', marginTop: '-0.5rem' }}>

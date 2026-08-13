@@ -87,10 +87,22 @@ function EditForm() {
   const fieldMenuRef = useRef(null)
   const [showPreview, setShowPreview] = useState(false)
   const [manageProductsIndex, setManageProductsIndex] = useState(null)
-  // Collapsed by default on cart forms so a business owner poking at the
-  // menu doesn't stumble into editing/deleting the checkout questions by
-  // accident - they're still fully editable once intentionally expanded.
-  const [showAdditionalInfo, setShowAdditionalInfo] = useState(false)
+  const [showMoreDetailsManager, setShowMoreDetailsManager] = useState(false)
+  const [editingFieldId, setEditingFieldId] = useState(null)
+  const [focusFieldId, setFocusFieldId] = useState(null)
+
+  // Focuses (and selects, so typing straight away replaces it) a just-added
+  // field's name input, once it actually exists in the DOM - a fresh field
+  // used to just say "Untitled field" until you went and found it yourself.
+  useEffect(() => {
+    if (!focusFieldId) return
+    const el = document.getElementById(`field-label-${focusFieldId}`)
+    if (el) {
+      el.focus()
+      el.select()
+      setFocusFieldId(null)
+    }
+  }, [focusFieldId, fields, showMoreDetailsManager])
 
   useEffect(() => {
     async function loadForm() {
@@ -221,11 +233,13 @@ function EditForm() {
   }
 
   function addField() {
-    setFields([...fields, {
-      id: 'f' + Date.now(),
-      label: '',
-      type: 'text',
-    }])
+    const newField = { id: 'f' + Date.now(), label: '', type: 'text' }
+    setFields([...fields, newField])
+    // editingFieldId only matters on a cart-based form (it's what
+    // MoreDetailsManager reads to decide which field's card to expand) -
+    // harmless to set unconditionally, a plain form just never reads it.
+    setEditingFieldId(newField.id)
+    setFocusFieldId(newField.id)
   }
 
   // Adds a recommended field (Location, Customer Name, ...) from
@@ -315,18 +329,146 @@ function EditForm() {
   if (error) return <div className="page" style={{ color: 'red' }}>{error}</div>
 
   const hasCartField = fields.some(f => f.type === 'cart')
-  // On a cart form, everything after the menu reads as one undifferentiated
-  // list otherwise - nothing marks it as "questions asked at checkout"
-  // rather than more menu configuration.
-  const firstNonCartFieldIndex = hasCartField ? fields.findIndex(f => f.type !== 'cart') : -1
-  const additionalInfoCount = firstNonCartFieldIndex === -1 ? 0 : fields.length - firstNonCartFieldIndex
+
+  // The draggable card for one non-section field (name/type, options,
+  // product manager for a cart field, validation controls, remove menu).
+  // Pulled out so it can be called both for the catalogue's own row in the
+  // main list, and again for every other field once nested inside Manage
+  // Details - same card either place, just rendered in a different spot.
+  function renderFieldCard(field, index) {
+    return (
+      <div
+        key={field.id}
+        draggable={field.type !== 'cart'}
+        onDragStart={() => handleDragStart(index)}
+        onDragOver={(e) => handleDragOver(e, index)}
+        onDragEnd={handleDragEnd}
+        className="card field-card"
+        style={{
+          padding: '1rem',
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: '0.8rem',
+          opacity: dragIndex === index ? 0.5 : 1,
+          cursor: field.type === 'cart' ? 'default' : 'grab',
+          background: field.type === 'cart' ? 'var(--color-primary-soft)' : undefined
+        }}
+      >
+        {/* The catalogue is always alone in the main list on a cart-based
+            form (every other field lives inside Manage Details instead) -
+            nothing for it to reorder against, so a drag handle here was
+            just a dead affordance. */}
+        {field.type !== 'cart' && (
+          <div className="field-drag-handle" style={{
+            fontSize: '1.2rem', color: '#bbb', paddingTop: '0.6rem',
+            userSelect: 'none', lineHeight: 1
+          }} title="Drag to reorder">
+            ⠿
+          </div>
+        )}
+
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+          {field.type !== 'cart' && (
+            <div className="field-row" style={{ display: 'flex', gap: '0.6rem' }}>
+              <input
+                id={`field-label-${field.id}`}
+                type="text"
+                value={field.label}
+                onChange={(e) => updateField(index, { label: e.target.value })}
+                placeholder="Field name"
+                style={{ flex: 2 }}
+              />
+              <select
+                value={field.type}
+                onChange={(e) => updateFieldType(index, e.target.value)}
+                style={{ flex: 1 }}
+              >
+                {FIELD_TYPES.map(t => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {TYPES_WITH_OPTIONS.includes(field.type) && (
+            <input
+              type="text"
+              value={field.optionsText !== undefined ? field.optionsText : (field.options || []).join(', ')}
+              onChange={(e) => updateFieldOptions(index, e.target.value)}
+              placeholder="Options, comma separated e.g. Cash, Transfer, Card"
+            />
+          )}
+
+          {TYPES_WITH_PRODUCTS.includes(field.type) && (
+            <div>
+              <div style={{ marginTop: '0.3rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.7rem', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.85rem' }}>
+                  ✓ {(field.products || []).length} Product{(field.products || []).length !== 1 ? 's' : ''}
+                </span>
+                <button type="button" onClick={() => setManageProductsIndex(manageProductsIndex === index ? null : index)}>
+                  {manageProductsIndex === index ? 'Hide Products' : 'Manage Products →'}
+                </button>
+              </div>
+              {manageProductsIndex === index && (
+                <ProductManager
+                  inline
+                  products={field.products || []}
+                  onChange={(products) => updateFieldProducts(index, products)}
+                />
+              )}
+            </div>
+          )}
+
+          {field.type !== 'cart' && (
+            <>
+              <FieldTypeConfig field={field} index={index} updateField={updateField} allFields={fields} />
+              <FieldValidationControls field={field} index={index} updateField={updateField} />
+            </>
+          )}
+        </div>
+
+        {field.type !== 'cart' && (
+          <div style={{ position: 'relative', flexShrink: 0 }} ref={openFieldMenu === field.id ? fieldMenuRef : null}>
+            <button
+              className="secondary"
+              onClick={() => setOpenFieldMenu(openFieldMenu === field.id ? null : field.id)}
+              title="More options"
+            >
+              ⋮
+            </button>
+
+            {openFieldMenu === field.id && (
+              <div className="dropdown-panel" style={{
+                position: 'absolute', top: '100%', right: 0, marginTop: '0.3rem',
+                background: 'white', border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius)', boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+                zIndex: 20, minWidth: '140px', overflow: 'hidden'
+              }}>
+                <MenuItem
+                  danger
+                  onClick={() => {
+                    setOpenFieldMenu(null)
+                    setPendingConfirm({ type: 'field', index })
+                  }}
+                >
+                  Remove Field
+                </MenuItem>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
-    <div className="page">
+    <div className="page" style={isFocusMode ? { paddingTop: '4rem' } : undefined}>
+      {/* Reserves room for PosSidePanel's fixed top-left hamburger - see the
+          same fix in PublicForm.jsx/Records.jsx. */}
       {isFocusMode && <PosSidePanel formId={id} hasCartField={hasCartField} />}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem', flexWrap: 'wrap', gap: '0.6rem' }}>
         <h1 style={{ margin: 0 }}>{hasCartField ? 'Add Product' : 'Edit Form'}</h1>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
           {!hasCartField && (
             <Link to={`/form/${id}`} style={{ fontSize: '0.9rem', color: 'var(--color-primary)' }}>
               View public form →
@@ -375,7 +517,7 @@ function EditForm() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
         {fields.map((field, index) => (
           <Fragment key={field.id}>
-          {(field.type === 'cart' || !hasCartField || showAdditionalInfo) && (
+          {
           field.type === 'section' ? (
             <div
               draggable
@@ -419,122 +561,55 @@ function EditForm() {
                 Remove
               </button>
             </div>
+          ) : field.type === 'cart' ? (
+            <>
+              {renderFieldCard(field, index)}
+
+              {/* Right after the catalogue's own row, styled and collapsed
+                  the same way as Manage Products right above it. Expanding
+                  this is now also the only way to reach every other field's
+                  own card (name/type/validation/etc) - same idea as
+                  products living inside Manage Products instead of each
+                  being its own top-level card. */}
+              {(() => {
+                const configurable = fields.map((f, i) => ({ f, i })).filter(({ f }) => f.type !== 'cart' && f.type !== 'section')
+                const pinnedCount = configurable.filter(({ f }) => !f.collapsedInCheckout).length
+                const moreDetailsCount = configurable.length - pinnedCount
+                return (
+                  <div className="card" style={{ marginTop: '0.6rem', padding: '1rem', background: 'var(--color-primary-soft)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.7rem', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '0.85rem' }}>
+                        ✓ {pinnedCount} pinned, {moreDetailsCount} in More Details
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowMoreDetailsManager(v => !v)
+                          setEditingFieldId(null)
+                        }}
+                      >
+                        {showMoreDetailsManager ? 'Hide Details' : 'Manage Details →'}
+                      </button>
+                    </div>
+                    {showMoreDetailsManager && (
+                      <div style={{ marginTop: '0.6rem' }}>
+                        <MoreDetailsManager
+                          fields={fields} setFields={setFields} addField={addField} addPresetField={addPresetField}
+                          editingFieldId={editingFieldId} setEditingFieldId={setEditingFieldId}
+                          renderFieldCard={renderFieldCard}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+            </>
           ) : (
-          <div
-            draggable
-            onDragStart={() => handleDragStart(index)}
-            onDragOver={(e) => handleDragOver(e, index)}
-            onDragEnd={handleDragEnd}
-            className="card field-card"
-            style={{
-              padding: '1rem',
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: '0.8rem',
-              opacity: dragIndex === index ? 0.5 : 1,
-              cursor: 'grab',
-              background: field.type === 'cart' ? 'var(--color-primary-soft)' : undefined
-            }}
-          >
-            <div className="field-drag-handle" style={{
-              fontSize: '1.2rem', color: '#bbb', paddingTop: '0.6rem',
-              userSelect: 'none', lineHeight: 1
-            }} title="Drag to reorder">
-              ⠿
-            </div>
-
-            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-              {field.type !== 'cart' && (
-                <div className="field-row" style={{ display: 'flex', gap: '0.6rem' }}>
-                  <input
-                    type="text"
-                    value={field.label}
-                    onChange={(e) => updateField(index, { label: e.target.value })}
-                    placeholder="Field name"
-                    style={{ flex: 2 }}
-                  />
-                  <select
-                    value={field.type}
-                    onChange={(e) => updateFieldType(index, e.target.value)}
-                    style={{ flex: 1 }}
-                  >
-                    {FIELD_TYPES.map(t => (
-                      <option key={t.value} value={t.value}>{t.label}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {TYPES_WITH_OPTIONS.includes(field.type) && (
-                <input
-                  type="text"
-                  value={field.optionsText !== undefined ? field.optionsText : (field.options || []).join(', ')}
-                  onChange={(e) => updateFieldOptions(index, e.target.value)}
-                  placeholder="Options, comma separated e.g. Cash, Transfer, Card"
-                />
-              )}
-
-              {TYPES_WITH_PRODUCTS.includes(field.type) && (
-                <div>
-                  <div style={{ marginTop: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
-                    <span style={{ fontSize: '0.85rem' }}>
-                      ✓ {(field.products || []).length} Product{(field.products || []).length !== 1 ? 's' : ''}
-                    </span>
-                    <button type="button" onClick={() => setManageProductsIndex(manageProductsIndex === index ? null : index)}>
-                      {manageProductsIndex === index ? 'Hide Products' : 'Manage Products →'}
-                    </button>
-                  </div>
-                  {manageProductsIndex === index && (
-                    <ProductManager
-                      inline
-                      products={field.products || []}
-                      onChange={(products) => updateFieldProducts(index, products)}
-                    />
-                  )}
-                </div>
-              )}
-
-              {field.type !== 'cart' && (
-                <>
-                  <FieldTypeConfig field={field} index={index} updateField={updateField} allFields={fields} />
-                  <FieldValidationControls field={field} index={index} updateField={updateField} />
-                </>
-              )}
-            </div>
-
-            {field.type !== 'cart' && (
-              <div style={{ position: 'relative', flexShrink: 0 }} ref={openFieldMenu === field.id ? fieldMenuRef : null}>
-                <button
-                  className="secondary"
-                  onClick={() => setOpenFieldMenu(openFieldMenu === field.id ? null : field.id)}
-                  title="More options"
-                >
-                  ⋮
-                </button>
-
-                {openFieldMenu === field.id && (
-                  <div className="dropdown-panel" style={{
-                    position: 'absolute', top: '100%', right: 0, marginTop: '0.3rem',
-                    background: 'white', border: '1px solid var(--color-border)',
-                    borderRadius: 'var(--radius)', boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
-                    zIndex: 20, minWidth: '140px', overflow: 'hidden'
-                  }}>
-                    <MenuItem
-                      danger
-                      onClick={() => {
-                        setOpenFieldMenu(null)
-                        setPendingConfirm({ type: 'field', index })
-                      }}
-                    >
-                      Remove Field
-                    </MenuItem>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+            // Non-cart fields on a cart-based form live inside Manage
+            // Details above instead of here - see the cart branch.
+            !hasCartField && renderFieldCard(field, index)
           )
-          )}
+          }
           </Fragment>
         ))}
 
@@ -543,35 +618,6 @@ function EditForm() {
         )}
       </div>
 
-      {hasCartField && (
-        <MoreDetailsManager fields={fields} setFields={setFields} addField={addField} addPresetField={addPresetField} />
-      )}
-
-      {hasCartField && (
-        <div
-          onClick={() => setShowAdditionalInfo(v => !v)}
-          style={{
-            marginTop: '1.1rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)',
-            cursor: 'pointer', userSelect: 'none', display: 'flex', alignItems: 'center', gap: '0.5rem'
-          }}
-        >
-          <span style={{
-            fontSize: '0.7rem', color: 'var(--color-muted)', transform: showAdditionalInfo ? 'rotate(0deg)' : 'rotate(-90deg)',
-            transition: 'transform 0.15s', display: 'inline-block'
-          }}>
-            ▾
-          </span>
-          <div>
-            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              Additional Information · {additionalInfoCount} field{additionalInfoCount !== 1 ? 's' : ''}
-            </div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)', marginTop: '0.2rem' }}>
-              Asked at checkout, alongside the order. Collapsed by default so the menu stays front and center - click to edit.
-            </div>
-          </div>
-        </div>
-      )}
-
       {!hasCartField && (
         <div style={{ display: 'flex', gap: '0.6rem', marginTop: '1rem', flexWrap: 'wrap' }}>
           <button className="secondary" onClick={addField}>
@@ -579,14 +625,6 @@ function EditForm() {
           </button>
           <button className="secondary" onClick={addSection}>
             + Add Section
-          </button>
-        </div>
-      )}
-
-      {hasCartField && showAdditionalInfo && (
-        <div style={{ marginTop: '1rem' }}>
-          <button className="secondary" onClick={addField}>
-            + Add Field
           </button>
         </div>
       )}
