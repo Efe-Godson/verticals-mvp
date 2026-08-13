@@ -41,3 +41,14 @@ export async function askAIQuestion(formId, question, submissionIds, languageSty
   if (data?.error) throw new Error(data.error)
   return data.answer
 }
+
+// Turns pasted, unstructured text (a menu copied from a PDF, a price list,
+// whatever) into a product list for ProductManager's "Use AI" import - the
+// caller is expected to show these for review/editing before adding them,
+// not commit them straight to the catalogue the way the .xlsx import does.
+export async function extractProductsFromText(text) {
+  const { data, error } = await supabase.functions.invoke('extract-products-ai', { body: { text } })
+  if (error) await throwFunctionError(error)
+  if (data?.error) throw new Error(data.error)
+  return data.products
+}

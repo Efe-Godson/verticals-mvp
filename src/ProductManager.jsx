@@ -11,9 +11,20 @@ import { useState } from 'react'
 import * as XLSX from 'xlsx'
 import PackageBuilder from './PackageBuilder'
 import ConfirmDialog from './ConfirmDialog'
+import { extractProductsFromText } from './lib/aiClient'
 
 function newProductId() {
   return 'p' + Date.now() + Math.random().toString(36).slice(2, 7)
+}
+
+// A flat 4-point sparkle, matching the plain single-color line-icon style
+// used elsewhere (see templateVisuals.jsx) instead of an emoji.
+function SparkleIcon({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 3L14.5 9.5L21 12L14.5 14.5L12 21L9.5 14.5L3 12L9.5 9.5Z" />
+    </svg>
+  )
 }
 
 const TOP_CATEGORY_COUNT = 6 // category pills shown before collapsing the rest behind "+N more"
@@ -177,6 +188,126 @@ function ProductForm({ product, onSave, onCancel }) {
   )
 }
 
+// Paste text -> AI extracts a product list -> reviewed/edited here -> only
+// then merged into the catalogue. Deliberately not a one-click import like
+// the .xlsx upload: an AI read of pasted text is more likely to need a
+// correction (a misread price, a name it cleaned up wrong) than a
+// structured file already is, so this always stops for a look first.
+function AiImportModal({ onClose, onImport }) {
+  const [pastedText, setPastedText] = useState('')
+  const [extracting, setExtracting] = useState(false)
+  const [extractError, setExtractError] = useState('')
+  const [drafts, setDrafts] = useState(null) // null while still on the paste step, else the reviewable array
+
+  async function handleExtract() {
+    if (!pastedText.trim()) return
+    setExtracting(true)
+    setExtractError('')
+    try {
+      const products = await extractProductsFromText(pastedText)
+      if (!products.length) {
+        setExtractError("Couldn't find any products in that text - try pasting more of it, or check it's the right content.")
+        return
+      }
+      setDrafts(products.map(p => ({ ...p, id: newProductId() })))
+    } catch (err) {
+      setExtractError(err.message)
+    } finally {
+      setExtracting(false)
+    }
+  }
+
+  function updateDraft(id, patch) {
+    setDrafts(current => current.map(d => d.id === id ? { ...d, ...patch } : d))
+  }
+
+  function removeDraft(id) {
+    setDrafts(current => current.filter(d => d.id !== id))
+  }
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 400, padding: '1rem'
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="card"
+        style={{ background: 'white', padding: '1.5rem', width: '560px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto' }}
+      >
+        <h3 style={{ margin: '0 0 0.3rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <SparkleIcon size={18} /> Use AI to add new products
+        </h3>
+
+        {drafts === null ? (
+          <>
+            <p style={{ fontSize: '0.85rem', color: 'var(--color-muted)', margin: '0 0 0.8rem' }}>
+              Paste a menu, price list, or product list from anywhere - a PDF, a spreadsheet, a message - and AI will turn it into products you can review before adding.
+            </p>
+            <textarea
+              value={pastedText}
+              onChange={(e) => setPastedText(e.target.value)}
+              placeholder={'e.g.\nGrilled Chicken - 12.99\nBeef Burger 10.99 (Mains)\nSoft Drink ......... 2.50'}
+              rows={10}
+              style={{ width: '100%', padding: '0.6rem', fontSize: '0.9rem' }}
+            />
+            {extractError && <p style={{ color: '#c0392b', fontSize: '0.85rem', marginTop: '0.5rem' }}>{extractError}</p>}
+            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '0.8rem' }}>
+              <button type="button" className="secondary" onClick={onClose}>Cancel</button>
+              <button type="button" disabled={!pastedText.trim() || extracting} onClick={handleExtract}>
+                {extracting ? 'Reading...' : 'Extract Products'}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p style={{ fontSize: '0.85rem', color: 'var(--color-muted)', margin: '0 0 0.8rem' }}>
+              Found {drafts.length} product{drafts.length !== 1 ? 's' : ''} - review and edit before adding them to your menu.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
+              {drafts.map(d => (
+                <div key={d.id} style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)', padding: '0.5rem' }}>
+                  <input
+                    type="text" value={d.name} onChange={(e) => updateDraft(d.id, { name: e.target.value })}
+                    placeholder="Name" style={{ flex: 2, minWidth: 0, padding: '0.4rem' }}
+                  />
+                  <input
+                    type="number" min="0" value={d.price} onChange={(e) => updateDraft(d.id, { price: e.target.value })}
+                    placeholder="Price" style={{ flex: 1, minWidth: '70px', padding: '0.4rem' }}
+                  />
+                  <input
+                    type="text" value={d.category} onChange={(e) => updateDraft(d.id, { category: e.target.value })}
+                    placeholder="Category" style={{ flex: 1, minWidth: '90px', padding: '0.4rem' }}
+                  />
+                  <span onClick={() => removeDraft(d.id)} title="Remove" style={{ color: '#c0392b', cursor: 'pointer', flexShrink: 0, padding: '0 0.2rem' }}>
+                    🗑
+                  </span>
+                </div>
+              ))}
+              {drafts.length === 0 && (
+                <p style={{ color: 'var(--color-muted)', fontSize: '0.85rem' }}>Nothing left to add - remove some and try again, or cancel.</p>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+              <button type="button" className="secondary" onClick={() => setDrafts(null)}>Back</button>
+              <button
+                type="button"
+                disabled={drafts.length === 0}
+                onClick={() => onImport(drafts.map(d => ({ ...d, price: Number(d.price) || 0 })))}
+              >
+                Add {drafts.length} Product{drafts.length !== 1 ? 's' : ''}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function ProductManager({ products, onChange, onClose, inline = false }) {
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState('All')
@@ -184,6 +315,7 @@ function ProductManager({ products, onChange, onClose, inline = false }) {
   const [openRowMenuId, setOpenRowMenuId] = useState(null)
   const [showPackageBuilder, setShowPackageBuilder] = useState(false)
   const [importMenuOpen, setImportMenuOpen] = useState(false)
+  const [showAiImport, setShowAiImport] = useState(false)
   const [pendingDeleteId, setPendingDeleteId] = useState(null)
   const [confirmingClearAll, setConfirmingClearAll] = useState(false)
   const [categoriesExpanded, setCategoriesExpanded] = useState(false)
@@ -281,6 +413,22 @@ function ProductManager({ products, onChange, onClose, inline = false }) {
 
   const content = (
     <>
+        {/* On a phone, flex-wrap alone leaves this row ragged - "Import"
+            wrapping alone onto its own mostly-empty line, "Clear All" doing
+            the same below it. A 2-column grid keeps every button/menu the
+            same width and packed evenly instead. */}
+        <style>{`
+          @media (max-width: 480px) {
+            .product-actions-row {
+              display: grid !important;
+              grid-template-columns: 1fr 1fr;
+            }
+            .product-actions-row > * { width: 100%; }
+            .product-actions-row > div > button { width: 100%; }
+            .product-actions-ai { grid-column: 1 / -1; }
+          }
+        `}</style>
+
         {!inline && (
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
             <h3 style={{ margin: 0 }}>Menu</h3>
@@ -288,8 +436,8 @@ function ProductManager({ products, onChange, onClose, inline = false }) {
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.9rem' }}>
-          <button type="button" onClick={() => setEditingProduct('new')}>+ Add Product</button>
+        <div className="product-actions-row" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.9rem' }}>
+          <button type="button" className="secondary" onClick={() => setEditingProduct('new')}>+ Add Product</button>
           <button type="button" className="secondary" onClick={() => setShowPackageBuilder(true)}>+ Create Package</button>
           <div style={{ position: 'relative' }}>
             <button type="button" className="secondary" onClick={() => setImportMenuOpen(o => !o)}>Import ▾</button>
@@ -323,6 +471,17 @@ function ProductManager({ products, onChange, onClose, inline = false }) {
               Clear All
             </button>
           )}
+          {/* Its own full row, below everything else - the flagship way to
+              build a catalogue from scratch, not just one more tile among
+              the smaller housekeeping actions above it. */}
+          <button
+            type="button"
+            className="product-actions-ai"
+            onClick={() => setShowAiImport(true)}
+            style={{ fontWeight: 600, width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+          >
+            <SparkleIcon /> Use AI to add new products
+          </button>
         </div>
 
         <input
@@ -363,7 +522,12 @@ function ProductManager({ products, onChange, onClose, inline = false }) {
         {filtered.length === 0 ? (
           <p style={{ color: 'var(--color-muted)' }}>No products yet. Click "+ Add Product" to start building the menu.</p>
         ) : (
-          <div style={{ border: '1px solid var(--color-border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
+          // A 5-column table doesn't shrink to fit a phone screen the way
+          // flex/grid layouts do - table-scroll (same class Records.jsx
+          // uses) keeps the overflow contained to just this table instead
+          // of either clipping the Category column/menu button off-screen
+          // or forcing the whole page to scroll sideways.
+          <div className="table-scroll" style={{ marginTop: 0 }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
               <thead>
                 <tr style={{ background: '#fafafa' }}>
@@ -473,6 +637,13 @@ function ProductManager({ products, onChange, onClose, inline = false }) {
             <PackageBuilder products={products} onCreate={addPackage} onCancel={() => setShowPackageBuilder(false)} />
           </div>
         </div>
+      )}
+
+      {showAiImport && (
+        <AiImportModal
+          onClose={() => setShowAiImport(false)}
+          onImport={(imported) => { onChange([...products, ...imported]); setShowAiImport(false) }}
+        />
       )}
 
       {pendingDeleteId && (

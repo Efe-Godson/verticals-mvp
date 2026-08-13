@@ -21,6 +21,12 @@ entrypoint = "./functions/ai-ask/index.ts"
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/ai-ask/*.html" ]
 
+[functions.extract-products-ai]
+enabled = true
+verify_jwt = true
+import_map = "./functions/extract-products-ai/deno.json"
+entrypoint = "./functions/extract-products-ai/index.ts"
+
 [functions.submit-form]
 enabled = true
 verify_jwt = false
