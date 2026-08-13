@@ -45,7 +45,6 @@ function Records() {
   const [selectedIds, setSelectedIds] = useState([])
   const [hiddenFieldIds, setHiddenFieldIds] = useState([])
   const [columnsExpanded, setColumnsExpanded] = useState(false)
-  const [searchOpen, setSearchOpen] = useState(false)
   const [tilesRevealed, setTilesRevealed] = useState(false)
   const [showRevealHint, setShowRevealHint] = useState(true)
 
@@ -86,6 +85,10 @@ function Records() {
       const isCartForm = formData.fields.some(f => f.type === 'cart')
       const defaultHidden = isCartForm ? ['__orderId', '__lastUpdate', '__ip', '__submissionId'] : []
       setHiddenFieldIds(formData.settings?.hiddenColumns ?? defaultHidden)
+      // A POS/order form (Restaurant, Retail, ...) is almost always opened
+      // to check today's sales, not the full history - other form types
+      // (surveys, registrations, ...) keep the "All time" default.
+      if (isCartForm) setDateRange('today')
 
       const { data: subsData, error: subsError } = await supabase
         .from('submissions').select('*').eq('form_id', id)
@@ -263,17 +266,17 @@ function Records() {
     )
   }
   const presets = form.settings?.recordPresets || []
-  const activeFilterCount = Object.keys(filters).length
-  const hasActiveFilters = activeFilterCount > 0 || searchText.trim() !== '' || dateRange !== 'all'
 
   function buildFilterSummary() {
     const parts = []
     if (searchText.trim() !== '') parts.push(`Search: "${searchText.trim()}"`)
     if (dateRange !== 'all') {
       const rangeLabel = DATE_RANGE_OPTIONS.find(o => o.value === dateRange)?.label
-      parts.push(dateRange === 'custom'
-        ? `Date: ${customStart || '…'} to ${customEnd || '…'}`
-        : rangeLabel)
+      parts.push(
+        dateRange === 'specific' ? `Date: ${customStart || '…'}`
+        : dateRange === 'custom' ? (customEnd ? `Date: ${customStart || '…'} to ${customEnd}` : `Date: ${customStart || '…'}`)
+        : rangeLabel
+      )
     }
     const activeFilterCount = Object.keys(filters).length
     if (activeFilterCount > 0) parts.push(`${activeFilterCount} column filter${activeFilterCount !== 1 ? 's' : ''} applied`)
@@ -547,7 +550,7 @@ function Records() {
   }
 
   return (
-    <div className="page" style={{ paddingLeft: '2.5rem' }}>
+    <div className="page" style={isFocusMode ? { paddingTop: '4rem' } : undefined}>
       <style>{`
         @keyframes fadeInOut {
           0% { opacity: 0; transform: translateY(4px); }
@@ -563,9 +566,20 @@ function Records() {
         .date-range-group { display: flex; align-items: center; gap: 0.4rem; flex: 1 1 240px; min-width: 0; }
         .date-range-group input[type="date"] { flex: 1; min-width: 0; }
         @media (max-width: 900px) {
-          .date-range-row { flex-direction: column; align-items: stretch; }
+          /* flex: 1 so this actually claims the row's remaining width next
+             to the search button, instead of just sitting at its own
+             content size with dead space trailing after it - the select's
+             own width: 100% below only has something real to fill once
+             its parent has grown to fill the row. */
+          .date-range-row { flex: 1 1 200px; flex-direction: column; align-items: stretch; min-width: 0; }
           .date-range-row select { width: 100%; }
-          .date-range-group { width: 100%; }
+          /* .date-range-group's base rule sets flex: 1 1 240px for a
+             horizontal row (240px starting *width*) - once the row above
+             flips to flex-direction: column, that same flex-basis applies
+             along the now-vertical main axis instead, reserving 240px of
+             *height* it doesn't need and leaving a large empty gap before
+             the date inputs. flex: none resets it to size by content. */
+          .date-range-group { width: 100%; flex: none; }
         }
         .records-table th {
           background: #f8fafc;
@@ -602,7 +616,22 @@ function Records() {
             margin-right: -0.2rem;
           }
         }
+        @media (max-width: 480px) {
+          /* Exports, column visibility, presets, and the Recycle Bin all
+             live behind this - power-user/desktop configuration, not
+             something a phone quick-check of orders needs reachable. */
+          .options-menu-row { display: none; }
+          /* Revenue and Orders are the two numbers worth a glance on a
+             phone - Avg Order and Delivery Fees stay one tap away on
+             desktop instead of crowding four tiles onto a small screen. */
+          .stat-tiles-grid > *:nth-child(n+3) { display: none; }
+        }
       `}</style>
+      {/* PosSidePanel's hamburger is position:fixed at top:1rem/left:1rem,
+          42px square - reserve room above the title so it doesn't paint on
+          top of the first few characters of the form name (see the same
+          fix in PublicForm.jsx). Only rendered/needed in focus mode, the
+          same condition PosSidePanel itself renders under below. */}
       {isFocusMode && <PosSidePanel formId={form.id} hasCartField={hasCartField} />}
       <h1 style={{ margin: 0 }}>{form.name}</h1>
 
@@ -622,7 +651,7 @@ function Records() {
               Click to reveal
             </div>
           )}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.7rem' }}>
+          <div className="stat-tiles-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.7rem' }}>
             {[
               { label: 'Revenue', value: `₦${revenue.toLocaleString()}` },
               { label: 'Orders', value: orderCount.toLocaleString() },
@@ -651,33 +680,23 @@ function Records() {
         </div>
       )}
 
+      {/* Search and the date filter live in their own wrapping row; Options
+          sits on its own line below instead of being one more thing that
+          row can wrap - the date filter's own dropdown+input already wrap
+          as a unit when space is tight, and Options jumping up onto that
+          same line (ahead of a wrapped date input) read as misaligned. */}
       <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem', marginTop: '0.8rem' }}>
-        {searchOpen ? (
-          <input
-            type="text"
-            autoFocus
-            className="records-search"
-            placeholder="Search all records..."
-            value={searchText}
-            onChange={(e) => { setSearchText(e.target.value); setCurrentPage(1) }}
-            onBlur={() => { if (!searchText.trim()) setSearchOpen(false) }}
-            style={{ padding: '0.5rem' }}
-          />
-        ) : (
-          <button
-            type="button"
-            className="secondary"
-            onClick={() => setSearchOpen(true)}
-            aria-label="Search"
-            title="Search"
-            style={{ padding: '0.5rem 0.65rem', display: 'flex', alignItems: 'center' }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <circle cx="11" cy="11" r="7" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
-          </button>
-        )}
+        {/* Always visible now, no click-to-reveal icon step - same "🔍
+            Search..." placeholder-as-icon convention ProductManager.jsx's
+            catalogue search already uses, one less tap to get to it. */}
+        <input
+          type="text"
+          className="records-search"
+          placeholder="🔍 Search all records..."
+          value={searchText}
+          onChange={(e) => { setSearchText(e.target.value); setCurrentPage(1) }}
+          style={{ padding: '0.5rem' }}
+        />
 
         <div className="date-range-row">
           <select
@@ -689,6 +708,17 @@ function Records() {
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>
+
+          {dateRange === 'specific' && (
+            <div className="date-range-group">
+              <input
+                type="date"
+                value={customStart}
+                onChange={(e) => { setCustomStart(e.target.value); setCurrentPage(1) }}
+                style={{ padding: '0.5rem' }}
+              />
+            </div>
+          )}
 
           {dateRange === 'custom' && (
             <div className="date-range-group">
@@ -702,21 +732,32 @@ function Records() {
               <input
                 type="date"
                 value={customEnd}
+                title="Leave blank to filter to just the start date"
                 onChange={(e) => { setCustomEnd(e.target.value); setCurrentPage(1) }}
                 style={{ padding: '0.5rem' }}
               />
             </div>
           )}
         </div>
+      </div>
 
-        <div style={{ position: 'relative', flexShrink: 0 }}>
-          <button className="secondary" onClick={() => setActiveMenu(activeMenu === 'options' ? null : 'options')}>
+      <div className="options-menu-row" style={{ marginTop: '0.6rem' }}>
+        <div className="options-menu-anchor" style={{ position: 'relative', flexShrink: 0, display: 'inline-block' }}>
+          <button className="secondary options-menu-button" onClick={() => setActiveMenu(activeMenu === 'options' ? null : 'options')}>
             Options ▾
           </button>
           {activeMenu === 'options' && (
             <>
               <div style={overlayStyle} onClick={() => setActiveMenu(null)} />
-              <div className="dropdown-panel" style={{ ...dropdownStyle, minWidth: '220px' }} onClick={(e) => e.stopPropagation()}>
+              {/* dropdownStyle defaults to right:0, meant for a trigger
+                  sitting near the right edge (e.g. a table row's own "⋮"
+                  menu). The Options button lives near the left edge of the
+                  page instead - right:0 there anchored the panel to the
+                  button's own (small, left-side) right edge and let it
+                  expand leftward straight off the screen. left:0 expands it
+                  rightward from the button instead, which actually stays
+                  on screen. */}
+              <div className="dropdown-panel" style={{ ...dropdownStyle, left: 0, right: 'auto', minWidth: '220px' }} onClick={(e) => e.stopPropagation()}>
                 {!hasCartField && (
                   <>
                     <DropdownItem onClick={() => { handleDownloadFillTemplate(); setActiveMenu(null) }}>
@@ -839,17 +880,6 @@ function Records() {
           <span style={{ fontSize: '0.9rem' }}>{selectedIds.length} selected</span>
           <button className="secondary" style={{ color: '#c0392b' }} onClick={deleteSelected}>Move to Bin</button>
           <button className="secondary" onClick={() => setSelectedIds([])}>Clear selection</button>
-        </div>
-      )}
-
-      {hasActiveFilters && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.6rem', marginTop: '0.7rem', marginBottom: '0.8rem', padding: '0.7rem 0.9rem', background: '#f8fbff', border: '1px solid #e2e8f0', borderRadius: 'var(--radius)' }}>
-          <span style={{ fontSize: '0.82rem', color: 'var(--color-muted)' }}>
-            {activeFilterCount > 0 ? `${activeFilterCount} active filter${activeFilterCount !== 1 ? 's' : ''}` : 'Search and filters are active'}
-          </span>
-          <button className="secondary" onClick={clearAllFilters} style={{ padding: '0.35rem 0.7rem', fontSize: '0.8rem' }}>
-            Clear all
-          </button>
         </div>
       )}
 
