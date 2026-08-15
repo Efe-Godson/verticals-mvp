@@ -1,6 +1,6 @@
 // Place at: src/PosSidePanel.jsx
 // Shared hamburger + slide-out panel for the restaurant/POS flow, so the
-// same "Order Screen / Add Products / Records / Settings" navigation is
+// same "Order Screen / Add Products / Inventory / Records / Settings" navigation is
 // pinned across every page of that flow (order screen, records, settings,
 // edit), not just the main order-taking page. Each destination other than
 // the order screen itself opens with ?focus=1 so it renders without the
@@ -9,6 +9,52 @@ import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from './AuthContext'
 import { supabase } from './supabaseClient'
+import { useToast } from './Toast'
+import { getOrCreateShortLink } from './shortLinks'
+
+// A single-row "here's your link" strip: the link's already on the
+// clipboard by the time this opens (see openShareLink below), this is just
+// visible confirmation plus a manual re-copy for whenever the silent
+// clipboard write doesn't land (blocked permission, non-secure context).
+function ShareLinkModal({ url, onClose }) {
+  const { showToast } = useToast()
+
+  function copyAgain() {
+    navigator.clipboard.writeText(url)
+    showToast('Link copied!', 'success')
+  }
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 400, padding: '1rem'
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="card"
+        style={{ background: 'white', padding: '1.2rem', width: '480px', maxWidth: '100%' }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+          <h3 style={{ margin: 0, fontSize: '1rem' }}>Share Link</h3>
+          <button type="button" className="secondary" onClick={onClose} style={{ padding: '0.25rem 0.6rem' }}>✕</button>
+        </div>
+        <p style={{ fontSize: '0.8rem', color: 'var(--color-muted)', margin: '0 0 0.7rem' }}>
+          Copied to your clipboard - opens straight to the order screen, just like customers see it.
+        </p>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <input
+            readOnly value={url} onFocus={(e) => e.target.select()}
+            style={{ flex: 1, minWidth: 0, padding: '0.5rem', fontSize: '0.85rem' }}
+          />
+          <button type="button" onClick={copyAgain} style={{ flexShrink: 0 }}>Copy</button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 // Generic nav for any template's form, not just cart/POS ones - Templates'
 // "Manage" opens whichever page fits the template with ?panel=1, which
@@ -16,6 +62,7 @@ import { supabase } from './supabaseClient'
 function PosSidePanel({ formId, hasCartField = false }) {
   const [searchParams] = useSearchParams()
   const [open, setOpen] = useState(searchParams.get('panel') === '1')
+  const [shareLinkUrl, setShareLinkUrl] = useState(null)
   const { staffFormId } = useAuth()
   // Staff accounts get Order Screen/View Form, Add Products, Records, and
   // Reports - Settings and Admin stay owner-only (see AdminStaff.jsx and
@@ -47,15 +94,37 @@ function PosSidePanel({ formId, hasCartField = false }) {
     return () => { cancelled = true }
   }, [formId])
 
+  // Prefers a short /s/:code link (see shortLinks.js) over the plain
+  // /form/:id URL - same destination, PublicForm.jsx's order screen, either
+  // way (see App.jsx's isPublicForm), just easier to read out or retype.
+  // Falls back to the full link if the short-link table/insert hiccups, so
+  // sharing still works either way. Copies straight away (no separate
+  // button press needed for the common case), then opens ShareLinkModal as
+  // visible confirmation + a manual re-copy.
+  async function openShareLink() {
+    setOpen(false)
+    let url = `${window.location.origin}/form/${formId}`
+    try {
+      const code = await getOrCreateShortLink(formId)
+      url = `${window.location.origin}/s/${code}`
+    } catch {
+      // Falls through to the full-length link above.
+    }
+    navigator.clipboard.writeText(url)
+    setShareLinkUrl(url)
+  }
+
   const links = [
     { label: hasCartField ? 'Order Screen' : 'View Form', to: `/form/${formId}` },
     ...(hasCartField ? [{ label: 'Add Products', to: `/form/${formId}/edit?focus=1` }] : []),
+    ...(hasCartField ? [{ label: 'Inventory', to: `/form/${formId}/inventory?focus=1` }] : []),
     { label: 'Records', to: `/form/${formId}/records?focus=1` },
     { label: 'Reports', to: `/form/${formId}/report?focus=1` },
     ...(isStaff ? [] : [
       { label: 'Settings', to: `/form/${formId}/settings?focus=1` },
       { label: 'Admin', to: `/form/${formId}/admin?focus=1` },
     ]),
+    ...(hasCartField ? [{ label: 'Share Link', onClick: openShareLink }] : []),
   ]
 
   // This panel replaces the app's NavBar entirely on every page it appears
@@ -125,17 +194,33 @@ function PosSidePanel({ formId, hasCartField = false }) {
             </>
           )}
           {links.map(link => (
-            <Link
-              key={link.label}
-              to={link.to}
-              onClick={() => setOpen(false)}
-              style={{ color: 'white', textDecoration: 'none', padding: '0.65rem 0.5rem', borderRadius: '6px', fontSize: '0.9rem' }}
-            >
-              {link.label}
-            </Link>
+            link.onClick ? (
+              <button
+                key={link.label}
+                type="button"
+                onClick={link.onClick}
+                style={{
+                  color: 'white', textDecoration: 'none', padding: '0.65rem 0.5rem', borderRadius: '6px',
+                  fontSize: '0.9rem', background: 'transparent', border: 'none', textAlign: 'left', cursor: 'pointer'
+                }}
+              >
+                {link.label}
+              </button>
+            ) : (
+              <Link
+                key={link.label}
+                to={link.to}
+                onClick={() => setOpen(false)}
+                style={{ color: 'white', textDecoration: 'none', padding: '0.65rem 0.5rem', borderRadius: '6px', fontSize: '0.9rem' }}
+              >
+                {link.label}
+              </Link>
+            )
           ))}
         </nav>
       </div>
+
+      {shareLinkUrl && <ShareLinkModal url={shareLinkUrl} onClose={() => setShareLinkUrl(null)} />}
     </>
   )
 }

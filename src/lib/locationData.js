@@ -54,3 +54,17 @@ export function statesFor(country) {
 export function citiesFor(country, state) {
   return (LOCATION_DATA[country] || {})[state] || []
 }
+
+// The generated dataset (country-state-city) is genuinely incomplete for
+// many states - real towns just missing from it. Rather than hand-editing
+// this generated file (overwritten the next time it's regenerated), a
+// Location field can carry its own `extraCities: { [state]: string[] }`
+// patch (see FieldTypeConfig.jsx's "Add missing cities" popup), merged in
+// here so every place that lists cities - the respondent-facing field, the
+// builder preview, and AI order-fill matching - sees the same combined list.
+export function citiesForField(field, country, state) {
+  const base = citiesFor(country, state)
+  const extra = field?.extraCities?.[state] || []
+  if (extra.length === 0) return base
+  return Array.from(new Set([...base, ...extra])).sort((a, b) => a.localeCompare(b))
+}

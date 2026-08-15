@@ -12,6 +12,8 @@ import CreateForm from './CreateForm'
 import EditForm from './EditForm'
 import PublicForm from './PublicForm'
 import Records from './Records'
+import Inventory from './Inventory'
+import ShortLinkRedirect from './ShortLinkRedirect'
 import Report from './Report'
 import AIAnalystPage from './AIAnalystPage'
 import FormSettings from './FormSettings'
@@ -51,7 +53,7 @@ function StaffScopedRoute({ children }) {
   const location = useLocation()
   if (staffFormId === undefined) return <div className="page">Loading...</div>
   if (!staffFormId) return children
-  const allowed = new RegExp(`^/form/${staffFormId}(/edit|/records|/report)?/?$`).test(location.pathname)
+  const allowed = new RegExp(`^/form/${staffFormId}(/edit|/records|/report|/inventory)?/?$`).test(location.pathname)
   if (!allowed) return <Navigate to={`/form/${staffFormId}`} replace />
   return children
 }
@@ -76,6 +78,10 @@ function PublicOnlyRoute({ children }) {
 function AppShell() {
   const location = useLocation()
   const isPublicForm = /^\/form\/[^/]+(\/response\/[^/]+)?$/.test(location.pathname)
+  // /s/:code (see ShortLinkRedirect.jsx) is just a brief hop through to the
+  // above before the real /form/:id replaces it in history - same reason to
+  // skip the app shell here as isPublicForm itself.
+  const isShortLink = /^\/s\/[^/]+$/.test(location.pathname)
   // Anonymous quiz players (no Verticals account, see quizIdentity.js) land
   // straight on these two pages from a shared room link/code - same reason
   // isPublicForm hides the app shell for form respondents below.
@@ -91,8 +97,9 @@ function AppShell() {
 
   return (
     <>
-      {!isPublicForm && !isQuizPlayer && !isLogin && !isSignUp && !isConfirmEmail && !isResetPassword && !isFocusMode && <NavBar />}
+      {!isPublicForm && !isShortLink && !isQuizPlayer && !isLogin && !isSignUp && !isConfirmEmail && !isResetPassword && !isFocusMode && <NavBar />}
       <Routes>
+        <Route path="/s/:code" element={<ShortLinkRedirect />} />
         <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
         <Route path="/signup" element={<PublicOnlyRoute><SignUp /></PublicOnlyRoute>} />
         <Route path="/confirm-email" element={<PublicOnlyRoute><ConfirmEmail /></PublicOnlyRoute>} />
@@ -124,6 +131,7 @@ function AppShell() {
         <Route path="/form/:id/response/:token" element={<PublicForm />} />
         <Route path="/form/:id/edit" element={<PrivateRoute><StaffScopedRoute><EditForm /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/form/:id/records" element={<PrivateRoute><StaffScopedRoute><Records /></StaffScopedRoute></PrivateRoute>} />
+        <Route path="/form/:id/inventory" element={<PrivateRoute><StaffScopedRoute><Inventory /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/form/:id/report" element={<PrivateRoute><StaffScopedRoute><Report /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/form/:id/ai-analyst" element={<PrivateRoute><StaffScopedRoute><AIAnalystPage /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/form/:id/settings" element={<PrivateRoute><StaffScopedRoute><FormSettings /></StaffScopedRoute></PrivateRoute>} />

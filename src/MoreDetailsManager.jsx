@@ -1,4 +1,5 @@
 // Place at: src/MoreDetailsManager.jsx
+import { useState } from 'react'
 // A cart-based form (Restaurant, Retail, ...) splits its non-cart fields
 // into "pinned" (shown on the order screen, right after the catalogue) and
 // "More Details" (collapsedInCheckout). For a deferCheckout form (Retail)
@@ -35,19 +36,32 @@ function presetKey(label, type) {
 // One pinned/unpinned tile: the label toggles pin state (the common case),
 // a separate small ✎ segment opens that one field's full card below (type,
 // required, validation) - two sibling buttons sharing a pill border rather
-// than a button nested in a button, which isn't valid HTML.
-function FieldTile({ label, pinned, onTogglePin, onEdit, editing }) {
+// than a button nested in a button, which isn't valid HTML. The whole tile
+// is also draggable (no separate handle - there isn't room for one in a
+// pill this small, and "grab the chip itself" is a familiar enough pattern
+// on its own, same as reordering browser tabs) to reorder fields within
+// their PINNED/MORE DETAILS group - see MoreDetailsManager's handleDragStart/
+// handleDragOver, same splice-the-array approach EditForm.jsx's own
+// field-card list already uses.
+function FieldTile({ label, pinned, onTogglePin, onEdit, editing, dragging, onDragStart, onDragOver, onDragEnd }) {
   return (
-    <div style={{
-      display: 'flex', alignItems: 'stretch', borderRadius: '999px', overflow: 'hidden',
-      border: `1px solid ${editing ? 'var(--color-primary)' : 'var(--color-border)'}`,
-      // A field label with no natural break points (one long word, or just
-      // a long name) can't shrink on its own - cap it and ellipsize instead
-      // of letting it force this tile, and the flex-wrap row it sits in,
-      // wider than the phone screen (same overflow shape as the mobile
-      // product grid bug, fixed the same way: bound the width explicitly).
-      maxWidth: '100%',
-    }}>
+    <div
+      draggable
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDragEnd={onDragEnd}
+      title="Drag to reorder"
+      style={{
+        display: 'flex', alignItems: 'stretch', borderRadius: '999px', overflow: 'hidden',
+        border: `1px solid ${editing ? 'var(--color-primary)' : 'var(--color-border)'}`,
+        // A field label with no natural break points (one long word, or just
+        // a long name) can't shrink on its own - cap it and ellipsize instead
+        // of letting it force this tile, and the flex-wrap row it sits in,
+        // wider than the phone screen (same overflow shape as the mobile
+        // product grid bug, fixed the same way: bound the width explicitly).
+        maxWidth: '100%',
+        cursor: 'grab', opacity: dragging ? 0.5 : 1,
+      }}>
       <button
         type="button"
         onClick={onTogglePin}
@@ -76,6 +90,8 @@ function FieldTile({ label, pinned, onTogglePin, onEdit, editing }) {
 }
 
 function MoreDetailsManager({ fields, setFields, addField, addPresetField, editingFieldId, setEditingFieldId, renderFieldCard }) {
+  const [dragIndex, setDragIndex] = useState(null)
+
   const configurable = fields
     .map((f, i) => ({ f, i }))
     .filter(({ f }) => f.type !== 'cart' && f.type !== 'section')
@@ -95,6 +111,30 @@ function MoreDetailsManager({ fields, setFields, addField, addPresetField, editi
     setEditingFieldId(current => current === fieldId ? null : fieldId)
   }
 
+  // Same splice-the-dragged-item-into-place approach as EditForm.jsx's own
+  // field-card drag handlers, just working off `fields`' absolute indices
+  // (each tile already carries its own `i`) rather than a filtered list -
+  // reordering across the PINNED/MORE DETAILS boundary is harmless too,
+  // since pin state lives on `collapsedInCheckout`, untouched by this, and
+  // rendering always re-splits into the two groups afterward.
+  function handleDragStart(index) {
+    setDragIndex(index)
+  }
+
+  function handleDragOver(e, overIndex) {
+    e.preventDefault()
+    if (dragIndex === null || dragIndex === overIndex) return
+    const newFields = [...fields]
+    const [moved] = newFields.splice(dragIndex, 1)
+    newFields.splice(overIndex, 0, moved)
+    setDragIndex(overIndex)
+    setFields(newFields)
+  }
+
+  function handleDragEnd() {
+    setDragIndex(null)
+  }
+
   return (
     // No card of its own - the parent in EditForm.jsx already wraps this
     // (plus the "N pinned, M in More Details / Manage Details" summary
@@ -105,7 +145,7 @@ function MoreDetailsManager({ fields, setFields, addField, addPresetField, editi
           said what this is; one short line is enough context, not a
           restatement of it plus a paragraph every time it's opened. */}
       <p style={{ fontSize: '0.78rem', color: 'var(--color-muted)', margin: '0 0 0.8rem' }}>
-        Pinned fields appear on the order screen. Tap a tile to pin or unpin it, or ✎ to edit.
+        Pinned fields appear on the order screen. Tap a tile to pin or unpin it, ✎ to edit, or drag to reorder.
       </p>
 
       {pinned.length > 0 && (
@@ -120,6 +160,10 @@ function MoreDetailsManager({ fields, setFields, addField, addPresetField, editi
                 editing={editingFieldId === f.id}
                 onTogglePin={() => setPinned(i, false)}
                 onEdit={() => toggleEdit(f.id)}
+                dragging={dragIndex === i}
+                onDragStart={() => handleDragStart(i)}
+                onDragOver={(e) => handleDragOver(e, i)}
+                onDragEnd={handleDragEnd}
               />
             ))}
           </div>
@@ -136,6 +180,10 @@ function MoreDetailsManager({ fields, setFields, addField, addPresetField, editi
             editing={editingFieldId === f.id}
             onTogglePin={() => setPinned(i, true)}
             onEdit={() => toggleEdit(f.id)}
+            dragging={dragIndex === i}
+            onDragStart={() => handleDragStart(i)}
+            onDragOver={(e) => handleDragOver(e, i)}
+            onDragEnd={handleDragEnd}
           />
         ))}
         {recommended.map(preset => (

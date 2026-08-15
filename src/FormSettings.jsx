@@ -21,6 +21,7 @@ function FormSettings() {
   const [companyAddress, setCompanyAddress] = useState('')
   const [receiptPaperWidth, setReceiptPaperWidth] = useState(80)
   const [staffReportRange, setStaffReportRange] = useState('today')
+  const [aiFillRules, setAiFillRules] = useState('')
 
   useEffect(() => {
     async function loadForm() {
@@ -36,6 +37,7 @@ function FormSettings() {
         setCompanyAddress(data.settings?.companyAddress ?? '')
         setReceiptPaperWidth(data.settings?.receiptPaperWidth ?? 80)
         setStaffReportRange(data.settings?.staffReportRange ?? 'today')
+        setAiFillRules(data.settings?.aiFillRules ?? '')
       }
       setLoading(false)
     }
@@ -55,7 +57,7 @@ function FormSettings() {
     const newSettings = {
       ...form.settings,
       allowMultipleResponses, collectEmail, companyName, companyPhone, companyAddress, receiptPaperWidth,
-      staffReportRange,
+      staffReportRange, aiFillRules,
     }
 
     const { error } = await supabase
@@ -210,6 +212,24 @@ function FormSettings() {
           </div>
         </div>
       </div>
+
+      {hasCartField && (
+        <div className="card" style={{ padding: '1.5rem', marginTop: '1.5rem' }}>
+          <h3 style={{ marginTop: 0 }}>AI Order-Fill Rules</h3>
+          <p style={{ fontSize: '0.85rem', color: 'var(--color-muted)', marginTop: '-0.5rem', marginBottom: '1rem' }}>
+            Extra guidance for the order screen's "Fill from Text" AI helper (see the ✨ button there) - things it should
+            do when a pasted message implies them without saying them outright. One rule per line works well. These are
+            suggestions the AI weighs, not guarantees - it still only ever picks from your actual products/field options.
+          </p>
+          <textarea
+            value={aiFillRules}
+            onChange={(e) => setAiFillRules(e.target.value)}
+            placeholder={'e.g.\nIf the message says "urgent" or "ASAP", set Delivery Type to Express.\nDefault Payment Method to Cash unless another method is mentioned.\nIf someone orders "a dozen", treat that as 12.'}
+            rows={5}
+            style={{ padding: '0.5rem', width: '100%' }}
+          />
+        </div>
+      )}
 
       <div className="card" style={{ padding: '1.5rem', marginTop: '1.5rem' }}>
         <h3 style={{ marginTop: 0 }}>Staff Access</h3>

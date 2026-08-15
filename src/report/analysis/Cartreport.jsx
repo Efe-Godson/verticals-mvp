@@ -12,11 +12,19 @@ function CartReport({ field, answered, showStats = true }) {
 
   const itemQty = {}
   const itemRevenue = {}
+  const categoryQty = {}
+  const categoryRevenue = {}
 
   answered.forEach(s => {
     s.data[field.id].items.forEach(item => {
       itemQty[item.name] = (itemQty[item.name] || 0) + item.quantity
       itemRevenue[item.name] = (itemRevenue[item.name] || 0) + item.price * item.quantity
+      // Each line item carries its own category (see PublicForm.jsx's
+      // submitAnswers), so one order spanning several categories splits
+      // correctly here instead of collapsing to a single bucket.
+      const category = item.category?.trim() || 'Uncategorized'
+      categoryQty[category] = (categoryQty[category] || 0) + item.quantity
+      categoryRevenue[category] = (categoryRevenue[category] || 0) + item.price * item.quantity
     })
   })
 
@@ -30,6 +38,22 @@ function CartReport({ field, answered, showStats = true }) {
 
   const bestSeller = topByQty[0]
   const topEarner = topByRevenue[0]
+
+  // Only worth its own section once there's an actual split to show - a
+  // single category (or every item uncategorized) just re-states the
+  // product breakdown above with one bar.
+  const hasCategoryBreakdown = Object.keys(categoryRevenue).length > 1
+
+  const categoryByRevenue = Object.entries(categoryRevenue)
+    .map(([name, revenue]) => ({ label: name, count: revenue }))
+    .sort((a, b) => b.count - a.count)
+
+  const categoryByQty = Object.entries(categoryQty)
+    .map(([name, qty]) => ({ label: name, count: qty }))
+    .sort((a, b) => b.count - a.count)
+
+  const topCategoryByRevenue = categoryByRevenue[0]
+  const topCategoryByQty = categoryByQty[0]
 
   return (
     <div style={{ marginTop: showStats ? '0.8rem' : 0 }}>
@@ -65,6 +89,34 @@ function CartReport({ field, answered, showStats = true }) {
             {bestSeller && (
               <p style={{ fontSize: '0.85rem', color: 'var(--color-muted)', marginTop: '0.8rem' }}>
                 {bestSeller.label} is the best seller, with {bestSeller.count.toLocaleString()} units sold.
+              </p>
+            )}
+          </div>
+        )}
+
+        {hasCategoryBreakdown && (
+          <div>
+            <div style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '0.9rem' }}>
+              Revenue by Category
+            </div>
+            <HorizontalBarChart data={categoryByRevenue} formatValue={(v) => formatNaira(v)} bare />
+            {topCategoryByRevenue && (
+              <p style={{ fontSize: '0.85rem', color: 'var(--color-muted)', marginTop: '0.8rem' }}>
+                {topCategoryByRevenue.label} generates the most revenue, at {formatNaira(topCategoryByRevenue.count)}.
+              </p>
+            )}
+          </div>
+        )}
+
+        {hasCategoryBreakdown && (
+          <div>
+            <div style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '0.9rem' }}>
+              Units Sold by Category
+            </div>
+            <HorizontalBarChart data={categoryByQty} bare />
+            {topCategoryByQty && (
+              <p style={{ fontSize: '0.85rem', color: 'var(--color-muted)', marginTop: '0.8rem' }}>
+                {topCategoryByQty.label} sells the most units, with {topCategoryByQty.count.toLocaleString()} sold.
               </p>
             )}
           </div>

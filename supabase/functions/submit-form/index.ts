@@ -57,6 +57,29 @@ Deno.serve(async req => {
 
     if (insertError) throw insertError
 
+    // Best-effort inventory decrement: a cart field's submitted value looks
+    // like { items: [{ id, quantity, ... }], total, ... } (see PublicForm.jsx's
+    // submitAnswers). Products without trackInventory are left alone by the
+    // function itself, so it's safe to always pass every item along here
+    // regardless of what kind of form this is.
+    const stockItems: { id: string; quantity: number }[] = []
+    for (const value of Object.values(data)) {
+      if (value && typeof value === 'object' && Array.isArray((value as any).items)) {
+        for (const item of (value as any).items) {
+          if (item?.id && Number(item.quantity) > 0) {
+            stockItems.push({ id: item.id, quantity: Number(item.quantity) })
+          }
+        }
+      }
+    }
+    if (stockItems.length > 0) {
+      const { error: stockError } = await supabase.rpc('apply_cart_stock_changes', {
+        p_form_id: form_id,
+        p_items: stockItems,
+      })
+      if (stockError) console.error('apply_cart_stock_changes failed:', stockError.message)
+    }
+
     return jsonResponse({
       id: submission.id,
       order_number: submission.order_number,

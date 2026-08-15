@@ -52,3 +52,18 @@ export async function extractProductsFromText(text) {
   if (data?.error) throw new Error(data.error)
   return data.products
 }
+
+// Turns a pasted order message into cart items + field answers for
+// PublicForm.jsx's "Fill from Text" button - products/fields describe the
+// current form's own catalogue and question list so the model only ever
+// returns ids that actually exist on it. `rules` is the shop owner's own
+// free-text extraction guidance (settings.aiFillRules, set on FormSettings)
+// - optional extra instructions layered on top of the fixed prompt, never a
+// substitute for it. Caller shows these for review before applying them,
+// same "never commit straight from AI" rule as extractProductsFromText above.
+export async function extractOrderFromText(text, products, fields, rules) {
+  const { data, error } = await supabase.functions.invoke('extract-order-ai', { body: { text, products, fields, rules } })
+  if (error) await throwFunctionError(error)
+  if (data?.error) throw new Error(data.error)
+  return data
+}

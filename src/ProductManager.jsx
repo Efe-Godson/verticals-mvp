@@ -11,20 +11,11 @@ import { useState } from 'react'
 import * as XLSX from 'xlsx'
 import PackageBuilder from './PackageBuilder'
 import ConfirmDialog from './ConfirmDialog'
+import SparkleIcon from './SparkleIcon'
 import { extractProductsFromText } from './lib/aiClient'
 
 function newProductId() {
   return 'p' + Date.now() + Math.random().toString(36).slice(2, 7)
-}
-
-// A flat 4-point sparkle, matching the plain single-color line-icon style
-// used elsewhere (see templateVisuals.jsx) instead of an emoji.
-function SparkleIcon({ size = 16 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
-      <path d="M12 3L14.5 9.5L21 12L14.5 14.5L12 21L9.5 14.5L3 12L9.5 9.5Z" />
-    </svg>
-  )
 }
 
 const TOP_CATEGORY_COUNT = 6 // category pills shown before collapsing the rest behind "+N more"

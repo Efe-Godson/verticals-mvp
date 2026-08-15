@@ -321,7 +321,11 @@ function EditForm() {
       setMessage('Error saving: ' + error.message)
     } else {
       setMessage('Changes saved.')
-      setTimeout(() => navigate('/'), 700)
+      // Back to the form itself (order screen for a cart-based form, plain
+      // view otherwise) - not all the way out to BusinessesHome, which just
+      // stranded whoever got here from the POS side panel's "Add Products"
+      // outside their own form entirely.
+      setTimeout(() => navigate(`/form/${id}`), 700)
     }
   }
 

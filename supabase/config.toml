@@ -27,6 +27,12 @@ verify_jwt = true
 import_map = "./functions/extract-products-ai/deno.json"
 entrypoint = "./functions/extract-products-ai/index.ts"
 
+[functions.extract-order-ai]
+enabled = true
+verify_jwt = true
+import_map = "./functions/extract-order-ai/deno.json"
+entrypoint = "./functions/extract-order-ai/index.ts"
+
 [functions.submit-form]
 enabled = true
 verify_jwt = false

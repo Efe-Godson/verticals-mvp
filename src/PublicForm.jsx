@@ -2,8 +2,12 @@ import { useState, useEffect, useMemo } from 'react'
 import { useParams } from 'react-router-dom'
 import PosSidePanel from './PosSidePanel'
 import { supabase } from './supabaseClient'
+import { useAuth } from './AuthContext'
+import { useToast } from './Toast'
+import SparkleIcon from './SparkleIcon'
 import { submitForm, getSubmissionByToken, updateSubmissionByToken } from './lib/submissionsClient'
-import { COUNTRIES, statesFor, citiesFor } from './lib/locationData'
+import { extractOrderFromText } from './lib/aiClient'
+import { COUNTRIES, statesFor, citiesForField } from './lib/locationData'
 import { printReceipt } from './receiptPrint'
 const PAYMENT_METHODS = ['Cash', 'Card', 'Bank Transfer', 'Split']
 const TOP_CATEGORY_COUNT = 6 // category pills shown before collapsing the rest behind "+N more"
@@ -29,8 +33,284 @@ function buildPages(fields) {
   return pages
 }
 
+// The model returns a location as free text ("City, State, Country" - see
+// extract-order-ai's prompt, best-effort and not always in that order or
+// complete). This is the client-side half of matching it against the real
+// dataset (locationData.js, plus this field's own extraCities) into the
+// {country, state, city} shape the Location field actually stores - the
+// edge function can't do this itself without bundling that whole dataset
+// into the Deno function too. Requires at least a state or city hit to
+// count; a country-only "match" is just the fallback default, not
+// something the text actually confirmed.
+function matchLocationAnswer(field, rawValue) {
+  const parts = rawValue.split(',').map(p => p.trim()).filter(Boolean)
+  if (parts.length === 0) return null
+
+  const matchedCountry = parts.find(p => COUNTRIES.some(c => c.toLowerCase() === p.toLowerCase()))
+  const country = matchedCountry
+    ? COUNTRIES.find(c => c.toLowerCase() === matchedCountry.toLowerCase())
+    : (field.defaultCountry || COUNTRIES[0])
+
+  const stateOptions = statesFor(country)
+  const matchedState = parts.find(p => stateOptions.some(s => s.toLowerCase() === p.toLowerCase()))
+  const state = matchedState ? stateOptions.find(s => s.toLowerCase() === matchedState.toLowerCase()) : ''
+
+  let city = ''
+  if (state) {
+    const cityOptions = citiesForField(field, country, state)
+    const matchedCity = parts.find(p => cityOptions.some(c => c.toLowerCase() === p.toLowerCase()))
+    city = matchedCity ? cityOptions.find(c => c.toLowerCase() === matchedCity.toLowerCase()) : ''
+  }
+
+  if (!state && !city) return null
+  return { country, state, city }
+}
+
+// Edits settings.aiFillRules without leaving the order screen - stacks on
+// top of AiFillModal (higher zIndex) rather than navigating to Settings,
+// which would abandon whatever's already in the cart/pasted text behind it.
+function AiRulesModal({ rules, onSave, onClose }) {
+  const [value, setValue] = useState(rules || '')
+  const [saving, setSaving] = useState(false)
+
+  async function handleSave() {
+    setSaving(true)
+    await onSave(value)
+    setSaving(false)
+    onClose()
+  }
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 450, padding: '1rem'
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="card"
+        style={{ background: 'white', padding: '1.5rem', width: '480px', maxWidth: '100%' }}
+      >
+        <h3 style={{ margin: '0 0 0.3rem' }}>AI Order-Fill Rules</h3>
+        <p style={{ fontSize: '0.85rem', color: 'var(--color-muted)', margin: '0 0 0.8rem' }}>
+          Extra guidance for how "Fill from Text" should read a pasted order - one rule per line works well. These are
+          suggestions it weighs, not guarantees - it still only ever picks from your actual products/field options.
+        </p>
+        <textarea
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder={'e.g.\nIf the message says "urgent" or "ASAP", set Delivery Type to Express.\nDefault Payment Method to Cash unless another method is mentioned.'}
+          rows={6}
+          style={{ width: '100%', padding: '0.6rem', fontSize: '0.9rem' }}
+        />
+        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '0.8rem' }}>
+          <button type="button" className="secondary" onClick={onClose}>Cancel</button>
+          <button type="button" disabled={saving} onClick={handleSave}>{saving ? 'Saving...' : 'Save Rules'}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Paste a customer's order (WhatsApp message, SMS, whatever) -> AI matches
+// it against this form's own catalogue and fields -> reviewed/edited here ->
+// only then applied to the order screen. Mirrors ProductManager.jsx's
+// AiImportModal (paste -> extract -> review -> commit), filling in an order
+// instead of a catalogue - nothing on the real order screen changes until
+// "Apply" is clicked.
+function AiFillModal({ cartField, fields, rules, showRulesButton, onSaveRules, onClose, onApply }) {
+  const [showRulesEditor, setShowRulesEditor] = useState(false)
+  const [pastedText, setPastedText] = useState('')
+  const [extracting, setExtracting] = useState(false)
+  const [extractError, setExtractError] = useState('')
+  const [draftItems, setDraftItems] = useState(null) // null while pasting, else [{ productId, name, price, quantity }]
+  const [draftAnswers, setDraftAnswers] = useState(null) // null while pasting, else [{ fieldId, label, value, type }] - value is {country,state,city} for a location field, a plain string otherwise
+
+  async function handleExtract() {
+    if (!pastedText.trim()) return
+    setExtracting(true)
+    setExtractError('')
+    try {
+      const products = (cartField?.products || []).map(p => ({ id: p.id, name: p.name }))
+      const fieldMeta = fields.map(f => ({ id: f.id, label: f.label, type: f.type, options: f.options }))
+      const result = await extractOrderFromText(pastedText, products, fieldMeta, rules)
+
+      const items = (result.items || []).map(item => {
+        const product = (cartField?.products || []).find(p => p.id === item.productId)
+        return product ? { productId: item.productId, name: product.name, price: product.price, quantity: item.quantity } : null
+      }).filter(Boolean)
+
+      const answers = (result.answers || []).map(a => {
+        const field = fields.find(f => f.id === a.fieldId)
+        if (!field) return null
+        if (field.type === 'location') {
+          const matched = matchLocationAnswer(field, a.value)
+          return matched ? { fieldId: a.fieldId, label: field.label, value: matched, type: 'location' } : null
+        }
+        return { fieldId: a.fieldId, label: field.label, value: a.value, type: field.type }
+      }).filter(Boolean)
+
+      if (items.length === 0 && answers.length === 0) {
+        setExtractError("Couldn't match anything in that text to your catalogue or fields - try pasting more of it.")
+        return
+      }
+      setDraftItems(items)
+      setDraftAnswers(answers)
+    } catch (err) {
+      setExtractError(err.message)
+    } finally {
+      setExtracting(false)
+    }
+  }
+
+  const isReviewing = draftItems !== null
+
+  return (
+    <>
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 400, padding: '1rem'
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="card"
+        style={{ background: 'white', padding: '1.5rem', width: '520px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto' }}
+      >
+        <h3 style={{ margin: '0 0 0.3rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <SparkleIcon size={18} /> Fill from Text
+        </h3>
+
+        {!isReviewing ? (
+          <>
+            <p style={{ fontSize: '0.85rem', color: 'var(--color-muted)', margin: '0 0 0.8rem' }}>
+              Paste a customer's order - a WhatsApp message, an SMS, anything - and AI will match it to your catalogue and fields for you to review before it's applied.
+            </p>
+            <textarea
+              value={pastedText}
+              onChange={(e) => setPastedText(e.target.value)}
+              placeholder={'e.g.\n2 t-shirts and a cap for John, 08012345678, deliver to Lekki, paying cash'}
+              rows={8}
+              style={{ width: '100%', padding: '0.6rem', fontSize: '0.9rem' }}
+            />
+            {extractError && <p style={{ color: '#c0392b', fontSize: '0.85rem', marginTop: '0.5rem' }}>{extractError}</p>}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: showRulesButton ? 'space-between' : 'flex-end', marginTop: '0.8rem' }}>
+              {showRulesButton ? (
+                <button type="button" className="secondary" onClick={() => setShowRulesEditor(true)} style={{ fontSize: '0.8rem' }}>
+                  Set Extraction Rules
+                </button>
+              ) : <span />}
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button type="button" className="secondary" onClick={onClose}>Cancel</button>
+                <button type="button" disabled={!pastedText.trim() || extracting} onClick={handleExtract}>
+                  {extracting ? 'Reading...' : 'Extract'}
+                </button>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <p style={{ fontSize: '0.85rem', color: 'var(--color-muted)', margin: '0 0 0.8rem' }}>
+              Review before applying - nothing on the order screen changes until you confirm.
+            </p>
+
+            {draftItems.length > 0 && (
+              <div style={{ marginBottom: '1rem' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '0.4rem' }}>
+                  Items
+                </div>
+                {draftItems.map(item => (
+                  <div key={item.productId} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', padding: '0.4rem 0', borderBottom: '1px solid #f0f0f0' }}>
+                    <span style={{ flex: 1 }}>{item.name}</span>
+                    <input
+                      type="number" min="1" value={item.quantity}
+                      onChange={(e) => setDraftItems(current => current.map(i => i.productId === item.productId ? { ...i, quantity: e.target.value } : i))}
+                      style={{ width: '60px', padding: '0.3rem' }}
+                    />
+                    <span
+                      onClick={() => setDraftItems(current => current.filter(i => i.productId !== item.productId))}
+                      style={{ color: '#c0392b', cursor: 'pointer', padding: '0 0.2rem' }}
+                    >
+                      🗑
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {draftAnswers.length > 0 && (
+              <div style={{ marginBottom: '1rem' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '0.4rem' }}>
+                  Other fields
+                </div>
+                {draftAnswers.map(a => (
+                  <div key={a.fieldId} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', padding: '0.4rem 0', borderBottom: '1px solid #f0f0f0' }}>
+                    <span style={{ flex: '0 0 40%', color: 'var(--color-muted)', fontSize: '0.85rem' }}>{a.label}</span>
+                    {a.type === 'location' ? (
+                      // Read-only summary rather than an editable input - a
+                      // real correction here needs the same cascading
+                      // country/state/city selects the order screen itself
+                      // uses, not a free-text box that'd just go back
+                      // through matchLocationAnswer's own guesswork.
+                      <span style={{ flex: 1, fontSize: '0.9rem' }}>
+                        {[a.value.city, a.value.state, a.value.country].filter(Boolean).join(', ')}
+                      </span>
+                    ) : (
+                      <input
+                        type={a.type === 'date' ? 'date' : 'text'} value={a.value}
+                        onChange={(e) => setDraftAnswers(current => current.map(x => x.fieldId === a.fieldId ? { ...x, value: e.target.value } : x))}
+                        style={{ flex: 1, padding: '0.3rem' }}
+                      />
+                    )}
+                    <span
+                      onClick={() => setDraftAnswers(current => current.filter(x => x.fieldId !== a.fieldId))}
+                      style={{ color: '#c0392b', cursor: 'pointer', padding: '0 0.2rem' }}
+                    >
+                      🗑
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {draftItems.length === 0 && draftAnswers.length === 0 && (
+              <p style={{ color: 'var(--color-muted)', fontSize: '0.85rem' }}>Nothing left to apply - remove everything and try again, or cancel.</p>
+            )}
+
+            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+              <button type="button" className="secondary" onClick={() => { setDraftItems(null); setDraftAnswers(null) }}>Back</button>
+              <button
+                type="button"
+                disabled={draftItems.length === 0 && draftAnswers.length === 0}
+                onClick={() => onApply(draftItems, draftAnswers)}
+              >
+                Apply
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+
+    {showRulesEditor && (
+      <AiRulesModal
+        rules={rules}
+        onSave={(newRules) => onSaveRules(newRules)}
+        onClose={() => setShowRulesEditor(false)}
+      />
+    )}
+    </>
+  )
+}
+
 function PublicForm() {
   const { id, token } = useParams()
+  const { session, staffFormId } = useAuth()
+  const { showToast } = useToast()
   const [form, setForm] = useState(null)
   const [answers, setAnswers] = useState({})
   const [cartQuantities, setCartQuantities] = useState({})
@@ -62,6 +342,7 @@ function PublicForm() {
   // width) to a single-column list of slim rows on a phone, where a grid of
   // padded cards burns too much vertical space per item to browse quickly.
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
+  const [showAiFill, setShowAiFill] = useState(false)
 
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 768)
@@ -237,32 +518,6 @@ function PublicForm() {
     }
     if (form) loadLinkedOptions()
   }, [form])
-
-  // Recomputes any field configured to auto-fill from a cart field's
-  // contents (see FieldTypeConfig's AutoFromCartConfig) whenever cart
-  // quantities change: 1 distinct product selected → "Single", 2+ →
-  // "Multiple", any package-type product → "Package".
-  useEffect(() => {
-    if (!form) return
-    const autoFields = form.fields.filter(f => f.autoFromCartFieldId)
-    if (autoFields.length === 0) return
-
-    setAnswers(current => {
-      let changed = false
-      const next = { ...current }
-      autoFields.forEach(field => {
-        const cartField = form.fields.find(f => f.id === field.autoFromCartFieldId && f.type === 'cart')
-        if (!cartField) return
-        const active = (cartField.products || []).filter(p => Number((cartQuantities[cartField.id] || {})[p.id]) > 0)
-        const computed = active.length === 0 ? '' : active.some(p => p.isPackage) ? 'Package' : active.length === 1 ? 'Single' : 'Multiple'
-        if (computed && next[field.id] !== computed) {
-          next[field.id] = computed
-          changed = true
-        }
-      })
-      return changed ? next : current
-    })
-  }, [cartQuantities, form])
 
   function updateAnswer(fieldId, value) {
     setAnswers({ ...answers, [fieldId]: value })
@@ -538,11 +793,21 @@ function PublicForm() {
     return newErrors
   }
 
+  // "Please fix the errors below" was no help when the erroring field was a
+  // Manage Details field that isn't even rendered on a deferCheckout order
+  // screen - naming the actual field(s) means there's always something to
+  // act on, whether or not it's currently visible.
+  function describeErrorFields(fieldErrors, pageFields) {
+    return Object.keys(fieldErrors)
+      .map(fieldId => fieldId === '_respondent_email' ? 'Email' : (pageFields.find(f => f.id === fieldId)?.label || 'a field'))
+      .join(', ')
+  }
+
   function goNext() {
     const pageErrors = validatePageFields(currentPage.fields)
     if (Object.keys(pageErrors).length > 0) {
       setErrors(current => ({ ...current, ...pageErrors }))
-      setMessage('Please fix the errors below before continuing.')
+      setMessage(`Please fix: ${describeErrorFields(pageErrors, currentPage.fields)}.`)
       return
     }
     setMessage('')
@@ -570,7 +835,7 @@ function PublicForm() {
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors)
-      setMessage('Please fix the errors below before submitting.')
+      setMessage(`Please fix: ${describeErrorFields(newErrors, form.fields)}.`)
       return
     }
     setErrors({})
@@ -581,7 +846,7 @@ function PublicForm() {
       if (field.type === 'cart') {
         const quantities = cartQuantities[field.id] || {}
         const items = (field.products || [])
-          .map(p => ({ name: p.name, price: p.price, category: p.category || '', quantity: Number(quantities[p.id]) || 0 }))
+          .map(p => ({ id: p.id, name: p.name, price: p.price, category: p.category || '', quantity: Number(quantities[p.id]) || 0 }))
           .filter(item => item.quantity > 0)
         const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
         finalData[field.id] = {
@@ -1502,7 +1767,7 @@ function PublicForm() {
       const value = answers[field.id] || {}
       const country = value.country || field.defaultCountry || COUNTRIES[0]
       const stateOptions = statesFor(country)
-      const cityOptions = value.state ? citiesFor(country, value.state) : []
+      const cityOptions = value.state ? citiesForField(field, country, value.state) : []
 
       function setLocationPart(patch) {
         updateAnswer(field.id, { country, ...value, ...patch })
@@ -1591,6 +1856,38 @@ function PublicForm() {
     )
   }
 
+  // Merges the AI-reviewed draft into the real order-screen state - additive
+  // on cart quantities (a cashier may have already added a few items by
+  // hand before pasting the rest of the message) rather than wiping
+  // anything not mentioned in the pasted text.
+  function applyAiFillResult(cartField, items, answers) {
+    if (cartField && items.length > 0) {
+      setCartQuantities(current => ({
+        ...current,
+        [cartField.id]: {
+          ...(current[cartField.id] || {}),
+          ...Object.fromEntries(items.map(i => [i.productId, Number(i.quantity) || 0])),
+        },
+      }))
+    }
+    if (answers.length > 0) {
+      setAnswers(current => ({ ...current, ...Object.fromEntries(answers.map(a => [a.fieldId, a.value])) }))
+    }
+    setShowAiFill(false)
+    showToast('Filled in from your paste - check everything before submitting.', 'success')
+  }
+
+  async function saveAiFillRules(newRules) {
+    const newSettings = { ...(form.settings || {}), aiFillRules: newRules }
+    const { error } = await supabase.from('forms').update({ settings: newSettings }).eq('id', form.id)
+    if (error) {
+      showToast('Could not save AI rules: ' + error.message, 'error')
+      return
+    }
+    setForm(current => ({ ...current, settings: newSettings }))
+    showToast('AI rules saved.', 'success')
+  }
+
   // One field's normal (non-checkout-modal) row: the cart itself, or any
   // plain field. Pulled out of the page's field list so it can be called
   // for the "primary" and "more details" groups separately on a
@@ -1604,17 +1901,7 @@ function PublicForm() {
           </label>
         )}
         <div style={field.type === 'cart' ? {} : { marginTop: '0.5rem' }}>
-          {field.autoFromCartFieldId ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{
-                padding: '0.4rem 0.8rem', borderRadius: '999px', background: '#f2f4f7',
-                fontSize: '0.9rem', fontWeight: 600, color: answers[field.id] ? 'inherit' : 'var(--color-muted)'
-              }}>
-                {answers[field.id] || 'Add items to your cart to set this'}
-              </span>
-              <span style={{ fontSize: '0.75rem', color: 'var(--color-muted)' }}>(set automatically from your cart)</span>
-            </div>
-          ) : renderInput(field)}
+          {renderInput(field)}
         </div>
         {errors[field.id] && (
           <p style={{ color: '#c0392b', fontSize: '0.8rem', marginTop: '0.5rem', marginBottom: 0 }}>
@@ -1642,8 +1929,29 @@ function PublicForm() {
         </div>
       )}
 
-      <h1 className="no-print">{form.name}</h1>
-      {form.description && <p className="no-print">{form.description}</p>}
+      <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.6rem', flexWrap: 'wrap' }}>
+        <div>
+          <h1 style={{ margin: 0 }}>{form.name}</h1>
+          {form.description && <p style={{ margin: '0.3rem 0 0' }}>{form.description}</p>}
+        </div>
+        {/* Staff/owner convenience only (session gated) - a customer filling
+            this out themselves via a shared link (see PosSidePanel's Share
+            Link) has nothing to paste from, and letting an anonymous visitor
+            call the AI endpoint isn't something this needs to support.
+            Skipped entirely when editing an existing response (token) -
+            there's nothing to "paste an order" into at that point. Same
+            SparkleIcon + solid-button styling as ProductManager's "Use AI to
+            add new products" - keep new AI entry points matching this. */}
+        {hasCartOnPage && session && !token && (
+          <button
+            type="button"
+            onClick={() => setShowAiFill(true)}
+            style={{ fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}
+          >
+            <SparkleIcon /> Fill from Text
+          </button>
+        )}
+      </div>
 
       {pages.length > 1 && (
         <div className="no-print" style={{ margin: '0.8rem 0 1.2rem' }}>
@@ -1782,6 +2090,28 @@ function PublicForm() {
       )}
 
       {message && <p className="no-print" style={{ marginTop: '1rem', color: 'red' }}>{message}</p>}
+
+      {showAiFill && (() => {
+        const cartField = currentPage.fields.find(f => f.type === 'cart')
+        const candidateFields = currentPage.fields.filter(f => f.type !== 'cart' && f.type !== 'section')
+        // Only the fields actually pinned to this order screen - same split
+        // the visibleFields block above already uses. A field tucked into
+        // Manage Details isn't shown here at all for a deferCheckout form,
+        // so letting the AI helper fill it anyway would silently write an
+        // answer into something nobody's looking at.
+        const otherFields = cartDefersCheckout ? candidateFields.filter(f => !f.collapsedInCheckout) : candidateFields
+        return (
+          <AiFillModal
+            cartField={cartField}
+            fields={otherFields}
+            rules={form.settings?.aiFillRules}
+            showRulesButton={!staffFormId}
+            onSaveRules={saveAiFillRules}
+            onClose={() => setShowAiFill(false)}
+            onApply={(items, answers) => applyAiFillResult(cartField, items, answers)}
+          />
+        )
+      })()}
 
       {!cartDefersCheckout && (
         <p className="no-print" style={{ marginTop: '3rem', color: '#999', fontSize: '0.85rem' }}>

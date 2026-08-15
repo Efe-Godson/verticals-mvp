@@ -4,7 +4,7 @@
 // "Preview" button on the Create/Edit form pages so builders can see exactly
 // what a respondent will see without saving or leaving the editor.
 import { useState } from 'react'
-import { COUNTRIES, statesFor, citiesFor } from './lib/locationData'
+import { COUNTRIES, statesFor, citiesForField } from './lib/locationData'
 
 // Mirrors PublicForm.jsx's buildPages, kept as a separate copy rather than
 // a shared import since one lives in a modal with no data-submission
@@ -206,7 +206,7 @@ function renderPreviewInput(field, value, onChange) {
     const locationValue = value || {}
     const country = locationValue.country || field.defaultCountry || COUNTRIES[0]
     const stateOptions = statesFor(country)
-    const cityOptions = locationValue.state ? citiesFor(country, locationValue.state) : []
+    const cityOptions = locationValue.state ? citiesForField(field, country, locationValue.state) : []
 
     function setLocationPart(patch) {
       onChange({ country, ...locationValue, ...patch })
@@ -312,14 +312,7 @@ function FormPreviewModal({ formName, description, fields, onClose }) {
               {field.label || 'Untitled question'}{field.required && <span style={{ color: '#c0392b' }}> *</span>}
             </label>
             <div style={{ marginTop: '0.5rem' }}>
-              {field.autoFromCartFieldId ? (
-                <span style={{
-                  display: 'inline-block', padding: '0.4rem 0.8rem', borderRadius: '999px',
-                  background: '#f2f4f7', fontSize: '0.9rem', color: 'var(--color-muted)'
-                }}>
-                  Set automatically based on the respondent's cart (preview's cart isn't interactive)
-                </span>
-              ) : renderPreviewInput(field, answers[field.id], (value) => updateAnswer(field.id, value))}
+              {renderPreviewInput(field, answers[field.id], (value) => updateAnswer(field.id, value))}
             </div>
           </div>
         ))}
