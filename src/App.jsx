@@ -33,10 +33,11 @@ import ResetPassword from './ResetPassword'
 import Templates from './Templates'
 import AccountPage from './AccountPage'
 import NavBar from './NavBar'
+import { LoadingState } from './LoadingState'
 
 function PrivateRoute({ children }) {
   const { session, loading } = useAuth()
-  if (loading) return <div className="page">Loading...</div>
+  if (loading) return <LoadingState />
   if (!session) return <Navigate to={isFirstVisit() ? '/signup' : '/login'} replace />
   return children
 }
@@ -51,7 +52,7 @@ function PrivateRoute({ children }) {
 function StaffScopedRoute({ children }) {
   const { staffFormId } = useAuth()
   const location = useLocation()
-  if (staffFormId === undefined) return <div className="page">Loading...</div>
+  if (staffFormId === undefined) return <LoadingState />
   if (!staffFormId) return children
   const allowed = new RegExp(`^/form/${staffFormId}(/edit|/records|/report|/inventory)?/?$`).test(location.pathname)
   if (!allowed) return <Navigate to={`/form/${staffFormId}`} replace />
@@ -63,14 +64,14 @@ function StaffScopedRoute({ children }) {
 // shown or reachable for anyone using the streamlined templates flow.
 function AdminOnlyRoute({ children }) {
   const { session, loading } = useAuth()
-  if (loading) return <div className="page">Loading...</div>
+  if (loading) return <LoadingState />
   if (!session || session.user.id !== TEMPLATE_ADMIN_USER_ID) return <Navigate to="/" replace />
   return children
 }
 
 function PublicOnlyRoute({ children }) {
   const { session, loading } = useAuth()
-  if (loading) return <div className="page">Loading...</div>
+  if (loading) return <LoadingState />
   if (session) return <Navigate to="/" replace />
   return children
 }

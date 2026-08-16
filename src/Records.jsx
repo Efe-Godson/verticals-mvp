@@ -13,6 +13,8 @@ import { RecycleBinDialog } from './records/RecycleBinDialog'
 import { SavePresetDialog } from './records/SavePresetDialog'
 import ConfirmDialog from './ConfirmDialog'
 import { useToast } from './Toast'
+import { LoadingState } from './LoadingState'
+import { ErrorState } from './ErrorState'
 
 const PAGE_SIZE = 10
 const META_COLUMNS = [
@@ -165,8 +167,8 @@ function Records() {
     return () => window.removeEventListener('message', handleMessage)
   }, [id])
 
-  if (loading) return <div className="page">Loading records...</div>
-  if (error) return <div className="page" style={{ color: 'red' }}>{error}</div>
+  if (loading) return <LoadingState label="Loading records..." />
+  if (error) return <ErrorState message={error} />
 
   const { start: rangeStart, end: rangeEnd } = getDateRangeBounds(dateRange, customStart, customEnd)
 

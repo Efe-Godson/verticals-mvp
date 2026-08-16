@@ -13,6 +13,8 @@ import HomeRecycleBinDialog from './HomeRecycleBinDialog'
 import { useRecycleBinTrigger } from './RecycleBinContext'
 import { categoryColor, LocationIcon } from './templateVisuals'
 import { createLocationForm, locationDestination } from './locations'
+import { LoadingState } from './LoadingState'
+import { ErrorState } from './ErrorState'
 
 function LocationTile({ location, color, onManage }) {
   return (
@@ -225,8 +227,8 @@ function TemplateLocations() {
     }
   }
 
-  if (loading) return <div className="page">Loading...</div>
-  if (error) return <div className="page" style={{ color: 'red' }}>{error}</div>
+  if (loading) return <LoadingState />
+  if (error) return <ErrorState message={error} />
 
   const color = categoryColor(template.category)
 

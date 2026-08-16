@@ -8,6 +8,8 @@ import { supabase } from './supabaseClient'
 import { calculateEmployeePayroll, getDailySalary, eventPeriod, eventEmployeeId, EMPLOYEE_FIELDS, EVENT_FIELDS } from './payroll/calculatePayroll'
 import StatTile from './report/components/StatTile'
 import PieChart from './report/components/PieChart'
+import { LoadingState } from './LoadingState'
+import { ErrorState } from './ErrorState'
 import HorizontalBarChart from './report/components/HorizontalBarChart'
 
 function currentPeriod() {
@@ -137,8 +139,8 @@ function PayrollDashboard() {
     }))
   }, [period, dailySalaryTotal])
 
-  if (loading) return <div className="page">Loading...</div>
-  if (error) return <div className="page"><p style={{ color: 'red' }}>{error}</p></div>
+  if (loading) return <LoadingState />
+  if (error) return <ErrorState message={error} />
 
   const totalDue = breakdowns.reduce((sum, b) => sum + b.finalSalary, 0)
   const totalDeductions = breakdowns.reduce((sum, b) => sum + b.deductions, 0)

@@ -13,6 +13,8 @@ import CrossAnalysis from './report/analysis/CrossAnalysis'
 import AIRecommendationsModal from './report/ai/AIRecommendationsModal'
 import { formatNaira, median } from './report/helpers/analysisUtils'
 import { DATE_RANGE_OPTIONS, getDateRangeBounds, getDateRangeLabel } from './report/helpers/dateRange'
+import { LoadingState } from './LoadingState'
+import { ErrorState } from './ErrorState'
 
 function getPreviousDateRangeBounds(range, customStart, customEnd) {
   if (range === 'all') return { start: null, end: null }
@@ -127,8 +129,8 @@ function Report() {
     loadData()
   }, [id, staffFormId])
 
-  if (loading) return <div className="page">Loading report...</div>
-  if (error) return <div style={{ padding: '2rem', fontFamily: 'sans-serif', color: 'red' }}>{error}</div>
+  if (loading) return <LoadingState label="Loading report..." />
+  if (error) return <ErrorState message={error} />
 
   if (submissions.length === 0) {
     return (

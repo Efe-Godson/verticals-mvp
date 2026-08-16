@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import PosSidePanel from './PosSidePanel'
+import { LoadingState } from './LoadingState'
+import { ErrorState } from './ErrorState'
 
 function FormSettings() {
   const { id } = useParams()
@@ -75,8 +77,8 @@ function FormSettings() {
     setTimeout(() => setSaved(false), 2000)
   }
 
-  if (loading) return <div className="page">Loading settings...</div>
-  if (error) return <div className="page" style={{ color: 'red' }}>{error}</div>
+  if (loading) return <LoadingState label="Loading settings..." />
+  if (error) return <ErrorState message={error} />
 
   const hasCartField = form.fields?.some(f => f.type === 'cart')
 

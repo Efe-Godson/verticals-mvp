@@ -12,6 +12,8 @@ import { useToast } from './Toast'
 import { invokeQuiz } from './quizApi'
 import RoomCodeBadge from './quiz/RoomCodeBadge'
 import HorizontalBarChart from './report/components/HorizontalBarChart'
+import { LoadingState } from './LoadingState'
+import { ErrorState } from './ErrorState'
 
 const POLL_MS = 2000
 
@@ -50,8 +52,8 @@ function QuizAdminDashboard() {
     }
   }
 
-  if (error) return <div className="page"><p>{error}</p></div>
-  if (!state) return <div className="page"><p style={{ color: 'var(--color-muted)' }}>Loading...</p></div>
+  if (error) return <ErrorState message={error} />
+  if (!state) return <LoadingState />
 
   const { room, player_count, players, leader, current_question, option_counts } = state
 

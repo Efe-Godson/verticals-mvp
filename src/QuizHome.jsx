@@ -10,6 +10,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
 import { getQuizIdentityToken } from './quizIdentity'
+import { LoadingSpinner } from './LoadingState'
 import { invokeQuiz } from './quizApi'
 
 function formatDate(dateString) {
@@ -75,7 +76,7 @@ function QuizHome() {
         {history?.history?.length > 0 && <Link to="/lab/quiz/history" style={{ fontSize: '0.85rem', color: 'var(--color-primary)' }}>View all →</Link>}
       </div>
       {loading ? (
-        <p style={{ color: 'var(--color-muted)' }}>Loading...</p>
+        <p style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--color-muted)' }}><LoadingSpinner size={15} color="var(--color-muted)" /> Loading...</p>
       ) : !history?.history?.length ? (
         <p style={{ color: 'var(--color-muted)', fontSize: '0.9rem' }}>You haven't finished a quiz on this device yet.</p>
       ) : (
@@ -91,7 +92,7 @@ function QuizHome() {
 
       <h3 style={{ marginBottom: '0.6rem' }}>Recent Rooms</h3>
       {loading ? (
-        <p style={{ color: 'var(--color-muted)' }}>Loading...</p>
+        <p style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--color-muted)' }}><LoadingSpinner size={15} color="var(--color-muted)" /> Loading...</p>
       ) : !recentRooms.length ? (
         <p style={{ color: 'var(--color-muted)', fontSize: '0.9rem' }}>No rooms created yet.</p>
       ) : (

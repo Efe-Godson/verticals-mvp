@@ -10,6 +10,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
+import { LoadingState } from './LoadingState'
+import { ErrorState } from './ErrorState'
 import { getQuizIdentityToken, getStoredPlayerCredential, storePlayerCredential } from './quizIdentity'
 import { invokeQuiz } from './quizApi'
 import QuizLobbyView from './quiz/QuizLobbyView'
@@ -85,8 +87,8 @@ function QuizRoom() {
     }).catch(() => {})
   }
 
-  if (notFound) return <div className="page"><p>This quiz room no longer exists.</p></div>
-  if (!room || !credential) return <div className="page"><p style={{ color: 'var(--color-muted)' }}>Loading...</p></div>
+  if (notFound) return <ErrorState message="This quiz room no longer exists." />
+  if (!room || !credential) return <LoadingState />
 
   if (room.state === 'setup' || room.state === 'lobby') {
     return <QuizLobbyView room={room} players={players} ownPlayerId={credential.player_id} onToggleReady={handleToggleReady} />
@@ -100,7 +102,7 @@ function QuizRoom() {
   if (room.state === 'finished') {
     return <QuizFinalResultsView room={room} players={players} ownPlayerId={credential.player_id} />
   }
-  return <div className="page"><p style={{ color: 'var(--color-muted)' }}>Loading...</p></div>
+  return <LoadingState />
 }
 
 export default QuizRoom

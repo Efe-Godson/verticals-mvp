@@ -5,6 +5,7 @@ import { printReceipt } from '../receiptPrint'
 import { formatCell } from './recordsUiKit'
 import { CartEditInput } from './CartEditInput'
 import { RecordEditInput } from './RecordEditInput'
+import { LoadingSpinner } from '../LoadingState'
 
 export function RecordDetail({ form, record, fields, onClose, onUpdated, initialEditing = false, hideEdit = false }) {
   const { session } = useAuth()
@@ -172,7 +173,7 @@ export function RecordDetail({ form, record, fields, onClose, onUpdated, initial
 
         {showHistory ? (
           loadingLogs ? (
-            <p style={{ color: '#999' }}>Loading history...</p>
+            <p style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#999' }}><LoadingSpinner size={15} color="#999" /> Loading history...</p>
           ) : logs.length === 0 ? (
             <p style={{ color: '#999' }}>No edits have been made to this record yet.</p>
           ) : (

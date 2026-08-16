@@ -5,6 +5,8 @@ import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
 import { useToast } from './Toast'
 import SparkleIcon from './SparkleIcon'
+import { LoadingState } from './LoadingState'
+import { ErrorState } from './ErrorState'
 import { submitForm, getSubmissionByToken, updateSubmissionByToken } from './lib/submissionsClient'
 import { extractOrderFromText } from './lib/aiClient'
 import { COUNTRIES, statesFor, citiesForField } from './lib/locationData'
@@ -1882,9 +1884,9 @@ function PublicForm() {
     )
   }
 
-  if (loading) return <div className="page">Loading form...</div>
+  if (loading) return <LoadingState label="Loading form..." />
 
-  if (!form) return <div className="page">{message}</div>
+  if (!form) return <ErrorState message={message} />
 
   if (submitted) {
     return (
