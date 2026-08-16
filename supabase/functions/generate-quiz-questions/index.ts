@@ -1,6 +1,7 @@
 // Place at: supabase/functions/generate-quiz-questions/index.ts
 // Deploy: supabase functions deploy generate-quiz-questions
 // Secret: reuses GEMINI_API_KEY (already set for ai-analyst/ai-ask)
+// and the optional OPENROUTER_API_KEY fallback, see _shared/aiProvider.ts
 // Admin-only, setup-phase only. Two actions: generate_batch (replaces every
 // question in the room, used on first generation and on "regenerate all")
 // and regenerate_one (replaces a single question by index, used by the
@@ -10,9 +11,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { jsonResponse, corsHeaders, requireQuizAdmin } from '../_shared/quiz.ts'
-
-const GEMINI_MODEL = 'gemini-flash-latest'
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
+import { generateText } from '../_shared/aiProvider.ts'
 
 function questionSchema(fixedType: string | null) {
   return {
@@ -68,7 +67,7 @@ For each question:
 Avoid ambiguous questions, questions with more than one defensible correct answer, and options that are near-duplicates of each other.`
 }
 
-async function callGemini(prompt: string, count: number, fixedType: string | null) {
+async function generateQuestions(prompt: string, count: number, fixedType: string | null) {
   const schema = {
     type: 'object',
     properties: {
@@ -77,23 +76,10 @@ async function callGemini(prompt: string, count: number, fixedType: string | nul
     required: ['questions'],
   }
 
-  const res = await fetch(`${GEMINI_URL}?key=${Deno.env.get('GEMINI_API_KEY')}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: { responseMimeType: 'application/json', responseSchema: schema },
-    }),
-  })
-  if (!res.ok) throw new Error(`Gemini API error: ${res.status} ${await res.text()}`)
-
-  const data = await res.json()
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text
-  if (!text) throw new Error('No content returned from Gemini')
-
+  const text = await generateText(prompt, schema)
   const parsed = JSON.parse(text)
   const questions = parsed.questions
-  if (!Array.isArray(questions) || questions.length === 0) throw new Error('Gemini returned no questions')
+  if (!Array.isArray(questions) || questions.length === 0) throw new Error('AI returned no questions')
   return questions
 }
 
@@ -125,7 +111,7 @@ Deno.serve(async req => {
     await supabase.from('quiz_rooms').update({ ai_prompt: prompt.trim() }).eq('id', room_id)
 
     if (action === 'generate_batch') {
-      const generated = await callGemini(
+      const generated = await generateQuestions(
         buildPrompt({ topic: room.topic, adminPrompt: prompt.trim(), count: room.question_count, difficulty: room.difficulty, questionType: room.question_type }),
         room.question_count,
         fixedType
@@ -153,7 +139,7 @@ Deno.serve(async req => {
     if (action === 'regenerate_one') {
       if (!Number.isInteger(index)) return jsonResponse({ error: 'index is required' }, 400)
 
-      const generated = await callGemini(
+      const generated = await generateQuestions(
         buildPrompt({ topic: room.topic, adminPrompt: prompt.trim(), count: 1, difficulty: room.difficulty, questionType: room.question_type }),
         1,
         fixedType

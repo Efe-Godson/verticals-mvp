@@ -1,6 +1,7 @@
 // Place at: supabase/functions/extract-products-ai/index.ts
 // Deploy: supabase functions deploy extract-products-ai
-// Secret: reuses GEMINI_API_KEY (already set for ai-analyst/ai-ask)
+// Secret: reuses GEMINI_API_KEY (already set for ai-analyst/ai-ask) and the
+// optional OPENROUTER_API_KEY fallback, see _shared/aiProvider.ts
 // Turns arbitrary pasted text (a menu copied from a PDF, a WhatsApp price
 // list, whatever) into a structured product list for ProductManager's
 // "Use AI" import option. Authenticated but not form-scoped - unlike ai-
@@ -10,9 +11,8 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { jsonResponse, corsHeaders } from '../_shared/stats.ts'
+import { generateText } from '../_shared/aiProvider.ts'
 
-const GEMINI_MODEL = 'gemini-flash-latest'
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
 const MAX_TEXT_LENGTH = 12000 // generous for a pasted menu/price list, cheap guard against runaway prompts
 
 const RESPONSE_SCHEMA = {
@@ -72,20 +72,7 @@ Deno.serve(async req => {
     if (!text?.trim()) return jsonResponse({ error: 'text is required' }, 400)
     const trimmedText = text.trim().slice(0, MAX_TEXT_LENGTH)
 
-    const geminiRes = await fetch(`${GEMINI_URL}?key=${Deno.env.get('GEMINI_API_KEY')}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: buildPrompt(trimmedText) }] }],
-        generationConfig: { responseMimeType: 'application/json', responseSchema: RESPONSE_SCHEMA },
-      }),
-    })
-    if (!geminiRes.ok) throw new Error(`Gemini API error: ${geminiRes.status} ${await geminiRes.text()}`)
-
-    const geminiData = await geminiRes.json()
-    const responseText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text
-    if (!responseText) throw new Error('No content returned from Gemini')
-
+    const responseText = await generateText(buildPrompt(trimmedText), RESPONSE_SCHEMA)
     const { products } = JSON.parse(responseText)
     if (!Array.isArray(products)) throw new Error('Gemini returned no products')
 

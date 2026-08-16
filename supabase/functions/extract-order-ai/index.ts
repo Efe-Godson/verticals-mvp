@@ -1,6 +1,7 @@
 // Place at: supabase/functions/extract-order-ai/index.ts
 // Deploy: supabase functions deploy extract-order-ai
 // Secret: reuses GEMINI_API_KEY (already set for ai-analyst/ai-ask/extract-products-ai)
+// and the optional OPENROUTER_API_KEY fallback, see _shared/aiProvider.ts
 // Turns a pasted order (a WhatsApp message, an SMS, a handwritten note read
 // aloud) into cart items + field answers for PublicForm.jsx's order screen
 // "Fill from Text" button - the cashier pastes the raw message instead of
@@ -13,9 +14,8 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { jsonResponse, corsHeaders } from '../_shared/stats.ts'
+import { generateText } from '../_shared/aiProvider.ts'
 
-const GEMINI_MODEL = 'gemini-flash-latest'
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
 const MAX_TEXT_LENGTH = 6000
 const MAX_RULES_LENGTH = 2000
 
@@ -102,20 +102,7 @@ Deno.serve(async req => {
     const trimmedRules = rules?.trim().slice(0, MAX_RULES_LENGTH) || ''
     const today = new Date().toISOString().slice(0, 10)
 
-    const geminiRes = await fetch(`${GEMINI_URL}?key=${Deno.env.get('GEMINI_API_KEY')}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: buildPrompt(trimmedText, safeProducts, safeFields, trimmedRules, today) }] }],
-        generationConfig: { responseMimeType: 'application/json', responseSchema: RESPONSE_SCHEMA },
-      }),
-    })
-    if (!geminiRes.ok) throw new Error(`Gemini API error: ${geminiRes.status} ${await geminiRes.text()}`)
-
-    const geminiData = await geminiRes.json()
-    const responseText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text
-    if (!responseText) throw new Error('No content returned from Gemini')
-
+    const responseText = await generateText(buildPrompt(trimmedText, safeProducts, safeFields, trimmedRules, today), RESPONSE_SCHEMA)
     const parsed = JSON.parse(responseText)
     const productIds = new Set(safeProducts.map((p: any) => p.id))
     const fieldsById = new Map(safeFields.map((f: any) => [f.id, f]))

@@ -3,14 +3,12 @@
 // Secret:    supabase secrets set GEMINI_API_KEY=your_key
 // (SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are injected automatically
 // by Supabase into every edge function, no need to set them yourself.)
+// Optional:  supabase secrets set OPENROUTER_API_KEY=your_key - falls back
+// to OpenRouter's hosted Llama if Gemini hits a 429, see _shared/aiProvider.ts
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { buildStats, fetchSubmissions, hashObject, jsonResponse, corsHeaders, requireFormOwner } from '../_shared/stats.ts'
-
-// Check ai.google.dev for the current recommended free-tier Flash model:
-// model names get superseded, this is just today's sensible default.
-const GEMINI_MODEL = 'gemini-flash-latest'
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
+import { generateText } from '../_shared/aiProvider.ts'
 
 const RESPONSE_SCHEMA = {
   type: 'object',
@@ -124,27 +122,7 @@ Deno.serve(async req => {
     }
 
     const prompt = buildPrompt(form.name, stats, date_range_label, language_style)
-
-    const geminiRes = await fetch(`${GEMINI_URL}?key=${Deno.env.get('GEMINI_API_KEY')}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: {
-          responseMimeType: 'application/json',
-          responseSchema: RESPONSE_SCHEMA,
-        },
-      }),
-    })
-
-    if (!geminiRes.ok) {
-      throw new Error(`Gemini API error: ${geminiRes.status} ${await geminiRes.text()}`)
-    }
-
-    const geminiData = await geminiRes.json()
-    const text = geminiData.candidates?.[0]?.content?.parts?.[0]?.text
-    if (!text) throw new Error('No content returned from Gemini')
-
+    const text = await generateText(prompt, RESPONSE_SCHEMA)
     const result = JSON.parse(text)
 
     await supabase.from('ai_analyses').upsert(

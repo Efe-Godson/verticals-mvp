@@ -1,12 +1,11 @@
 // Place at: supabase/functions/ai-ask/index.ts
 // Deploy: supabase functions deploy ai-ask
-// Uses the same GEMINI_API_KEY secret as ai-analyst.
+// Uses the same GEMINI_API_KEY (and optional OPENROUTER_API_KEY fallback,
+// see _shared/aiProvider.ts) as ai-analyst.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { buildStats, fetchSubmissions, jsonResponse, corsHeaders, requireFormOwner } from '../_shared/stats.ts'
-
-const GEMINI_MODEL = 'gemini-flash-latest'
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
+import { generateText } from '../_shared/aiProvider.ts'
 
 Deno.serve(async req => {
   try {
@@ -38,18 +37,7 @@ ${JSON.stringify(stats, null, 2)}
 
 Question: ${question}`
 
-    const geminiRes = await fetch(`${GEMINI_URL}?key=${Deno.env.get('GEMINI_API_KEY')}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }] }),
-    })
-
-    if (!geminiRes.ok) {
-      throw new Error(`Gemini API error: ${geminiRes.status} ${await geminiRes.text()}`)
-    }
-
-    const geminiData = await geminiRes.json()
-    const answer = geminiData.candidates?.[0]?.content?.parts?.[0]?.text?.trim()
+    const answer = (await generateText(prompt))?.trim()
     if (!answer) throw new Error('No answer returned')
 
     return jsonResponse({ answer })
