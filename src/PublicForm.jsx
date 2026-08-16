@@ -307,6 +307,55 @@ function AiFillModal({ cartField, fields, rules, showRulesButton, onSaveRules, o
   )
 }
 
+function CheckIcon({ size = 40 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="var(--status-good)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M8 12.5l2.5 2.5L16 9.5" />
+    </svg>
+  )
+}
+
+// Replaces the old "jump straight to a print-preview popup" behavior (see
+// submitAnswers) - plain in-page confirmation that always shows regardless
+// of the browser's popup blocker, with printing as an explicit opt-in click
+// instead of something forced on every single order.
+function OrderConfirmationModal({ form, submission, onClose }) {
+  const cartField = form.fields.find(f => f.type === 'cart')
+  const cartData = cartField ? submission.data[cartField.id] : null
+  const itemCount = cartData ? cartData.items.reduce((sum, i) => sum + i.quantity, 0) : 0
+  const grandTotal = cartData ? cartData.total + (Number(cartData.deliveryFee) || 0) : 0
+
+  return (
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.45)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 500, padding: '1rem'
+    }}>
+      <div className="card" style={{ background: 'white', padding: '1.75rem', width: '380px', maxWidth: '100%', textAlign: 'center' }}>
+        <CheckIcon />
+        <h3 style={{ margin: '0.8rem 0 0.2rem' }}>Order Placed</h3>
+        <p style={{ color: 'var(--color-muted)', margin: '0 0 1.2rem' }}>
+          {submission.order_number ? `Order #${submission.order_number}` : 'Order recorded'}
+          {itemCount > 0 ? ` · ${itemCount} item${itemCount !== 1 ? 's' : ''}` : ''}
+        </p>
+        {cartData && (
+          <div style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '1.3rem' }}>
+            ₦{grandTotal.toLocaleString()}
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button type="button" className="secondary" onClick={() => printReceipt(form, submission)} style={{ flex: 1 }}>
+            Print Receipt
+          </button>
+          <button type="button" onClick={onClose} style={{ flex: 1 }}>
+            New Order
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function PublicForm() {
   const { id, token } = useParams()
   const { session, staffFormId } = useAuth()
@@ -343,6 +392,7 @@ function PublicForm() {
   // padded cards burns too much vertical space per item to browse quickly.
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
   const [showAiFill, setShowAiFill] = useState(false)
+  const [orderConfirmation, setOrderConfirmation] = useState(null) // snapshot of the just-placed order, or null
 
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 768)
@@ -363,15 +413,28 @@ function PublicForm() {
   // scroll (catalogue + customer fields) - it needs the running total from
   // here, at page level, since renderFieldRow's own cart branch computes its
   // total in a scope this bar can't reach.
-  const deferCheckoutCartTotal = useMemo(() => {
+  // Any field the builder flagged addToTotal (see FieldTypeConfig's Number
+  // config - "delivery" is just the common case, not the only one) gets
+  // summed in on top of the cart itself - no dedicated Delivery Fee input
+  // of its own, a Retail form's own Number field (Delivery, Service Charge,
+  // whatever it's labeled) already is that input.
+  const deferCheckoutExtraTotal = useMemo(() => {
     if (!cartDefersCheckout) return 0
     return currentPage.fields
+      .filter(f => f.addToTotal)
+      .reduce((sum, f) => sum + (Number(answers[f.id]) || 0), 0)
+  }, [cartDefersCheckout, currentPage.fields, answers])
+
+  const deferCheckoutCartTotal = useMemo(() => {
+    if (!cartDefersCheckout) return 0
+    const itemsTotal = currentPage.fields
       .filter(f => f.type === 'cart' && f.deferCheckout)
       .reduce((sum, f) => {
         const quantities = cartQuantities[f.id] || {}
         return sum + (f.products || []).reduce((s, p) => s + (Number(quantities[p.id]) || 0) * Number(p.price), 0)
       }, 0)
-  }, [cartDefersCheckout, currentPage.fields, cartQuantities])
+    return itemsTotal + deferCheckoutExtraTotal
+  }, [cartDefersCheckout, currentPage.fields, cartQuantities, deferCheckoutExtraTotal])
   const isLastPage = pageIndex === pages.length - 1
 
   // Prefills the builder state from a saved submission: the inverse of the
@@ -786,6 +849,13 @@ function PublicForm() {
     const newErrors = {}
     pageFields.forEach(field => {
       if (field.type === 'section') return
+      // A deferCheckout order screen never renders a collapsedInCheckout
+      // field at all (see primaryFields above) - required or not, there's
+      // no way to fill it in from here, so it can't be allowed to block
+      // submission either. Restaurant's checkout modal still lets you
+      // expand and fill a collapsed field before submitting, so this only
+      // applies to deferCheckout.
+      if (cartDefersCheckout && field.collapsedInCheckout) return
       const value = field.type === 'cart' ? cartItemCount(field) : answers[field.id]
       const err = validateField(field, value)
       if (err) newErrors[field.id] = err
@@ -852,7 +922,7 @@ function PublicForm() {
         finalData[field.id] = {
           items, total,
           payment: (paymentOverride && paymentOverride[field.id]) || cartPayment[field.id] || null,
-          deliveryFee: Number(deliveryFee[field.id]) || 0,
+          deliveryFee: field.deferCheckout ? deferCheckoutExtraTotal : (Number(deliveryFee[field.id]) || 0),
         }
       } else {
         finalData[field.id] = answers[field.id]
@@ -891,21 +961,25 @@ function PublicForm() {
         if (result.order_number) realOrderNumber = result.order_number
       }
 
-      // Orders go straight to a print preview of the receipt instead of the
-      // generic "thanks for submitting" page, then the order screen resets
-      // itself for the next customer, since this is a POS flow, not a
-      // one-and-done form. Reuses the exact same popup-window renderer as
-      // Records' "Print Receipt" button (see receiptPrint.js) instead of a
-      // second, in-page implementation - that one only ever has the receipt
-      // itself on the page, so there's no "rest of the page" to accidentally
-      // print alongside it and nothing here has to fight print CSS for it.
+      // An order used to jump straight to a print-preview popup, which
+      // browsers routinely block when it's triggered from inside an async
+      // submit chain rather than a direct click - the respondent just saw a
+      // "please allow pop-ups" browser nag instead of any confirmation their
+      // order actually went through. A plain in-page confirmation always
+      // shows regardless of popup settings; printing (still the same
+      // receiptPrint.js popup renderer Records' own Print button uses) is
+      // now an explicit click from inside that confirmation, which browsers
+      // don't block since it's a direct user gesture.
       if (hasCartOnPage) {
         const cartField = currentPage.fields.find(f => f.type === 'cart')
-        printReceipt(form, {
-          id: submissionId,
-          order_number: realOrderNumber,
-          data: finalData,
-          created_at: new Date().toISOString(),
+        setOrderConfirmation({
+          form,
+          submission: {
+            id: submissionId,
+            order_number: realOrderNumber,
+            data: finalData,
+            created_at: new Date().toISOString(),
+          },
         })
 
         setCartQuantities(current => ({ ...current, [cartField.id]: {} }))
@@ -2042,8 +2116,15 @@ function PublicForm() {
               normal embedded-checkout cart (Restaurant) never reaches this
               row at all (hasCartOnPage suppresses it, same as before). */}
           {cartDefersCheckout && (
-            <div style={{ fontWeight: 700, fontSize: '1.05rem', whiteSpace: 'nowrap' }}>
-              Total <span style={{ marginLeft: '0.4rem', color: 'var(--color-primary)' }}>₦{deferCheckoutCartTotal.toLocaleString()}</span>
+            <div style={{ whiteSpace: 'nowrap' }}>
+              {deferCheckoutExtraTotal > 0 && (
+                <div style={{ fontSize: '0.78rem', color: 'var(--color-muted)' }}>
+                  Subtotal ₦{(deferCheckoutCartTotal - deferCheckoutExtraTotal).toLocaleString()} + Additional ₦{deferCheckoutExtraTotal.toLocaleString()}
+                </div>
+              )}
+              <div style={{ fontWeight: 700, fontSize: '1.05rem' }}>
+                Total <span style={{ marginLeft: '0.4rem', color: 'var(--color-primary)' }}>₦{deferCheckoutCartTotal.toLocaleString()}</span>
+              </div>
             </div>
           )}
 
@@ -2112,6 +2193,14 @@ function PublicForm() {
           />
         )
       })()}
+
+      {orderConfirmation && (
+        <OrderConfirmationModal
+          form={orderConfirmation.form}
+          submission={orderConfirmation.submission}
+          onClose={() => setOrderConfirmation(null)}
+        />
+      )}
 
       {!cartDefersCheckout && (
         <p className="no-print" style={{ marginTop: '3rem', color: '#999', fontSize: '0.85rem' }}>

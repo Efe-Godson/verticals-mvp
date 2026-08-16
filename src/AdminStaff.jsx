@@ -9,6 +9,8 @@ import { useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { useToast } from './Toast'
 import PosSidePanel from './PosSidePanel'
+import { LoadingState } from './LoadingState'
+import { ErrorState } from './ErrorState'
 
 // supabase-js only populates `data` when the function returns 2xx - on a
 // non-2xx response `data` is null and `error.message` is just the generic
@@ -215,8 +217,8 @@ function AdminStaff() {
     loadStaff()
   }
 
-  if (loading) return <div className="page">Loading admin...</div>
-  if (error) return <div className="page" style={{ color: 'red' }}>{error}</div>
+  if (loading) return <LoadingState label="Loading admin..." />
+  if (error) return <ErrorState message={error} />
 
   return (
     <div className="page" style={isFocusMode ? { paddingTop: '4rem' } : undefined}>

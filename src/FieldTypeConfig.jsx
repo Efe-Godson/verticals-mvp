@@ -259,6 +259,19 @@ function FieldTypeConfig({ field, index, updateField }) {
     )
   }
 
+  if (field.type === 'number') {
+    return (
+      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: 'var(--color-muted)', marginTop: '0.3rem', cursor: 'pointer' }}>
+        <input
+          type="checkbox"
+          checked={!!field.addToTotal}
+          onChange={(e) => updateField(index, { addToTotal: e.target.checked || undefined })}
+        />
+        Add this field's value to the order total (e.g. a delivery fee) - Retail-style forms only
+      </label>
+    )
+  }
+
   if (field.type === 'linked_record') {
     return <LinkedRecordConfig field={field} index={index} updateField={updateField} />
   }

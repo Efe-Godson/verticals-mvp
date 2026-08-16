@@ -10,6 +10,8 @@ import FormPreviewModal from './FormPreview'
 import ProductManager from './ProductManager'
 import MoreDetailsManager from './MoreDetailsManager'
 import { COUNTRIES } from './lib/locationData'
+import { LoadingState } from './LoadingState'
+import { ErrorState } from './ErrorState'
 
 const FIELD_TYPES = [
   { value: 'text', label: 'Short Text' },
@@ -329,8 +331,8 @@ function EditForm() {
     }
   }
 
-  if (loading) return <div className="page">Loading form...</div>
-  if (error) return <div className="page" style={{ color: 'red' }}>{error}</div>
+  if (loading) return <LoadingState label="Loading form..." />
+  if (error) return <ErrorState message={error} />
 
   const hasCartField = fields.some(f => f.type === 'cart')
 

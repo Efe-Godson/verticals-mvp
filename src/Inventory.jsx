@@ -15,6 +15,8 @@ import { useParams, useSearchParams } from 'react-router-dom'
 import PosSidePanel from './PosSidePanel'
 import { supabase } from './supabaseClient'
 import { useToast } from './Toast'
+import { LoadingState } from './LoadingState'
+import { ErrorState } from './ErrorState'
 
 const LOW_STOCK_THRESHOLD = 5
 
@@ -102,8 +104,8 @@ function Inventory() {
     loadForm()
   }, [id])
 
-  if (loading) return <div className="page">Loading inventory...</div>
-  if (error) return <div className="page" style={{ color: 'red' }}>{error}</div>
+  if (loading) return <LoadingState label="Loading inventory..." />
+  if (error) return <ErrorState message={error} />
 
   const cartField = form.fields.find(f => f.type === 'cart')
   if (!cartField) {

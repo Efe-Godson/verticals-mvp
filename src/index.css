@@ -101,6 +101,12 @@
   box-sizing: border-box;
 }
 
+/* Shared by LoadingState.jsx's LoadingSpinner - defined once globally
+   rather than per-component, since it's used across most pages in the app. */
+@keyframes verticals-spin {
+  to { transform: rotate(360deg); }
+}
+
 html, body {
   /* Safety net against any element that overflows its container width
      (long unwrapped text forcing a grid track wider than 1fr, a stray fixed

@@ -6,6 +6,8 @@ import { supabase } from './supabaseClient'
 import { fetchAIAnalysis, askAIQuestion } from './lib/aiClient'
 import { DATE_RANGE_OPTIONS, getDateRangeBounds, getDateRangeLabel } from './report/helpers/dateRange'
 import StatTile from './report/components/StatTile'
+import { LoadingState } from './LoadingState'
+import { ErrorState } from './ErrorState'
 
 const EXAMPLE_QUESTIONS = [
   'Which product should I restock first?',
@@ -171,8 +173,8 @@ function AIAnalystPage() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [qaHistory, asking])
 
-  if (loading) return <div className="page">Loading...</div>
-  if (!form) return <div className="page">Form not found.</div>
+  if (loading) return <LoadingState />
+  if (!form) return <ErrorState message="Form not found." />
 
   const { start, end } = getDateRangeBounds(dateRange, customStart, customEnd)
   const filtered = submissions.filter(s => {
