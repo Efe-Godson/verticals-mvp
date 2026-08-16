@@ -107,6 +107,13 @@
   to { transform: rotate(360deg); }
 }
 
+/* Shared by LoadingState.jsx's ExtractingOverlay - a moving tinted band
+   across the field being read, rather than a static "Loading..." label. */
+@keyframes verticals-shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
 html, body {
   /* Safety net against any element that overflows its container width
      (long unwrapped text forcing a grid track wider than 1fr, a stray fixed

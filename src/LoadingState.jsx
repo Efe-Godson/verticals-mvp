@@ -27,3 +27,21 @@ export function LoadingState({ label = 'Loading...' }) {
     </div>
   )
 }
+
+// Covers a field (a textarea being read by AI, say) with a moving
+// theme-tinted band instead of just relabeling the submit button - the
+// person's eye is on what they just pasted, not the button, while the
+// model reads it. Parent needs position: 'relative' so this fills it.
+export function ExtractingOverlay({ label = 'Reading...' }) {
+  return (
+    <div style={{
+      position: 'absolute', inset: 0, borderRadius: 'var(--radius)',
+      background: 'linear-gradient(90deg, var(--color-primary-soft) 25%, var(--color-surface) 37%, var(--color-primary-soft) 63%)',
+      backgroundSize: '400% 100%', animation: 'verticals-shimmer 1.4s ease infinite',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+    }}>
+      <LoadingSpinner color="var(--color-primary)" />
+      <span style={{ color: 'var(--color-primary)', fontWeight: 600, fontSize: '0.9rem' }}>{label}</span>
+    </div>
+  )
+}

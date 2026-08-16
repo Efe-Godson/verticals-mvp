@@ -13,6 +13,7 @@ import PackageBuilder from './PackageBuilder'
 import ConfirmDialog from './ConfirmDialog'
 import SparkleIcon from './SparkleIcon'
 import { extractProductsFromText, describeAIError } from './lib/aiClient'
+import { ExtractingOverlay } from './LoadingState'
 
 function newProductId() {
   return 'p' + Date.now() + Math.random().toString(36).slice(2, 7)
@@ -238,13 +239,17 @@ function AiImportModal({ onClose, onImport }) {
             <p style={{ fontSize: '0.85rem', color: 'var(--color-muted)', margin: '0 0 0.8rem' }}>
               Paste a menu, price list, or product list from anywhere - a PDF, a spreadsheet, a message - and AI will turn it into products you can review before adding.
             </p>
-            <textarea
-              value={pastedText}
-              onChange={(e) => setPastedText(e.target.value)}
-              placeholder={'e.g.\nGrilled Chicken - 12.99\nBeef Burger 10.99 (Mains)\nSoft Drink ......... 2.50'}
-              rows={10}
-              style={{ width: '100%', padding: '0.6rem', fontSize: '0.9rem' }}
-            />
+            <div style={{ position: 'relative' }}>
+              <textarea
+                value={pastedText}
+                onChange={(e) => setPastedText(e.target.value)}
+                placeholder={'e.g.\nGrilled Chicken - 12.99\nBeef Burger 10.99 (Mains)\nSoft Drink ......... 2.50'}
+                rows={10}
+                disabled={extracting}
+                style={{ width: '100%', padding: '0.6rem', fontSize: '0.9rem' }}
+              />
+              {extracting && <ExtractingOverlay label="Reading your text..." />}
+            </div>
             {extractError && <p style={{ color: '#c0392b', fontSize: '0.85rem', marginTop: '0.5rem' }}>{extractError}</p>}
             <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '0.8rem' }}>
               <button type="button" className="secondary" onClick={onClose}>Cancel</button>

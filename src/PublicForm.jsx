@@ -5,7 +5,7 @@ import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
 import { useToast } from './Toast'
 import SparkleIcon from './SparkleIcon'
-import { LoadingState } from './LoadingState'
+import { LoadingState, ExtractingOverlay } from './LoadingState'
 import { ErrorState } from './ErrorState'
 import { InvoiceModal } from './InvoiceModal'
 import { submitForm, getSubmissionByToken, updateSubmissionByToken } from './lib/submissionsClient'
@@ -192,13 +192,17 @@ function AiFillModal({ cartField, fields, rules, showRulesButton, onSaveRules, o
             <p style={{ fontSize: '0.85rem', color: 'var(--color-muted)', margin: '0 0 0.8rem' }}>
               Paste a customer's order - a WhatsApp message, an SMS, anything - and AI will match it to your catalogue and fields for you to review before it's applied.
             </p>
-            <textarea
-              value={pastedText}
-              onChange={(e) => setPastedText(e.target.value)}
-              placeholder={'e.g.\n2 t-shirts and a cap for John, 08012345678, deliver to Lekki, paying cash'}
-              rows={8}
-              style={{ width: '100%', padding: '0.6rem', fontSize: '0.9rem' }}
-            />
+            <div style={{ position: 'relative' }}>
+              <textarea
+                value={pastedText}
+                onChange={(e) => setPastedText(e.target.value)}
+                placeholder={'e.g.\n2 t-shirts and a cap for John, 08012345678, deliver to Lekki, paying cash'}
+                rows={8}
+                disabled={extracting}
+                style={{ width: '100%', padding: '0.6rem', fontSize: '0.9rem' }}
+              />
+              {extracting && <ExtractingOverlay label="Reading your text..." />}
+            </div>
             {extractError && <p style={{ color: '#c0392b', fontSize: '0.85rem', marginTop: '0.5rem' }}>{extractError}</p>}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: showRulesButton ? 'space-between' : 'flex-end', marginTop: '0.8rem' }}>
               {showRulesButton ? (
