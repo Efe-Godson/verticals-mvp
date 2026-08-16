@@ -9,7 +9,7 @@ import { LoadingState, ExtractingOverlay } from './LoadingState'
 import { ErrorState } from './ErrorState'
 import { InvoiceModal } from './InvoiceModal'
 import { printReceipt } from './receiptPrint'
-import { isRetailTemplate } from './lib/templateFlags'
+import { isRetailTemplate, isRestaurantTemplate } from './lib/templateFlags'
 import { submitForm, getSubmissionByToken, updateSubmissionByToken } from './lib/submissionsClient'
 import { extractOrderFromText, describeAIError } from './lib/aiClient'
 import { COUNTRIES, statesFor, citiesForField } from './lib/locationData'
@@ -2037,8 +2037,10 @@ function PublicForm() {
             Skipped entirely when editing an existing response (token) -
             there's nothing to "paste an order" into at that point. Same
             SparkleIcon + solid-button styling as ProductManager's "Use AI to
-            add new products" - keep new AI entry points matching this. */}
-        {hasCartOnPage && session && !token && (
+            add new products" - keep new AI entry points matching this.
+            Restaurant doesn't get this at all (see lib/templateFlags.js) -
+            back to exactly how it worked before AI fill existed. */}
+        {hasCartOnPage && session && !token && !isRestaurantTemplate(form) && (
           <button
             type="button"
             onClick={() => setShowAiFill(true)}

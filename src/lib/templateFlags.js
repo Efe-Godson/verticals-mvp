@@ -7,7 +7,15 @@
 // fixed seed slug (supabase/migrations/20260812130000_retail_shop_template.sql),
 // not the dynamic slugify()+timestamp one admin-authored custom templates get.
 export const RETAIL_TEMPLATE_SLUG = 'retail-shop'
+export const RESTAURANT_TEMPLATE_SLUG = 'restaurant-order-pay'
 
 export function isRetailTemplate(form) {
   return form?.settings?.templateSlug === RETAIL_TEMPLATE_SLUG
+}
+
+// Restaurant stays exactly as it was before the Invoice/AI-fill work -
+// no downloadable Invoice (see isRetailTemplate above) and no AI
+// paste-and-extract entry points (Fill from Text, Use AI to add products).
+export function isRestaurantTemplate(form) {
+  return form?.settings?.templateSlug === RESTAURANT_TEMPLATE_SLUG
 }

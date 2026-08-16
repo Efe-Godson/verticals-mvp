@@ -10,6 +10,7 @@ import FormPreviewModal from './FormPreview'
 import ProductManager from './ProductManager'
 import MoreDetailsManager from './MoreDetailsManager'
 import { COUNTRIES } from './lib/locationData'
+import { isRestaurantTemplate } from './lib/templateFlags'
 import { LoadingState } from './LoadingState'
 import { ErrorState } from './ErrorState'
 
@@ -67,6 +68,7 @@ function EditForm() {
   const [error, setError] = useState('')
   const [formName, setFormName] = useState('')
   const [formDescription, setFormDescription] = useState('')
+  const [formSettings, setFormSettings] = useState({})
   const [fields, setFields] = useState([])
   const [message, setMessage] = useState('')
   const [saving, setSaving] = useState(false)
@@ -114,6 +116,7 @@ function EditForm() {
       } else {
         setFormName(data.name)
         setFormDescription(data.description || '')
+        setFormSettings(data.settings || {})
         setFields(data.fields || [])
       }
       setLoading(false)
@@ -420,6 +423,7 @@ function EditForm() {
                   inline
                   products={field.products || []}
                   onChange={(products) => updateFieldProducts(index, products)}
+                  hideAiImport={isRestaurantTemplate({ settings: formSettings })}
                 />
               )}
             </div>

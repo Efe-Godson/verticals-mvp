@@ -304,7 +304,7 @@ function AiImportModal({ onClose, onImport }) {
   )
 }
 
-function ProductManager({ products, onChange, onClose, inline = false }) {
+function ProductManager({ products, onChange, onClose, inline = false, hideAiImport = false }) {
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState('All')
   const [editingProduct, setEditingProduct] = useState(null) // null closed, 'new', or a product object
@@ -469,15 +469,19 @@ function ProductManager({ products, onChange, onClose, inline = false }) {
           )}
           {/* Its own full row, below everything else - the flagship way to
               build a catalogue from scratch, not just one more tile among
-              the smaller housekeeping actions above it. */}
-          <button
-            type="button"
-            className="product-actions-ai"
-            onClick={() => setShowAiImport(true)}
-            style={{ fontWeight: 600, width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
-          >
-            <SparkleIcon /> Use AI to add new products
-          </button>
+              the smaller housekeeping actions above it. Restaurant doesn't
+              get this at all (see lib/templateFlags.js) - back to exactly
+              how it worked before AI import existed. */}
+          {!hideAiImport && (
+            <button
+              type="button"
+              className="product-actions-ai"
+              onClick={() => setShowAiImport(true)}
+              style={{ fontWeight: 600, width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+            >
+              <SparkleIcon /> Use AI to add new products
+            </button>
+          )}
         </div>
 
         <input
