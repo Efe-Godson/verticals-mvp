@@ -1,9 +1,12 @@
 import { useState } from 'react'
 import { overlayStyle, dropdownStyle } from './recordsUiKit'
 import { InvoiceModal } from '../InvoiceModal'
+import { printReceipt } from '../receiptPrint'
+import { isRetailTemplate } from '../lib/templateFlags'
 
 export function CartCell({ value, cellKey, openCartCellKey, setOpenCartCellKey, form, submission }) {
   const [showInvoice, setShowInvoice] = useState(false)
+  const isRetail = isRetailTemplate(form)
 
   if (!value || !value.items || value.items.length === 0) {
     return <span style={{ color: '#ccc' }}>-</span>
@@ -50,17 +53,21 @@ export function CartCell({ value, cellKey, openCartCellKey, setOpenCartCellKey, 
             {form && submission && (
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); setShowInvoice(true) }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (isRetail) setShowInvoice(true)
+                  else printReceipt(form, submission)
+                }}
                 style={{ width: '100%', marginTop: '0.7rem', fontSize: '0.8rem' }}
               >
-                Invoice
+                {isRetail ? 'Invoice' : 'Print'}
               </button>
             )}
           </div>
         </>
       )}
 
-      {showInvoice && (
+      {isRetail && showInvoice && (
         <InvoiceModal form={form} submission={submission} onClose={() => setShowInvoice(false)} />
       )}
     </span>

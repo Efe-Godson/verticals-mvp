@@ -4,6 +4,7 @@ import { supabase } from './supabaseClient'
 import PosSidePanel from './PosSidePanel'
 import { LoadingState } from './LoadingState'
 import { ErrorState } from './ErrorState'
+import { isRetailTemplate } from './lib/templateFlags'
 
 function FormSettings() {
   const { id } = useParams()
@@ -21,6 +22,7 @@ function FormSettings() {
   const [companyName, setCompanyName] = useState('')
   const [companyPhone, setCompanyPhone] = useState('')
   const [companyAddress, setCompanyAddress] = useState('')
+  const [receiptPaperWidth, setReceiptPaperWidth] = useState(80)
   const [staffReportRange, setStaffReportRange] = useState('today')
   const [aiFillRules, setAiFillRules] = useState('')
 
@@ -36,6 +38,7 @@ function FormSettings() {
         setCompanyName(data.settings?.companyName ?? '')
         setCompanyPhone(data.settings?.companyPhone ?? '')
         setCompanyAddress(data.settings?.companyAddress ?? '')
+        setReceiptPaperWidth(data.settings?.receiptPaperWidth ?? 80)
         setStaffReportRange(data.settings?.staffReportRange ?? 'today')
         setAiFillRules(data.settings?.aiFillRules ?? '')
       }
@@ -56,7 +59,7 @@ function FormSettings() {
     // used to silently delete all of those the moment this page saved.
     const newSettings = {
       ...form.settings,
-      allowMultipleResponses, collectEmail, companyName, companyPhone, companyAddress,
+      allowMultipleResponses, collectEmail, companyName, companyPhone, companyAddress, receiptPaperWidth,
       staffReportRange, aiFillRules,
     }
 
@@ -79,6 +82,9 @@ function FormSettings() {
   if (error) return <ErrorState message={error} />
 
   const hasCartField = form.fields?.some(f => f.type === 'cart')
+  // The downloadable Invoice is Retail-only - Restaurant and every other
+  // template/custom cart form keep the original thermal-receipt settings.
+  const isRetail = isRetailTemplate(form)
 
   return (
     <div className="page" style={isFocusMode ? { paddingTop: '4rem' } : undefined}>
@@ -126,9 +132,11 @@ function FormSettings() {
       )}
 
       <div className="card" style={{ padding: '1.5rem', marginTop: '1.5rem' }}>
-        <h3 style={{ marginTop: 0 }}>Invoice Details</h3>
+        <h3 style={{ marginTop: 0 }}>{isRetail ? 'Invoice Details' : 'Receipt Details'}</h3>
         <p style={{ fontSize: '0.85rem', color: 'var(--color-muted)', marginTop: '-0.5rem', marginBottom: '1rem' }}>
-          Shown on the downloadable invoice for records with a Product Cart. Leave blank to just use the form name.
+          {isRetail
+            ? 'Shown on the downloadable invoice for records with a Product Cart. Leave blank to just use the form name.'
+            : 'Shown on printed receipts for records with a Product Cart. Leave blank to just use the form name.'}
         </p>
 
         <div style={{ marginBottom: '1rem' }}>
@@ -164,38 +172,85 @@ function FormSettings() {
           />
         </div>
 
+        {!isRetail && (
+          <div style={{ marginBottom: '1.2rem' }}>
+            <label style={{ fontSize: '0.85rem', color: 'var(--color-muted)' }}>Printer Width</label>
+            <select
+              value={receiptPaperWidth}
+              onChange={(e) => setReceiptPaperWidth(Number(e.target.value))}
+              style={{ padding: '0.5rem', width: '100%', marginTop: '0.3rem' }}
+            >
+              <option value={58}>58mm (small thermal printers)</option>
+              <option value={80}>80mm (standard thermal printers)</option>
+            </select>
+          </div>
+        )}
+
         <div>
           <label style={{ fontSize: '0.85rem', color: 'var(--color-muted)', display: 'block', marginBottom: '0.5rem' }}>
             Preview
           </label>
-          <div style={{ background: '#eef0f2', padding: '1.2rem', borderRadius: 'var(--radius)', display: 'flex', justifyContent: 'center' }}>
-            <div style={{
-              fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '12px', color: '#111',
-              width: '100%', maxWidth: '360px', background: 'white', padding: '1.2rem',
-              boxShadow: '0 2px 10px rgba(0,0,0,0.12)'
-            }}>
-              <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '15px', letterSpacing: '0.5px', marginBottom: '3px', textTransform: 'uppercase' }}>
-                {companyName.trim() || form.name}
-              </div>
-              {companyAddress.trim() && <div style={{ textAlign: 'center', fontSize: '10px', color: '#444' }}>{companyAddress}</div>}
-              {companyPhone.trim() && <div style={{ textAlign: 'center', fontSize: '10px', color: '#444' }}>{companyPhone}</div>}
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '2px solid #111', borderBottom: '2px solid #111', padding: '0.4rem 0', margin: '0.6rem 0' }}>
-                <span>Invoice #4821</span>
-                <span>10 Aug 2026</span>
-              </div>
-              {[{ n: 'Grilled Chicken', q: 2, p: 12.99 }, { n: 'Soft Drink', q: 1, p: 2.50 }].map((item, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', margin: '4px 0' }}>
-                  <span>{item.n} ×{item.q}</span>
-                  <span>{(item.p * item.q).toLocaleString()}</span>
+          {isRetail ? (
+            <div style={{ background: '#eef0f2', padding: '1.2rem', borderRadius: 'var(--radius)', display: 'flex', justifyContent: 'center' }}>
+              <div style={{
+                fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '12px', color: '#111',
+                width: '100%', maxWidth: '360px', background: 'white', padding: '1.2rem',
+                boxShadow: '0 2px 10px rgba(0,0,0,0.12)'
+              }}>
+                <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '15px', letterSpacing: '0.5px', marginBottom: '3px', textTransform: 'uppercase' }}>
+                  {companyName.trim() || form.name}
                 </div>
-              ))}
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '14px', borderTop: '2px solid #111', marginTop: '0.4rem', paddingTop: '0.4rem' }}>
-                <span>Total</span>
-                <span>28.48</span>
+                {companyAddress.trim() && <div style={{ textAlign: 'center', fontSize: '10px', color: '#444' }}>{companyAddress}</div>}
+                {companyPhone.trim() && <div style={{ textAlign: 'center', fontSize: '10px', color: '#444' }}>{companyPhone}</div>}
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '2px solid #111', borderBottom: '2px solid #111', padding: '0.4rem 0', margin: '0.6rem 0' }}>
+                  <span>Invoice #4821</span>
+                  <span>10 Aug 2026</span>
+                </div>
+                {[{ n: 'Grilled Chicken', q: 2, p: 12.99 }, { n: 'Soft Drink', q: 1, p: 2.50 }].map((item, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', margin: '4px 0' }}>
+                    <span>{item.n} ×{item.q}</span>
+                    <span>{(item.p * item.q).toLocaleString()}</span>
+                  </div>
+                ))}
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '14px', borderTop: '2px solid #111', marginTop: '0.4rem', paddingTop: '0.4rem' }}>
+                  <span>Total</span>
+                  <span>28.48</span>
+                </div>
+                <div style={{ textAlign: 'center', fontSize: '9px', color: '#999', marginTop: '1rem' }}>Powered by Verticals</div>
               </div>
-              <div style={{ textAlign: 'center', fontSize: '9px', color: '#999', marginTop: '1rem' }}>Powered by Verticals</div>
             </div>
-          </div>
+          ) : (
+            <div style={{ background: '#eef0f2', padding: '1.2rem', borderRadius: 'var(--radius)', display: 'flex', justifyContent: 'center' }}>
+              <div style={{
+                fontFamily: "'Courier New', monospace", fontSize: '12px', color: '#000',
+                width: `${receiptPaperWidth}mm`, background: 'white', padding: '5mm 4mm',
+                boxShadow: '0 2px 10px rgba(0,0,0,0.12)'
+              }}>
+                <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '17px', letterSpacing: '0.5px', marginBottom: '4px', textTransform: 'uppercase' }}>
+                  {companyName.trim() || form.name}
+                </div>
+                {companyAddress.trim() && <div style={{ textAlign: 'center', fontSize: '10px', color: '#333' }}>{companyAddress}</div>}
+                {companyPhone.trim() && <div style={{ textAlign: 'center', fontSize: '10px', color: '#333' }}>{companyPhone}</div>}
+                <div style={{ textAlign: 'center', fontSize: '10px', margin: '8px 0 4px' }}>Sat 10/08/2026 · 7:45 PM</div>
+                <div style={{ borderTop: '1px dashed #000', margin: '8px 0' }} />
+                {[{ n: 'Grilled Chicken', q: 2, p: 12.99 }, { n: 'Soft Drink', q: 1, p: 2.50 }].map((item, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', margin: '4px 0' }}>
+                    <span>{i + 1}. {item.n} ×{item.q}</span>
+                    <span>{(item.p * item.q).toLocaleString()}</span>
+                  </div>
+                ))}
+                <div style={{ borderTop: '2px solid #000', margin: '6px 0' }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '15px', margin: '4px 0' }}>
+                  <span>TOTAL</span>
+                  <span>28.48</span>
+                </div>
+                <div style={{ borderTop: '1px dashed #000', margin: '8px 0' }} />
+                <div style={{ textAlign: 'center', fontSize: '11px', fontWeight: 'bold', marginTop: '10px' }}>Thank you for coming!</div>
+                <div style={{ textAlign: 'center', fontSize: '9px', letterSpacing: '1px', marginTop: '6px' }}>#ABC123456789#</div>
+                <div style={{ textAlign: 'center', fontSize: '9px', color: '#999', marginTop: '4px' }}>Powered by Verticals</div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

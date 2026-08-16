@@ -8,6 +8,8 @@ import SparkleIcon from './SparkleIcon'
 import { LoadingState, ExtractingOverlay } from './LoadingState'
 import { ErrorState } from './ErrorState'
 import { InvoiceModal } from './InvoiceModal'
+import { printReceipt } from './receiptPrint'
+import { isRetailTemplate } from './lib/templateFlags'
 import { submitForm, getSubmissionByToken, updateSubmissionByToken } from './lib/submissionsClient'
 import { extractOrderFromText, describeAIError } from './lib/aiClient'
 import { COUNTRIES, statesFor, citiesForField } from './lib/locationData'
@@ -324,16 +326,20 @@ function CheckIcon({ size = 40 }) {
 
 // Replaces the old "jump straight to a print-preview popup" behavior (see
 // submitAnswers) - plain in-page confirmation that always shows regardless
-// of the browser's popup blocker, with the invoice as an explicit opt-in
-// click instead of something forced on every single order.
+// of the browser's popup blocker, with the invoice/receipt as an explicit
+// opt-in click instead of something forced on every single order. The
+// downloadable Invoice is Retail-only (see lib/templateFlags.js) - every
+// other template, including Restaurant, keeps the original printReceipt()
+// popup unchanged.
 function OrderConfirmationModal({ form, submission, onClose }) {
   const [showInvoice, setShowInvoice] = useState(false)
+  const isRetail = isRetailTemplate(form)
   const cartField = form.fields.find(f => f.type === 'cart')
   const cartData = cartField ? submission.data[cartField.id] : null
   const itemCount = cartData ? cartData.items.reduce((sum, i) => sum + i.quantity, 0) : 0
   const grandTotal = cartData ? cartData.total + (Number(cartData.deliveryFee) || 0) : 0
 
-  if (showInvoice) {
+  if (isRetail && showInvoice) {
     return <InvoiceModal form={form} submission={submission} onClose={() => setShowInvoice(false)} />
   }
 
@@ -355,9 +361,15 @@ function OrderConfirmationModal({ form, submission, onClose }) {
           </div>
         )}
         <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <button type="button" className="secondary" onClick={() => setShowInvoice(true)} style={{ flex: 1 }}>
-            View Invoice
-          </button>
+          {isRetail ? (
+            <button type="button" className="secondary" onClick={() => setShowInvoice(true)} style={{ flex: 1 }}>
+              View Invoice
+            </button>
+          ) : (
+            <button type="button" className="secondary" onClick={() => printReceipt(form, submission)} style={{ flex: 1 }}>
+              Print Receipt
+            </button>
+          )}
           <button type="button" onClick={onClose} style={{ flex: 1 }}>
             New Order
           </button>

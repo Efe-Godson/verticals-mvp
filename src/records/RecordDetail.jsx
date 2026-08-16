@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../AuthContext'
 import { InvoiceModal } from '../InvoiceModal'
+import { printReceipt } from '../receiptPrint'
+import { isRetailTemplate } from '../lib/templateFlags'
 import { formatCell } from './recordsUiKit'
 import { CartEditInput } from './CartEditInput'
 import { RecordEditInput } from './RecordEditInput'
@@ -10,6 +12,7 @@ import { LoadingSpinner } from '../LoadingState'
 export function RecordDetail({ form, record, fields, onClose, onUpdated, initialEditing = false, hideEdit = false }) {
   const { session } = useAuth()
   const hasCartField = fields.some(f => f.type === 'cart')
+  const isRetail = isRetailTemplate(form)
 
   const [isEditing, setIsEditing] = useState(initialEditing)
   const [editedValues, setEditedValues] = useState(record.data)
@@ -149,7 +152,11 @@ export function RecordDetail({ form, record, fields, onClose, onUpdated, initial
             {!showHistory && !isEditing && (
               <>
                 {hasCartField && (
-                  <button className="secondary" onClick={() => setShowInvoice(true)}>View Invoice</button>
+                  isRetail ? (
+                    <button className="secondary" onClick={() => setShowInvoice(true)}>View Invoice</button>
+                  ) : (
+                    <button className="secondary" onClick={() => printReceipt(form, record)}>Print Receipt</button>
+                  )
                 )}
                 <button className="secondary" onClick={openHistory}>History</button>
                 {!hideEdit && (
@@ -233,7 +240,7 @@ export function RecordDetail({ form, record, fields, onClose, onUpdated, initial
         )}
       </div>
 
-      {showInvoice && (
+      {isRetail && showInvoice && (
         <InvoiceModal form={form} submission={record} onClose={() => setShowInvoice(false)} />
       )}
     </div>
