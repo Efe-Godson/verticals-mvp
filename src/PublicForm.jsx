@@ -2204,7 +2204,10 @@ function PublicForm() {
         <OrderConfirmationModal
           form={orderConfirmation.form}
           submission={orderConfirmation.submission}
-          onClose={() => setOrderConfirmation(null)}
+          onClose={() => {
+            setOrderConfirmation(null)
+            window.scrollTo({ top: 0, behavior: 'smooth' })
+          }}
         />
       )}
 
