@@ -3,7 +3,7 @@
 // "Generate" button keeps free-tier usage predictable while still offering a
 // richer, more practical analysis experience.
 import { useEffect, useState } from 'react'
-import { fetchAIAnalysis } from '../../lib/aiClient'
+import { fetchAIAnalysis, describeAIError } from '../../lib/aiClient'
 
 function getPriorityTone(priority) {
   if (priority === 'high') return { background: '#fef2f2', color: '#b91c1c' }
@@ -79,7 +79,7 @@ function AIInsightCards({ formId, dateRangeLabel, submissionIds, hideExecutiveSu
         JSON.stringify({ analysis: nextAnalysis, generatedAt: nextGeneratedAt, cached: Boolean(result.cached) })
       )
     } catch (err) {
-      setError('Could not generate insights: ' + err.message)
+      setError(await describeAIError(err, "Couldn't generate insights right now - please try again in a moment."))
     } finally {
       setLoading(false)
     }

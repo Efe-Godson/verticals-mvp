@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
-import { fetchAIAnalysis, askAIQuestion } from './lib/aiClient'
+import { fetchAIAnalysis, askAIQuestion, describeAIError } from './lib/aiClient'
 import { DATE_RANGE_OPTIONS, getDateRangeBounds, getDateRangeLabel } from './report/helpers/dateRange'
 import StatTile from './report/components/StatTile'
 import { LoadingState } from './LoadingState'
@@ -196,7 +196,7 @@ function AIAnalystPage() {
       setAnalysisMeta(meta)
       localStorage.setItem(`ai-analysis:${form.id}`, JSON.stringify({ analysis: result, meta }))
     } catch (err) {
-      setError('Could not generate analysis: ' + err.message)
+      setError(await describeAIError(err, "Couldn't generate the analysis right now - please try again in a moment."))
     }
     setAnalyzing(false)
   }
@@ -211,7 +211,7 @@ function AIAnalystPage() {
       setQaHistory(current => [...current, { question: trimmed, answer: result }])
       setQuestion('')
     } catch (err) {
-      setAskError('Could not get an answer: ' + err.message)
+      setAskError(await describeAIError(err, "Couldn't get an answer right now - please try again in a moment."))
     }
     setAsking(false)
   }

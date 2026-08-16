@@ -8,7 +8,7 @@ import SparkleIcon from './SparkleIcon'
 import { LoadingState } from './LoadingState'
 import { ErrorState } from './ErrorState'
 import { submitForm, getSubmissionByToken, updateSubmissionByToken } from './lib/submissionsClient'
-import { extractOrderFromText } from './lib/aiClient'
+import { extractOrderFromText, describeAIError } from './lib/aiClient'
 import { COUNTRIES, statesFor, citiesForField } from './lib/locationData'
 import { printReceipt } from './receiptPrint'
 const PAYMENT_METHODS = ['Cash', 'Card', 'Bank Transfer', 'Split']
@@ -161,7 +161,7 @@ function AiFillModal({ cartField, fields, rules, showRulesButton, onSaveRules, o
       setDraftItems(items)
       setDraftAnswers(answers)
     } catch (err) {
-      setExtractError(err.message)
+      setExtractError(await describeAIError(err, "Couldn't read that text right now - please try again in a moment."))
     } finally {
       setExtracting(false)
     }

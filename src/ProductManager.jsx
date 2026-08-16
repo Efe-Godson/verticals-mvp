@@ -12,7 +12,7 @@ import * as XLSX from 'xlsx'
 import PackageBuilder from './PackageBuilder'
 import ConfirmDialog from './ConfirmDialog'
 import SparkleIcon from './SparkleIcon'
-import { extractProductsFromText } from './lib/aiClient'
+import { extractProductsFromText, describeAIError } from './lib/aiClient'
 
 function newProductId() {
   return 'p' + Date.now() + Math.random().toString(36).slice(2, 7)
@@ -202,7 +202,7 @@ function AiImportModal({ onClose, onImport }) {
       }
       setDrafts(products.map(p => ({ ...p, id: newProductId() })))
     } catch (err) {
-      setExtractError(err.message)
+      setExtractError(await describeAIError(err, "Couldn't read that text right now - please try again in a moment."))
     } finally {
       setExtracting(false)
     }

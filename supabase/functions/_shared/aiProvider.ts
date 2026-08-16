@@ -3,12 +3,12 @@
 // extract-order-ai) calls the model through generateText() instead of
 // hitting Gemini directly. Gemini stays primary - its responseSchema mode
 // gives strict structured output, worth keeping as the default - but a 429
-// (free-tier quota exhausted) automatically retries the same prompt against
-// OpenRouter's hosted Llama instead of just failing the request outright.
-// Only a 429 triggers the fallback: a real prompt/parsing error would fail
-// the same way on the second provider too, so there's nothing to gain
-// retrying those, just double the latency on a request that was never
-// going to succeed.
+// (free-tier quota exhausted) or 503 (model overloaded/unavailable)
+// automatically retries the same prompt against OpenRouter's hosted Llama
+// instead of just failing the request outright. Only those two statuses
+// trigger the fallback: a real prompt/parsing error would fail the same way
+// on the second provider too, so there's nothing to gain retrying those,
+// just double the latency on a request that was never going to succeed.
 const GEMINI_MODEL = 'gemini-flash-latest'
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
@@ -76,7 +76,8 @@ export async function generateText(prompt: string, jsonSchema?: object) {
   try {
     return await callGemini(prompt, jsonSchema)
   } catch (err) {
-    if ((err as Error & { status?: number }).status !== 429) throw err
+    const status = (err as Error & { status?: number }).status
+    if (status !== 429 && status !== 503) throw err
     return await callOpenRouter(prompt, jsonSchema)
   }
 }

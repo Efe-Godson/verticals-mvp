@@ -1,5 +1,17 @@
 // Place at: src/lib/aiClient.js
 import { supabase } from '../supabaseClient'
+import { TEMPLATE_ADMIN_USER_ID } from '../adminAccount'
+
+// Raw AI-provider errors (quota, API-key, upstream 503s) are only
+// actionable by the person who can fix the underlying config, so only the
+// admin account gets the original err.message. Everyone else - including
+// anonymous PublicForm visitors - gets a short, retry-oriented message
+// instead of a string like "Gemini API error: 503 ...".
+export async function describeAIError(err, friendlyMessage) {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (session?.user?.id === TEMPLATE_ADMIN_USER_ID) return err.message
+  return friendlyMessage
+}
 
 async function throwFunctionError(error) {
   // Supabase wraps non-2xx function replies in a generic FunctionsHttpError.
