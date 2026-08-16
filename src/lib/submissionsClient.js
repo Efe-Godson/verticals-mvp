@@ -7,6 +7,9 @@ async function throwFunctionError(error) {
     try {
       const payload = await response.clone().json()
       if (payload?.error) throw new Error(payload.error)
+      // The platform gateway itself (rejecting before our function code
+      // even runs) uses `message`, not `error`.
+      if (payload?.message) throw new Error(payload.message)
     } catch (parseError) {
       if (parseError instanceof Error && parseError.message !== 'Unexpected end of JSON input') {
         throw parseError

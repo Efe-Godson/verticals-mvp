@@ -23,6 +23,9 @@ async function functionErrorMessage(invokeError, data) {
     try {
       const body = await invokeError.context.json()
       if (body?.error) return body.error
+      // The platform gateway itself (rejecting before our function code
+      // even runs - e.g. an expired JWT) uses `message`, not `error`.
+      if (body?.message) return body.message
     } catch { /* body wasn't JSON, fall through to the generic message */ }
   }
   return invokeError?.message || 'Unknown error'

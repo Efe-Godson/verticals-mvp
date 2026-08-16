@@ -13,44 +13,56 @@ export async function describeAIError(err, friendlyMessage) {
   return friendlyMessage
 }
 
-async function throwFunctionError(error) {
-  // Supabase wraps non-2xx function replies in a generic FunctionsHttpError.
-  // Preserve the function's JSON error message so the UI can tell the user
-  // what actually needs attention (for example, an API-key or quota issue).
-  const response = error?.context
-  if (response instanceof Response) {
+// Mirrors AdminStaff.jsx's invokeManageStaff/functionErrorMessage and
+// quizApi.js's invokeQuiz: supabase-js only populates `data` on a 2xx reply -
+// on anything else `data` is null and `error.message` is just the generic
+// "Edge Function returned a non-2xx status code". The real reason lives in
+// the response body: either our own function's `{ error }` shape, or - when
+// the platform gateway rejects the request before our function code even
+// runs (e.g. a stale JWT on a tab left idle) - the gateway's own `{ message }`
+// shape (`{"code":"UNAUTHORIZED_INVALID_JWT_FORMAT","message":"Invalid JWT"}`).
+// A stale token is worth one retry after a session refresh rather than
+// immediately surfacing an error - the rest of the app doesn't otherwise show
+// one here, since RLS-backed table queries route around the same staleness
+// more gracefully than a token an edge function validates directly.
+async function functionErrorMessage(invokeError, data) {
+  if (data?.error) return data.error
+  if (invokeError?.context?.json) {
     try {
-      const payload = await response.clone().json()
-      if (payload?.error) throw new Error(payload.error)
-    } catch (parseError) {
-      if (parseError instanceof Error && parseError.message !== 'Unexpected end of JSON input') {
-        throw parseError
-      }
-    }
+      const body = await invokeError.context.json()
+      if (body?.error) return body.error
+      if (body?.message) return body.message
+    } catch { /* body wasn't JSON, fall through to the generic message */ }
   }
-  throw error
+  return invokeError?.message || 'Unknown error'
+}
+
+async function invokeAI(name, body) {
+  let result = await supabase.functions.invoke(name, { body })
+  if (result.error) {
+    await supabase.auth.refreshSession()
+    result = await supabase.functions.invoke(name, { body })
+  }
+  if (result.error) throw new Error(await functionErrorMessage(result.error, result.data))
+  if (result.data?.error) throw new Error(result.data.error)
+  return result.data
 }
 
 // Generates (or fetches the cached) full structured analysis for a form's
 // current filtered submission set. Manual-trigger only: call this from a
 // button click, not on mount, to keep free-tier usage predictable.
 export async function fetchAIAnalysis(formId, dateRangeLabel, submissionIds, languageStyle = 'plain') {
-  const { data, error } = await supabase.functions.invoke('ai-analyst', {
-    body: { form_id: formId, date_range_label: dateRangeLabel, submission_ids: submissionIds, language_style: languageStyle },
+  return invokeAI('ai-analyst', {
+    form_id: formId, date_range_label: dateRangeLabel, submission_ids: submissionIds, language_style: languageStyle,
   })
-  if (error) await throwFunctionError(error)
-  if (data?.error) throw new Error(data.error)
-  return data
 }
 
 // Natural-language Q&A over the same aggregated stats. Always live (no
 // caching), since each question is different.
 export async function askAIQuestion(formId, question, submissionIds, languageStyle = 'plain') {
-  const { data, error } = await supabase.functions.invoke('ai-ask', {
-    body: { form_id: formId, question, submission_ids: submissionIds, language_style: languageStyle },
+  const data = await invokeAI('ai-ask', {
+    form_id: formId, question, submission_ids: submissionIds, language_style: languageStyle,
   })
-  if (error) await throwFunctionError(error)
-  if (data?.error) throw new Error(data.error)
   return data.answer
 }
 
@@ -59,9 +71,7 @@ export async function askAIQuestion(formId, question, submissionIds, languageSty
 // caller is expected to show these for review/editing before adding them,
 // not commit them straight to the catalogue the way the .xlsx import does.
 export async function extractProductsFromText(text) {
-  const { data, error } = await supabase.functions.invoke('extract-products-ai', { body: { text } })
-  if (error) await throwFunctionError(error)
-  if (data?.error) throw new Error(data.error)
+  const data = await invokeAI('extract-products-ai', { text })
   return data.products
 }
 
@@ -74,8 +84,5 @@ export async function extractProductsFromText(text) {
 // substitute for it. Caller shows these for review before applying them,
 // same "never commit straight from AI" rule as extractProductsFromText above.
 export async function extractOrderFromText(text, products, fields, rules) {
-  const { data, error } = await supabase.functions.invoke('extract-order-ai', { body: { text, products, fields, rules } })
-  if (error) await throwFunctionError(error)
-  if (data?.error) throw new Error(data.error)
-  return data
+  return invokeAI('extract-order-ai', { text, products, fields, rules })
 }
