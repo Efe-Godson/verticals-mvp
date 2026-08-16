@@ -7,10 +7,10 @@ import { useToast } from './Toast'
 import SparkleIcon from './SparkleIcon'
 import { LoadingState } from './LoadingState'
 import { ErrorState } from './ErrorState'
+import { InvoiceModal } from './InvoiceModal'
 import { submitForm, getSubmissionByToken, updateSubmissionByToken } from './lib/submissionsClient'
 import { extractOrderFromText, describeAIError } from './lib/aiClient'
 import { COUNTRIES, statesFor, citiesForField } from './lib/locationData'
-import { printReceipt } from './receiptPrint'
 const PAYMENT_METHODS = ['Cash', 'Card', 'Bank Transfer', 'Split']
 const TOP_CATEGORY_COUNT = 6 // category pills shown before collapsing the rest behind "+N more"
 
@@ -320,13 +320,18 @@ function CheckIcon({ size = 40 }) {
 
 // Replaces the old "jump straight to a print-preview popup" behavior (see
 // submitAnswers) - plain in-page confirmation that always shows regardless
-// of the browser's popup blocker, with printing as an explicit opt-in click
-// instead of something forced on every single order.
+// of the browser's popup blocker, with the invoice as an explicit opt-in
+// click instead of something forced on every single order.
 function OrderConfirmationModal({ form, submission, onClose }) {
+  const [showInvoice, setShowInvoice] = useState(false)
   const cartField = form.fields.find(f => f.type === 'cart')
   const cartData = cartField ? submission.data[cartField.id] : null
   const itemCount = cartData ? cartData.items.reduce((sum, i) => sum + i.quantity, 0) : 0
   const grandTotal = cartData ? cartData.total + (Number(cartData.deliveryFee) || 0) : 0
+
+  if (showInvoice) {
+    return <InvoiceModal form={form} submission={submission} onClose={() => setShowInvoice(false)} />
+  }
 
   return (
     <div style={{
@@ -346,8 +351,8 @@ function OrderConfirmationModal({ form, submission, onClose }) {
           </div>
         )}
         <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <button type="button" className="secondary" onClick={() => printReceipt(form, submission)} style={{ flex: 1 }}>
-            Print Receipt
+          <button type="button" className="secondary" onClick={() => setShowInvoice(true)} style={{ flex: 1 }}>
+            View Invoice
           </button>
           <button type="button" onClick={onClose} style={{ flex: 1 }}>
             New Order
@@ -957,7 +962,7 @@ function PublicForm() {
         const result = await submitForm(form.id, finalData)
         setEditLink(`${window.location.origin}/form/${form.id}/response/${result.edit_token}`)
         submissionId = result.id
-        // The receipt should show the real, persisted order number (also
+        // The invoice should show the real, persisted order number (also
         // what Records searches/filters by) rather than the random one
         // generated client-side just to label the order while building it.
         if (result.order_number) realOrderNumber = result.order_number
@@ -968,10 +973,9 @@ function PublicForm() {
       // submit chain rather than a direct click - the respondent just saw a
       // "please allow pop-ups" browser nag instead of any confirmation their
       // order actually went through. A plain in-page confirmation always
-      // shows regardless of popup settings; printing (still the same
-      // receiptPrint.js popup renderer Records' own Print button uses) is
-      // now an explicit click from inside that confirmation, which browsers
-      // don't block since it's a direct user gesture.
+      // shows regardless of popup settings; viewing the invoice (still the
+      // same InvoiceModal Records' own invoice action uses) is an explicit
+      // click from inside that confirmation instead.
       if (hasCartOnPage) {
         const cartField = currentPage.fields.find(f => f.type === 'cart')
         setOrderConfirmation({
@@ -1534,7 +1538,7 @@ function PublicForm() {
                       key={method}
                       type="button"
                       className={checkoutMethod === method ? '' : 'secondary'}
-                      onClick={() => { setCheckoutMethod(method); setShowKeypad(false) }}
+                      onClick={() => setCheckoutMethod(method)}
                       style={{ padding: '0.7rem 0.5rem' }}
                     >
                       {method}

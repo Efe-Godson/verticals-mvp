@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../AuthContext'
-import { printReceipt } from '../receiptPrint'
+import { InvoiceModal } from '../InvoiceModal'
 import { formatCell } from './recordsUiKit'
 import { CartEditInput } from './CartEditInput'
 import { RecordEditInput } from './RecordEditInput'
@@ -19,6 +19,7 @@ export function RecordDetail({ form, record, fields, onClose, onUpdated, initial
   const [showHistory, setShowHistory] = useState(false)
   const [logs, setLogs] = useState([])
   const [loadingLogs, setLoadingLogs] = useState(false)
+  const [showInvoice, setShowInvoice] = useState(false)
 
   function startEditing() {
     setEditedValues(record.data)
@@ -148,7 +149,7 @@ export function RecordDetail({ form, record, fields, onClose, onUpdated, initial
             {!showHistory && !isEditing && (
               <>
                 {hasCartField && (
-                  <button className="secondary" onClick={() => printReceipt(form, record)}>Print Receipt</button>
+                  <button className="secondary" onClick={() => setShowInvoice(true)}>View Invoice</button>
                 )}
                 <button className="secondary" onClick={openHistory}>History</button>
                 {!hideEdit && (
@@ -231,6 +232,10 @@ export function RecordDetail({ form, record, fields, onClose, onUpdated, initial
           </>
         )}
       </div>
+
+      {showInvoice && (
+        <InvoiceModal form={form} submission={record} onClose={() => setShowInvoice(false)} />
+      )}
     </div>
   )
 }
