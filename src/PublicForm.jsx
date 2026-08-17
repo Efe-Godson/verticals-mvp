@@ -1286,14 +1286,15 @@ function PublicForm() {
               {filteredProducts.length === 0 ? (
                 <p style={{ color: '#999', margin: '1rem 0' }}>No items match your search.</p>
               ) : isMobile ? (
-                // Square tiles, 3 per row, in a grid capped to roughly two
-                // rows (about 6 tiles) with its own internal scroll - no
+                // Square tiles, 2 per row, in a grid capped to roughly two
+                // rows (about 4 tiles) with its own internal scroll - no
                 // "show all" prompt needed, the rest of the catalogue is
                 // just a scroll away inside this same box, same as any
-                // normal scrollable list.
+                // normal scrollable list. Wider tiles than a 3-per-row grid
+                // would give, so names truncate less on a phone-width screen.
                 <div style={{
-                  display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem',
-                  maxHeight: '200px', overflowY: 'auto', paddingRight: '0.15rem',
+                  display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem',
+                  maxHeight: '300px', overflowY: 'auto', paddingRight: '0.15rem',
                 }}>
                   {filteredProducts.map(p => {
                     const qty = Number(quantities[p.id]) || 0

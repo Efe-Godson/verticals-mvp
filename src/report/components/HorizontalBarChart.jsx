@@ -48,8 +48,8 @@ function HorizontalBarChart({
         return () => window.removeEventListener("resize", resize)
     }, [])
 
-    const labelWidth = isMobile ? 85 : 110
-    const valueWidth = isMobile ? 60 : 80
+    const labelWidth = isMobile ? 115 : 110
+    const valueWidth = isMobile ? 55 : 80
     const barHeight = isMobile ? 24 : 20
     const gap = isMobile ? ".45rem" : ".7rem"
     const labelFont = isMobile ? ".78rem" : ".82rem"
