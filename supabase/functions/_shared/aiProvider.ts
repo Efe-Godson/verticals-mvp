@@ -6,13 +6,24 @@
 // (free-tier quota exhausted) or 503 (model overloaded/unavailable)
 // automatically retries the same prompt against OpenRouter's hosted Llama
 // instead of just failing the request outright. Only those two statuses
-// trigger the fallback: a real prompt/parsing error would fail the same way
-// on the second provider too, so there's nothing to gain retrying those,
-// just double the latency on a request that was never going to succeed.
+// trigger the Gemini->OpenRouter fallback: a real prompt/parsing error would
+// fail the same way on the second provider too, so there's nothing to gain
+// retrying those, just double the latency on a request that was never going
+// to succeed. If OpenRouter *also* fails - for any reason, not just 429/503,
+// since by this point it's the last resort before giving up entirely - Vercel
+// AI Gateway is tried as a third tier. It's opt-in: with no
+// AI_GATEWAY_API_KEY secret set, this whole tier is skipped and the
+// OpenRouter error surfaces as before.
 const GEMINI_MODEL = 'gemini-flash-latest'
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
 const OPENROUTER_MODEL = 'meta-llama/llama-3.3-70b-instruct'
+// Model catalogue is account/plan-specific and changes over time - confirm
+// this is still valid via `GET https://ai-gateway.vercel.sh/v1/models`
+// (with your AI_GATEWAY_API_KEY) or the Playground/Model List pages in the
+// Vercel dashboard before relying on it, and swap it there if not.
+const GATEWAY_URL = 'https://ai-gateway.vercel.sh/v1/chat/completions'
+const GATEWAY_MODEL = 'openai/gpt-5.4'
 
 async function callGemini(prompt: string, jsonSchema?: object) {
   const res = await fetch(`${GEMINI_URL}?key=${Deno.env.get('GEMINI_API_KEY')}`, {
@@ -68,6 +79,30 @@ async function callOpenRouter(prompt: string, jsonSchema?: object) {
   return text
 }
 
+// OpenAI-compatible Chat Completions endpoint - same request/response shape
+// as callOpenRouter, just a different base URL/model and (for structured
+// output) OpenAI's json_schema response_format instead of prompt-embedding
+// the schema, since the Gateway supports it natively.
+async function callVercelGateway(prompt: string, jsonSchema?: object) {
+  const apiKey = Deno.env.get('AI_GATEWAY_API_KEY')
+  if (!apiKey) throw new Error('Gemini and OpenRouter both failed, and AI_GATEWAY_API_KEY is not set, so there is no further fallback available right now.')
+
+  const res = await fetch(GATEWAY_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model: GATEWAY_MODEL,
+      messages: [{ role: 'user', content: prompt }],
+      ...(jsonSchema ? { response_format: { type: 'json_schema', json_schema: { name: 'response', schema: jsonSchema } } } : {}),
+    }),
+  })
+  if (!res.ok) throw new Error(`Vercel AI Gateway error: ${res.status} ${await res.text()}`)
+  const data = await res.json()
+  const text = data.choices?.[0]?.message?.content
+  if (!text) throw new Error('No content returned from Vercel AI Gateway')
+  return text
+}
+
 // jsonSchema: pass the Gemini responseSchema object for structured output -
 // used for Gemini's own strict decoding, and doubles as the signal to ask
 // OpenRouter for JSON mode on fallback. Omit for a plain free-text answer
@@ -75,9 +110,13 @@ async function callOpenRouter(prompt: string, jsonSchema?: object) {
 export async function generateText(prompt: string, jsonSchema?: object) {
   try {
     return await callGemini(prompt, jsonSchema)
-  } catch (err) {
-    const status = (err as Error & { status?: number }).status
-    if (status !== 429 && status !== 503) throw err
-    return await callOpenRouter(prompt, jsonSchema)
+  } catch (geminiErr) {
+    const status = (geminiErr as Error & { status?: number }).status
+    if (status !== 429 && status !== 503) throw geminiErr
+    try {
+      return await callOpenRouter(prompt, jsonSchema)
+    } catch {
+      return await callVercelGateway(prompt, jsonSchema)
+    }
   }
 }

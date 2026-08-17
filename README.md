@@ -62,6 +62,8 @@ Both functions need a `GEMINI_API_KEY` secret:
 supabase secrets set GEMINI_API_KEY=your_key
 ```
 
+Optionally, `OPENROUTER_API_KEY` and `AI_GATEWAY_API_KEY` add a second and third fallback tier if Gemini (then OpenRouter) is rate-limited or unavailable — see `_shared/aiProvider.ts`. Neither is required; without them, that tier is just skipped.
+
 `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected automatically into every Edge Function — no need to set them yourself.
 
 ## Deployment
