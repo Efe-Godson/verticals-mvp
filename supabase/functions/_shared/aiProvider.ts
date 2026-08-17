@@ -17,7 +17,11 @@
 const GEMINI_MODEL = 'gemini-flash-latest'
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
-const OPENROUTER_MODEL = 'meta-llama/llama-3.3-70b-instruct'
+// The ":free" suffix matters - without it this is OpenRouter's paid Llama
+// ($0.10 / $0.32 per 1M tokens), not the free tier this fallback is meant
+// to be. Free-tier rate limits are tighter, which is exactly why the Gateway
+// tier below exists - to catch requests this one can't serve right now.
+const OPENROUTER_MODEL = 'meta-llama/llama-3.3-70b-instruct:free'
 // Model catalogue is account/plan-specific and changes over time - confirm
 // this is still valid via `GET https://ai-gateway.vercel.sh/v1/models`
 // (with your AI_GATEWAY_API_KEY) or the Playground/Model List pages in the
