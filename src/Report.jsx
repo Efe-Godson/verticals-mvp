@@ -1,6 +1,6 @@
 // Place at: src/Report.jsx
 import { useState, useEffect, useRef } from 'react'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
 import PosSidePanel from './PosSidePanel'
@@ -11,6 +11,10 @@ import CartReport from './report/analysis/Cartreport'
 import CartCategoryChart from './report/analysis/components/CartCategoryChart'
 import CrossAnalysis from './report/analysis/CrossAnalysis'
 import AIRecommendationsModal from './report/ai/AIRecommendationsModal'
+import HorizontalBarChart from './report/components/HorizontalBarChart'
+import PieChart from './report/components/PieChart'
+import PivotTable from './report/components/PivotTable'
+import { getGroupableFields, getMeasureOptions, computePivot, toChartData } from './report/helpers/pivotEngine'
 import { formatNaira, median } from './report/helpers/analysisUtils'
 import { DATE_RANGE_OPTIONS, getDateRangeBounds, getDateRangeLabel } from './report/helpers/dateRange'
 import { LoadingState } from './LoadingState'
@@ -74,6 +78,7 @@ function isChannelField(field) {
 
 function Report() {
   const { id } = useParams()
+  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const isFocusMode = searchParams.get('focus') === '1'
   const { staffFormId } = useAuth()
@@ -332,6 +337,18 @@ function Report() {
                 >
                   + Add Metric
                 </button>
+                {!isStaffView && (
+                  <>
+                    <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.3rem 0' }} />
+                    <button
+                      className="secondary"
+                      onClick={() => { navigate(`/form/${id}/report/builder`); setOptionsMenuOpen(false) }}
+                      style={{ display: 'block', width: '100%', textAlign: 'left', border: 'none', background: 'transparent', padding: '0.45rem 0.3rem', fontSize: '0.85rem' }}
+                    >
+                      Report Builder
+                    </button>
+                  </>
+                )}
               </div>
             </>
           )}
@@ -422,6 +439,19 @@ function Report() {
           <div id="report-cross-analysis" style={{ marginTop: '2rem' }}>
             <CrossAnalysis fields={crossAnalysisFields} cartFields={cartFields} submissions={filteredSubmissions} />
           </div>
+
+          {(form.settings?.reportWidgets || []).length > 0 && (
+            <div id="report-custom" style={{ marginTop: '2rem' }}>
+              {form.settings.reportWidgets.map(widget => (
+                <div key={widget.id} className="card" style={{ padding: '1.75rem', marginBottom: '1.2rem' }}>
+                  <div style={{ fontSize: '1.15rem', fontWeight: 800, marginBottom: '0.9rem' }}>
+                    {widget.title}
+                  </div>
+                  <CustomReportWidget form={form} widget={widget} submissions={filteredSubmissions} />
+                </div>
+              ))}
+            </div>
+          )}
         </>
       )}
 
@@ -435,6 +465,31 @@ function Report() {
       )}
     </div>
   )
+}
+
+// Renders one promoted Report Builder widget (see ReportBuilder.jsx, which
+// writes these into form.settings.reportWidgets - same computePivot engine
+// it uses for its own live preview, so a promoted widget looks identical to
+// what was previewed there). Fields referenced by a widget can be deleted
+// from the form later (EditForm.jsx), so this resolves them defensively
+// rather than assuming they still exist.
+function CustomReportWidget({ form, widget, submissions }) {
+  const groupableFields = getGroupableFields(form)
+  const measureOptions = getMeasureOptions(form)
+  const rowField = groupableFields.find(f => f.id === widget.rowFieldId)
+  const colField = widget.colFieldId ? groupableFields.find(f => f.id === widget.colFieldId) : null
+  const measure = measureOptions.find(m => m.id === widget.measureId)
+
+  if (!rowField || !measure) {
+    return <p style={{ color: 'var(--color-muted)' }}>One of this report's fields was removed from the form - edit or remove it in the Report Builder.</p>
+  }
+
+  const pivotResult = computePivot({ rowField, colField, measure, submissions })
+  const formatValue = measure.kind === 'cartRevenue' ? formatNaira : (v) => v.toLocaleString()
+
+  if (widget.chartType === 'table' || colField) return <PivotTable pivotResult={pivotResult} formatValue={formatValue} />
+  if (widget.chartType === 'pie') return <PieChart data={toChartData(pivotResult)} />
+  return <HorizontalBarChart data={toChartData(pivotResult)} formatValue={formatValue} />
 }
 
 function OverviewCard({ form, submissions }) {

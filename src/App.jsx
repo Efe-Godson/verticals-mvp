@@ -15,6 +15,7 @@ import Records from './Records'
 import Inventory from './Inventory'
 import ShortLinkRedirect from './ShortLinkRedirect'
 import Report from './Report'
+import ReportBuilder from './ReportBuilder'
 import AIAnalystPage from './AIAnalystPage'
 import FormSettings from './FormSettings'
 import AdminStaff from './AdminStaff'
@@ -136,6 +137,10 @@ function AppShell() {
         <Route path="/form/:id/records" element={<PrivateRoute><StaffScopedRoute><Records /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/form/:id/inventory" element={<PrivateRoute><StaffScopedRoute><Inventory /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/form/:id/report" element={<PrivateRoute><StaffScopedRoute><Report /></StaffScopedRoute></PrivateRoute>} />
+        {/* Deliberately NOT added to StaffScopedRoute's allowed-paths regex above -
+            staff navigating here directly get bounced back to their order screen,
+            same as /settings and /admin do today, so this stays owner-only. */}
+        <Route path="/form/:id/report/builder" element={<PrivateRoute><StaffScopedRoute><ReportBuilder /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/form/:id/ai-analyst" element={<PrivateRoute><StaffScopedRoute><AIAnalystPage /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/form/:id/settings" element={<PrivateRoute><StaffScopedRoute><FormSettings /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/form/:id/admin" element={<PrivateRoute><StaffScopedRoute><AdminStaff /></StaffScopedRoute></PrivateRoute>} />
