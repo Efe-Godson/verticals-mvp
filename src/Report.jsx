@@ -92,7 +92,6 @@ function Report() {
   const [customStart, setCustomStart] = useState('')
   const [customEnd, setCustomEnd] = useState('')
   const [optionsMenuOpen, setOptionsMenuOpen] = useState(false)
-  const [includeDelivery, setIncludeDelivery] = useState(true)
   const [moreMenuOpen, setMoreMenuOpen] = useState(false)
   const [showAIPanel, setShowAIPanel] = useState(false)
   const reportContentRef = useRef(null)
@@ -271,27 +270,6 @@ function Report() {
         </div>
 
         <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          {form.fields.some(f => f.type === 'cart') && (
-            <div style={{ display: 'flex', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
-              <button
-                type="button"
-                className={includeDelivery ? '' : 'secondary'}
-                onClick={() => setIncludeDelivery(true)}
-                style={{ borderRadius: 0, border: 'none', padding: '0.5rem 0.8rem', fontSize: '0.85rem' }}
-              >
-                With Delivery
-              </button>
-              <button
-                type="button"
-                className={!includeDelivery ? '' : 'secondary'}
-                onClick={() => setIncludeDelivery(false)}
-                style={{ borderRadius: 0, border: 'none', padding: '0.5rem 0.8rem', fontSize: '0.85rem' }}
-              >
-                Without Delivery
-              </button>
-            </div>
-          )}
-
           <div style={{ position: 'relative', flexShrink: 0 }}>
           <button className="secondary" onClick={() => setOptionsMenuOpen(!optionsMenuOpen)}>
             Options ▾
@@ -365,7 +343,7 @@ function Report() {
       ) : (
         <>
           <div id="report-overview">
-            <OverviewCard form={form} submissions={filteredSubmissions} includeDelivery={includeDelivery} />
+            <OverviewCard form={form} submissions={filteredSubmissions} />
           </div>
 
           <div id="report-performance" style={{ marginTop: '2rem' }}>
@@ -374,7 +352,6 @@ function Report() {
               submissions={filteredSubmissions}
               previousSubmissions={previousFilteredSubmissions}
               totalResponses={totalResponses}
-              includeDelivery={includeDelivery}
               moreMenuOpen={moreMenuOpen}
               setMoreMenuOpen={setMoreMenuOpen}
             />
@@ -453,7 +430,7 @@ function Report() {
   )
 }
 
-function OverviewCard({ form, submissions, includeDelivery = true }) {
+function OverviewCard({ form, submissions }) {
   const cartFields = form.fields.filter(f => f.type === 'cart')
   let totalRevenue = 0
   let hasCartData = false
@@ -463,14 +440,14 @@ function OverviewCard({ form, submissions, includeDelivery = true }) {
       const v = s.data[field.id]
       if (v && v.items && v.items.length > 0) {
         hasCartData = true
-        totalRevenue += v.total + (includeDelivery ? (v.deliveryFee || 0) : 0)
+        totalRevenue += v.total + (v.deliveryFee || 0)
       }
     })
   })
 
   const totalResponses = submissions.length
   // Keep this concise: a briefing, not a list of everything the data could say.
-  const insights = computeInsights(form, submissions, includeDelivery).slice(0, 6)
+  const insights = computeInsights(form, submissions).slice(0, 6)
 
   return (
     <div className="card" style={{ padding: '1.5rem', marginBottom: '1.2rem', background: 'linear-gradient(135deg, var(--color-surface) 0%, var(--color-primary-soft) 100%)' }}>
@@ -514,7 +491,7 @@ function OverviewCard({ form, submissions, includeDelivery = true }) {
 // Aggregates the numbers a trend comparison needs from a set of submissions,
 // shared between the current and previous period so the two are computed
 // identically.
-function computeCartTotals(cartFields, submissions, includeDelivery = true) {
+function computeCartTotals(cartFields, submissions) {
   let totalRevenue = 0
   let totalOrders = 0
   let totalItems = 0
@@ -524,7 +501,7 @@ function computeCartTotals(cartFields, submissions, includeDelivery = true) {
     submissions.forEach(s => {
       const v = s.data[field.id]
       if (v && v.items && v.items.length > 0) {
-        const grandTotal = v.total + (includeDelivery ? (v.deliveryFee || 0) : 0)
+        const grandTotal = v.total + (v.deliveryFee || 0)
         totalRevenue += grandTotal
         totalOrders += 1
         orderTotals.push(grandTotal)
@@ -544,7 +521,7 @@ function computeTrend(current, previous) {
   return { direction: current >= previous ? 'up' : 'down', percent }
 }
 
-function KPIGrid({ form, submissions, previousSubmissions = [], totalResponses, includeDelivery = true, moreMenuOpen, setMoreMenuOpen }) {
+function KPIGrid({ form, submissions, previousSubmissions = [], totalResponses, moreMenuOpen, setMoreMenuOpen }) {
   const [selectedMore, setSelectedMore] = useState([])
   const [metricSearch, setMetricSearch] = useState('')
   const cartFields = form.fields.filter(f => f.type === 'cart')
@@ -561,8 +538,8 @@ function KPIGrid({ form, submissions, previousSubmissions = [], totalResponses, 
   const moreKpis = []
 
   // ---- Cart / revenue metrics ----
-  const { totalRevenue, totalOrders, totalItems, orderTotals } = computeCartTotals(cartFields, submissions, includeDelivery)
-  const previousCart = hasPreviousPeriod ? computeCartTotals(cartFields, previousSubmissions, includeDelivery) : null
+  const { totalRevenue, totalOrders, totalItems, orderTotals } = computeCartTotals(cartFields, submissions)
+  const previousCart = hasPreviousPeriod ? computeCartTotals(cartFields, previousSubmissions) : null
   const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0
 
   if (cartFields.length > 0) {
@@ -740,7 +717,7 @@ function KPIGrid({ form, submissions, previousSubmissions = [], totalResponses, 
   )
 }
 
-function computeInsights(form, submissions, includeDelivery = true) {
+function computeInsights(form, submissions) {
   const insights = []
   // Dynamic on purpose: aggregates across every cart field on the form, not
   // just the first one, a form can use the cart feature more than once.
@@ -759,7 +736,7 @@ function computeInsights(form, submissions, includeDelivery = true) {
         const v = s.data[cartField.id]
         if (!v || !v.items || v.items.length === 0) return
         hasCartData = true
-        const grandTotal = v.total + (includeDelivery ? (v.deliveryFee || 0) : 0)
+        const grandTotal = v.total + (v.deliveryFee || 0)
         totalRevenue += grandTotal
         v.items.forEach(item => {
           itemQty[item.name] = (itemQty[item.name] || 0) + item.quantity

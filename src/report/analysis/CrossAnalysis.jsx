@@ -82,7 +82,7 @@ function getMeasureValue(sub, field) {
     const v = sub.data[field.cartFieldId]
     if (!v || !v.items || v.items.length === 0) return NaN
     return field.measure === 'revenue'
-      ? v.total
+      ? v.total + (v.deliveryFee || 0)
       : v.items.reduce((sum, item) => sum + item.quantity, 0)
   }
   return Number(sub.data[field.id])

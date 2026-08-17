@@ -110,7 +110,7 @@ function buildFieldSectionHtml(field, submissions, totalResponses) {
     if (answered.length === 0) {
       bodyHtml = '<p class="muted">No orders yet.</p>'
     } else {
-      const totals = answered.map(s => s.data[field.id].total)
+      const totals = answered.map(s => s.data[field.id].total + (s.data[field.id].deliveryFee || 0))
       const totalRevenue = totals.reduce((a, b) => a + b, 0)
       const avgOrder = totalRevenue / totals.length
 

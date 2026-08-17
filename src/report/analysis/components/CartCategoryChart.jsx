@@ -11,10 +11,11 @@ function CartCategoryChart({ categoryField, cartField, submissions }) {
   submissions.forEach(sub => {
     const cartVal = sub.data[cartField.id]
     if (!cartVal || !cartVal.items || cartVal.items.length === 0) return
-    totalRevenue += cartVal.total
+    const grandTotal = cartVal.total + (cartVal.deliveryFee || 0)
+    totalRevenue += grandTotal
 
     getFieldValues(sub, categoryField).forEach(val => {
-      groups[val] = (groups[val] || 0) + cartVal.total
+      groups[val] = (groups[val] || 0) + grandTotal
     })
   })
 
