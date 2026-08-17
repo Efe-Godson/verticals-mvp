@@ -4,12 +4,25 @@
 // coordinates (fixed positioning) rather than a library, these charts are
 // simple enough not to need a portal/collision engine.
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+
+// Touch devices synthesize a "mouseenter" from a tap but never send the
+// matching "mouseleave" (there's no pointer to leave with), so a
+// hover-triggered tooltip just gets stuck on screen, fixed-positioned,
+// riding along as the page scrolls - the bar/column it describes is
+// already labeled with its value directly, so hover is a pure desktop
+// nicety, not something worth losing on touch. Gating on `(hover: hover)`
+// (true for mice/trackpads, false for touchscreens) skips it there instead
+// of trying to patch touch semantics onto a hover-only interaction.
+function supportsHover() {
+  return typeof window !== 'undefined' && window.matchMedia?.('(hover: hover)').matches
+}
 
 export function useChartTooltip() {
   const [tooltip, setTooltip] = useState(null) // { x, y, label, value }
 
   const showTooltip = useCallback((e, label, value) => {
+    if (!supportsHover()) return
     setTooltip({ x: e.clientX, y: e.clientY, label, value })
   }, [])
 
@@ -18,6 +31,14 @@ export function useChartTooltip() {
   }, [])
 
   const hideTooltip = useCallback(() => setTooltip(null), [])
+
+  // Belt-and-suspenders for hybrid devices (touchscreen laptops, etc.) that
+  // do report hover support: a stuck tooltip should never survive a scroll.
+  useEffect(() => {
+    if (!tooltip) return
+    window.addEventListener('scroll', hideTooltip, { capture: true, passive: true })
+    return () => window.removeEventListener('scroll', hideTooltip, { capture: true })
+  }, [tooltip, hideTooltip])
 
   return { tooltip, showTooltip, moveTooltip, hideTooltip }
 }
