@@ -34,6 +34,7 @@ import Templates from './Templates'
 import AccountPage from './AccountPage'
 import NavBar from './NavBar'
 import { LoadingState } from './LoadingState'
+import OfflineBanner from './OfflineBanner'
 
 function PrivateRoute({ children }) {
   const { session, loading } = useAuth()
@@ -98,6 +99,7 @@ function AppShell() {
 
   return (
     <>
+      <OfflineBanner />
       {!isPublicForm && !isShortLink && !isQuizPlayer && !isLogin && !isSignUp && !isConfirmEmail && !isResetPassword && !isFocusMode && <NavBar />}
       <Routes>
         <Route path="/s/:code" element={<ShortLinkRedirect />} />
