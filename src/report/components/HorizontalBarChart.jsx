@@ -168,18 +168,29 @@ function HorizontalBarChart({
                             style={{
                                 width: "100%",
                                 maxWidth: isMobile ? "44px" : "56px",
-                                height: `${Math.max(
-                                    (d.count / maxValue) *
-                                        (isMobile ? 120 : 150),
-                                    4
-                                )}px`,
-                                background: "var(--chart-series-1)",
+                                height: isMobile ? "120px" : "150px",
+                                background: "var(--color-primary-soft)",
                                 borderRadius: "5px 5px 0 0",
+                                display: "flex",
+                                alignItems: "flex-end",
                                 opacity: hovered === null || hovered === d.label ? 1 : 0.55,
                                 transition: "opacity .12s ease",
                                 cursor: "default",
                             }}
-                        />
+                        >
+                            <div
+                                style={{
+                                    width: "100%",
+                                    height: `${Math.max(
+                                        (d.count / maxValue) *
+                                            (isMobile ? 120 : 150),
+                                        4
+                                    )}px`,
+                                    background: "var(--color-primary)",
+                                    borderRadius: "5px 5px 0 0",
+                                }}
+                            />
+                        </div>
 
                         <div
                             title={d.label}
@@ -262,7 +273,7 @@ function HorizontalBarChart({
                             style={{
                                 flex: 1,
                                 height: barHeight,
-                                background: "var(--color-bg)",
+                                background: "var(--color-primary-soft)",
                                 borderRadius: "6px",
                                 overflow: "hidden",
                                 cursor: "default",
@@ -276,7 +287,7 @@ function HorizontalBarChart({
                                         2
                                     )}%`,
                                     height: "100%",
-                                    background: "var(--chart-series-1)",
+                                    background: "var(--color-primary)",
                                     borderRadius: "6px",
                                     opacity: hovered === null || hovered === d.label ? 1 : 0.55,
                                     transition: "opacity .12s ease",
