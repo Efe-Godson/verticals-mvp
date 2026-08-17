@@ -201,10 +201,13 @@ function Report() {
   }
 
   return (
-    <div className="page" style={{ maxWidth: '960px', ...(isFocusMode ? { paddingTop: '4rem' } : {}) }} ref={reportContentRef}>
-      {/* Reserves room for PosSidePanel's fixed top-left hamburger so it
-          doesn't paint over the title below - see the same fix in
-          PublicForm.jsx/Records.jsx. */}
+    <div className="page" style={{ maxWidth: '960px', ...(isFocusMode ? { paddingTop: '4rem', paddingLeft: '4rem' } : {}) }} ref={reportContentRef}>
+      {/* Reserves room for PosSidePanel's fixed top-left hamburger - top
+          padding clears the page title, and since the button stays pinned to
+          the same screen corner while the page scrolls underneath it, left
+          padding is needed too so it doesn't clip whichever card heading
+          later scrolls under that same spot (see the same fix in
+          PublicForm.jsx/Records.jsx). */}
       {isFocusMode && <PosSidePanel formId={form.id} hasCartField={cartFields.length > 0} />}
       <style>{`
         .kpi-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.8rem; }
