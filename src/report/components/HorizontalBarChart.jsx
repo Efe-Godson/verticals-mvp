@@ -48,8 +48,13 @@ function HorizontalBarChart({
         return () => window.removeEventListener("resize", resize)
     }, [])
 
-    const labelWidth = isMobile ? 115 : 110
-    const valueWidth = isMobile ? 55 : 80
+    // A fixed px label width either wastes space or truncates too hard
+    // depending on how much room the row actually has (e.g. a focus-mode
+    // page vs a normal one), and that available width isn't knowable here -
+    // a percentage of the row claims more room wherever there's more to
+    // give instead of needing hand-tuning per context.
+    const labelWidth = isMobile ? "44%" : 110
+    const valueWidth = isMobile ? 58 : 80
     const barHeight = isMobile ? 24 : 20
     const gap = isMobile ? ".45rem" : ".7rem"
     const labelFont = isMobile ? ".78rem" : ".82rem"
