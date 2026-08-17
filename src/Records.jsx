@@ -552,7 +552,7 @@ function Records() {
   }
 
   return (
-    <div className="page" style={isFocusMode ? { paddingTop: '4rem', paddingLeft: '4rem' } : undefined}>
+    <div className="page" style={isFocusMode ? { paddingTop: '4rem' } : undefined}>
       <style>{`
         @keyframes fadeInOut {
           0% { opacity: 0; transform: translateY(4px); }
@@ -631,12 +631,13 @@ function Records() {
       `}</style>
       {/* PosSidePanel's hamburger is position:fixed at top:1rem/left:1rem,
           42px square - reserve room above the title so it doesn't paint on
-          top of the first few characters of the form name, and to the left
-          too since the button stays pinned to that screen corner as the
-          page scrolls, so it'd otherwise clip whatever heading later
-          scrolls under it (see the same fix in PublicForm.jsx). Only
-          rendered/needed in focus mode, the same condition PosSidePanel
-          itself renders under below. */}
+          top of the first few characters of the form name (see the same
+          fix in PublicForm.jsx). A permanent left-padding reserve too (so a
+          scrolled-past heading couldn't get clipped either) cost enough
+          width on a narrow phone to clip real content on the right edge
+          instead - worse than the momentary letter overlap it fixed, so
+          just the top reserve stays. Only rendered/needed in focus mode,
+          the same condition PosSidePanel itself renders under below. */}
       {isFocusMode && <PosSidePanel formId={form.id} hasCartField={hasCartField} />}
       <h1 style={{ margin: 0 }}>{form.name}</h1>
 

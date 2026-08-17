@@ -2015,12 +2015,13 @@ function PublicForm() {
       // left:1rem, 42px square - with no reserved space it sits directly on
       // top of the title below (the button is a later paint layer, so it
       // wins visually and clips the first few characters of the form name).
-      // Left padding matters too, not just top: the button stays pinned to
-      // that same screen corner as the page scrolls, so without it the
-      // button would clip whatever heading/section later scrolls under that
-      // spot, not just the title. Only needed when the panel actually
-      // renders (a saved-response edit link, `token`, skips it entirely).
-      ...(!token ? { paddingTop: '4rem', paddingLeft: '4rem' } : {}),
+      // A permanent left-padding reserve too (so a scrolled-past
+      // heading/section couldn't get clipped either) cost enough width on a
+      // narrow phone to clip real content on the right edge instead - worse
+      // than the momentary letter overlap it fixed, so just the top reserve
+      // stays. Only needed when the panel actually renders (a saved-response
+      // edit link, `token`, skips it entirely).
+      ...(!token ? { paddingTop: '4rem' } : {}),
       ...(cartDefersCheckout ? { paddingBottom: 'calc(7.5rem + env(safe-area-inset-bottom))' } : {}),
     }}>
       {!token && (

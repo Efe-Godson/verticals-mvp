@@ -201,13 +201,17 @@ function Report() {
   }
 
   return (
-    <div className="page" style={{ maxWidth: '960px', ...(isFocusMode ? { paddingTop: '4rem', paddingLeft: '4rem' } : {}) }} ref={reportContentRef}>
-      {/* Reserves room for PosSidePanel's fixed top-left hamburger - top
-          padding clears the page title, and since the button stays pinned to
-          the same screen corner while the page scrolls underneath it, left
-          padding is needed too so it doesn't clip whichever card heading
-          later scrolls under that same spot (see the same fix in
-          PublicForm.jsx/Records.jsx). */}
+    <div className="page" style={{ maxWidth: '960px', ...(isFocusMode ? { paddingTop: '4rem' } : {}) }} ref={reportContentRef}>
+      {/* Reserves room for PosSidePanel's fixed top-left hamburger so it
+          doesn't paint over the page title - see the same fix in
+          PublicForm.jsx/Records.jsx. A matching permanent left-padding
+          reserve was tried too (so a scrolled-past card heading couldn't get
+          clipped either), but on a narrow phone that ~4rem reserve ate
+          enough width to start clipping real content on the right edge
+          instead (e.g. a revenue figure) - a worse bug than the one it
+          fixed. A momentary, partial letter overlap while scrolling past a
+          floating button is normal FAB behavior (see Gmail/WhatsApp etc.),
+          not worth trading real content width for. */}
       {isFocusMode && <PosSidePanel formId={form.id} hasCartField={cartFields.length > 0} />}
       <style>{`
         .kpi-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.8rem; }
