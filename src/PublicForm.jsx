@@ -1251,13 +1251,34 @@ function PublicForm() {
           {/* Catalogue box - search + categories stay pinned while the menu below scrolls */}
           <div className="card" style={{ padding: 0, background: 'var(--color-primary-soft)', maxHeight: '70vh', overflowY: 'auto' }}>
             <div style={{ position: 'sticky', top: 0, zIndex: 5, background: 'var(--color-primary-soft)', padding: '1rem 1rem 0' }}>
-              <input
-                type="text"
-                value={cartSearch[field.id] || ''}
-                onChange={(e) => setCartSearchText(field.id, e.target.value)}
-                placeholder="Search menu..."
-                style={{ width: '100%', padding: '0.6rem', marginBottom: '0.7rem' }}
-              />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.7rem' }}>
+                <input
+                  type="text"
+                  value={cartSearch[field.id] || ''}
+                  onChange={(e) => setCartSearchText(field.id, e.target.value)}
+                  placeholder="Search menu..."
+                  style={{ flex: 1, padding: '0.6rem' }}
+                />
+                {/* Retail only - moved down here from the page header so it
+                    sits at the edge of the row it actually acts on, instead
+                    of floating alone up top. See the header block above for
+                    the rest of the AI-fill gating (session/token/etc). */}
+                {isRetail && hasCartOnPage && session && !token && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAiFill(true)}
+                    aria-label="Fill from Text"
+                    title="Fill from Text"
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      width: '38px', height: '38px', padding: 0, flexShrink: 0,
+                      background: 'transparent', border: 'none', color: 'var(--color-primary)',
+                    }}
+                  >
+                    <SparkleIcon size={22} />
+                  </button>
+                )}
+              </div>
 
               {categories.length > 1 && (
                 <div
@@ -2021,8 +2042,16 @@ function PublicForm() {
   // for the "primary" and "more details" groups separately on a
   // deferCheckout form, instead of one flat .map() over every field.
   function renderFieldRow(field) {
+    // Matches the Current Order/Catalogue boxes' pale-green shade above,
+    // instead of these fields being the only plain-white cards on the
+    // page - deferCheckout only (Retail's inline "cart + fields + one
+    // Submit" flow), not a cart-less form's fields, which have no matching
+    // shaded boxes elsewhere on their page to stay consistent with.
+    const fieldCardStyle = field.type === 'cart'
+      ? { marginBottom: '1rem' }
+      : { padding: '1rem', marginBottom: '1rem', ...(cartDefersCheckout ? { background: 'var(--color-primary-soft)' } : {}) }
     return (
-      <div key={field.id} className={field.type === 'cart' ? '' : 'card'} style={field.type === 'cart' ? { marginBottom: '1rem' } : { padding: '1rem', marginBottom: '1rem' }}>
+      <div key={field.id} className={field.type === 'cart' ? '' : 'card'} style={fieldCardStyle}>
         {field.type !== 'cart' && (
           <label style={{ fontWeight: '600' }}>
             {field.label}{field.required && <span style={{ color: '#c0392b' }}> *</span>}
@@ -2063,7 +2092,11 @@ function PublicForm() {
 
       <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.6rem', flexWrap: 'wrap' }}>
         <div>
-          <h1 style={{ margin: 0 }}>{form.name}</h1>
+          {/* Retail-only: the form name is redundant chrome on a phone
+              screen - the hamburger/back buttons already establish where
+              you are, and cutting it saves real vertical space above the
+              catalogue. Restaurant (and anything else) keeps it. */}
+          {!isRetail && <h1 style={{ margin: 0 }}>{form.name}</h1>}
           {form.description && <p style={{ margin: '0.3rem 0 0' }}>{form.description}</p>}
         </div>
         {/* Staff/owner convenience only (session gated) - a customer filling
@@ -2075,8 +2108,10 @@ function PublicForm() {
             SparkleIcon + solid-button styling as ProductManager's "Use AI to
             add new products" - keep new AI entry points matching this.
             Restaurant doesn't get this at all (see lib/templateFlags.js) -
-            back to exactly how it worked before AI fill existed. */}
-        {hasCartOnPage && session && !token && !isRestaurantTemplate(form) && (
+            back to exactly how it worked before AI fill existed. Retail
+            moves this button down next to the search bar instead of
+            showing it up here - see the catalogue's search row below. */}
+        {hasCartOnPage && session && !token && !isRestaurantTemplate(form) && !isRetail && (
           <button
             type="button"
             onClick={() => setShowAiFill(true)}

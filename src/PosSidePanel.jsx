@@ -166,12 +166,12 @@ function PosSidePanel({ formId, hasCartField = false }) {
           title={exitLink.label}
           style={{
             position: 'fixed', top: '1rem', right: '1rem', zIndex: 150,
-            width: '38px', height: '38px', borderRadius: '8px',
-            background: 'var(--color-primary)', color: 'white',
+            width: '38px', height: '38px', background: 'transparent', border: 'none',
+            color: 'var(--color-primary)',
             display: open ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center',
           }}
         >
-          <ArrowLeftIcon size={18} />
+          <ArrowLeftIcon size={26} />
         </Link>
       )}
 
