@@ -86,7 +86,8 @@ function Records() {
       // the account has already customized column visibility before.
       const isCartForm = formData.fields.some(f => f.type === 'cart')
       const defaultHidden = isCartForm ? ['__orderId', '__lastUpdate', '__ip', '__submissionId'] : []
-      setHiddenFieldIds(formData.settings?.hiddenColumns ?? defaultHidden)
+      const hasCustomizedColumns = formData.settings?.hiddenColumns != null
+      setHiddenFieldIds(hasCustomizedColumns ? formData.settings.hiddenColumns : defaultHidden)
       // A POS/order form (Restaurant, Retail, ...) is almost always opened
       // to check today's sales, not the full history - other form types
       // (surveys, registrations, ...) keep the "All time" default.
@@ -103,6 +104,44 @@ function Records() {
         return
       }
       setSubmissions(subsData)
+
+      // Auto-hide columns that are ~90%+ empty across every record - a
+      // one-time suggested default, not something recomputed on every load
+      // (a column's fill rate shifts as more records come in, and silently
+      // hiding/reappearing columns on their own would be confusing). Only
+      // runs the first time this form is opened, before the account has
+      // ever touched column visibility here; once it saves this as the
+      // starting point, any later Options > Columns change is what
+      // persists from then on, same as toggling one by hand.
+      if (!hasCustomizedColumns && subsData.length > 0) {
+        const sparseFieldIds = formData.fields
+          .filter(f => f.type !== 'section' && f.type !== 'cart')
+          .filter(f => {
+            const answered = subsData.filter(s => {
+              const v = s.data[f.id]
+              if (f.type === 'multiplechoicegrid' || f.type === 'checkboxgrid') return v && typeof v === 'object' && Object.keys(v).length > 0
+              if (f.type === 'checkbox') return Array.isArray(v) && v.length > 0
+              return v !== undefined && v !== null && v.toString().trim() !== ''
+            })
+            return answered.length / subsData.length <= 0.1
+          })
+          .map(f => f.id)
+
+        if (sparseFieldIds.length > 0) {
+          const mergedHidden = [...new Set([...defaultHidden, ...sparseFieldIds])]
+          setHiddenFieldIds(mergedHidden)
+          const updatedSettings = { ...(formData.settings || {}), hiddenColumns: mergedHidden }
+          // Persisted so this becomes the account's actual saved preference
+          // from here on, not just a recomputed-every-visit guess - matches
+          // how a manual column toggle already saves via updateFormSettings.
+          // form state updated too so it doesn't sit stale on settings that
+          // just changed underneath it (formRef.current, read by that same
+          // updateFormSettings, would otherwise still point at the version
+          // from before this write).
+          await supabase.from('forms').update({ settings: updatedSettings }).eq('id', id)
+          setForm({ ...formData, settings: updatedSettings })
+        }
+      }
 
       const { count } = await supabase
         .from('submissions')
