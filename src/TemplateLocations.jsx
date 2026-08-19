@@ -4,7 +4,7 @@
 // "+ Add Location" for the next one. Reached from BusinessesHome.jsx's
 // grid, or from Templates.jsx's "Manage" once a template is already in use.
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
 import { useToast } from './Toast'
@@ -15,6 +15,7 @@ import { categoryColor, LocationIcon } from './templateVisuals'
 import { createLocationForm, locationDestination } from './locations'
 import { LoadingState } from './LoadingState'
 import { ErrorState } from './ErrorState'
+import { usePageTitle } from './PageTitleContext'
 
 function LocationTile({ location, color, onManage }) {
   return (
@@ -76,6 +77,8 @@ function TemplateLocations() {
   const [locations, setLocations] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+
+  usePageTitle(template?.name)
 
   const [showAddModal, setShowAddModal] = useState(false)
   const [locationNameInput, setLocationNameInput] = useState('')
@@ -240,10 +243,9 @@ function TemplateLocations() {
         .template-tile:active { transform: translateY(0); box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
       `}</style>
 
-      <Link to="/" style={{ fontSize: '0.85rem', color: 'var(--color-primary)' }}>← All businesses</Link>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '0.5rem' }}>
         <div>
-          <h1 style={{ margin: '0.5rem 0 0.2rem' }}>{template.name}</h1>
+          <h1 style={{ margin: '0 0 0.2rem' }}>{template.name}</h1>
           <p style={{ color: 'var(--color-muted)', margin: 0 }}>
             {locations.length} location{locations.length !== 1 ? 's' : ''}
           </p>

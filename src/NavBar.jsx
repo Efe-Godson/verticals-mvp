@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
 import { useRecycleBinTrigger } from './RecycleBinContext'
+import { useCurrentPageTitle } from './PageTitleContext'
 import { TEMPLATE_ADMIN_USER_ID } from './adminAccount'
 
 function NavBar() {
@@ -12,8 +13,10 @@ function NavBar() {
   const [linkedMenuOpen, setLinkedMenuOpen] = useState(false)
   const [accountMenuOpen, setAccountMenuOpen] = useState(false)
   const [isPayrollForm, setIsPayrollForm] = useState(false)
+  const [formName, setFormName] = useState('')
   const [linkedForms, setLinkedForms] = useState([]) // sibling forms in the same bundle, excluding self
   const { trigger: binTrigger } = useRecycleBinTrigger()
+  const pageTitle = useCurrentPageTitle()
 
   // Edge-swipe-to-open, the same gesture iOS/Android drawers use: a touch
   // starting within EDGE_ZONE px of the left edge that moves right past
@@ -76,12 +79,13 @@ function NavBar() {
   // and this is otherwise the only way back to them.
   useEffect(() => {
     let cancelled = false
-    if (!id) { setIsPayrollForm(false); setLinkedForms([]); return }
+    if (!id) { setIsPayrollForm(false); setLinkedForms([]); setFormName(''); return }
 
     async function load() {
       const { data: current } = await supabase.from('forms').select('id, name, settings').eq('id', id).single()
       if (cancelled || !current) return
       setIsPayrollForm(current.settings?.payrollRole === 'employees')
+      setFormName(current.name)
 
       const groupPrimaryId = current.settings?.primaryFormId || current.id
       const [{ data: primary }, { data: siblings }] = await Promise.all([
@@ -102,6 +106,14 @@ function NavBar() {
   function linkColor(segment) {
     return location.pathname.includes(segment) ? 'var(--color-primary)' : 'var(--color-muted)'
   }
+
+  // The compact mobile bar shows what you're actually looking at (a
+  // business's name, a template's name) instead of just the app's own
+  // brand name whenever there's something more specific to show - falls
+  // back to "Verticals" on pages that never set one (Home, login, etc).
+  // Form context wins when both are set, since it's the more specific of
+  // the two (a form nested inside e.g. Templates' own registered title).
+  const mobileBrand = (isFormContext && formName) || pageTitle || 'Verticals'
 
   return (
     <div style={{ background: 'white', borderBottom: '1px solid var(--color-border)' }}>
@@ -248,7 +260,9 @@ function NavBar() {
           <span style={{ width: '17px', height: '2px', background: 'white', borderRadius: '1px' }} />
           <span style={{ width: '17px', height: '2px', background: 'white', borderRadius: '1px' }} />
         </button>
-        <Link to="/" style={{ fontWeight: 'bold', fontSize: '1rem' }}>Verticals</Link>
+        <Link to="/" style={{ fontWeight: 'bold', fontSize: '1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {mobileBrand}
+        </Link>
       </div>
 
       {menuOpen && (

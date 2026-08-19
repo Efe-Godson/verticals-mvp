@@ -7,6 +7,7 @@ import { TEMPLATE_ADMIN_USER_ID } from './adminAccount'
 import TemplateEditorDialog from './TemplateEditorDialog'
 import { categoryColor, CategoryIcon } from './templateVisuals'
 import { createLocationForm, locationDestination } from './locations'
+import { usePageTitle } from './PageTitleContext'
 
 function TemplatesSkeleton() {
   return (
@@ -65,6 +66,7 @@ function Templates() {
   const { session } = useAuth()
   const { showToast } = useToast()
   const navigate = useNavigate()
+  usePageTitle('Templates')
 
   const [templates, setTemplates] = useState([])
   const [loading, setLoading] = useState(true)

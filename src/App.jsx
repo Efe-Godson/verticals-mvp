@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './AuthContext'
 import { isFirstVisit } from './firstVisit'
 import { ToastProvider } from './Toast'
 import { RecycleBinProvider } from './RecycleBinContext'
+import { PageTitleProvider } from './PageTitleContext'
 import Home from './Home'
 import BusinessesHome from './BusinessesHome'
 import TemplateLocations from './TemplateLocations'
@@ -156,7 +157,9 @@ function App() {
     <AuthProvider>
       <ToastProvider>
         <RecycleBinProvider>
-          <AppShell />
+          <PageTitleProvider>
+            <AppShell />
+          </PageTitleProvider>
         </RecycleBinProvider>
       </ToastProvider>
     </AuthProvider>

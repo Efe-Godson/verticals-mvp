@@ -7,6 +7,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
 import { categoryColor, CategoryIcon } from './templateVisuals'
+import { usePageTitle } from './PageTitleContext'
 
 function ReportTile({ template, locationCount, onOpen }) {
   const color = categoryColor(template.category)
@@ -47,6 +48,7 @@ function ReportTile({ template, locationCount, onOpen }) {
 function Reports() {
   const { session } = useAuth()
   const navigate = useNavigate()
+  usePageTitle('Reports')
 
   const [usedTemplates, setUsedTemplates] = useState([]) // [{ template, locationCount, singleFormId, isBundle }]
   const [loading, setLoading] = useState(true)

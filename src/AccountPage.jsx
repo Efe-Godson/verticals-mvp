@@ -9,6 +9,7 @@ import StatTile from './report/components/StatTile'
 import PieChart from './report/components/PieChart'
 import HorizontalBarChart from './report/components/HorizontalBarChart'
 import { THEME_COLORS, saveThemeColor, applyThemeColor } from './theme'
+import { usePageTitle } from './PageTitleContext'
 
 const STATUS_LABEL = { draft: 'Draft', published: 'Live', paused: 'Paused', archived: 'Archived' }
 
@@ -38,6 +39,7 @@ function AccountPage() {
   const { session } = useAuth()
   const { showToast } = useToast()
   const navigate = useNavigate()
+  usePageTitle('Account')
 
   const user = session.user
   const provider = user.app_metadata?.provider || 'email'
