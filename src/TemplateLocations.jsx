@@ -3,7 +3,7 @@
 // own menu, own orders, own records) created from this template, plus
 // "+ Add Location" for the next one. Reached from BusinessesHome.jsx's
 // grid, or from Templates.jsx's "Manage" once a template is already in use.
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
@@ -18,11 +18,14 @@ import { ErrorState } from './ErrorState'
 import { usePageTitle } from './PageTitleContext'
 
 // Options menu (⋮) matches BusinessesHome.jsx's BusinessTile exactly, just
-// with a Duplicate action added alongside Delete - the old "Manage
+// with Duplicate/logo actions added alongside Delete - the old "Manage
 // Locations" modal (a single flat list with only Delete) is gone in favor
-// of putting both actions right on the card they act on.
-function LocationTile({ location, color, onManage, onDuplicate, onDelete }) {
+// of putting every action right on the card it acts on.
+function LocationTile({ location, color, uploading, onManage, onDuplicate, onDelete, onLogoChange, onLogoRemove }) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const fileInputRef = useRef(null)
+  const logoUrl = location.settings?.logoUrl
+
   return (
     <div
       className="template-tile"
@@ -36,6 +39,19 @@ function LocationTile({ location, color, onManage, onDuplicate, onDelete }) {
         justifyContent: 'center', gap: '0.5rem', padding: '0.9rem', textAlign: 'center', cursor: 'pointer'
       }}
     >
+      {/* PNG only: the accept attribute is a picker hint, not enforcement
+          (some OS pickers let you override it to "all files"), so the real
+          check happens on the selected file itself, see handleLogoChange. */}
+      <input
+        ref={fileInputRef} type="file" accept="image/png" style={{ display: 'none' }}
+        onClick={(e) => e.stopPropagation()}
+        onChange={(e) => {
+          const file = e.target.files[0]
+          e.target.value = ''
+          if (file) onLogoChange(file)
+        }}
+      />
+
       <div style={{ position: 'absolute', top: '0.4rem', right: '0.4rem' }} onClick={(e) => e.stopPropagation()}>
         <button
           type="button"
@@ -56,7 +72,7 @@ function LocationTile({ location, color, onManage, onDuplicate, onDelete }) {
             <div className="dropdown-panel" style={{
               position: 'absolute', top: '100%', right: 0, marginTop: '0.2rem',
               background: 'white', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 20, minWidth: '130px', overflow: 'hidden'
+              boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 20, minWidth: '150px', overflow: 'hidden'
             }}>
               <div
                 onClick={() => { setMenuOpen(false); onDuplicate() }}
@@ -64,6 +80,20 @@ function LocationTile({ location, color, onManage, onDuplicate, onDelete }) {
               >
                 Duplicate
               </div>
+              <div
+                onClick={() => { setMenuOpen(false); fileInputRef.current?.click() }}
+                style={{ padding: '0.55rem 0.8rem', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
+              >
+                {logoUrl ? 'Change Logo' : 'Add Logo'}
+              </div>
+              {logoUrl && (
+                <div
+                  onClick={() => { setMenuOpen(false); onLogoRemove() }}
+                  style={{ padding: '0.55rem 0.8rem', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
+                >
+                  Remove Logo
+                </div>
+              )}
               <div
                 onClick={() => { setMenuOpen(false); onDelete() }}
                 style={{ padding: '0.55rem 0.8rem', fontSize: '0.82rem', cursor: 'pointer', color: '#c0392b', textAlign: 'left' }}
@@ -74,11 +104,12 @@ function LocationTile({ location, color, onManage, onDuplicate, onDelete }) {
           </>
         )}
       </div>
+
       <div style={{
-        width: '44px', height: '44px', borderRadius: '10px', background: `${color}16`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center'
+        width: '44px', height: '44px', borderRadius: '10px', background: logoUrl ? 'transparent' : `${color}16`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden'
       }}>
-        <LocationIcon color={color} />
+        {logoUrl ? <img src={logoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <LocationIcon color={color} />}
       </div>
       <span style={{
         fontSize: '0.8rem', fontWeight: 600, lineHeight: 1.25,
@@ -86,6 +117,16 @@ function LocationTile({ location, color, onManage, onDuplicate, onDelete }) {
       }}>
         {location.settings?.locationName || location.name}
       </span>
+
+      {uploading && (
+        <div style={{
+          position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.85)', borderRadius: '12px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-muted)',
+        }}>
+          Uploading…
+        </div>
+      )}
     </div>
   )
 }
@@ -137,6 +178,7 @@ function TemplateLocations() {
   const [showBin, setShowBin] = useState(false)
   const [trashedLocations, setTrashedLocations] = useState([])
   const [loadingBin, setLoadingBin] = useState(false)
+  const [uploadingLogoId, setUploadingLogoId] = useState(null)
 
   async function loadLocations(templateSlug) {
     const { data } = await supabase
@@ -191,6 +233,47 @@ function TemplateLocations() {
       .order('deleted_at', { ascending: false })
     setTrashedLocations(data || [])
     setLoadingBin(false)
+  }
+
+  // Spread-merge into that one location's own settings bag, same convention
+  // as Records.jsx/ReportBuilder.jsx's updateFormSettings - this page just
+  // has several forms open at once instead of one, so it takes the
+  // location explicitly rather than reading a single formRef.
+  async function saveLocationSettings(location, patch) {
+    const updatedSettings = { ...(location.settings || {}), ...patch }
+    const { error } = await supabase.from('forms').update({ settings: updatedSettings }).eq('id', location.id)
+    if (error) {
+      showToast('Could not save: ' + error.message, 'error')
+      return
+    }
+    setLocations(current => current.map(l => l.id === location.id ? { ...l, settings: updatedSettings } : l))
+  }
+
+  async function handleLogoChange(location, file) {
+    // The file input's accept="image/png" is only a picker hint, not
+    // enforcement - re-check the actual file before uploading anything.
+    if (file.type !== 'image/png') {
+      showToast('Only PNG logos are supported.', 'error')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('Logo must be under 5MB.', 'error')
+      return
+    }
+
+    setUploadingLogoId(location.id)
+    const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_')
+    const path = `logos/${location.id}/${Date.now()}-${safeName}`
+    const { error: uploadError } = await supabase.storage.from('form-uploads').upload(path, file)
+    if (uploadError) {
+      setUploadingLogoId(null)
+      showToast('Could not upload the logo: ' + uploadError.message, 'error')
+      return
+    }
+
+    const { data } = supabase.storage.from('form-uploads').getPublicUrl(path)
+    await saveLocationSettings(location, { logoUrl: data.publicUrl })
+    setUploadingLogoId(null)
   }
 
   function requestDeleteLocation(formId) {
@@ -308,9 +391,12 @@ function TemplateLocations() {
             key={location.id}
             location={location}
             color={color}
+            uploading={uploadingLogoId === location.id}
             onManage={() => navigate(locationDestination(template, location.id))}
             onDuplicate={() => openDuplicateModal(location)}
             onDelete={() => requestDeleteLocation(location.id)}
+            onLogoChange={(file) => handleLogoChange(location, file)}
+            onLogoRemove={() => saveLocationSettings(location, { logoUrl: null })}
           />
         ))}
         <AddLocationTile onClick={openAddModal} />
