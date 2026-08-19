@@ -4,7 +4,7 @@
 // "+ Add Location" for the next one. Reached from BusinessesHome.jsx's
 // grid, or from Templates.jsx's "Manage" once a template is already in use.
 import { useEffect, useRef, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
 import { useToast } from './Toast'
@@ -99,6 +99,13 @@ function LocationTile({ location, color, uploading, onManage, onDuplicate, onDel
                 style={{ padding: '0.55rem 0.8rem', fontSize: '0.82rem', cursor: 'pointer', color: '#c0392b', textAlign: 'left' }}
               >
                 Delete
+              </div>
+              <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.2rem 0' }} />
+              <div
+                onClick={() => setMenuOpen(false)}
+                style={{ padding: '0.55rem 0.8rem', fontSize: '0.82rem', cursor: 'pointer', color: 'var(--color-muted)', textAlign: 'left' }}
+              >
+                Cancel
               </div>
             </div>
           </>
@@ -381,10 +388,16 @@ function TemplateLocations() {
         .template-tile:active { transform: translateY(0); box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
       `}</style>
 
-      {/* No page title/location count/"Manage Locations" header here - the
-          nav bar's compact mobile title already shows the template name
-          (see PageTitleContext.jsx), and Duplicate/Delete now live on each
-          card's own ⋮ menu instead of a separate management modal. */}
+      {/* The full page title/location count/"Manage Locations" header is
+          gone (the nav bar's compact mobile title already shows the
+          template name, see PageTitleContext.jsx, and Duplicate/Delete now
+          live on each card's own ⋮ menu) - but dropping it entirely left no
+          visible way back to All Businesses, since the mobile nav bar's
+          hamburger reads as "menu", not "back". This compact link covers
+          that without reintroducing the full header. */}
+      <Link to="/" style={{ fontSize: '0.85rem', color: 'var(--color-primary)', display: 'inline-block', marginBottom: '0.8rem' }}>
+        ← All Businesses
+      </Link>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.8rem' }}>
         {locations.map(location => (
           <LocationTile
