@@ -299,8 +299,7 @@ function NavBar() {
           padding: '1rem', overflowY: 'auto', fontSize: '0.9rem',
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem' }}>
-          <span style={{ fontWeight: 700, fontSize: '1.05rem' }}>Verticals</span>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.2rem' }}>
           <button
             onClick={() => setMenuOpen(false)} aria-label="Close menu"
             style={{ background: 'transparent', border: 'none', fontSize: '1.3rem', cursor: 'pointer', lineHeight: 1, padding: 0 }}
@@ -362,6 +361,20 @@ function NavBar() {
           >
             Log out
           </button>
+        </div>
+
+        {/* Brand mark moved here from the drawer's own header - a quiet
+            watermark at the very bottom instead of a heading up top, since
+            the compact bar's own brand/title already identifies the app
+            before the drawer is even open. A fixed light gray rather than a
+            theme variable: the drawer's own background is hardcoded white
+            (not theme-aware, matching PosSidePanel's drawer elsewhere), so
+            a dark-mode color here would read as too strong against it. */}
+        <div style={{
+          position: 'absolute', bottom: '1rem', left: 0, right: 0, textAlign: 'center',
+          fontSize: '0.78rem', fontWeight: 700, color: '#d1d5db', letterSpacing: '0.02em',
+        }}>
+          Verticals
         </div>
       </div>
     </div>
