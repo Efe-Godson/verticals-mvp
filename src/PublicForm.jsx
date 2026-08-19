@@ -1286,22 +1286,29 @@ function PublicForm() {
               {filteredProducts.length === 0 ? (
                 <p style={{ color: '#999', margin: '1rem 0' }}>No items match your search.</p>
               ) : isMobile ? (
-                // Square tiles, 2 per row, in a grid capped to roughly two
-                // rows (about 4 tiles) with its own internal scroll - no
-                // "show all" prompt needed, the rest of the catalogue is
-                // just a scroll away inside this same box, same as any
-                // normal scrollable list. Wider tiles than a 3-per-row grid
-                // would give, so names truncate less on a phone-width screen.
+                // Tiles sized to content, 2 per row, in a grid capped to
+                // roughly two rows with its own internal scroll - no "show
+                // all" prompt needed, the rest of the catalogue is just a
+                // scroll away inside this same box, same as any normal
+                // scrollable list. Wider tiles than a 3-per-row grid would
+                // give, so names truncate less on a phone-width screen.
                 <div style={{
                   display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem',
-                  maxHeight: '300px', overflowY: 'auto', paddingRight: '0.15rem',
+                  maxHeight: '180px', overflowY: 'auto', paddingRight: '0.15rem',
                 }}>
                   {filteredProducts.map(p => {
                     const qty = Number(quantities[p.id]) || 0
                     return (
                       <div key={p.id} className="card" style={{
-                        aspectRatio: '1 / 0.62', padding: '0.4rem', background: 'var(--color-surface)',
-                        display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+                        // A fixed aspectRatio here used to be tuned for the
+                        // old 3-per-row grid - at 2 per row each tile is
+                        // ~1.5x wider, and the same ratio made it ~1.5x
+                        // taller too, leaving a big empty gap between the
+                        // price and the Add button. Sizing to content
+                        // (padding + a small gap) instead of a forced ratio
+                        // means it stays right regardless of column count.
+                        padding: '0.5rem', gap: '0.4rem', background: 'var(--color-surface)',
+                        display: 'flex', flexDirection: 'column',
                         // Grid items default to min-width: auto, meaning
                         // they won't shrink below their content's intrinsic
                         // size - the nowrap product name below would force
