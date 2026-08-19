@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
 import { useRecycleBinTrigger } from './RecycleBinContext'
-import { useCurrentPageTitle } from './PageTitleContext'
+import { useCurrentPageTitle, useCurrentPageBack } from './PageTitleContext'
 import { TEMPLATE_ADMIN_USER_ID } from './adminAccount'
 
 function NavBar() {
@@ -17,6 +17,7 @@ function NavBar() {
   const [linkedForms, setLinkedForms] = useState([]) // sibling forms in the same bundle, excluding self
   const { trigger: binTrigger } = useRecycleBinTrigger()
   const pageTitle = useCurrentPageTitle()
+  const pageBack = useCurrentPageBack()
 
   // Edge-swipe-to-open, the same gesture iOS/Android drawers use: a touch
   // starting within EDGE_ZONE px of the left edge that moves right past
@@ -263,6 +264,24 @@ function NavBar() {
         <Link to="/" style={{ fontWeight: 'bold', fontSize: '1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {mobileBrand}
         </Link>
+
+        {/* Right-hand back control - only for pages one level below the top
+            that registered a destination via usePageBack (e.g.
+            TemplateLocations.jsx -> "/"). The hamburger opens the general
+            nav drawer, not "back", so a page like that needs its own way
+            out beyond the drawer's own Home link. */}
+        {pageBack && (
+          <Link
+            to={pageBack.to}
+            aria-label={pageBack.label ? `Back to ${pageBack.label}` : 'Back'}
+            style={{
+              marginLeft: 'auto', flexShrink: 0, fontSize: '1.4rem', fontWeight: 800,
+              color: 'var(--color-text)', lineHeight: 1, padding: '0.2rem',
+            }}
+          >
+            ←
+          </Link>
+        )}
       </div>
 
       {menuOpen && (
@@ -297,6 +316,14 @@ function NavBar() {
           {isAdmin && (
             <Link to="/lab" style={{ color: location.pathname === '/lab' ? 'var(--color-primary)' : 'var(--color-text)' }} onClick={() => setMenuOpen(false)}>Lab</Link>
           )}
+          {binTrigger && (
+            <button
+              onClick={() => { setMenuOpen(false); binTrigger.onOpen() }}
+              style={{ background: 'transparent', border: 'none', padding: 0, textAlign: 'left', color: 'var(--color-text)', fontSize: '0.9rem', cursor: 'pointer' }}
+            >
+              Recycle Bin{binTrigger.count > 0 ? ` (${binTrigger.count})` : ''}
+            </button>
+          )}
 
           {isFormContext && (
             <>
@@ -329,14 +356,6 @@ function NavBar() {
             Account
           </div>
           <Link to="/account" style={{ color: 'var(--color-text)' }} onClick={() => setMenuOpen(false)}>Profile</Link>
-          {binTrigger && (
-            <button
-              onClick={() => { setMenuOpen(false); binTrigger.onOpen() }}
-              style={{ background: 'transparent', border: 'none', padding: 0, textAlign: 'left', color: 'var(--color-text)', fontSize: '0.9rem', cursor: 'pointer' }}
-            >
-              Recycle Bin{binTrigger.count > 0 ? ` (${binTrigger.count})` : ''}
-            </button>
-          )}
           <button
             onClick={() => { setMenuOpen(false); supabase.auth.signOut() }}
             style={{ background: 'transparent', border: 'none', padding: 0, textAlign: 'left', color: '#c0392b', fontSize: '0.9rem', cursor: 'pointer' }}

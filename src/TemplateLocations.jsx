@@ -4,7 +4,7 @@
 // "+ Add Location" for the next one. Reached from BusinessesHome.jsx's
 // grid, or from Templates.jsx's "Manage" once a template is already in use.
 import { useEffect, useRef, useState } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
 import { useToast } from './Toast'
@@ -15,7 +15,7 @@ import { categoryColor, LocationIcon } from './templateVisuals'
 import { createLocationForm, duplicateLocationForm, locationDestination } from './locations'
 import { LoadingState } from './LoadingState'
 import { ErrorState } from './ErrorState'
-import { usePageTitle } from './PageTitleContext'
+import { usePageTitle, usePageBack } from './PageTitleContext'
 
 // Options menu (⋮) matches BusinessesHome.jsx's BusinessTile exactly, just
 // with Duplicate/logo actions added alongside Delete - the old "Manage
@@ -170,6 +170,7 @@ function TemplateLocations() {
   const [error, setError] = useState('')
 
   usePageTitle(template?.name)
+  usePageBack('/', 'All Businesses')
 
   const [showAddModal, setShowAddModal] = useState(false)
   const [locationNameInput, setLocationNameInput] = useState('')
@@ -391,13 +392,9 @@ function TemplateLocations() {
       {/* The full page title/location count/"Manage Locations" header is
           gone (the nav bar's compact mobile title already shows the
           template name, see PageTitleContext.jsx, and Duplicate/Delete now
-          live on each card's own ⋮ menu) - but dropping it entirely left no
-          visible way back to All Businesses, since the mobile nav bar's
-          hamburger reads as "menu", not "back". This compact link covers
-          that without reintroducing the full header. */}
-      <Link to="/" style={{ fontSize: '0.85rem', color: 'var(--color-primary)', display: 'inline-block', marginBottom: '0.8rem' }}>
-        ← All Businesses
-      </Link>
+          live on each card's own ⋮ menu) - the way back to All Businesses
+          is the ← button usePageBack registers in the mobile nav bar's own
+          right-hand corner instead of a link drawn in the page body. */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.8rem' }}>
         {locations.map(location => (
           <LocationTile
