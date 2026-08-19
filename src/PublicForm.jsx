@@ -1123,10 +1123,26 @@ function PublicForm() {
       // checkout modal instead of the main order screen, since this page is
       // the POS order flow and those answers belong to checkout, not the menu.
       const checkoutQuestions = currentPage.fields.filter(f => f.id !== field.id && f.type !== 'section')
+      // Retail-only: the full pale-green order box (Held/item list/Total+
+      // button) only earns its place once there's actually something to
+      // summarize - before that it just pushes the real catalogue further
+      // down the screen. Restaurant (and anything else) keeps the box
+      // always-expanded exactly as before, "No items yet" text included.
+      const showCompactOrderBox = isRetail && cartItems.length === 0
 
       return (
         <div>
+          {showCompactOrderBox && (
+            <div className="card" style={{
+              padding: '0.7rem 1rem', marginBottom: '1rem', background: 'var(--color-primary-soft)',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem', fontSize: '0.88rem',
+            }}>
+              <span>Current Order · #{orderNumber}</span>
+              <span style={{ fontWeight: 700 }}>₦{total.toLocaleString()}</span>
+            </div>
+          )}
           {/* Order box - lives on its own at the top, above the menu */}
+          {!showCompactOrderBox && (
           <div className="card" style={{ padding: '1rem', marginBottom: '1rem', background: 'var(--color-primary-soft)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.6rem' }}>
               <div style={{ fontWeight: '600' }}>Current Order</div>
@@ -1230,6 +1246,7 @@ function PublicForm() {
               )}
             </div>
           </div>
+          )}
 
           {/* Catalogue box - search + categories stay pinned while the menu below scrolls */}
           <div className="card" style={{ padding: 0, background: 'var(--color-primary-soft)', maxHeight: '70vh', overflowY: 'auto' }}>
@@ -1307,7 +1324,7 @@ function PublicForm() {
                         // price and the Add button. Sizing to content
                         // (padding + a small gap) instead of a forced ratio
                         // means it stays right regardless of column count.
-                        padding: '0.5rem', gap: '0.4rem', background: 'var(--color-surface)',
+                        padding: isRetail ? '0.4rem' : '0.5rem', gap: isRetail ? '0.3rem' : '0.4rem', background: 'var(--color-surface)',
                         display: 'flex', flexDirection: 'column',
                         // Grid items default to min-width: auto, meaning
                         // they won't shrink below their content's intrinsic
@@ -2058,9 +2075,13 @@ function PublicForm() {
             onClick={() => setShowAiFill(true)}
             aria-label="Fill from Text"
             title="Fill from Text"
-            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '38px', height: '38px', padding: 0, flexShrink: 0 }}
+            style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              width: '38px', height: '38px', padding: 0, flexShrink: 0,
+              background: 'transparent', border: 'none', color: 'var(--color-primary)',
+            }}
           >
-            <SparkleIcon size={18} />
+            <SparkleIcon size={26} />
           </button>
         )}
       </div>
@@ -2178,7 +2199,7 @@ function PublicForm() {
               disabled={submitting}
               style={{ padding: '0.7rem 1.5rem', fontSize: '1rem', flex: cartDefersCheckout ? '1 1 auto' : undefined }}
             >
-              {submitting ? 'Submitting...' : (token ? 'Save Changes' : 'Submit')}
+              {submitting ? 'Submitting...' : (token ? 'Save Changes' : (isRetail ? 'Place Order' : 'Submit'))}
             </button>
           ) : (
             <button
@@ -2199,7 +2220,8 @@ function PublicForm() {
             thing on screen, closest to an iPhone's home-indicator strip. */}
         {cartDefersCheckout && (
           <p style={{
-            textAlign: 'center', fontStyle: 'italic', color: '#999', fontSize: '0.75rem',
+            textAlign: 'center', fontStyle: 'italic', color: '#999',
+            fontSize: isRetail ? '0.68rem' : '0.75rem', opacity: isRetail ? 0.7 : 1,
             margin: 0, padding: '0 0 calc(0.5rem + env(safe-area-inset-bottom))',
           }}>
             Powered by Verticals
