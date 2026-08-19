@@ -67,14 +67,22 @@ function NavBar() {
       <div className="navbar-row" style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap', rowGap: '0.4rem' }}>
-          <Link to="/" style={{ fontWeight: 'bold', fontSize: '1.05rem' }}>Verticals</Link>
-          <Link to="/" style={{ color: location.pathname === '/' ? 'var(--color-primary)' : 'var(--color-muted)', fontSize: '0.9rem' }}>Home</Link>
-          <Link to="/reports" style={{ color: location.pathname === '/reports' ? 'var(--color-primary)' : 'var(--color-muted)', fontSize: '0.9rem' }}>Reports</Link>
-          <Link to="/templates" style={{ color: location.pathname === '/templates' ? 'var(--color-primary)' : 'var(--color-muted)', fontSize: '0.9rem' }}>Templates</Link>
-          {isAdmin && (
-            <Link to="/lab" style={{ color: location.pathname === '/lab' ? 'var(--color-primary)' : 'var(--color-muted)', fontSize: '0.9rem' }}>Lab</Link>
-          )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+          <Link to="/" style={{ fontWeight: 'bold', fontSize: '1.05rem', flexShrink: 0 }}>Verticals</Link>
+
+          {/* .navbar-links-desktop hides below 768px (see index.css) - these
+              top-level links used to have no mobile treatment at all, just
+              wrapping onto extra lines and pushing the avatar button down
+              with them. Reuses the exact toggle/.navbar-links-mobile pattern
+              the form-context sub-nav below already had. */}
+          <div className="navbar-links-desktop" style={{ display: 'flex', gap: '1.2rem', fontSize: '0.9rem' }}>
+            <Link to="/" style={{ color: location.pathname === '/' ? 'var(--color-primary)' : 'var(--color-muted)' }}>Home</Link>
+            <Link to="/reports" style={{ color: location.pathname === '/reports' ? 'var(--color-primary)' : 'var(--color-muted)' }}>Reports</Link>
+            <Link to="/templates" style={{ color: location.pathname === '/templates' ? 'var(--color-primary)' : 'var(--color-muted)' }}>Templates</Link>
+            {isAdmin && (
+              <Link to="/lab" style={{ color: location.pathname === '/lab' ? 'var(--color-primary)' : 'var(--color-muted)' }}>Lab</Link>
+            )}
+          </div>
 
           {isFormContext && (
             <div className="navbar-links-desktop" style={{ display: 'flex', gap: '1rem', fontSize: '0.9rem' }}>
@@ -177,35 +185,44 @@ function NavBar() {
             )}
           </div>
 
-          {isFormContext && (
-            <button
-              className="secondary navbar-toggle"
-              onClick={() => setMenuOpen(!menuOpen)}
-              aria-label="Toggle menu"
-              style={{ padding: '0.5rem 0.7rem' }}
-            >
-              {menuOpen ? '✕' : '☰'}
-            </button>
-          )}
+          {/* Unconditional now - the top-level links above need this
+              fallback on every page, not just form-context ones. */}
+          <button
+            className="secondary navbar-toggle"
+            onClick={() => setMenuOpen(!menuOpen)}
+            aria-label="Toggle menu"
+            style={{ padding: '0.5rem 0.7rem' }}
+          >
+            {menuOpen ? '✕' : '☰'}
+          </button>
         </div>
       </div>
 
-      {isFormContext && (
-        <div className={`navbar-links-mobile ${menuOpen ? 'open' : ''}`} style={{ fontSize: '0.9rem' }}>
-          <Link to="/" style={{ color: 'var(--color-muted)' }} onClick={() => setMenuOpen(false)}>Home</Link>
-          <Link to={`/form/${id}/edit`} style={{ color: linkColor('/edit') }} onClick={() => setMenuOpen(false)}>Builder</Link>
-          <Link to={`/form/${id}/records`} style={{ color: linkColor('/records') }} onClick={() => setMenuOpen(false)}>Records</Link>
-          <Link to={`/form/${id}/report`} style={{ color: linkColor('/report') }} onClick={() => setMenuOpen(false)}>Report</Link>
-          {isPayrollForm && <Link to={`/form/${id}/payroll`} style={{ color: linkColor('/payroll') }} onClick={() => setMenuOpen(false)}>Payroll</Link>}
-          <Link to={`/form/${id}/ai-analyst`} style={{ color: linkColor('/ai-analyst') }} onClick={() => setMenuOpen(false)}>AI Analyst</Link>
-          <Link to={`/form/${id}/settings`} style={{ color: linkColor('/settings') }} onClick={() => setMenuOpen(false)}>Settings</Link>
-          {linkedForms.map(f => (
-            <Link key={f.id} to={`/form/${f.id}/records`} style={{ color: 'var(--color-muted)' }} onClick={() => setMenuOpen(false)}>
-              → {f.name}
-            </Link>
-          ))}
-        </div>
-      )}
+      <div className={`navbar-links-mobile ${menuOpen ? 'open' : ''}`} style={{ fontSize: '0.9rem' }}>
+        <Link to="/" style={{ color: location.pathname === '/' ? 'var(--color-primary)' : 'var(--color-muted)' }} onClick={() => setMenuOpen(false)}>Home</Link>
+        <Link to="/reports" style={{ color: location.pathname === '/reports' ? 'var(--color-primary)' : 'var(--color-muted)' }} onClick={() => setMenuOpen(false)}>Reports</Link>
+        <Link to="/templates" style={{ color: location.pathname === '/templates' ? 'var(--color-primary)' : 'var(--color-muted)' }} onClick={() => setMenuOpen(false)}>Templates</Link>
+        {isAdmin && (
+          <Link to="/lab" style={{ color: location.pathname === '/lab' ? 'var(--color-primary)' : 'var(--color-muted)' }} onClick={() => setMenuOpen(false)}>Lab</Link>
+        )}
+
+        {isFormContext && (
+          <>
+            <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.3rem 0' }} />
+            <Link to={`/form/${id}/edit`} style={{ color: linkColor('/edit') }} onClick={() => setMenuOpen(false)}>Builder</Link>
+            <Link to={`/form/${id}/records`} style={{ color: linkColor('/records') }} onClick={() => setMenuOpen(false)}>Records</Link>
+            <Link to={`/form/${id}/report`} style={{ color: linkColor('/report') }} onClick={() => setMenuOpen(false)}>Report</Link>
+            {isPayrollForm && <Link to={`/form/${id}/payroll`} style={{ color: linkColor('/payroll') }} onClick={() => setMenuOpen(false)}>Payroll</Link>}
+            <Link to={`/form/${id}/ai-analyst`} style={{ color: linkColor('/ai-analyst') }} onClick={() => setMenuOpen(false)}>AI Analyst</Link>
+            <Link to={`/form/${id}/settings`} style={{ color: linkColor('/settings') }} onClick={() => setMenuOpen(false)}>Settings</Link>
+            {linkedForms.map(f => (
+              <Link key={f.id} to={`/form/${f.id}/records`} style={{ color: 'var(--color-muted)' }} onClick={() => setMenuOpen(false)}>
+                → {f.name}
+              </Link>
+            ))}
+          </>
+        )}
+      </div>
     </div>
   )
 }
