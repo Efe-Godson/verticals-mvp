@@ -410,11 +410,11 @@ function EditForm() {
 
           {TYPES_WITH_PRODUCTS.includes(field.type) && (
             <div>
-              <div style={{ marginTop: '0.3rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.7rem', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '0.85rem' }}>
+              <div style={{ marginTop: '0.3rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.7rem' }}>
+                <span style={{ fontSize: '0.85rem', flex: 1, minWidth: 0 }}>
                   ✓ {(field.products || []).length} Product{(field.products || []).length !== 1 ? 's' : ''}
                 </span>
-                <button type="button" onClick={() => setManageProductsIndex(manageProductsIndex === index ? null : index)}>
+                <button type="button" onClick={() => setManageProductsIndex(manageProductsIndex === index ? null : index)} style={{ flexShrink: 0 }}>
                   {manageProductsIndex === index ? 'Hide Products' : 'Manage Products →'}
                 </button>
               </div>
@@ -587,8 +587,8 @@ function EditForm() {
                 const moreDetailsCount = configurable.length - pinnedCount
                 return (
                   <div className="card" style={{ marginTop: '0.6rem', padding: '1rem', background: 'var(--color-primary-soft)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.7rem', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '0.85rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.7rem' }}>
+                      <span style={{ fontSize: '0.85rem', flex: 1, minWidth: 0 }}>
                         ✓ {pinnedCount} pinned, {moreDetailsCount} in More Details
                       </span>
                       <button
@@ -597,6 +597,7 @@ function EditForm() {
                           setShowMoreDetailsManager(v => !v)
                           setEditingFieldId(null)
                         }}
+                        style={{ flexShrink: 0 }}
                       >
                         {showMoreDetailsManager ? 'Hide Details' : 'Manage Details →'}
                       </button>
