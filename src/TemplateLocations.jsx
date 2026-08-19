@@ -12,12 +12,17 @@ import ConfirmDialog from './ConfirmDialog'
 import HomeRecycleBinDialog from './HomeRecycleBinDialog'
 import { useRecycleBinTrigger } from './RecycleBinContext'
 import { categoryColor, LocationIcon } from './templateVisuals'
-import { createLocationForm, locationDestination } from './locations'
+import { createLocationForm, duplicateLocationForm, locationDestination } from './locations'
 import { LoadingState } from './LoadingState'
 import { ErrorState } from './ErrorState'
 import { usePageTitle } from './PageTitleContext'
 
-function LocationTile({ location, color, onManage }) {
+// Options menu (⋮) matches BusinessesHome.jsx's BusinessTile exactly, just
+// with a Duplicate action added alongside Delete - the old "Manage
+// Locations" modal (a single flat list with only Delete) is gone in favor
+// of putting both actions right on the card they act on.
+function LocationTile({ location, color, onManage, onDuplicate, onDelete }) {
+  const [menuOpen, setMenuOpen] = useState(false)
   return (
     <div
       className="template-tile"
@@ -31,6 +36,44 @@ function LocationTile({ location, color, onManage }) {
         justifyContent: 'center', gap: '0.5rem', padding: '0.9rem', textAlign: 'center', cursor: 'pointer'
       }}
     >
+      <div style={{ position: 'absolute', top: '0.4rem', right: '0.4rem' }} onClick={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          onClick={() => setMenuOpen(v => !v)}
+          title="More options"
+          aria-label="More options"
+          style={{
+            width: '24px', height: '24px', padding: 0,
+            borderRadius: '6px', border: 'none', background: 'transparent', color: 'var(--color-muted)',
+            fontSize: '1rem', lineHeight: 1, cursor: 'pointer'
+          }}
+        >
+          ⋮
+        </button>
+        {menuOpen && (
+          <>
+            <div style={{ position: 'fixed', inset: 0, zIndex: 15 }} onClick={() => setMenuOpen(false)} />
+            <div className="dropdown-panel" style={{
+              position: 'absolute', top: '100%', right: 0, marginTop: '0.2rem',
+              background: 'white', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 20, minWidth: '130px', overflow: 'hidden'
+            }}>
+              <div
+                onClick={() => { setMenuOpen(false); onDuplicate() }}
+                style={{ padding: '0.55rem 0.8rem', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
+              >
+                Duplicate
+              </div>
+              <div
+                onClick={() => { setMenuOpen(false); onDelete() }}
+                style={{ padding: '0.55rem 0.8rem', fontSize: '0.82rem', cursor: 'pointer', color: '#c0392b', textAlign: 'left' }}
+              >
+                Delete
+              </div>
+            </div>
+          </>
+        )}
+      </div>
       <div style={{
         width: '44px', height: '44px', borderRadius: '10px', background: `${color}16`,
         display: 'flex', alignItems: 'center', justifyContent: 'center'
@@ -83,7 +126,10 @@ function TemplateLocations() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [locationNameInput, setLocationNameInput] = useState('')
   const [creating, setCreating] = useState(false)
-  const [showManageModal, setShowManageModal] = useState(false)
+  // Non-null while the "name this location" modal is duplicating an
+  // existing one rather than creating a fresh one from the template -
+  // holds just the source location's id (see duplicateLocationForm).
+  const [duplicateSourceId, setDuplicateSourceId] = useState(null)
 
   const [pendingDeleteId, setPendingDeleteId] = useState(null)
   const [pendingBinConfirm, setPendingBinConfirm] = useState(null) // { type: 'permanentDelete', formId } | { type: 'emptyBin' }
@@ -210,7 +256,14 @@ function TemplateLocations() {
   }
 
   function openAddModal() {
+    setDuplicateSourceId(null)
     setLocationNameInput(template.name)
+    setShowAddModal(true)
+  }
+
+  function openDuplicateModal(location) {
+    setDuplicateSourceId(location.id)
+    setLocationNameInput(`${location.settings?.locationName || location.name} (Copy)`)
     setShowAddModal(true)
   }
 
@@ -219,12 +272,14 @@ function TemplateLocations() {
     if (!locationNameInput.trim()) return
     setCreating(true)
     try {
-      const form = await createLocationForm({ session, template, locationName: locationNameInput })
-      showToast(`"${form.name}" created, customize it now.`, 'success')
+      const form = duplicateSourceId
+        ? await duplicateLocationForm({ session, sourceFormId: duplicateSourceId, locationName: locationNameInput })
+        : await createLocationForm({ session, template, locationName: locationNameInput })
+      showToast(`"${form.name}" ${duplicateSourceId ? 'duplicated' : 'created'}, customize it now.`, 'success')
       setShowAddModal(false)
       navigate(locationDestination(template, form.id))
     } catch (err) {
-      showToast('Could not create this location: ' + err.message, 'error')
+      showToast(`Could not ${duplicateSourceId ? 'duplicate' : 'create'} this location: ` + err.message, 'error')
     } finally {
       setCreating(false)
     }
@@ -243,75 +298,23 @@ function TemplateLocations() {
         .template-tile:active { transform: translateY(0); box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
       `}</style>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '0.5rem' }}>
-        <div>
-          <h1 style={{ margin: '0 0 0.2rem' }}>{template.name}</h1>
-          <p style={{ color: 'var(--color-muted)', margin: 0 }}>
-            {locations.length} location{locations.length !== 1 ? 's' : ''}
-          </p>
-        </div>
-        {locations.length > 0 && (
-          <button className="secondary" onClick={() => setShowManageModal(true)}>
-            Manage Locations
-          </button>
-        )}
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.8rem', marginTop: '1rem' }}>
+      {/* No page title/location count/"Manage Locations" header here - the
+          nav bar's compact mobile title already shows the template name
+          (see PageTitleContext.jsx), and Duplicate/Delete now live on each
+          card's own ⋮ menu instead of a separate management modal. */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.8rem' }}>
         {locations.map(location => (
           <LocationTile
             key={location.id}
             location={location}
             color={color}
             onManage={() => navigate(locationDestination(template, location.id))}
+            onDuplicate={() => openDuplicateModal(location)}
+            onDelete={() => requestDeleteLocation(location.id)}
           />
         ))}
         <AddLocationTile onClick={openAddModal} />
       </div>
-
-      {showManageModal && (
-        <div
-          onClick={() => setShowManageModal(false)}
-          style={{
-            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '1rem'
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{ background: 'white', borderRadius: '8px', padding: '1.5rem', width: '420px', maxWidth: '100%', maxHeight: '80vh', overflowY: 'auto' }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
-              <h3 style={{ margin: 0 }}>Manage Locations</h3>
-              <button className="secondary" onClick={() => setShowManageModal(false)}>Close</button>
-            </div>
-            <p style={{ fontSize: '0.85rem', color: 'var(--color-muted)', marginTop: '0.2rem', marginBottom: '1rem' }}>
-              Deleting moves a location to the Recycle Bin - you can restore it later from there.
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {locations.length === 0 && (
-                <p style={{ color: 'var(--color-muted)', fontSize: '0.85rem', margin: 0 }}>No locations left.</p>
-              )}
-              {locations.map(location => (
-                <div key={location.id} style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6rem',
-                  padding: '0.5rem 0.7rem', border: '1px solid var(--color-border)', borderRadius: '6px'
-                }}>
-                  <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>{location.settings?.locationName || location.name}</span>
-                  <button
-                    type="button"
-                    className="secondary"
-                    style={{ color: '#c0392b', fontSize: '0.8rem', padding: '0.3rem 0.7rem' }}
-                    onClick={() => requestDeleteLocation(location.id)}
-                  >
-                    Delete
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
       {pendingDeleteId && (
         <ConfirmDialog
@@ -355,9 +358,11 @@ function TemplateLocations() {
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '1rem' }}
         >
           <div onClick={(e) => e.stopPropagation()} style={{ background: 'white', borderRadius: '8px', padding: '1.5rem', width: '380px', maxWidth: '100%' }}>
-            <h3 style={{ margin: '0 0 0.4rem' }}>Name this location</h3>
+            <h3 style={{ margin: '0 0 0.4rem' }}>{duplicateSourceId ? 'Name this duplicate' : 'Name this location'}</h3>
             <p style={{ color: 'var(--color-muted)', fontSize: '0.85rem', margin: '0 0 1rem' }}>
-              A new, independent "{template.name}" - its own menu and its own orders.
+              {duplicateSourceId
+                ? 'A new, independent copy with the same menu and setup - no records or orders carry over.'
+                : `A new, independent "${template.name}" - its own menu and its own orders.`}
             </p>
             <form onSubmit={confirmAddLocation}>
               <input
@@ -367,7 +372,7 @@ function TemplateLocations() {
               />
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem' }}>
                 <button type="button" className="secondary" onClick={() => setShowAddModal(false)}>Cancel</button>
-                <button type="submit" disabled={creating}>{creating ? 'Creating...' : 'Create'}</button>
+                <button type="submit" disabled={creating}>{creating ? (duplicateSourceId ? 'Duplicating...' : 'Creating...') : (duplicateSourceId ? 'Duplicate' : 'Create')}</button>
               </div>
             </form>
           </div>
