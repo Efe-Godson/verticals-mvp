@@ -1933,6 +1933,13 @@ function PublicForm() {
 
   if (!form) return <ErrorState message={message} />
 
+  // Retail-only order-screen tweaks (compact empty cart box, "Place Order"
+  // label, tighter tiles, subtler footer) all read this - declared here,
+  // not reused from OrderConfirmationModal's own same-named const above
+  // (a completely different component/closure, form isn't even the same
+  // object there - that one's a submission's snapshot).
+  const isRetail = isRetailTemplate(form)
+
   if (submitted) {
     return (
       <div className="page">
