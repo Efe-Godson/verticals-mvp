@@ -371,8 +371,8 @@ function NavBar() {
             (not theme-aware, matching PosSidePanel's drawer elsewhere), so
             a dark-mode color here would read as too strong against it. */}
         <div style={{
-          position: 'absolute', bottom: '1rem', left: 0, right: 0, textAlign: 'center',
-          fontSize: '0.78rem', fontWeight: 700, color: '#d1d5db', letterSpacing: '0.02em',
+          position: 'absolute', bottom: '1rem', left: '1rem', right: 0, textAlign: 'left',
+          fontSize: '0.78rem', fontWeight: 700, fontStyle: 'italic', color: '#d1d5db', letterSpacing: '0.02em',
         }}>
           Verticals
         </div>
