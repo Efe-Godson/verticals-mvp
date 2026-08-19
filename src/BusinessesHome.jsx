@@ -13,6 +13,7 @@ import ConfirmDialog from './ConfirmDialog'
 import HomeRecycleBinDialog from './HomeRecycleBinDialog'
 import { useRecycleBinTrigger } from './RecycleBinContext'
 import { categoryColor, CategoryIcon } from './templateVisuals'
+import { usePageTitle } from './PageTitleContext'
 
 // Bundle templates (Employees + Salary Events, etc.) have no Locations
 // sub-page of their own - there's only ever the one form - so deleting
@@ -114,6 +115,7 @@ function BusinessesHome() {
   const navigate = useNavigate()
   const { showToast } = useToast()
   const { setTrigger } = useRecycleBinTrigger()
+  usePageTitle('Home')
 
   const [usedTemplates, setUsedTemplates] = useState([]) // [{ template, locationCount, singleFormId, isBundle }]
   const [loading, setLoading] = useState(true)
@@ -268,13 +270,6 @@ function BusinessesHome() {
         .template-tile:hover { border-color: var(--color-primary); box-shadow: 0 4px 14px rgba(0,0,0,0.1); transform: translateY(-2px); }
         .template-tile:active { transform: translateY(0); box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
       `}</style>
-
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.3rem' }}>
-        <h1 style={{ margin: 0 }}>Your Businesses</h1>
-      </div>
-      <p style={{ color: 'var(--color-muted)', marginTop: 0, marginBottom: '1.5rem' }}>
-        Everything you've set up from a template, in one place.
-      </p>
 
       {loading ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.8rem' }}>
