@@ -11,6 +11,7 @@ import { useAuth } from './AuthContext'
 import { supabase } from './supabaseClient'
 import { useToast } from './Toast'
 import { getOrCreateShortLink } from './shortLinks'
+import ArrowLeftIcon from './ArrowLeftIcon'
 
 // A single-row "here's your link" strip: the link's already on the
 // clipboard by the time this opens (see openShareLink below), this is just
@@ -82,13 +83,13 @@ function PosSidePanel({ formId, hasCartField = false }) {
     async function resolveBackLink() {
       const { data: form } = await supabase.from('forms').select('settings').eq('id', formId).single()
       const slug = form?.settings?.templateSlug
-      if (!slug) { if (!cancelled) setBackTo({ label: '← All Businesses', to: '/' }); return }
+      if (!slug) { if (!cancelled) setBackTo({ label: 'All Businesses', to: '/' }); return }
 
       const { data: template } = await supabase.from('templates').select('bundle').eq('slug', slug).maybeSingle()
       if (cancelled) return
       setBackTo(template?.bundle?.length > 0
-        ? { label: '← All Businesses', to: '/' }
-        : { label: '← Locations', to: `/templates/${slug}/locations` })
+        ? { label: 'All Businesses', to: '/' }
+        : { label: 'Locations', to: `/templates/${slug}/locations` })
     }
     resolveBackLink()
     return () => { cancelled = true }
@@ -153,6 +154,27 @@ function PosSidePanel({ formId, hasCartField = false }) {
         <span style={{ width: '20px', height: '2px', background: 'white', borderRadius: '1px' }} />
       </button>
 
+      {/* Same right-hand back-button placement as NavBar.jsx's compact
+          mobile bar (see PageTitleContext.jsx's usePageBack) - moved here
+          from a text link inside the drawer, so getting back to Locations
+          doesn't need opening the menu first, and to save room in the
+          drawer's own link list. */}
+      {exitLink && (
+        <Link
+          to={exitLink.to}
+          aria-label={`Back to ${exitLink.label}`}
+          title={exitLink.label}
+          style={{
+            position: 'fixed', top: '1rem', right: '1rem', zIndex: 150,
+            width: '38px', height: '38px', borderRadius: '8px',
+            background: 'var(--color-primary)', color: 'white',
+            display: open ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <ArrowLeftIcon size={18} />
+        </Link>
+      )}
+
       {open && (
         <div
           onClick={() => setOpen(false)}
@@ -162,7 +184,7 @@ function PosSidePanel({ formId, hasCartField = false }) {
 
       <div
         style={{
-          position: 'fixed', top: 0, left: 0, bottom: 0, width: '240px',
+          position: 'fixed', top: 0, left: 0, bottom: 0, width: '200px',
           background: 'var(--color-primary)', color: 'white', zIndex: 151,
           transform: open ? 'translateX(0)' : 'translateX(-100%)',
           transition: 'transform 0.2s ease', padding: '1rem', boxShadow: '2px 0 12px rgba(0,0,0,0.2)'
@@ -181,18 +203,6 @@ function PosSidePanel({ formId, hasCartField = false }) {
         </div>
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-          {exitLink && (
-            <>
-              <Link
-                to={exitLink.to}
-                onClick={() => setOpen(false)}
-                style={{ color: 'white', textDecoration: 'none', padding: '0.65rem 0.5rem', borderRadius: '6px', fontSize: '0.9rem', opacity: 0.85 }}
-              >
-                {exitLink.label}
-              </Link>
-              <div style={{ borderTop: '1px solid rgba(255,255,255,0.25)', margin: '0.3rem 0' }} />
-            </>
-          )}
           {links.map(link => (
             link.onClick ? (
               <button

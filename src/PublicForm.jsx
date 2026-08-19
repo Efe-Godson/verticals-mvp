@@ -2056,9 +2056,11 @@ function PublicForm() {
           <button
             type="button"
             onClick={() => setShowAiFill(true)}
-            style={{ fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}
+            aria-label="Fill from Text"
+            title="Fill from Text"
+            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '38px', height: '38px', padding: 0, flexShrink: 0 }}
           >
-            <SparkleIcon /> Fill from Text
+            <SparkleIcon size={18} />
           </button>
         )}
       </div>

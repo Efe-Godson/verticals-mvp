@@ -5,6 +5,7 @@ import { useAuth } from './AuthContext'
 import { useRecycleBinTrigger } from './RecycleBinContext'
 import { useCurrentPageTitle, useCurrentPageBack } from './PageTitleContext'
 import { TEMPLATE_ADMIN_USER_ID } from './adminAccount'
+import ArrowLeftIcon from './ArrowLeftIcon'
 
 function NavBar() {
   const location = useLocation()
@@ -275,11 +276,11 @@ function NavBar() {
             to={pageBack.to}
             aria-label={pageBack.label ? `Back to ${pageBack.label}` : 'Back'}
             style={{
-              marginLeft: 'auto', flexShrink: 0, fontSize: '1.4rem', fontWeight: 800,
-              color: 'var(--color-text)', lineHeight: 1, padding: '0.2rem',
+              marginLeft: 'auto', flexShrink: 0, color: 'var(--color-text)',
+              display: 'flex', alignItems: 'center', padding: '0.2rem',
             }}
           >
-            ←
+            <ArrowLeftIcon size={20} />
           </Link>
         )}
       </div>
