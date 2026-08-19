@@ -66,7 +66,11 @@ export async function duplicateLocationForm({ session, sourceFormId, locationNam
 // Where a freshly created (or existing) location should open by default -
 // cart/POS templates land on the order screen, everything else on the
 // builder, same convention Templates.jsx already used for single instances.
+// The order screen itself no longer auto-opens PosSidePanel's drawer
+// (?panel=1) on arrival - the hamburger/back buttons are discoverable
+// enough now that popping the menu open unprompted just gets in the way
+// of the catalogue you actually came here to see. The builder still does.
 export function locationDestination(template, formId) {
   const isCartTemplate = template.fields?.some(f => f.type === 'cart')
-  return isCartTemplate ? `/form/${formId}?panel=1` : `/form/${formId}/edit?panel=1`
+  return isCartTemplate ? `/form/${formId}` : `/form/${formId}/edit?panel=1`
 }

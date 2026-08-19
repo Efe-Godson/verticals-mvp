@@ -578,6 +578,42 @@ function PublicForm() {
     saveHeldOrders({ ...heldOrders, [fieldId]: (heldOrders[fieldId] || []).filter(h => h.id !== heldId) })
   }
 
+  // Retail (deferCheckout) has no Hold button - accidentally navigating
+  // away mid-sale (a wrong "back" tap, a browser gesture) had nothing to
+  // catch it. Same per-device localStorage convention as heldOrders above,
+  // just autosaved continuously instead of needing a deliberate tap, and
+  // restored once on arrival instead of picked from a list. Skipped
+  // entirely for a token edit link (a saved response has its own real data
+  // to load, see loadAnswersFromData, not a draft to resume) and for any
+  // non-deferCheckout form (Restaurant's Held orders already cover this).
+  useEffect(() => {
+    if (!form || token || !cartDefersCheckout) return
+    try {
+      const raw = localStorage.getItem(`verticals_draft_${form.id}`)
+      if (!raw) return
+      const draft = JSON.parse(raw)
+      if (draft.cartQuantities) setCartQuantities(draft.cartQuantities)
+      if (draft.answers) setAnswers(current => ({ ...current, ...draft.answers }))
+      if (draft.deliveryFee) setDeliveryFee(draft.deliveryFee)
+    } catch {}
+    // Runs once per form landed on, not on every keystroke - see the
+    // deliberately narrow dependency list.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form?.id, token, cartDefersCheckout])
+
+  useEffect(() => {
+    if (!form || token || !cartDefersCheckout) return
+    const hasItems = Object.values(cartQuantities).some(qtys => Object.values(qtys || {}).some(q => Number(q) > 0))
+    const hasAnswers = Object.values(answers).some(v => v !== undefined && v !== null && v !== '')
+    try {
+      if (!hasItems && !hasAnswers) {
+        localStorage.removeItem(`verticals_draft_${form.id}`)
+      } else {
+        localStorage.setItem(`verticals_draft_${form.id}`, JSON.stringify({ cartQuantities, answers, deliveryFee }))
+      }
+    } catch {}
+  }, [form, token, cartDefersCheckout, cartQuantities, answers, deliveryFee])
+
   // Linked-record dropdowns pull their options from another form's records.
   // Only readable when the person filling this in is authenticated as that
   // linked form's owner (RLS scopes submission reads to the owner), so for an
@@ -993,6 +1029,13 @@ function PublicForm() {
       // same InvoiceModal Records' own invoice action uses) is an explicit
       // click from inside that confirmation instead.
       if (hasCartOnPage) {
+        // Order actually went through - the in-progress draft (see the
+        // autosave effect above) would otherwise still be sitting in
+        // localStorage and get restored on the next visit as if this sale
+        // never happened.
+        if (cartDefersCheckout) {
+          try { localStorage.removeItem(`verticals_draft_${form.id}`) } catch {}
+        }
         const cartField = currentPage.fields.find(f => f.type === 'cart')
         setOrderConfirmation({
           form,
