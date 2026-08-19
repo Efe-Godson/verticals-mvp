@@ -15,6 +15,50 @@ function NavBar() {
   const [linkedForms, setLinkedForms] = useState([]) // sibling forms in the same bundle, excluding self
   const { trigger: binTrigger } = useRecycleBinTrigger()
 
+  // Edge-swipe-to-open, the same gesture iOS/Android drawers use: a touch
+  // starting within EDGE_ZONE px of the left edge that moves right past
+  // OPEN_THRESHOLD before it moves more vertically than horizontally (so it
+  // doesn't fight a normal vertical scroll that happens to start near the
+  // edge) opens the drawer. Document-level listeners since the point is
+  // opening it from wherever you're reading, not just from the compact bar
+  // itself - only armed while the drawer is closed, so it can't interfere
+  // with touches inside the open drawer (its own ✕/backdrop/links close it).
+  useEffect(() => {
+    if (menuOpen) return
+    const EDGE_ZONE = 24
+    const OPEN_THRESHOLD = 60
+    let startX = null
+    let startY = null
+    let armed = false
+
+    function onTouchStart(e) {
+      const touch = e.touches[0]
+      armed = !!touch && touch.clientX <= EDGE_ZONE
+      if (armed) { startX = touch.clientX; startY = touch.clientY }
+    }
+
+    function onTouchMove(e) {
+      if (!armed) return
+      const touch = e.touches[0]
+      if (!touch) return
+      const dx = touch.clientX - startX
+      const dy = touch.clientY - startY
+      if (Math.abs(dy) > Math.abs(dx)) { armed = false; return }
+      if (dx > OPEN_THRESHOLD) { setMenuOpen(true); armed = false }
+    }
+
+    function onTouchEnd() { armed = false }
+
+    document.addEventListener('touchstart', onTouchStart, { passive: true })
+    document.addEventListener('touchmove', onTouchMove, { passive: true })
+    document.addEventListener('touchend', onTouchEnd, { passive: true })
+    return () => {
+      document.removeEventListener('touchstart', onTouchStart)
+      document.removeEventListener('touchmove', onTouchMove)
+      document.removeEventListener('touchend', onTouchEnd)
+    }
+  }, [menuOpen])
+
   const isAdmin = session?.user?.id === TEMPLATE_ADMIN_USER_ID
   const displayName = session?.user?.user_metadata?.full_name || ''
   const initials = (displayName || session?.user?.email || '?').trim().slice(0, 1).toUpperCase()
@@ -60,22 +104,20 @@ function NavBar() {
   }
 
   return (
-    <div style={{
-      background: 'white', borderBottom: '1px solid var(--color-border)',
-      padding: '0.8rem 1.5rem'
-    }}>
-      <div className="navbar-row" style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem'
+    <div style={{ background: 'white', borderBottom: '1px solid var(--color-border)' }}>
+      {/* Full bar: the logo, every link inline, both dropdown buttons - this
+          is a desktop layout (a row of horizontal text links plus a 30px
+          avatar circle just doesn't fit a phone width) and is hidden below
+          768px in favor of .navbar-mobile-row below, not just collapsed
+          into a hamburger while staying visible itself. */}
+      <div className="navbar-desktop-row" style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem',
+        padding: '0.8rem 1.5rem',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
           <Link to="/" style={{ fontWeight: 'bold', fontSize: '1.05rem', flexShrink: 0 }}>Verticals</Link>
 
-          {/* .navbar-links-desktop hides below 768px (see index.css) - these
-              top-level links used to have no mobile treatment at all, just
-              wrapping onto extra lines and pushing the avatar button down
-              with them. Reuses the exact toggle/.navbar-links-mobile pattern
-              the form-context sub-nav below already had. */}
-          <div className="navbar-links-desktop" style={{ display: 'flex', gap: '1.2rem', fontSize: '0.9rem' }}>
+          <div style={{ display: 'flex', gap: '1.2rem', fontSize: '0.9rem' }}>
             <Link to="/" style={{ color: location.pathname === '/' ? 'var(--color-primary)' : 'var(--color-muted)' }}>Home</Link>
             <Link to="/reports" style={{ color: location.pathname === '/reports' ? 'var(--color-primary)' : 'var(--color-muted)' }}>Reports</Link>
             <Link to="/templates" style={{ color: location.pathname === '/templates' ? 'var(--color-primary)' : 'var(--color-muted)' }}>Templates</Link>
@@ -85,7 +127,7 @@ function NavBar() {
           </div>
 
           {isFormContext && (
-            <div className="navbar-links-desktop" style={{ display: 'flex', gap: '1rem', fontSize: '0.9rem' }}>
+            <div style={{ display: 'flex', gap: '1rem', fontSize: '0.9rem' }}>
               <Link to="/" style={{ color: 'var(--color-muted)' }}>Home</Link>
               <Link to={`/form/${id}/edit`} style={{ color: linkColor('/edit') }}>Builder</Link>
               <Link to={`/form/${id}/records`} style={{ color: linkColor('/records') }}>Records</Link>
@@ -185,43 +227,109 @@ function NavBar() {
             )}
           </div>
 
-          {/* Unconditional now - the top-level links above need this
-              fallback on every page, not just form-context ones. */}
-          <button
-            className="secondary navbar-toggle"
-            onClick={() => setMenuOpen(!menuOpen)}
-            aria-label="Toggle menu"
-            style={{ padding: '0.5rem 0.7rem' }}
-          >
-            {menuOpen ? '✕' : '☰'}
-          </button>
         </div>
       </div>
 
-      <div className={`navbar-links-mobile ${menuOpen ? 'open' : ''}`} style={{ fontSize: '0.9rem' }}>
-        <Link to="/" style={{ color: location.pathname === '/' ? 'var(--color-primary)' : 'var(--color-muted)' }} onClick={() => setMenuOpen(false)}>Home</Link>
-        <Link to="/reports" style={{ color: location.pathname === '/reports' ? 'var(--color-primary)' : 'var(--color-muted)' }} onClick={() => setMenuOpen(false)}>Reports</Link>
-        <Link to="/templates" style={{ color: location.pathname === '/templates' ? 'var(--color-primary)' : 'var(--color-muted)' }} onClick={() => setMenuOpen(false)}>Templates</Link>
-        {isAdmin && (
-          <Link to="/lab" style={{ color: location.pathname === '/lab' ? 'var(--color-primary)' : 'var(--color-muted)' }} onClick={() => setMenuOpen(false)}>Lab</Link>
-        )}
+      {/* Compact bar: hidden on desktop, shown below 768px instead of the
+          row above - just enough to open the drawer and know what app
+          you're in, not a shrunk copy of the desktop nav. */}
+      <div className="navbar-mobile-row">
+        <button
+          onClick={() => setMenuOpen(true)}
+          aria-label="Open menu"
+          style={{
+            width: '38px', height: '38px', padding: 0, borderRadius: '8px',
+            background: 'var(--color-primary)', color: 'white', border: 'none',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            gap: '3px', cursor: 'pointer', flexShrink: 0,
+          }}
+        >
+          <span style={{ width: '17px', height: '2px', background: 'white', borderRadius: '1px' }} />
+          <span style={{ width: '17px', height: '2px', background: 'white', borderRadius: '1px' }} />
+          <span style={{ width: '17px', height: '2px', background: 'white', borderRadius: '1px' }} />
+        </button>
+        <Link to="/" style={{ fontWeight: 'bold', fontSize: '1rem' }}>Verticals</Link>
+      </div>
 
-        {isFormContext && (
-          <>
-            <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.3rem 0' }} />
-            <Link to={`/form/${id}/edit`} style={{ color: linkColor('/edit') }} onClick={() => setMenuOpen(false)}>Builder</Link>
-            <Link to={`/form/${id}/records`} style={{ color: linkColor('/records') }} onClick={() => setMenuOpen(false)}>Records</Link>
-            <Link to={`/form/${id}/report`} style={{ color: linkColor('/report') }} onClick={() => setMenuOpen(false)}>Report</Link>
-            {isPayrollForm && <Link to={`/form/${id}/payroll`} style={{ color: linkColor('/payroll') }} onClick={() => setMenuOpen(false)}>Payroll</Link>}
-            <Link to={`/form/${id}/ai-analyst`} style={{ color: linkColor('/ai-analyst') }} onClick={() => setMenuOpen(false)}>AI Analyst</Link>
-            <Link to={`/form/${id}/settings`} style={{ color: linkColor('/settings') }} onClick={() => setMenuOpen(false)}>Settings</Link>
-            {linkedForms.map(f => (
-              <Link key={f.id} to={`/form/${f.id}/records`} style={{ color: 'var(--color-muted)' }} onClick={() => setMenuOpen(false)}>
-                → {f.name}
-              </Link>
-            ))}
-          </>
-        )}
+      {menuOpen && (
+        <div
+          onClick={() => setMenuOpen(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 150 }}
+        />
+      )}
+
+      <div
+        style={{
+          position: 'fixed', top: 0, left: 0, bottom: 0, width: '250px', zIndex: 151,
+          background: 'white', boxShadow: '2px 0 12px rgba(0,0,0,0.2)',
+          transform: menuOpen ? 'translateX(0)' : 'translateX(-100%)', transition: 'transform 0.2s ease',
+          padding: '1rem', overflowY: 'auto', fontSize: '0.9rem',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem' }}>
+          <span style={{ fontWeight: 700, fontSize: '1.05rem' }}>Verticals</span>
+          <button
+            onClick={() => setMenuOpen(false)} aria-label="Close menu"
+            style={{ background: 'transparent', border: 'none', fontSize: '1.3rem', cursor: 'pointer', lineHeight: 1, padding: 0 }}
+          >
+            ✕
+          </button>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <Link to="/" style={{ color: location.pathname === '/' ? 'var(--color-primary)' : 'var(--color-text)' }} onClick={() => setMenuOpen(false)}>Home</Link>
+          <Link to="/reports" style={{ color: location.pathname === '/reports' ? 'var(--color-primary)' : 'var(--color-text)' }} onClick={() => setMenuOpen(false)}>Reports</Link>
+          <Link to="/templates" style={{ color: location.pathname === '/templates' ? 'var(--color-primary)' : 'var(--color-text)' }} onClick={() => setMenuOpen(false)}>Templates</Link>
+          {isAdmin && (
+            <Link to="/lab" style={{ color: location.pathname === '/lab' ? 'var(--color-primary)' : 'var(--color-text)' }} onClick={() => setMenuOpen(false)}>Lab</Link>
+          )}
+
+          {isFormContext && (
+            <>
+              <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.2rem 0' }} />
+              <Link to={`/form/${id}/edit`} style={{ color: linkColor('/edit') }} onClick={() => setMenuOpen(false)}>Builder</Link>
+              <Link to={`/form/${id}/records`} style={{ color: linkColor('/records') }} onClick={() => setMenuOpen(false)}>Records</Link>
+              <Link to={`/form/${id}/report`} style={{ color: linkColor('/report') }} onClick={() => setMenuOpen(false)}>Report</Link>
+              {isPayrollForm && <Link to={`/form/${id}/payroll`} style={{ color: linkColor('/payroll') }} onClick={() => setMenuOpen(false)}>Payroll</Link>}
+              <Link to={`/form/${id}/ai-analyst`} style={{ color: linkColor('/ai-analyst') }} onClick={() => setMenuOpen(false)}>AI Analyst</Link>
+              <Link to={`/form/${id}/settings`} style={{ color: linkColor('/settings') }} onClick={() => setMenuOpen(false)}>Settings</Link>
+              {linkedForms.map(f => (
+                <Link key={f.id} to={`/form/${f.id}/records`} style={{ color: 'var(--color-muted)' }} onClick={() => setMenuOpen(false)}>
+                  → {f.name}
+                </Link>
+              ))}
+            </>
+          )}
+
+          {/* Account actions live only in the desktop avatar dropdown above
+              768px - folded into the drawer here since that dropdown's
+              trigger button is part of the now-hidden desktop row. */}
+          <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.2rem 0' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-muted)', fontSize: '0.8rem' }}>
+            <span style={{
+              width: '22px', height: '22px', borderRadius: '50%', background: 'var(--color-primary)',
+              color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 700, flexShrink: 0,
+            }}>
+              {initials}
+            </span>
+            Account
+          </div>
+          <Link to="/account" style={{ color: 'var(--color-text)' }} onClick={() => setMenuOpen(false)}>Profile</Link>
+          {binTrigger && (
+            <button
+              onClick={() => { setMenuOpen(false); binTrigger.onOpen() }}
+              style={{ background: 'transparent', border: 'none', padding: 0, textAlign: 'left', color: 'var(--color-text)', fontSize: '0.9rem', cursor: 'pointer' }}
+            >
+              Recycle Bin{binTrigger.count > 0 ? ` (${binTrigger.count})` : ''}
+            </button>
+          )}
+          <button
+            onClick={() => { setMenuOpen(false); supabase.auth.signOut() }}
+            style={{ background: 'transparent', border: 'none', padding: 0, textAlign: 'left', color: '#c0392b', fontSize: '0.9rem', cursor: 'pointer' }}
+          >
+            Log out
+          </button>
+        </div>
       </div>
     </div>
   )

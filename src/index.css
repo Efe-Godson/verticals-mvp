@@ -413,22 +413,12 @@ input:focus, select:focus, textarea:focus {
   text-overflow: ellipsis;
 }
 
-/* NavBar: hamburger toggle, hidden on desktop by default */
-.navbar-toggle {
+/* NavBar: full desktop row vs. compact mobile bar (brand + hamburger only,
+   see NavBar.jsx) - below 768px the mobile bar takes over entirely rather
+   than the desktop row just losing its links, since a row of inline text
+   links plus a 30px avatar circle doesn't fit a phone width at all. */
+.navbar-mobile-row {
   display: none;
-}
-
-.navbar-links-mobile {
-  display: none;
-}
-
-.navbar-links-mobile.open {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  width: 100%;
-  gap: 0.75rem;
-  padding-top: 0.75rem;
 }
 
 /* Form list rows: full button row on desktop, Open + overflow menu on mobile.
@@ -564,16 +554,15 @@ input:focus, select:focus, textarea:focus {
     width: 100%;
   }
 
-  .navbar-toggle {
-    display: inline-flex;
-  }
-
-  .navbar-links-desktop {
+  .navbar-desktop-row {
     display: none !important;
   }
 
-  .navbar-row {
-    flex-wrap: wrap;
+  .navbar-mobile-row {
+    display: flex !important;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.7rem 1rem;
   }
 
   .list-actions-desktop {
