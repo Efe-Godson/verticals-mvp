@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
+import PasswordInput from './PasswordInput'
 
 function ResetPassword() {
   const navigate = useNavigate()
@@ -52,22 +53,18 @@ function ResetPassword() {
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', marginTop: '1rem' }}>
         <div>
           <label>New Password</label><br />
-          <input
-            type="password"
+          <PasswordInput
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            style={{ width: '100%' }}
           />
         </div>
         <div>
           <label>Confirm Password</label><br />
-          <input
-            type="password"
+          <PasswordInput
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             required
-            style={{ width: '100%' }}
           />
         </div>
         <button type="submit" disabled={loading}>

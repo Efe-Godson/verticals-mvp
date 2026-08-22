@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { COUNTRIES } from './lib/locationData'
+import PasswordInput from './PasswordInput'
 
 function GoogleLogo() {
   return (
@@ -83,12 +84,10 @@ function SignUp() {
 
         <div>
           <label>Password</label><br />
-          <input
-            type="password"
+          <PasswordInput
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            style={{ width: '100%' }}
           />
         </div>
 

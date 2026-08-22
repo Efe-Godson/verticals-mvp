@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from './supabaseClient'
+import PasswordInput from './PasswordInput'
 
 function GoogleLogo() {
   return (
@@ -86,7 +87,7 @@ function Login() {
         {mode !== 'forgot' && (
           <div>
             <label>Password</label><br />
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required style={{ width: '100%' }} />
+            <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} required />
           </div>
         )}
  
