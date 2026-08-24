@@ -5,6 +5,7 @@ import PosSidePanel from './PosSidePanel'
 import { LoadingState } from './LoadingState'
 import { ErrorState } from './ErrorState'
 import { isRetailTemplate } from './lib/templateFlags'
+import { LOGO_ICONS, LogoIcon } from './invoiceLogos'
 
 function FormSettings() {
   const { id } = useParams()
@@ -25,6 +26,10 @@ function FormSettings() {
   const [receiptPaperWidth, setReceiptPaperWidth] = useState(80)
   const [staffReportRange, setStaffReportRange] = useState('today')
   const [aiFillRules, setAiFillRules] = useState('')
+  const [logoUrl, setLogoUrl] = useState('')
+  const [logoIconKey, setLogoIconKey] = useState('')
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [logoError, setLogoError] = useState('')
 
   useEffect(() => {
     async function loadForm() {
@@ -41,6 +46,8 @@ function FormSettings() {
         setReceiptPaperWidth(data.settings?.receiptPaperWidth ?? 80)
         setStaffReportRange(data.settings?.staffReportRange ?? 'today')
         setAiFillRules(data.settings?.aiFillRules ?? '')
+        setLogoUrl(data.settings?.logoUrl ?? '')
+        setLogoIconKey(data.settings?.logoIconKey ?? '')
       }
       setLoading(false)
     }
@@ -60,7 +67,7 @@ function FormSettings() {
     const newSettings = {
       ...form.settings,
       allowMultipleResponses, collectEmail, companyName, companyPhone, companyAddress, receiptPaperWidth,
-      staffReportRange, aiFillRules,
+      staffReportRange, aiFillRules, logoUrl, logoIconKey,
     }
 
     const { error } = await supabase
@@ -76,6 +83,37 @@ function FormSettings() {
     setForm(current => ({ ...current, settings: newSettings }))
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
+  }
+
+  // Uploads immediately (same convention as TemplateLocations.jsx's
+  // handleLogoChange - Storage upload can't wait on the page's "Save
+  // Settings" button), but the resulting URL is only local state until
+  // Save Settings is clicked, same as companyName/companyAddress above.
+  async function handleLogoChange(file) {
+    setLogoError('')
+    if (file.type !== 'image/png') {
+      setLogoError('Only PNG logos are supported.')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setLogoError('Logo must be under 5MB.')
+      return
+    }
+
+    setUploadingLogo(true)
+    const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_')
+    const path = `logos/${id}/${Date.now()}-${safeName}`
+    const { error: uploadError } = await supabase.storage.from('form-uploads').upload(path, file)
+    if (uploadError) {
+      setUploadingLogo(false)
+      setLogoError('Could not upload the logo: ' + uploadError.message)
+      return
+    }
+
+    const { data } = supabase.storage.from('form-uploads').getPublicUrl(path)
+    setLogoUrl(data.publicUrl)
+    setLogoIconKey('')
+    setUploadingLogo(false)
   }
 
   if (loading) return <LoadingState label="Loading settings..." />
@@ -172,6 +210,54 @@ function FormSettings() {
           />
         </div>
 
+        {isRetail && (
+          <div style={{ marginBottom: '1.2rem' }}>
+            <label style={{ fontSize: '0.85rem', color: 'var(--color-muted)', display: 'block', marginBottom: '0.5rem' }}>Logo</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', marginBottom: '0.8rem' }}>
+              <label className="secondary" style={{ display: 'inline-block', cursor: 'pointer', fontSize: '0.85rem' }}>
+                {uploadingLogo ? 'Uploading...' : 'Upload PNG logo'}
+                <input
+                  type="file"
+                  accept="image/png"
+                  disabled={uploadingLogo}
+                  onChange={(e) => { if (e.target.files[0]) handleLogoChange(e.target.files[0]); e.target.value = '' }}
+                  style={{ display: 'none' }}
+                />
+              </label>
+              {(logoUrl || logoIconKey) && (
+                <button
+                  type="button"
+                  className="secondary"
+                  style={{ fontSize: '0.85rem' }}
+                  onClick={() => { setLogoUrl(''); setLogoIconKey('') }}
+                >
+                  Remove logo
+                </button>
+              )}
+            </div>
+            {logoError && <p style={{ color: '#c0392b', fontSize: '0.8rem', marginTop: '-0.4rem' }}>{logoError}</p>}
+
+            <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)', marginBottom: '0.5rem' }}>Or pick a default icon:</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+              {LOGO_ICONS.map(icon => (
+                <button
+                  key={icon.key}
+                  type="button"
+                  title={icon.label}
+                  onClick={() => { setLogoIconKey(icon.key); setLogoUrl('') }}
+                  style={{
+                    width: '44px', height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    border: icon.key === logoIconKey ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius)', background: 'var(--color-surface)', cursor: 'pointer', padding: 0,
+                  }}
+                >
+                  <LogoIcon iconKey={icon.key} color="#444" size={24} />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {!isRetail && (
           <div style={{ marginBottom: '1.2rem' }}>
             <label style={{ fontSize: '0.85rem', color: 'var(--color-muted)' }}>Printer Width</label>
@@ -197,6 +283,13 @@ function FormSettings() {
                 width: '100%', maxWidth: '360px', background: 'white', padding: '1.2rem',
                 boxShadow: '0 2px 10px rgba(0,0,0,0.12)'
               }}>
+                {(logoUrl || logoIconKey) && (
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '4px' }}>
+                    {logoUrl
+                      ? <img src={logoUrl} alt="" style={{ maxHeight: '36px', maxWidth: '120px', objectFit: 'contain' }} />
+                      : <LogoIcon iconKey={logoIconKey} color="#111" size={30} />}
+                  </div>
+                )}
                 <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '15px', letterSpacing: '0.5px', marginBottom: '3px', textTransform: 'uppercase' }}>
                   {companyName.trim() || form.name}
                 </div>

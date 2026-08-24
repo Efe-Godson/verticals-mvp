@@ -68,7 +68,7 @@ export function CartCell({ value, cellKey, openCartCellKey, setOpenCartCellKey, 
       )}
 
       {isRetail && showInvoice && (
-        <InvoiceModal form={form} submission={submission} onClose={() => setShowInvoice(false)} />
+        <InvoiceModal form={form} submission={submission} onClose={() => setShowInvoice(false)} allowDateEdit />
       )}
     </span>
   )

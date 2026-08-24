@@ -5,28 +5,42 @@
 // html2canvas + jsPDF instead of handing the person off to the browser's
 // print dialog. Shared by the order confirmation screen and Records'
 // per-order actions so there's one invoice layout everywhere.
+//
+// The visual layout is one of several interchangeable template components
+// (src/invoiceTemplates/), tinted by one of a few curated palettes
+// (src/invoicePalettes.js) - both chosen fresh each time someone opens this
+// modal, not saved anywhere. Backdating the invoice date IS saved (see
+// handleDateChange below), but only form owners/staff are allowed to do
+// that - see the allowDateEdit prop.
 import { useRef, useState } from 'react'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
+import { supabase } from './supabaseClient'
+import { INVOICE_TEMPLATES, getInvoiceTemplate } from './invoiceTemplates'
+import { INVOICE_PALETTES, getPalette } from './invoicePalettes'
+import { LogoIcon } from './invoiceLogos'
 
-function formatFieldValue(field, value) {
-  if (Array.isArray(value)) return value.join(', ')
-  if (field.type === 'multiplechoicegrid' && value && typeof value === 'object') {
-    return Object.entries(value).map(([row, col]) => `${row}: ${col}`).join('; ')
-  }
-  if (field.type === 'checkboxgrid' && value && typeof value === 'object') {
-    return Object.entries(value).map(([row, cols]) => `${row}: ${(cols || []).join(', ')}`).join('; ')
-  }
-  if (field.type === 'rating') return `${value} / ${field.maxStars ?? 5} stars`
-  if (field.type === 'linked_record') return value?.label ? value.label.toString() : ''
-  if (field.type === 'location') return [value?.city, value?.state, value?.country].filter(Boolean).join(', ')
-  return value.toString()
+function toDateInputValue(d) {
+  const yr = d.getFullYear()
+  const mo = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${yr}-${mo}-${day}`
 }
 
-export function InvoiceModal({ form, submission, onClose }) {
+export function InvoiceModal({ form, submission, onClose, allowDateEdit = false }) {
   const invoiceRef = useRef(null)
   const [downloading, setDownloading] = useState(false)
   const [downloadError, setDownloadError] = useState('')
+
+  const [templateKey, setTemplateKey] = useState(INVOICE_TEMPLATES[0].key)
+  const [paletteKey, setPaletteKey] = useState(INVOICE_PALETTES[0].key)
+  const palette = getPalette(paletteKey)
+  const TemplateComponent = getInvoiceTemplate(templateKey).Component
+
+  const [invoiceDateInput, setInvoiceDateInput] = useState(
+    toDateInputValue(submission.invoice_date ? new Date(submission.invoice_date) : new Date(submission.created_at))
+  )
+  const [dateSaveStatus, setDateSaveStatus] = useState('') // '', 'saving', 'saved', 'error'
 
   const settings = form.settings || {}
   const cartFields = form.fields.filter(f => f.type === 'cart')
@@ -60,12 +74,34 @@ export function InvoiceModal({ form, submission, onClose }) {
     ? String(submission.order_number)
     : submission.id.replace(/-/g, '').slice(-12).toUpperCase()
 
-  const createdDate = new Date(submission.created_at)
-  const dateStr = createdDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+  // invoiceDateInput (yyyy-mm-dd, local to this modal) is what actually
+  // renders - it's seeded from invoice_date/created_at above and kept in
+  // sync with the database by handleDateChange, so a reload shows the same
+  // backdated date without needing to re-derive it here.
+  const dateStr = new Date(invoiceDateInput + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
 
   const businessName = settings.companyName?.trim() || form.name
   const businessAddress = settings.companyAddress?.trim()
   const businessPhone = settings.companyPhone?.trim()
+
+  const logoUrl = settings.logoUrl
+  const logoIconKey = settings.logoIconKey
+  const logoElement = logoUrl
+    ? <img src={logoUrl} alt="" style={{ maxHeight: '48px', maxWidth: '160px', objectFit: 'contain' }} crossOrigin="anonymous" />
+    : logoIconKey
+      ? <LogoIcon iconKey={logoIconKey} color={palette.primary} size={40} />
+      : null
+
+  async function handleDateChange(value) {
+    setInvoiceDateInput(value)
+    setDateSaveStatus('saving')
+    const { error } = await supabase
+      .from('submissions')
+      .update({ invoice_date: value })
+      .eq('id', submission.id)
+    setDateSaveStatus(error ? 'error' : 'saved')
+    if (!error) setTimeout(() => setDateSaveStatus(''), 1500)
+  }
 
   async function handleDownload() {
     if (!invoiceRef.current) return
@@ -91,6 +127,12 @@ export function InvoiceModal({ form, submission, onClose }) {
         heightLeft -= pageHeight
       }
 
+      // pdf.save() triggers a direct file download (blob + temporary
+      // download-anchor) - deliberately NOT navigator.share() or a plain
+      // link, so this always lands in the browser's Downloads folder rather
+      // than opening a share sheet. (iOS Safari doesn't reliably honor
+      // anchor `download` for blob URLs and may open the PDF inline instead
+      // - that's a Safari platform limitation, not something fixable here.)
       pdf.save(`Invoice-${orderNumber}.pdf`)
     } catch {
       setDownloadError('Could not create the PDF. Please try again.')
@@ -131,86 +173,83 @@ export function InvoiceModal({ form, submission, onClose }) {
           <p style={{ color: 'var(--status-critical)', fontSize: '0.85rem', margin: '0.75rem 1.25rem 0' }}>{downloadError}</p>
         )}
 
+        <div style={{
+          display: 'flex', flexWrap: 'wrap', gap: '1.2rem', alignItems: 'center',
+          padding: '0.9rem 1.25rem', borderBottom: '1px solid var(--color-border)'
+        }}>
+          <div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--color-muted)', marginBottom: '0.3rem' }}>Style</div>
+            <div style={{ display: 'flex', gap: '0.4rem' }}>
+              {INVOICE_TEMPLATES.map(t => (
+                <button
+                  key={t.key}
+                  type="button"
+                  className={t.key === templateKey ? undefined : 'secondary'}
+                  onClick={() => setTemplateKey(t.key)}
+                  style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem' }}
+                >
+                  {t.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--color-muted)', marginBottom: '0.3rem' }}>Color</div>
+            <div style={{ display: 'flex', gap: '0.4rem' }}>
+              {INVOICE_PALETTES.map(p => (
+                <button
+                  key={p.key}
+                  type="button"
+                  title={p.name}
+                  onClick={() => setPaletteKey(p.key)}
+                  style={{
+                    width: '22px', height: '22px', borderRadius: '50%', background: p.primary,
+                    border: p.key === paletteKey ? '2px solid var(--color-text)' : '2px solid transparent',
+                    padding: 0, cursor: 'pointer'
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+
+          {allowDateEdit && (
+            <div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--color-muted)', marginBottom: '0.3rem' }}>Invoice Date</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <input
+                  type="date"
+                  value={invoiceDateInput}
+                  onChange={(e) => handleDateChange(e.target.value)}
+                  style={{ padding: '0.35rem 0.5rem', fontSize: '0.8rem' }}
+                />
+                {dateSaveStatus === 'saving' && <span style={{ fontSize: '0.75rem', color: 'var(--color-muted)' }}>Saving...</span>}
+                {dateSaveStatus === 'saved' && <span style={{ fontSize: '0.75rem', color: 'var(--status-positive, #16a34a)' }}>Saved</span>}
+                {dateSaveStatus === 'error' && <span style={{ fontSize: '0.75rem', color: 'var(--status-critical)' }}>Could not save</span>}
+              </div>
+            </div>
+          )}
+        </div>
+
         <div style={{ overflowY: 'auto', padding: '1.5rem', background: '#eef0f2' }}>
           {/* Explicit colors throughout (not theme vars) - html2canvas
               snapshots this element as-is, and the PDF must read the same
               regardless of the app's light/dark theme. */}
-          <div ref={invoiceRef} style={{ background: '#ffffff', color: '#111', padding: '2rem', fontFamily: 'Arial, Helvetica, sans-serif' }}>
-            <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-              <div style={{ fontSize: '20px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                {businessName}
-              </div>
-              {businessAddress && <div style={{ fontSize: '12px', color: '#444', marginTop: '4px' }}>{businessAddress}</div>}
-              {businessPhone && <div style={{ fontSize: '12px', color: '#444' }}>{businessPhone}</div>}
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '2px solid #111', borderBottom: '2px solid #111', padding: '0.6rem 0', margin: '0 0 1.2rem' }}>
-              <div>
-                <div style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Invoice</div>
-                <div style={{ fontSize: '15px', fontWeight: 'bold' }}>#{orderNumber}</div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Date</div>
-                <div style={{ fontSize: '15px', fontWeight: 'bold' }}>{dateStr}</div>
-              </div>
-            </div>
-
-            {details.length > 0 && (
-              <div style={{ marginBottom: '1.2rem' }}>
-                {details.map(({ field, value }) => (
-                  <div key={field.id} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.8rem', fontSize: '13px', padding: '0.25rem 0' }}>
-                    <span style={{ color: '#666' }}>{field.label}</span>
-                    <span style={{ textAlign: 'right' }}>{formatFieldValue(field, value)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {items.length > 0 && (
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', marginBottom: '1rem' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid #ccc' }}>
-                    <th style={{ textAlign: 'left', padding: '0.4rem 0', color: '#666', fontWeight: 600 }}>Item</th>
-                    <th style={{ textAlign: 'center', padding: '0.4rem 0', color: '#666', fontWeight: 600 }}>Qty</th>
-                    <th style={{ textAlign: 'right', padding: '0.4rem 0', color: '#666', fontWeight: 600 }}>Price</th>
-                    <th style={{ textAlign: 'right', padding: '0.4rem 0', color: '#666', fontWeight: 600 }}>Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((item, i) => (
-                    <tr key={i} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                      <td style={{ padding: '0.4rem 0' }}>{item.name}</td>
-                      <td style={{ textAlign: 'center', padding: '0.4rem 0' }}>{item.quantity}</td>
-                      <td style={{ textAlign: 'right', padding: '0.4rem 0' }}>{item.price.toLocaleString()}</td>
-                      <td style={{ textAlign: 'right', padding: '0.4rem 0' }}>{(item.price * item.quantity).toLocaleString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-
-            {items.length > 0 && (
-              <div style={{ marginLeft: 'auto', width: '220px' }}>
-                {deliveryFee > 0 && (
-                  <>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '0.2rem 0' }}>
-                      <span>Subtotal</span>
-                      <span>{subtotal.toLocaleString()}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '0.2rem 0' }}>
-                      <span>Delivery Fee</span>
-                      <span>{deliveryFee.toLocaleString()}</span>
-                    </div>
-                  </>
-                )}
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '17px', fontWeight: 'bold', borderTop: '2px solid #111', marginTop: '0.3rem', paddingTop: '0.4rem' }}>
-                  <span>Total</span>
-                  <span>{total.toLocaleString()}</span>
-                </div>
-              </div>
-            )}
-
-            <div style={{ textAlign: 'center', fontSize: '10px', color: '#999', marginTop: '2.5rem' }}>Powered by Verticals</div>
+          <div ref={invoiceRef}>
+            <TemplateComponent
+              businessName={businessName}
+              businessAddress={businessAddress}
+              businessPhone={businessPhone}
+              logoElement={logoElement}
+              orderNumber={orderNumber}
+              dateStr={dateStr}
+              details={details}
+              items={items}
+              subtotal={subtotal}
+              deliveryFee={deliveryFee}
+              total={total}
+              palette={palette}
+            />
           </div>
         </div>
       </div>

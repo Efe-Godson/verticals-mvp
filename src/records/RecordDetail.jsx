@@ -241,7 +241,7 @@ export function RecordDetail({ form, record, fields, onClose, onUpdated, initial
       </div>
 
       {isRetail && showInvoice && (
-        <InvoiceModal form={form} submission={record} onClose={() => setShowInvoice(false)} />
+        <InvoiceModal form={form} submission={record} onClose={() => setShowInvoice(false)} allowDateEdit />
       )}
     </div>
   )
