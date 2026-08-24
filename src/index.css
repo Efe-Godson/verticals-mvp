@@ -12,6 +12,9 @@
      Recomputed by theme.js whenever that color changes; this is just the
      matching default for the initial blue. */
   --color-primary-soft: #eff6ff;
+  /* Light tint for warning/attention banners (e.g. "N selected"), same
+     role as --color-primary-soft but off the warning hue instead. */
+  --color-warning-soft: #fff4e5;
   --radius: 8px;
   --shadow: 0 1px 3px rgba(0,0,0,0.06);
 
@@ -43,14 +46,19 @@
 @media (prefers-color-scheme: dark) {
   :root:where(:not([data-theme="light"])) {
     color-scheme: dark;
-    --color-bg: #121317;
-    --color-surface: #1c1e24;
-    --color-border: #33363f;
-    --color-text: #f0f1f3;
-    --color-muted: #9aa0ab;
+    --color-bg: #17191e;
+    --color-surface: #1e2027;
+    --color-border: #34373f;
+    /* Stepped down from a near-white #f0f1f3 - pure-white text on a near-
+       black surface reads as harsh/glare-y (a common "dark mode is too
+       bright" complaint, worse on mobile screens at night); ~86% lightness
+       is still comfortably above AA contrast without the glare. */
+    --color-text: #dcdee3;
+    --color-muted: #8f95a1;
     --color-primary: #4d94ff;
     --color-primary-hover: #7ab0ff;
     --color-primary-soft: #25334b;
+    --color-warning-soft: #3a2f1e;
     --shadow: 0 1px 3px rgba(0,0,0,0.35);
 
     --chart-series-1: #3987e5;
@@ -72,13 +80,15 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --color-bg: #121317;
-  --color-surface: #1c1e24;
-  --color-border: #33363f;
-  --color-text: #f0f1f3;
-  --color-muted: #9aa0ab;
+  --color-bg: #17191e;
+  --color-surface: #1e2027;
+  --color-border: #34373f;
+  --color-text: #dcdee3;
+  --color-muted: #8f95a1;
   --color-primary: #4d94ff;
   --color-primary-hover: #7ab0ff;
+  --color-primary-soft: #25334b;
+  --color-warning-soft: #3a2f1e;
   --shadow: 0 1px 3px rgba(0,0,0,0.35);
 
   --chart-series-1: #3987e5;

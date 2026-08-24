@@ -67,13 +67,13 @@ function ProductForm({ product, onSave, onCancel }) {
       onClick={onCancel}
       style={{
         position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 400, padding: '1rem'
+        display: 'grid', placeItems: 'start center', overflowY: 'auto', zIndex: 400, padding: '1rem'
       }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
         className="card"
-        style={{ background: 'white', padding: '1.5rem', width: '420px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto' }}
+        style={{ background: 'white', padding: '1.5rem', width: '420px', maxWidth: '100%', margin: '3vh 0' }}
       >
         <h3 style={{ margin: '0 0 1rem' }}>{product ? 'Edit Product' : 'Add Product'}</h3>
 
@@ -222,13 +222,13 @@ function AiImportModal({ onClose, onImport }) {
       onClick={onClose}
       style={{
         position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 400, padding: '1rem'
+        display: 'grid', placeItems: 'start center', overflowY: 'auto', zIndex: 400, padding: '1rem'
       }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
         className="card"
-        style={{ background: 'white', padding: '1.5rem', width: '560px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto' }}
+        style={{ background: 'white', padding: '1.5rem', width: '560px', maxWidth: '100%', margin: '3vh 0' }}
       >
         <h3 style={{ margin: '0 0 0.3rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <SparkleIcon size={18} /> Use AI to add new products
@@ -604,13 +604,13 @@ function ProductManager({ products, onChange, onClose, inline = false, hideAiImp
           onClick={onClose}
           style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: '1rem'
+            display: 'grid', placeItems: 'start center', overflowY: 'auto', zIndex: 300, padding: '1rem'
           }}
         >
           <div
             onClick={(e) => e.stopPropagation()}
             className="card"
-            style={{ background: 'white', padding: '1.5rem', width: '720px', maxWidth: '100%', maxHeight: '88vh', overflowY: 'auto' }}
+            style={{ background: 'white', padding: '1.5rem', width: '720px', maxWidth: '100%', margin: '3vh 0' }}
           >
             {content}
           </div>
@@ -630,10 +630,10 @@ function ProductManager({ products, onChange, onClose, inline = false, hideAiImp
           onClick={() => setShowPackageBuilder(false)}
           style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 400, padding: '1rem'
+            display: 'grid', placeItems: 'start center', overflowY: 'auto', zIndex: 400, padding: '1rem'
           }}
         >
-          <div onClick={(e) => e.stopPropagation()} style={{ width: '420px', maxWidth: '100%' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: '420px', maxWidth: '100%', margin: '3vh 0' }}>
             <PackageBuilder products={products} onCreate={addPackage} onCancel={() => setShowPackageBuilder(false)} />
           </div>
         </div>

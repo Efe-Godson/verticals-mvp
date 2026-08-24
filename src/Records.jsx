@@ -267,15 +267,15 @@ function Records() {
       onMouseEnter={() => setHoveredHeaderId('__submitted')}
       onMouseLeave={() => setHoveredHeaderId(null)}
       style={{
-        textAlign: 'left', borderBottom: '2px solid #e5e7eb', padding: '0.75rem 0.9rem',
+        textAlign: 'left', borderBottom: '2px solid var(--color-border)', padding: '0.75rem 0.9rem',
         position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap',
-        background: hoveredHeaderId === '__submitted' ? '#eef6ff' : '#fafafa',
+        background: hoveredHeaderId === '__submitted' ? 'var(--color-primary-soft)' : 'var(--color-bg)',
         transition: 'background 0.1s ease'
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
         <span title="date">
-          <CubeIcon color={hoveredHeaderId === '__submitted' ? 'var(--color-primary)' : '#94a3b8'} />
+          <CubeIcon color={hoveredHeaderId === '__submitted' ? 'var(--color-primary)' : 'var(--color-muted)'} />
         </span>
         <span>Date</span>
       </div>
@@ -284,7 +284,7 @@ function Records() {
 
   function dateCell(sub) {
     return (
-      <td style={{ borderBottom: '1px solid #eee', padding: '0.75rem 0.9rem', color: '#666', whiteSpace: 'nowrap' }}>
+      <td style={{ borderBottom: '1px solid var(--color-border)', padding: '0.75rem 0.9rem', color: 'var(--color-muted)', whiteSpace: 'nowrap' }}>
         {new Date(sub.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
       </td>
     )
@@ -292,8 +292,8 @@ function Records() {
 
   const orderIdHeaderCell = (
     <th style={{
-      textAlign: 'left', borderBottom: '2px solid #e5e7eb', padding: '0.75rem 0.9rem',
-      position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap', background: '#fafafa'
+      textAlign: 'left', borderBottom: '2px solid var(--color-border)', padding: '0.75rem 0.9rem',
+      position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap', background: 'var(--color-bg)'
     }}>
       Order ID
     </th>
@@ -301,7 +301,7 @@ function Records() {
 
   function orderIdCell(sub) {
     return (
-      <td style={{ borderBottom: '1px solid #eee', padding: '0.75rem 0.9rem', color: '#666', whiteSpace: 'nowrap' }}>
+      <td style={{ borderBottom: '1px solid var(--color-border)', padding: '0.75rem 0.9rem', color: 'var(--color-muted)', whiteSpace: 'nowrap' }}>
         {sub.order_number ? `Order #${sub.order_number}` : '-'}
       </td>
     )
@@ -623,27 +623,27 @@ function Records() {
           .date-range-group { width: 100%; flex: none; }
         }
         .records-table th {
-          background: #f8fafc;
-          border-bottom: 2px solid #e2e8f0;
+          background: var(--color-bg);
+          border-bottom: 2px solid var(--color-border);
           font-size: 0.82rem;
           padding: 0.7rem 0.75rem;
           transition: background 0.16s ease, color 0.16s ease;
         }
         .records-table th:hover {
-          background: #eef6ff;
+          background: var(--color-primary-soft);
         }
         .records-table td {
           padding: 0.7rem 0.75rem;
           vertical-align: top;
         }
         .records-table tbody tr:hover {
-          background: #f8fbff;
+          background: var(--color-primary-soft);
         }
         .records-table tbody tr:nth-child(even) {
-          background: #fcfdff;
+          background: var(--color-bg);
         }
         .records-table tbody tr:nth-child(even):hover {
-          background: #f4f9ff;
+          background: var(--color-primary-soft);
         }
         @media (max-width: 640px) {
           .date-range-row select { width: 100%; }
@@ -658,10 +658,6 @@ function Records() {
           }
         }
         @media (max-width: 480px) {
-          /* Exports, column visibility, presets, and the Recycle Bin all
-             live behind this - power-user/desktop configuration, not
-             something a phone quick-check of orders needs reachable. */
-          .options-menu-row { display: none; }
           /* Revenue and Orders are the two numbers worth a glance on a
              phone - Avg Order and Delivery Fees stay one tap away on
              desktop instead of crowding four tiles onto a small screen. */
@@ -882,7 +878,7 @@ function Records() {
                   Presets
                 </div>
                 {presets.length === 0 && (
-                  <p style={{ fontSize: '0.8rem', color: '#999', margin: '0 0 0.5rem' }}>No saved presets yet.</p>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--color-muted)', margin: '0 0 0.5rem' }}>No saved presets yet.</p>
                 )}
                 {presets.map((preset, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6rem', padding: '0.3rem 0' }}>
@@ -920,7 +916,7 @@ function Records() {
       {selectedIds.length > 0 && (
         <div style={{
           display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '1rem', marginTop: '0.8rem',
-          padding: '0.6rem 1rem', background: '#fff4e5', borderRadius: 'var(--radius)'
+          padding: '0.6rem 1rem', background: 'var(--color-warning-soft)', borderRadius: 'var(--radius)'
         }}>
           <span style={{ fontSize: '0.9rem' }}>{selectedIds.length} selected</span>
           <button className="secondary" style={{ color: '#c0392b' }} onClick={deleteSelected}>Move to Bin</button>
@@ -950,8 +946,8 @@ function Records() {
               <thead>
                 <tr>
                   <th style={{
-                    textAlign: 'left', borderBottom: '2px solid #e5e7eb', padding: '0.75rem 0.9rem',
-                    background: '#fafafa', position: 'sticky', top: 0, zIndex: 6, width: '36px'
+                    textAlign: 'left', borderBottom: '2px solid var(--color-border)', padding: '0.75rem 0.9rem',
+                    background: 'var(--color-bg)', position: 'sticky', top: 0, zIndex: 6, width: '36px'
                   }}>
                     <input
                       type="checkbox"
@@ -970,17 +966,17 @@ function Records() {
                       onMouseEnter={() => setHoveredHeaderId(field.id)}
                       onMouseLeave={() => setHoveredHeaderId(null)}
                       style={{
-                        textAlign: 'left', borderBottom: '2px solid #e5e7eb',
+                        textAlign: 'left', borderBottom: '2px solid var(--color-border)',
                         padding: '0.75rem 0.9rem', position: 'sticky', top: 0, zIndex: 5,
                         whiteSpace: 'nowrap', minWidth: '140px',
-                        background: isHovered ? '#eef6ff' : '#fafafa',
+                        background: isHovered ? 'var(--color-primary-soft)' : 'var(--color-bg)',
                         transition: 'background 0.1s ease'
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.45rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0 }}>
                           <span title={field.type} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <CubeIcon color={isHovered ? 'var(--color-primary)' : '#94a3b8'} />
+                            <CubeIcon color={isHovered ? 'var(--color-primary)' : 'var(--color-muted)'} />
                           </span>
 
                           <span style={{ whiteSpace: 'nowrap' }}>
@@ -996,10 +992,10 @@ function Records() {
                               display: 'flex', alignItems: 'center', justifyContent: 'center',
                               width: '22px', height: '22px', padding: 0, borderRadius: '5px', flexShrink: 0,
                               background: filters[field.id] ? 'var(--color-primary)' : 'transparent',
-                              border: filters[field.id] ? 'none' : '1px solid #cbd5e1'
+                              border: filters[field.id] ? 'none' : '1px solid var(--color-border)'
                             }}
                           >
-                            <FilterIcon color={filters[field.id] ? 'white' : (isHovered ? 'var(--color-primary)' : '#64748b')} />
+                            <FilterIcon color={filters[field.id] ? 'white' : (isHovered ? 'var(--color-primary)' : 'var(--color-muted)')} />
                           </button>
                         )}
                       </div>
@@ -1016,20 +1012,20 @@ function Records() {
                     {field.type === 'cart' && hasCartField && (
                       <>
                         <th style={{
-                          textAlign: 'left', borderBottom: '2px solid #e5e7eb', padding: '0.75rem 0.9rem',
-                          position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap', background: '#fafafa'
+                          textAlign: 'left', borderBottom: '2px solid var(--color-border)', padding: '0.75rem 0.9rem',
+                          position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap', background: 'var(--color-bg)'
                         }}>
                           Grand Total
                         </th>
                         <th style={{
-                          textAlign: 'left', borderBottom: '2px solid #e5e7eb', padding: '0.75rem 0.9rem',
-                          position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap', background: '#fafafa'
+                          textAlign: 'left', borderBottom: '2px solid var(--color-border)', padding: '0.75rem 0.9rem',
+                          position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap', background: 'var(--color-bg)'
                         }}>
                           Total
                         </th>
                         <th style={{
-                          textAlign: 'left', borderBottom: '2px solid #e5e7eb', padding: '0.75rem 0.9rem',
-                          position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap', background: '#fafafa'
+                          textAlign: 'left', borderBottom: '2px solid var(--color-border)', padding: '0.75rem 0.9rem',
+                          position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap', background: 'var(--color-bg)'
                         }}>
                           Delivery
                         </th>
@@ -1041,31 +1037,31 @@ function Records() {
                   {!hasCartField && dateHeaderCell}
                   {!hiddenFieldIds.includes('__lastUpdate') && (
                     <th style={{
-                      textAlign: 'left', borderBottom: '2px solid #e5e7eb', padding: '0.75rem 0.9rem',
-                      position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap', background: '#fafafa'
+                      textAlign: 'left', borderBottom: '2px solid var(--color-border)', padding: '0.75rem 0.9rem',
+                      position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap', background: 'var(--color-bg)'
                     }}>
                       Last Update Date
                     </th>
                   )}
                   {!hiddenFieldIds.includes('__ip') && (
                     <th style={{
-                      textAlign: 'left', borderBottom: '2px solid #e5e7eb', padding: '0.75rem 0.9rem',
-                      position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap', background: '#fafafa'
+                      textAlign: 'left', borderBottom: '2px solid var(--color-border)', padding: '0.75rem 0.9rem',
+                      position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap', background: 'var(--color-bg)'
                     }}>
                       IP
                     </th>
                   )}
                   {!hiddenFieldIds.includes('__submissionId') && (
                     <th style={{
-                      textAlign: 'left', borderBottom: '2px solid #e5e7eb', padding: '0.75rem 0.9rem',
-                      position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap', background: '#fafafa'
+                      textAlign: 'left', borderBottom: '2px solid var(--color-border)', padding: '0.75rem 0.9rem',
+                      position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap', background: 'var(--color-bg)'
                     }}>
                       Submission ID
                     </th>
                   )}
                   <th style={{
-                    textAlign: 'left', borderBottom: '2px solid #e5e7eb', padding: '0.75rem 0.9rem',
-                    position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap', background: '#fafafa'
+                    textAlign: 'left', borderBottom: '2px solid var(--color-border)', padding: '0.75rem 0.9rem',
+                    position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap', background: 'var(--color-bg)'
                   }}>
                     Edit
                   </th>
@@ -1079,7 +1075,7 @@ function Records() {
                     onClick={() => setSelectedRecord(sub)}
                   >
                     <td
-                      style={{ borderBottom: '1px solid #eee', padding: '0.75rem 0.9rem' }}
+                      style={{ borderBottom: '1px solid var(--color-border)', padding: '0.75rem 0.9rem' }}
                       onClick={(e) => e.stopPropagation()}
                     >
                       <input
@@ -1094,7 +1090,7 @@ function Records() {
                     {visibleFields.map(field => (
                       <Fragment key={field.id}>
                       <td style={{
-                        borderBottom: '1px solid #eee', padding: '0.75rem 0.9rem',
+                        borderBottom: '1px solid var(--color-border)', padding: '0.75rem 0.9rem',
                         textAlign: field.type === 'number' ? 'right' : 'left',
                         whiteSpace: 'normal',
                         maxWidth: field.type === 'cart' ? '300px' : undefined,
@@ -1115,13 +1111,13 @@ function Records() {
                       </td>
                       {field.type === 'cart' && hasCartField && (
                         <>
-                          <td style={{ borderBottom: '1px solid #eee', padding: '0.75rem 0.9rem', color: 'var(--color-primary)', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                          <td style={{ borderBottom: '1px solid var(--color-border)', padding: '0.75rem 0.9rem', color: 'var(--color-primary)', fontWeight: 700, whiteSpace: 'nowrap' }}>
                             ₦{(Number(sub.data[field.id]?.total || 0) + Number(sub.data[field.id]?.deliveryFee || 0)).toLocaleString()}
                           </td>
-                          <td style={{ borderBottom: '1px solid #eee', padding: '0.75rem 0.9rem', color: '#666', whiteSpace: 'nowrap' }}>
+                          <td style={{ borderBottom: '1px solid var(--color-border)', padding: '0.75rem 0.9rem', color: 'var(--color-muted)', whiteSpace: 'nowrap' }}>
                             ₦{Number(sub.data[field.id]?.total || 0).toLocaleString()}
                           </td>
-                          <td style={{ borderBottom: '1px solid #eee', padding: '0.75rem 0.9rem', color: '#666', whiteSpace: 'nowrap' }}>
+                          <td style={{ borderBottom: '1px solid var(--color-border)', padding: '0.75rem 0.9rem', color: 'var(--color-muted)', whiteSpace: 'nowrap' }}>
                             ₦{Number(sub.data[field.id]?.deliveryFee || 0).toLocaleString()}
                           </td>
                         </>
@@ -1130,24 +1126,24 @@ function Records() {
                     ))}
                     {!hasCartField && dateCell(sub)}
                     {!hiddenFieldIds.includes('__lastUpdate') && (
-                      <td style={{ borderBottom: '1px solid #eee', padding: '0.75rem 0.9rem', color: '#666', whiteSpace: 'nowrap' }}>
+                      <td style={{ borderBottom: '1px solid var(--color-border)', padding: '0.75rem 0.9rem', color: 'var(--color-muted)', whiteSpace: 'nowrap' }}>
                         {sub.updated_at ? new Date(sub.updated_at).toLocaleDateString('en-GB', {
                           day: '2-digit', month: 'short', year: 'numeric'
                         }) : '-'}
                       </td>
                     )}
                     {!hiddenFieldIds.includes('__ip') && (
-                      <td style={{ borderBottom: '1px solid #eee', padding: '0.75rem 0.9rem', color: '#666', whiteSpace: 'nowrap' }}>
+                      <td style={{ borderBottom: '1px solid var(--color-border)', padding: '0.75rem 0.9rem', color: 'var(--color-muted)', whiteSpace: 'nowrap' }}>
                         {sub.ip_address || '-'}
                       </td>
                     )}
                     {!hiddenFieldIds.includes('__submissionId') && (
-                      <td style={{ borderBottom: '1px solid #eee', padding: '0.75rem 0.9rem', color: '#666', whiteSpace: 'nowrap', fontFamily: 'monospace', fontSize: '0.8rem' }}>
+                      <td style={{ borderBottom: '1px solid var(--color-border)', padding: '0.75rem 0.9rem', color: 'var(--color-muted)', whiteSpace: 'nowrap', fontFamily: 'monospace', fontSize: '0.8rem' }}>
                         {sub.id.slice(0, 8)}
                       </td>
                     )}
                     <td
-                      style={{ borderBottom: '1px solid #eee', padding: '0.75rem 0.9rem', whiteSpace: 'nowrap' }}
+                      style={{ borderBottom: '1px solid var(--color-border)', padding: '0.75rem 0.9rem', whiteSpace: 'nowrap' }}
                       onClick={(e) => e.stopPropagation()}
                     >
                       <span
@@ -1171,7 +1167,7 @@ function Records() {
           </div>
 
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.75rem', marginTop: '1rem' }}>
-            <span style={{ color: '#666', fontSize: '0.9rem' }}>
+            <span style={{ color: 'var(--color-muted)', fontSize: '0.9rem' }}>
               Showing {startIndex + 1}–{Math.min(startIndex + PAGE_SIZE, visible.length)} of {visible.length}
             </span>
             <button disabled={safePage === 1} onClick={() => setCurrentPage(safePage - 1)}>
@@ -1208,7 +1204,7 @@ function Records() {
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              background: 'white', borderRadius: '10px', width: '900px', maxWidth: '100%',
+              background: 'var(--color-surface)', borderRadius: '10px', width: '900px', maxWidth: '100%',
               height: '85vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
               boxShadow: '0 18px 45px rgba(0,0,0,0.25)'
             }}

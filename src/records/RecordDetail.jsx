@@ -135,7 +135,7 @@ export function RecordDetail({ form, record, fields, onClose, onUpdated, initial
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: 'white', borderRadius: '12px', padding: '1.4rem 1.5rem',
+          background: 'var(--color-surface)', borderRadius: '12px', padding: '1.4rem 1.5rem',
           width: '520px', maxWidth: '100%', maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 18px 45px rgba(0,0,0,0.16)'
         }}
       >
@@ -181,20 +181,20 @@ export function RecordDetail({ form, record, fields, onClose, onUpdated, initial
 
         {showHistory ? (
           loadingLogs ? (
-            <p style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#999' }}><LoadingSpinner size={15} color="#999" /> Loading history...</p>
+            <p style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--color-muted)' }}><LoadingSpinner size={15} color="var(--color-muted)" /> Loading history...</p>
           ) : logs.length === 0 ? (
-            <p style={{ color: '#999' }}>No edits have been made to this record yet.</p>
+            <p style={{ color: 'var(--color-muted)' }}>No edits have been made to this record yet.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
               {logs.map(log => (
-                <div key={log.id} style={{ borderBottom: '1px solid #f0f0f0', paddingBottom: '0.7rem' }}>
+                <div key={log.id} style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '0.7rem' }}>
                   <div style={{ fontSize: '0.85rem', fontWeight: '600' }}>{log.field_label}</div>
-                  <div style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.2rem' }}>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--color-muted)', marginTop: '0.2rem' }}>
                     <span style={{ textDecoration: 'line-through', color: '#c0392b' }}>{log.old_value || '(empty)'}</span>
                     {' → '}
                     <span style={{ color: '#1a7f37' }}>{log.new_value || '(empty)'}</span>
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: '#999', marginTop: '0.2rem' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--color-muted)', marginTop: '0.2rem' }}>
                     {log.changed_by_email} · {new Date(log.created_at).toLocaleString('en-GB', {
                       day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
                     })}
@@ -207,7 +207,7 @@ export function RecordDetail({ form, record, fields, onClose, onUpdated, initial
           <>
             {fields.map(field => (
               <div key={field.id} style={{ marginBottom: '0.9rem' }}>
-                <div style={{ fontSize: '0.8rem', color: '#999', marginBottom: '0.35rem', fontWeight: 600 }}>{field.label}</div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)', marginBottom: '0.35rem', fontWeight: 600 }}>{field.label}</div>
                 {isEditing && field.type === 'cart' ? (
                   <CartEditInput
                     field={field}
@@ -221,16 +221,16 @@ export function RecordDetail({ form, record, fields, onClose, onUpdated, initial
                     onChange={(val) => setEditedValues({ ...editedValues, [field.id]: val })}
                   />
                 ) : (
-                  <div style={{ fontSize: '1rem', padding: '0.55rem 0.7rem', borderRadius: '8px', background: '#f8fafc', border: '1px solid #eef2f7', minHeight: '44px', display: 'flex', alignItems: 'center' }}>
+                  <div style={{ fontSize: '1rem', padding: '0.55rem 0.7rem', borderRadius: '8px', background: 'var(--color-bg)', border: '1px solid var(--color-border)', minHeight: '44px', display: 'flex', alignItems: 'center' }}>
                     {formatCell(record.data[field.id], field)}
                   </div>
                 )}
               </div>
             ))}
 
-            <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #eee' }}>
-              <div style={{ fontSize: '0.8rem', color: '#999' }}>Submitted</div>
-              <div style={{ fontSize: '0.9rem', color: '#666' }}>
+            <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)' }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>Submitted</div>
+              <div style={{ fontSize: '0.9rem', color: 'var(--color-muted)' }}>
                 {new Date(record.created_at).toLocaleString('en-GB', {
                   day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
                 })}
