@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
@@ -6,6 +6,11 @@ import { useRecycleBinTrigger } from './RecycleBinContext'
 import { useCurrentPageTitle, useCurrentPageBack } from './PageTitleContext'
 import { TEMPLATE_ADMIN_USER_ID } from './adminAccount'
 import ArrowLeftIcon from './ArrowLeftIcon'
+import MobileBottomNav from './MobileBottomNav'
+
+// Sheet drag-to-dismiss: how far down (px) a drag has to travel before
+// releasing counts as "close" rather than snapping back open.
+const SHEET_CLOSE_THRESHOLD = 80
 
 function NavBar() {
   const location = useLocation()
@@ -20,49 +25,32 @@ function NavBar() {
   const pageTitle = useCurrentPageTitle()
   const pageBack = useCurrentPageBack()
 
-  // Edge-swipe-to-open, the same gesture iOS/Android drawers use: a touch
-  // starting within EDGE_ZONE px of the left edge that moves right past
-  // OPEN_THRESHOLD before it moves more vertically than horizontally (so it
-  // doesn't fight a normal vertical scroll that happens to start near the
-  // edge) opens the drawer. Document-level listeners since the point is
-  // opening it from wherever you're reading, not just from the compact bar
-  // itself - only armed while the drawer is closed, so it can't interfere
-  // with touches inside the open drawer (its own ✕/backdrop/links close it).
-  useEffect(() => {
-    if (menuOpen) return
-    const EDGE_ZONE = 24
-    const OPEN_THRESHOLD = 60
-    let startX = null
-    let startY = null
-    let armed = false
+  // Swipe-down-to-close on the mobile menu sheet (see the drag-handle strip
+  // below) - dragY is the live offset while a finger's down, reset once it's
+  // released either way. Plain refs/DOM writes for the live drag instead of
+  // state, so a fast drag doesn't fight React's render cycle; dragging only
+  // flips a state bit (to turn the CSS transition off while live-tracking).
+  const [dragging, setDragging] = useState(false)
+  const dragStartY = useRef(null)
+  const sheetRef = useRef(null)
 
-    function onTouchStart(e) {
-      const touch = e.touches[0]
-      armed = !!touch && touch.clientX <= EDGE_ZONE
-      if (armed) { startX = touch.clientX; startY = touch.clientY }
-    }
-
-    function onTouchMove(e) {
-      if (!armed) return
-      const touch = e.touches[0]
-      if (!touch) return
-      const dx = touch.clientX - startX
-      const dy = touch.clientY - startY
-      if (Math.abs(dy) > Math.abs(dx)) { armed = false; return }
-      if (dx > OPEN_THRESHOLD) { setMenuOpen(true); armed = false }
-    }
-
-    function onTouchEnd() { armed = false }
-
-    document.addEventListener('touchstart', onTouchStart, { passive: true })
-    document.addEventListener('touchmove', onTouchMove, { passive: true })
-    document.addEventListener('touchend', onTouchEnd, { passive: true })
-    return () => {
-      document.removeEventListener('touchstart', onTouchStart)
-      document.removeEventListener('touchmove', onTouchMove)
-      document.removeEventListener('touchend', onTouchEnd)
-    }
-  }, [menuOpen])
+  function handleSheetDragStart(e) {
+    dragStartY.current = e.touches[0].clientY
+    setDragging(true)
+  }
+  function handleSheetDragMove(e) {
+    if (dragStartY.current == null || !sheetRef.current) return
+    const delta = Math.max(0, e.touches[0].clientY - dragStartY.current)
+    sheetRef.current.style.transform = `translateY(${delta}px)`
+  }
+  function handleSheetDragEnd(e) {
+    if (dragStartY.current == null || !sheetRef.current) return
+    const delta = Math.max(0, (e.changedTouches[0]?.clientY ?? dragStartY.current) - dragStartY.current)
+    dragStartY.current = null
+    setDragging(false)
+    sheetRef.current.style.transform = ''
+    if (delta > SHEET_CLOSE_THRESHOLD) setMenuOpen(false)
+  }
 
   const isAdmin = session?.user?.id === TEMPLATE_ADMIN_USER_ID
   const displayName = session?.user?.user_metadata?.full_name || ''
@@ -245,55 +233,34 @@ function NavBar() {
       </div>
 
       {/* Compact bar: hidden on desktop, shown below 768px instead of the
-          row above - just the page title now, since the hamburger/back
-          controls that used to live here moved to navbar-bottom-bar below
-          (a top corner was an awkward one-handed reach on a phone; the
-          bottom is where a thumb actually rests). */}
+          row above. Back is a hierarchical "one level up" control (only for
+          pages that registered a destination via usePageBack, e.g.
+          TemplateLocations.jsx -> "/") - it stays paired with the title up
+          here, since it means something different from the persistent
+          Home/Records/Reports tabs below (see MobileBottomNav.jsx): this is
+          "back to where I came from", not "jump to a top-level section". */}
       <div className="navbar-mobile-row">
-        <Link to="/" style={{ fontWeight: 'bold', fontSize: '1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {mobileBrand}
-        </Link>
-      </div>
-
-      {/* Fixed bottom bar: same hamburger + back control as the old top
-          row, just anchored to the bottom of the viewport instead - only
-          ever shown alongside navbar-mobile-row above (same breakpoint),
-          see the matching CSS in index.css. */}
-      <div className="navbar-bottom-bar">
-        <button
-          onClick={() => setMenuOpen(true)}
-          aria-label="Open menu"
-          style={{
-            width: '44px', height: '44px', padding: 0, borderRadius: '8px',
-            background: 'var(--color-primary)', color: 'white', border: 'none',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            gap: '3px', cursor: 'pointer', flexShrink: 0,
-          }}
-        >
-          <span style={{ width: '18px', height: '2px', background: 'white', borderRadius: '1px' }} />
-          <span style={{ width: '18px', height: '2px', background: 'white', borderRadius: '1px' }} />
-          <span style={{ width: '18px', height: '2px', background: 'white', borderRadius: '1px' }} />
-        </button>
-
-        {/* Only for pages one level below the top that registered a
-            destination via usePageBack (e.g. TemplateLocations.jsx -> "/").
-            The hamburger opens the general nav drawer, not "back", so a
-            page like that needs its own way out beyond the drawer's own
-            Home link. */}
         {pageBack && (
           <Link
             to={pageBack.to}
             aria-label={pageBack.label ? `Back to ${pageBack.label}` : 'Back'}
             style={{
               width: '44px', height: '44px', flexShrink: 0, color: 'var(--color-text)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              border: '1px solid var(--color-border)', borderRadius: '8px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: '-0.4rem',
             }}
           >
-            <ArrowLeftIcon size={20} />
+            <ArrowLeftIcon size={22} />
           </Link>
         )}
+        <span style={{ fontWeight: 'bold', fontSize: '1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {mobileBrand}
+        </span>
       </div>
+
+      {/* Fixed bottom tab bar - Menu/Home/Records/Reports, see
+          MobileBottomNav.jsx. Only ever shown alongside navbar-mobile-row
+          above (same breakpoint), see the matching CSS in index.css. */}
+      <MobileBottomNav onOpenMenu={() => setMenuOpen(true)} />
 
       {menuOpen && (
         <div
@@ -302,21 +269,40 @@ function NavBar() {
         />
       )}
 
+      {/* Menu sheet: slides up from the bottom rather than in from the side
+          - the Menu tab that opens it lives at the bottom now too, so a
+          bottom sheet reads as "grew out of the button you tapped" instead
+          of arriving from an unrelated edge. Drag the handle down (or tap
+          the backdrop/✕) to close. */}
       <div
+        ref={sheetRef}
         style={{
-          position: 'fixed', top: 0, left: 0, bottom: 0, width: '250px', zIndex: 151,
-          background: 'var(--color-surface)', boxShadow: '2px 0 12px rgba(0,0,0,0.2)',
-          transform: menuOpen ? 'translateX(0)' : 'translateX(-100%)', transition: 'transform 0.2s ease',
-          // top(0)/bottom(0) here means this ignores body's own safe-area
-          // padding (a fixed element positions against the viewport
-          // directly), so its own close button/footer would otherwise sit
-          // under the status bar / behind the home-indicator on an
-          // installed PWA - padding handles both ends itself instead.
-          padding: 'calc(1rem + env(safe-area-inset-top)) 1rem calc(1rem + env(safe-area-inset-bottom))',
-          overflowY: 'auto', fontSize: '0.9rem',
+          position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 151, maxHeight: '80vh',
+          background: 'var(--color-surface)', boxShadow: '0 -4px 20px rgba(0,0,0,0.2)',
+          borderTopLeftRadius: '16px', borderTopRightRadius: '16px',
+          transform: menuOpen ? 'translateY(0)' : 'translateY(100%)',
+          transition: dragging ? 'none' : 'transform 0.25s ease',
+          display: 'flex', flexDirection: 'column', fontSize: '0.9rem',
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.2rem' }}>
+        <div
+          onTouchStart={handleSheetDragStart}
+          onTouchMove={handleSheetDragMove}
+          onTouchEnd={handleSheetDragEnd}
+          style={{ padding: '0.6rem 0 0.3rem', display: 'flex', justifyContent: 'center', touchAction: 'none', flexShrink: 0 }}
+        >
+          <span style={{ width: '36px', height: '4px', borderRadius: '999px', background: 'var(--color-border)' }} />
+        </div>
+
+        <div style={{
+          // minHeight: 0 overrides a flex item's default min-height:auto -
+          // without it, this couldn't actually shrink to fit the sheet's own
+          // maxHeight cap once the link list is long enough, so overflowY
+          // below would never get the chance to kick in (the sheet would
+          // just clip past 80vh with no way to scroll to the rest).
+          flex: '1 1 auto', minHeight: 0, overflowY: 'auto', padding: '0 1rem calc(1rem + env(safe-area-inset-bottom))',
+        }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.8rem' }}>
           <button
             onClick={() => setMenuOpen(false)} aria-label="Close menu"
             style={{ background: 'transparent', border: 'none', fontSize: '1.3rem', cursor: 'pointer', lineHeight: 1, padding: 0 }}
@@ -325,9 +311,9 @@ function NavBar() {
           </button>
         </div>
 
+        {/* Home/Records/Reports live in the persistent bottom tab bar now
+            (see MobileBottomNav.jsx) - not repeated here too. */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          <Link to="/" style={{ color: location.pathname === '/' ? 'var(--color-primary)' : 'var(--color-text)' }} onClick={() => setMenuOpen(false)}>Home</Link>
-          <Link to="/reports" style={{ color: location.pathname === '/reports' ? 'var(--color-primary)' : 'var(--color-text)' }} onClick={() => setMenuOpen(false)}>Reports</Link>
           <Link to="/templates" style={{ color: location.pathname === '/templates' ? 'var(--color-primary)' : 'var(--color-text)' }} onClick={() => setMenuOpen(false)}>Templates</Link>
           {isAdmin && (
             <Link to="/lab" style={{ color: location.pathname === '/lab' ? 'var(--color-primary)' : 'var(--color-text)' }} onClick={() => setMenuOpen(false)}>Lab</Link>
@@ -341,12 +327,13 @@ function NavBar() {
             </button>
           )}
 
+          {/* Records/Report are deliberately not repeated here either - the
+              bottom tab bar's Records/Reports already jump straight into
+              this same form's records/report when there's one in context. */}
           {isFormContext && (
             <>
               <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.2rem 0' }} />
               <Link to={`/form/${id}/edit`} style={{ color: linkColor('/edit') }} onClick={() => setMenuOpen(false)}>Builder</Link>
-              <Link to={`/form/${id}/records`} style={{ color: linkColor('/records') }} onClick={() => setMenuOpen(false)}>Records</Link>
-              <Link to={`/form/${id}/report`} style={{ color: linkColor('/report') }} onClick={() => setMenuOpen(false)}>Report</Link>
               {isPayrollForm && <Link to={`/form/${id}/payroll`} style={{ color: linkColor('/payroll') }} onClick={() => setMenuOpen(false)}>Payroll</Link>}
               <Link to={`/form/${id}/ai-analyst`} style={{ color: linkColor('/ai-analyst') }} onClick={() => setMenuOpen(false)}>AI Analyst</Link>
               <Link to={`/form/${id}/settings`} style={{ color: linkColor('/settings') }} onClick={() => setMenuOpen(false)}>Settings</Link>
@@ -359,7 +346,7 @@ function NavBar() {
           )}
 
           {/* Account actions live only in the desktop avatar dropdown above
-              768px - folded into the drawer here since that dropdown's
+              768px - folded into the sheet here since that dropdown's
               trigger button is part of the now-hidden desktop row. */}
           <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.2rem 0' }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-muted)', fontSize: '0.8rem' }}>
@@ -378,17 +365,17 @@ function NavBar() {
           >
             Log out
           </button>
-        </div>
 
-        {/* Brand mark moved here from the drawer's own header - a quiet
-            watermark at the very bottom instead of a heading up top, since
-            the compact bar's own brand/title already identifies the app
-            before the drawer is even open. */}
-        <div style={{
-          position: 'absolute', bottom: 'calc(1rem + env(safe-area-inset-bottom))', left: '1rem', right: 0, textAlign: 'left',
-          fontSize: '0.78rem', fontWeight: 700, fontStyle: 'italic', color: 'var(--color-muted)', letterSpacing: '0.02em',
-        }}>
-          Verticals
+          {/* Quiet watermark closing out the list, rather than a heading up
+              top - the compact bar's own title already identifies the app
+              before the sheet is even open. */}
+          <div style={{
+            fontSize: '0.78rem', fontWeight: 700, fontStyle: 'italic', color: 'var(--color-muted)',
+            letterSpacing: '0.02em', marginTop: '0.5rem',
+          }}>
+            Verticals
+          </div>
+        </div>
         </div>
       </div>
     </div>

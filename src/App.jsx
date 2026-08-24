@@ -9,6 +9,7 @@ import BusinessesHome from './BusinessesHome'
 import TemplateLocations from './TemplateLocations'
 import { TEMPLATE_ADMIN_USER_ID } from './adminAccount'
 import Reports from './Reports'
+import RecordsHome from './RecordsHome'
 import CreateForm from './CreateForm'
 import EditForm from './EditForm'
 import PublicForm from './PublicForm'
@@ -135,6 +136,7 @@ function AppShell() {
         <Route path="/lab/quiz/room/:roomId/admin" element={<PrivateRoute><StaffScopedRoute><AdminOnlyRoute><QuizAdminDashboard /></AdminOnlyRoute></StaffScopedRoute></PrivateRoute>} />
         <Route path="/lab/quiz/history" element={<PrivateRoute><StaffScopedRoute><AdminOnlyRoute><QuizPointHistory /></AdminOnlyRoute></StaffScopedRoute></PrivateRoute>} />
         <Route path="/reports" element={<PrivateRoute><StaffScopedRoute><Reports /></StaffScopedRoute></PrivateRoute>} />
+        <Route path="/records" element={<PrivateRoute><StaffScopedRoute><RecordsHome /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/templates" element={<PrivateRoute><StaffScopedRoute><Templates /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/templates/:slug/locations" element={<PrivateRoute><StaffScopedRoute><TemplateLocations /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/account" element={<PrivateRoute><StaffScopedRoute><AccountPage /></StaffScopedRoute></PrivateRoute>} />

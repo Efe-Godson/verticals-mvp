@@ -564,7 +564,7 @@ input:focus, select:focus, textarea:focus {
      last bit of a page (a table's final row, a form's Save button) would
      sit underneath it. */
   .app-content-under-navbar .page {
-    padding: 1.25rem 1rem calc(4.75rem + env(safe-area-inset-bottom));
+    padding: 1.25rem 1rem calc(84px + env(safe-area-inset-bottom));
   }
 
   .page {
@@ -604,12 +604,12 @@ input:focus, select:focus, textarea:focus {
     right: 0;
     bottom: 0;
     z-index: 140;
-    align-items: center;
+    height: calc(68px + env(safe-area-inset-bottom));
+    align-items: stretch;
     justify-content: space-between;
-    gap: 0.6rem;
     background: var(--color-surface);
     border-top: 1px solid var(--color-border);
-    padding: 0.5rem 1rem calc(0.5rem + env(safe-area-inset-bottom));
+    padding: 0 0.3rem env(safe-area-inset-bottom);
   }
 
   /* PosSidePanel's menu/back buttons: same top-corner floating buttons as
