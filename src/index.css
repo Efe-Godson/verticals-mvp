@@ -153,6 +153,15 @@ a {
   text-decoration: none;
 }
 
+/* Mobile taps: skip the browser's ~300ms double-tap-to-zoom delay and the
+   gray flash it paints on tap, on every button/link app-wide - most
+   noticeable on the small fixed nav controls (menu/back buttons), but
+   there's no reason to limit it to just those. */
+a, button {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
 button {
   font-family: inherit;
   cursor: pointer;

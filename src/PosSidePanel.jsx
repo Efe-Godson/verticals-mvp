@@ -147,8 +147,14 @@ function PosSidePanel({ formId, hasCartField = false, bottomBarPresent = false }
         onClick={() => setOpen(true)}
         aria-label="Open menu"
         style={{
-          position: 'fixed', top: '1rem', left: '1rem', zIndex: 150,
-          width: '42px', height: '42px', padding: 0, borderRadius: '8px',
+          // calc()'d rather than relying on body's own safe-area padding -
+          // a position:fixed element positions against the viewport
+          // directly and ignores an ancestor's padding, so without this it
+          // sits under the status bar/notch on an installed PWA (viewport-
+          // fit=cover + a translucent status bar let page content render
+          // there at all) instead of clear of it.
+          position: 'fixed', top: 'calc(1rem + env(safe-area-inset-top))', left: '1rem', zIndex: 150,
+          width: '44px', height: '44px', padding: 0, borderRadius: '8px',
           background: 'var(--color-primary)', color: 'white', border: 'none',
           display: open ? 'none' : 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center', gap: '4px', cursor: 'pointer'
@@ -171,8 +177,8 @@ function PosSidePanel({ formId, hasCartField = false, bottomBarPresent = false }
           aria-label={`Back to ${exitLink.label}`}
           title={exitLink.label}
           style={{
-            position: 'fixed', top: '1rem', right: '1rem', zIndex: 150,
-            width: '38px', height: '38px', background: 'transparent', border: 'none',
+            position: 'fixed', top: 'calc(1rem + env(safe-area-inset-top))', right: '1rem', zIndex: 150,
+            width: '44px', height: '44px', background: 'transparent', border: 'none',
             color: 'var(--color-primary)',
             display: open ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center',
           }}
@@ -193,7 +199,11 @@ function PosSidePanel({ formId, hasCartField = false, bottomBarPresent = false }
           position: 'fixed', top: 0, left: 0, bottom: 0, width: '200px',
           background: 'var(--color-primary)', color: 'white', zIndex: 151,
           transform: open ? 'translateX(0)' : 'translateX(-100%)',
-          transition: 'transform 0.2s ease', padding: '1rem', boxShadow: '2px 0 12px rgba(0,0,0,0.2)'
+          transition: 'transform 0.2s ease',
+          // See the menu button above for why env(safe-area-inset-*) is
+          // needed - this drawer is top:0/bottom:0 fixed too.
+          padding: 'calc(1rem + env(safe-area-inset-top)) 1rem calc(1rem + env(safe-area-inset-bottom))',
+          boxShadow: '2px 0 12px rgba(0,0,0,0.2)'
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>

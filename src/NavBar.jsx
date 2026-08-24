@@ -307,7 +307,13 @@ function NavBar() {
           position: 'fixed', top: 0, left: 0, bottom: 0, width: '250px', zIndex: 151,
           background: 'var(--color-surface)', boxShadow: '2px 0 12px rgba(0,0,0,0.2)',
           transform: menuOpen ? 'translateX(0)' : 'translateX(-100%)', transition: 'transform 0.2s ease',
-          padding: '1rem', overflowY: 'auto', fontSize: '0.9rem',
+          // top(0)/bottom(0) here means this ignores body's own safe-area
+          // padding (a fixed element positions against the viewport
+          // directly), so its own close button/footer would otherwise sit
+          // under the status bar / behind the home-indicator on an
+          // installed PWA - padding handles both ends itself instead.
+          padding: 'calc(1rem + env(safe-area-inset-top)) 1rem calc(1rem + env(safe-area-inset-bottom))',
+          overflowY: 'auto', fontSize: '0.9rem',
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.2rem' }}>
@@ -379,7 +385,7 @@ function NavBar() {
             the compact bar's own brand/title already identifies the app
             before the drawer is even open. */}
         <div style={{
-          position: 'absolute', bottom: '1rem', left: '1rem', right: 0, textAlign: 'left',
+          position: 'absolute', bottom: 'calc(1rem + env(safe-area-inset-bottom))', left: '1rem', right: 0, textAlign: 'left',
           fontSize: '0.78rem', fontWeight: 700, fontStyle: 'italic', color: 'var(--color-muted)', letterSpacing: '0.02em',
         }}>
           Verticals

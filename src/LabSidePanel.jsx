@@ -29,8 +29,11 @@ function LabSidePanel() {
         onClick={() => setOpen(true)}
         aria-label="Open Lab menu"
         style={{
-          position: 'fixed', top: '1rem', left: '1rem', zIndex: 150,
-          width: '42px', height: '42px', padding: 0, borderRadius: '8px',
+          // See PosSidePanel.jsx's matching button for why env(safe-area-
+          // inset-top) is needed here (a fixed element ignores an
+          // ancestor's own safe-area padding).
+          position: 'fixed', top: 'calc(1rem + env(safe-area-inset-top))', left: '1rem', zIndex: 150,
+          width: '44px', height: '44px', padding: 0, borderRadius: '8px',
           background: 'var(--color-primary)', color: 'white', border: 'none',
           display: open ? 'none' : 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center', gap: '4px', cursor: 'pointer'
@@ -53,7 +56,11 @@ function LabSidePanel() {
           position: 'fixed', top: 0, left: 0, bottom: 0, width: '240px',
           background: 'var(--color-primary)', color: 'white', zIndex: 151,
           transform: open ? 'translateX(0)' : 'translateX(-100%)',
-          transition: 'transform 0.2s ease', padding: '1rem', boxShadow: '2px 0 12px rgba(0,0,0,0.2)'
+          transition: 'transform 0.2s ease',
+          // See PosSidePanel.jsx's matching drawer for why this needs its
+          // own env(safe-area-inset-*) padding.
+          padding: 'calc(1rem + env(safe-area-inset-top)) 1rem calc(1rem + env(safe-area-inset-bottom))',
+          boxShadow: '2px 0 12px rgba(0,0,0,0.2)'
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
