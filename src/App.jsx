@@ -98,11 +98,18 @@ function AppShell() {
   // append this so those pages open on their own, without the app's nav -
   // a cashier jumping over to edit the menu shouldn't land in the full app shell.
   const isFocusMode = new URLSearchParams(location.search).get('focus') === '1'
+  const showNavBar = !isPublicForm && !isShortLink && !isQuizPlayer && !isLogin && !isSignUp && !isConfirmEmail && !isResetPassword && !isFocusMode
 
   return (
     <>
       <OfflineBanner />
-      {!isPublicForm && !isShortLink && !isQuizPlayer && !isLogin && !isSignUp && !isConfirmEmail && !isResetPassword && !isFocusMode && <NavBar />}
+      {showNavBar && <NavBar />}
+      {/* Only pages with NavBar get its fixed navbar-bottom-bar on mobile,
+          so only they need the matching bottom padding reserved (see the
+          .app-content-under-navbar rule in index.css) - a focus-mode/public
+          form page has no such bar and would just get pointless empty
+          space at the bottom otherwise. */}
+      <div className={showNavBar ? 'app-content-under-navbar' : undefined}>
       <Routes>
         <Route path="/s/:code" element={<ShortLinkRedirect />} />
         <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
@@ -148,6 +155,7 @@ function AppShell() {
         <Route path="/form/:id/payroll" element={<PrivateRoute><StaffScopedRoute><PayrollDashboard /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/form/:id/payroll/payments" element={<PrivateRoute><StaffScopedRoute><PayrollPage /></StaffScopedRoute></PrivateRoute>} />
       </Routes>
+      </div>
     </>
   )
 }

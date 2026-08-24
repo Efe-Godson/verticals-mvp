@@ -25,6 +25,7 @@ function LabSidePanel() {
     <>
       <button
         type="button"
+        className="pos-menu-button"
         onClick={() => setOpen(true)}
         aria-label="Open Lab menu"
         style={{

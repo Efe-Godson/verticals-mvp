@@ -2129,7 +2129,7 @@ function PublicForm() {
     }}>
       {!token && (
         <div className="no-print">
-          <PosSidePanel formId={form.id} hasCartField={form.fields.some(f => f.type === 'cart')} />
+          <PosSidePanel formId={form.id} hasCartField={form.fields.some(f => f.type === 'cart')} bottomBarPresent={cartDefersCheckout} />
         </div>
       )}
 

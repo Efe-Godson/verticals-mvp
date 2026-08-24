@@ -319,7 +319,7 @@ input:focus, select:focus, textarea:focus {
 }
 
 .records-table tbody tr:nth-child(even) {
-  background: #fafbfc;
+  background: var(--color-bg);
 }
 
 .records-table tbody tr:hover {
@@ -428,6 +428,10 @@ input:focus, select:focus, textarea:focus {
    than the desktop row just losing its links, since a row of inline text
    links plus a 30px avatar circle doesn't fit a phone width at all. */
 .navbar-mobile-row {
+  display: none;
+}
+
+.navbar-bottom-bar {
   display: none;
 }
 
@@ -545,6 +549,15 @@ input:focus, select:focus, textarea:focus {
 }
 
 @media (max-width: 768px) {
+  /* Bottom padding reserves room for .navbar-bottom-bar below, whenever
+     it's actually present (see App.jsx's app-content-under-navbar) - a
+     fixed bar doesn't push content up on its own, so without this the
+     last bit of a page (a table's final row, a form's Save button) would
+     sit underneath it. */
+  .app-content-under-navbar .page {
+    padding: 1.25rem 1rem calc(4.75rem + env(safe-area-inset-bottom));
+  }
+
   .page {
     padding: 1.25rem 1rem;
   }
@@ -573,6 +586,32 @@ input:focus, select:focus, textarea:focus {
     align-items: center;
     gap: 0.6rem;
     padding: 0.7rem 1rem;
+  }
+
+  .navbar-bottom-bar {
+    display: flex !important;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 140;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+    padding: 0.5rem 1rem calc(0.5rem + env(safe-area-inset-bottom));
+  }
+
+  /* PosSidePanel's menu/back buttons: same top-corner floating buttons as
+     desktop, just re-anchored to the bottom corners here - a top corner is
+     an awkward one-handed reach on a phone, the bottom is where a thumb
+     actually rests. Only the vertical anchor changes; size/color/side stay
+     exactly as PosSidePanel.jsx sets them. */
+  .pos-menu-button,
+  .pos-back-button {
+    top: auto !important;
+    bottom: calc(1rem + env(safe-area-inset-bottom)) !important;
   }
 
   .list-actions-desktop {

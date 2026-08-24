@@ -60,7 +60,7 @@ function ShareLinkModal({ url, onClose }) {
 // Generic nav for any template's form, not just cart/POS ones - Templates'
 // "Manage" opens whichever page fits the template with ?panel=1, which
 // starts this open instead of collapsed.
-function PosSidePanel({ formId, hasCartField = false }) {
+function PosSidePanel({ formId, hasCartField = false, bottomBarPresent = false }) {
   const [searchParams] = useSearchParams()
   const [open, setOpen] = useState(searchParams.get('panel') === '1')
   const [shareLinkUrl, setShareLinkUrl] = useState(null)
@@ -139,6 +139,11 @@ function PosSidePanel({ formId, hasCartField = false }) {
     <>
       <button
         type="button"
+        // Skipped when the host page already pins its own bottom bar there
+        // (Retail's deferCheckout order screen and its Back/Place Order
+        // row - see PublicForm.jsx) - re-anchoring to the bottom on mobile
+        // would land this right on top of that bar instead of clear of it.
+        className={bottomBarPresent ? undefined : 'pos-menu-button'}
         onClick={() => setOpen(true)}
         aria-label="Open menu"
         style={{
@@ -162,6 +167,7 @@ function PosSidePanel({ formId, hasCartField = false }) {
       {exitLink && (
         <Link
           to={exitLink.to}
+          className={bottomBarPresent ? undefined : 'pos-back-button'}
           aria-label={`Back to ${exitLink.label}`}
           title={exitLink.label}
           style={{

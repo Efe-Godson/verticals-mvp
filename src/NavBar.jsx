@@ -245,39 +245,49 @@ function NavBar() {
       </div>
 
       {/* Compact bar: hidden on desktop, shown below 768px instead of the
-          row above - just enough to open the drawer and know what app
-          you're in, not a shrunk copy of the desktop nav. */}
+          row above - just the page title now, since the hamburger/back
+          controls that used to live here moved to navbar-bottom-bar below
+          (a top corner was an awkward one-handed reach on a phone; the
+          bottom is where a thumb actually rests). */}
       <div className="navbar-mobile-row">
+        <Link to="/" style={{ fontWeight: 'bold', fontSize: '1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {mobileBrand}
+        </Link>
+      </div>
+
+      {/* Fixed bottom bar: same hamburger + back control as the old top
+          row, just anchored to the bottom of the viewport instead - only
+          ever shown alongside navbar-mobile-row above (same breakpoint),
+          see the matching CSS in index.css. */}
+      <div className="navbar-bottom-bar">
         <button
           onClick={() => setMenuOpen(true)}
           aria-label="Open menu"
           style={{
-            width: '38px', height: '38px', padding: 0, borderRadius: '8px',
+            width: '44px', height: '44px', padding: 0, borderRadius: '8px',
             background: 'var(--color-primary)', color: 'white', border: 'none',
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             gap: '3px', cursor: 'pointer', flexShrink: 0,
           }}
         >
-          <span style={{ width: '17px', height: '2px', background: 'white', borderRadius: '1px' }} />
-          <span style={{ width: '17px', height: '2px', background: 'white', borderRadius: '1px' }} />
-          <span style={{ width: '17px', height: '2px', background: 'white', borderRadius: '1px' }} />
+          <span style={{ width: '18px', height: '2px', background: 'white', borderRadius: '1px' }} />
+          <span style={{ width: '18px', height: '2px', background: 'white', borderRadius: '1px' }} />
+          <span style={{ width: '18px', height: '2px', background: 'white', borderRadius: '1px' }} />
         </button>
-        <Link to="/" style={{ fontWeight: 'bold', fontSize: '1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {mobileBrand}
-        </Link>
 
-        {/* Right-hand back control - only for pages one level below the top
-            that registered a destination via usePageBack (e.g.
-            TemplateLocations.jsx -> "/"). The hamburger opens the general
-            nav drawer, not "back", so a page like that needs its own way
-            out beyond the drawer's own Home link. */}
+        {/* Only for pages one level below the top that registered a
+            destination via usePageBack (e.g. TemplateLocations.jsx -> "/").
+            The hamburger opens the general nav drawer, not "back", so a
+            page like that needs its own way out beyond the drawer's own
+            Home link. */}
         {pageBack && (
           <Link
             to={pageBack.to}
             aria-label={pageBack.label ? `Back to ${pageBack.label}` : 'Back'}
             style={{
-              marginLeft: 'auto', flexShrink: 0, color: 'var(--color-text)',
-              display: 'flex', alignItems: 'center', padding: '0.2rem',
+              width: '44px', height: '44px', flexShrink: 0, color: 'var(--color-text)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              border: '1px solid var(--color-border)', borderRadius: '8px',
             }}
           >
             <ArrowLeftIcon size={20} />
