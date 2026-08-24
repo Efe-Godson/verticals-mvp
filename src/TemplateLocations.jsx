@@ -35,7 +35,7 @@ function LocationTile({ location, color, uploading, onManage, onDuplicate, onDel
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onManage() } }}
       style={{
         position: 'relative', aspectRatio: '1', border: '1px solid var(--color-border)', borderRadius: '12px',
-        background: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center',
+        background: 'var(--color-surface)', display: 'flex', flexDirection: 'column', alignItems: 'center',
         justifyContent: 'center', gap: '0.5rem', padding: '0.9rem', textAlign: 'center', cursor: 'pointer'
       }}
     >
@@ -71,7 +71,7 @@ function LocationTile({ location, color, uploading, onManage, onDuplicate, onDel
             <div style={{ position: 'fixed', inset: 0, zIndex: 15 }} onClick={() => setMenuOpen(false)} />
             <div className="dropdown-panel" style={{
               position: 'absolute', top: '100%', right: 0, marginTop: '0.2rem',
-              background: 'white', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
+              background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
               boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 20, minWidth: '150px', overflow: 'hidden'
             }}>
               <div
@@ -453,7 +453,7 @@ function TemplateLocations() {
           onClick={() => setShowAddModal(false)}
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '1rem' }}
         >
-          <div onClick={(e) => e.stopPropagation()} style={{ background: 'white', borderRadius: '8px', padding: '1.5rem', width: '380px', maxWidth: '100%' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: 'var(--color-surface)', borderRadius: '8px', padding: '1.5rem', width: '380px', maxWidth: '100%' }}>
             <h3 style={{ margin: '0 0 0.4rem' }}>{duplicateSourceId ? 'Name this duplicate' : 'Name this location'}</h3>
             <p style={{ color: 'var(--color-muted)', fontSize: '0.85rem', margin: '0 0 1rem' }}>
               {duplicateSourceId

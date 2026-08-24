@@ -25,7 +25,7 @@ function DetailsModal({ breakdown, status, onClose }) {
       onClick={onClose}
       style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '1rem' }}
     >
-      <div onClick={(e) => e.stopPropagation()} style={{ background: 'white', borderRadius: '8px', padding: '1.5rem', width: '460px', maxWidth: '100%', maxHeight: '85vh', overflowY: 'auto' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: 'var(--color-surface)', borderRadius: '8px', padding: '1.5rem', width: '460px', maxWidth: '100%', maxHeight: '85vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
           <h3 style={{ margin: 0 }}>{breakdown.name}</h3>
           <button className="secondary" onClick={onClose}>Close</button>

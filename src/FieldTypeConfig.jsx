@@ -133,7 +133,7 @@ function ManageCitiesModal({ field, index, updateField, onClose }) {
       <div
         onClick={(e) => e.stopPropagation()}
         className="card"
-        style={{ background: 'white', padding: '1.5rem', width: '420px', maxWidth: '100%', maxHeight: '85vh', overflowY: 'auto' }}
+        style={{ background: 'var(--color-surface)', padding: '1.5rem', width: '420px', maxWidth: '100%', maxHeight: '85vh', overflowY: 'auto' }}
       >
         <h3 style={{ margin: '0 0 0.3rem' }}>Add Missing Cities</h3>
         <p style={{ fontSize: '0.85rem', color: 'var(--color-muted)', margin: '0 0 1rem' }}>

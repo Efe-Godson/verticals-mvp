@@ -20,7 +20,7 @@ function ReportTile({ template, locationCount, onOpen }) {
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen() } }}
       style={{
         position: 'relative', aspectRatio: '1', border: '1px solid var(--color-border)', borderRadius: '12px',
-        background: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center',
+        background: 'var(--color-surface)', display: 'flex', flexDirection: 'column', alignItems: 'center',
         justifyContent: 'center', gap: '0.4rem', padding: '0.9rem', textAlign: 'center', cursor: 'pointer'
       }}
     >

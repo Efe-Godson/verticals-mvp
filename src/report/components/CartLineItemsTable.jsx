@@ -1,10 +1,10 @@
 // Place at: src/report/components/CartLineItemsTable.jsx
 
 const thStyle = {
-  textAlign: 'left', padding: '0.5rem 0.7rem', background: '#fafafa',
-  borderBottom: '1px solid #eee', position: 'sticky', top: 0
+  textAlign: 'left', padding: '0.5rem 0.7rem', background: 'var(--color-bg)',
+  borderBottom: '1px solid var(--color-border)', position: 'sticky', top: 0
 }
-const tdStyle = { padding: '0.5rem 0.7rem', borderBottom: '1px solid #f5f5f5' }
+const tdStyle = { padding: '0.5rem 0.7rem', borderBottom: '1px solid var(--color-border)' }
 
 function CartLineItemsTable({ field, answered }) {
   const rows = []

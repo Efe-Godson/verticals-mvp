@@ -289,7 +289,7 @@ function AdminStaff() {
             display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: '1rem'
           }}
         >
-          <div onClick={(e) => e.stopPropagation()} className="card" style={{ background: 'white', padding: '1.5rem', width: '360px', maxWidth: '100%' }}>
+          <div onClick={(e) => e.stopPropagation()} className="card" style={{ background: 'var(--color-surface)', padding: '1.5rem', width: '360px', maxWidth: '100%' }}>
             <h3 style={{ margin: '0 0 1rem' }}>Reset Password for {resetTarget.email.split('@')[0]}</h3>
             <form onSubmit={submitResetPassword}>
               <div style={{ marginBottom: '1rem' }}>
@@ -317,7 +317,7 @@ function AdminStaff() {
             display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: '1rem'
           }}
         >
-          <div onClick={(e) => e.stopPropagation()} className="card" style={{ background: 'white', padding: '1.5rem', width: '360px', maxWidth: '100%' }}>
+          <div onClick={(e) => e.stopPropagation()} className="card" style={{ background: 'var(--color-surface)', padding: '1.5rem', width: '360px', maxWidth: '100%' }}>
             <h3 style={{ margin: '0 0 0.6rem' }}>Remove this staff login?</h3>
             <p style={{ color: 'var(--color-muted)', fontSize: '0.9rem' }}>They'll immediately lose access and won't be able to sign in again.</p>
             <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>

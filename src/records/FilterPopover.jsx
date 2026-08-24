@@ -7,7 +7,7 @@ export function FilterPopover({ field, currentFilter, onApply, onClear }) {
   const [selected, setSelected] = useState(currentFilter?.selected || [])
 
   const boxStyle = {
-    position: 'absolute', top: '100%', left: 0, background: 'white',
+    position: 'absolute', top: '100%', left: 0, background: 'var(--color-surface)',
     border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.8rem',
     boxShadow: '0 10px 24px rgba(15,23,42,0.12)', zIndex: 10, width: '240px', maxWidth: '90vw',
     fontWeight: 'normal', fontSize: '0.85rem'

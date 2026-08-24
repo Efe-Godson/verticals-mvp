@@ -417,7 +417,7 @@ function Home() {
       </div>
 
       {!loading && demoForm && (
-        <div className="card" style={{ padding: '1.2rem 1.5rem', marginBottom: '1.5rem', background: 'white' }}>
+        <div className="card" style={{ padding: '1.2rem 1.5rem', marginBottom: '1.5rem', background: 'var(--color-surface)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.6rem' }}>
             <PinIcon size={13} />
             <span style={{ fontWeight: 600, fontSize: '0.92rem' }}>Try Demo</span>
@@ -662,7 +662,7 @@ function ListView({ pageForms, togglePin, publishForm, setFormStatus, duplicateF
               {openMenuId === `d-${form.id}` && (
                 <div className="dropdown-panel" style={{
                   position: 'absolute', top: '100%', right: 0, marginTop: '0.3rem',
-                  background: 'white', border: '1px solid var(--color-border)',
+                  background: 'var(--color-surface)', border: '1px solid var(--color-border)',
                   borderRadius: 'var(--radius)', boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
                   zIndex: 20, minWidth: '120px', overflow: 'hidden'
                 }}>
@@ -701,7 +701,7 @@ function ListView({ pageForms, togglePin, publishForm, setFormStatus, duplicateF
               {openMenuId === `m-${form.id}` && (
                 <div className="dropdown-panel" style={{
                   position: 'absolute', top: '100%', right: 0, marginTop: '0.3rem',
-                  background: 'white', border: '1px solid var(--color-border)',
+                  background: 'var(--color-surface)', border: '1px solid var(--color-border)',
                   borderRadius: 'var(--radius)', boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
                   zIndex: 20, minWidth: '150px', overflow: 'hidden'
                 }}>
@@ -789,7 +789,7 @@ function GridView({ pageForms, togglePin, publishForm, setFormStatus, duplicateF
               {openMenuId === form.id && (
                 <div style={{
                   position: 'absolute', top: '100%', right: 0, marginTop: '0.3rem',
-                  background: 'white', border: '1px solid var(--color-border)',
+                  background: 'var(--color-surface)', border: '1px solid var(--color-border)',
                   borderRadius: 'var(--radius)', boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
                   zIndex: 20, minWidth: '150px', overflow: 'hidden'
                 }}>

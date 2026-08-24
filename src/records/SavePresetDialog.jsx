@@ -19,7 +19,7 @@ export function SavePresetDialog({ onSave, onClose }) {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ background: 'white', borderRadius: '8px', padding: '1.5rem', width: '360px', maxWidth: '100%' }}
+        style={{ background: 'var(--color-surface)', borderRadius: '8px', padding: '1.5rem', width: '360px', maxWidth: '100%' }}
       >
         <h3 style={{ margin: '0 0 1rem' }}>Save Filter Preset</h3>
 

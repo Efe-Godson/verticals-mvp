@@ -13,6 +13,11 @@
 // localStorage is only a same-device cache for an instant paint at boot,
 // before AuthContext.jsx has resolved a session and fetched the real value.
 const STORAGE_KEY = 'verticals_theme_color'
+// Device-local only (see applyThemeMode below) - unlike the accent color,
+// light/dark is a "what's comfortable on the screen in front of me right
+// now" preference, not a brand setting that should follow the account
+// across devices, so this deliberately isn't synced to account_settings.
+const MODE_KEY = 'verticals_theme_mode'
 
 export const THEME_COLORS = [
   { name: 'Blue', hex: '#0070f3' },
@@ -46,7 +51,40 @@ function mix(hex, towardHex, amount) {
 }
 
 function isDarkMode() {
+  // A forced mode (see applyThemeMode) wins over the OS setting - index.css's
+  // dark block is scoped to data-theme="dark" OR (no data-theme and OS
+  // dark), so this mirrors that same precedence for the accent-color mix.
+  const forced = document.documentElement.dataset.theme
+  if (forced === 'dark') return true
+  if (forced === 'light') return false
   return typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches
+}
+
+export function getThemeMode() {
+  return localStorage.getItem(MODE_KEY) || 'system'
+}
+
+// Sets/clears the data-theme attribute index.css keys its dark palette off
+// of, persists the choice, and recomputes the accent-color mix (its hover/
+// soft variants depend on light vs dark, which just changed).
+export function applyThemeMode(mode) {
+  const root = document.documentElement
+  if (mode === 'dark') root.dataset.theme = 'dark'
+  else if (mode === 'light') root.dataset.theme = 'light'
+  else delete root.dataset.theme
+  localStorage.setItem(MODE_KEY, mode)
+  applyThemeColor(localStorage.getItem(STORAGE_KEY) || THEME_COLORS[0].hex)
+}
+
+// Boot-time only: paints the last-chosen mode immediately, before React (or
+// even applyCachedThemeColor) runs - main.jsx calls this first so the
+// data-theme attribute is already in place when applyCachedThemeColor reads
+// isDarkMode() right after, instead of painting one theme and flashing to
+// another a moment later.
+export function applyCachedThemeMode() {
+  const mode = getThemeMode()
+  if (mode === 'dark') document.documentElement.dataset.theme = 'dark'
+  else if (mode === 'light') document.documentElement.dataset.theme = 'light'
 }
 
 // Applies to the page and refreshes the local same-device cache. Does not

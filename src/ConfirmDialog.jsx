@@ -10,7 +10,7 @@ function ConfirmDialog({ title, message, confirmLabel = 'Confirm', danger, onCon
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ background: 'white', borderRadius: '8px', padding: '1.5rem', width: '380px', maxWidth: '100%' }}
+        style={{ background: 'var(--color-surface)', borderRadius: '8px', padding: '1.5rem', width: '380px', maxWidth: '100%' }}
       >
         <h3 style={{ margin: '0 0 0.7rem' }}>{title}</h3>
         <p style={{ color: 'var(--color-muted)', fontSize: '0.9rem', margin: '0 0 1.3rem' }}>{message}</p>

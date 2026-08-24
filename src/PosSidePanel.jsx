@@ -36,7 +36,7 @@ function ShareLinkModal({ url, onClose }) {
       <div
         onClick={(e) => e.stopPropagation()}
         className="card"
-        style={{ background: 'white', padding: '1.2rem', width: '480px', maxWidth: '100%' }}
+        style={{ background: 'var(--color-surface)', padding: '1.2rem', width: '480px', maxWidth: '100%' }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
           <h3 style={{ margin: 0, fontSize: '1rem' }}>Share Link</h3>

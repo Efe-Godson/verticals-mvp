@@ -8,7 +8,7 @@ import { useToast } from './Toast'
 import StatTile from './report/components/StatTile'
 import PieChart from './report/components/PieChart'
 import HorizontalBarChart from './report/components/HorizontalBarChart'
-import { THEME_COLORS, saveThemeColor, applyThemeColor } from './theme'
+import { THEME_COLORS, saveThemeColor, applyThemeColor, getThemeMode, applyThemeMode } from './theme'
 import { usePageTitle } from './PageTitleContext'
 
 const STATUS_LABEL = { draft: 'Draft', published: 'Live', paused: 'Paused', archived: 'Archived' }
@@ -60,6 +60,14 @@ function AccountPage() {
   const [loadingAnalytics, setLoadingAnalytics] = useState(true)
 
   const [themeColor, setThemeColor] = useState(THEME_COLORS[0].hex)
+  // Device-local (not account_settings) - see the comment on MODE_KEY in
+  // theme.js for why this one doesn't sync across devices like the color does.
+  const [themeMode, setThemeMode] = useState(getThemeMode())
+
+  function chooseThemeMode(mode) {
+    setThemeMode(mode)
+    applyThemeMode(mode)
+  }
 
   useEffect(() => {
     supabase.from('account_settings').select('theme_color').eq('user_id', user.id).maybeSingle()
@@ -242,6 +250,27 @@ function AccountPage() {
       )}
 
       <SectionCard title="Appearance">
+        <div style={{ fontSize: '0.85rem', color: 'var(--color-muted)', marginBottom: '0.5rem' }}>
+          Theme mode - Dark uses a reduced-contrast night palette instead of following the color scheme your device happens to be set to.
+        </div>
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.4rem' }}>
+          {[
+            { value: 'system', label: 'System' },
+            { value: 'light', label: 'Light' },
+            { value: 'dark', label: 'Dark' },
+          ].map(opt => (
+            <button
+              key={opt.value}
+              type="button"
+              className={themeMode === opt.value ? '' : 'secondary'}
+              aria-pressed={themeMode === opt.value}
+              onClick={() => chooseThemeMode(opt.value)}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
         <div style={{ fontSize: '0.85rem', color: 'var(--color-muted)', marginBottom: '0.8rem' }}>
           Theme color - applies everywhere the app uses its accent color, including the softer tinted cards and highlights.
         </div>

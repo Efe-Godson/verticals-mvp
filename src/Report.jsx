@@ -294,7 +294,7 @@ function Report() {
               />
               <div className="dropdown-panel" style={{
                 position: 'absolute', top: '100%', right: 0, marginTop: '0.3rem',
-                background: 'white', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
+                background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 20, minWidth: '220px', padding: '0.6rem',
                 overflow: 'hidden'
               }}>
@@ -738,7 +738,7 @@ function KPIGrid({ form, submissions, previousSubmissions = [], totalResponses, 
           <div
             onClick={(e) => e.stopPropagation()}
             className="card"
-            style={{ background: 'white', padding: '1.2rem', width: '320px', maxWidth: '100%' }}
+            style={{ background: 'var(--color-surface)', padding: '1.2rem', width: '320px', maxWidth: '100%' }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
               <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Add Metric</span>

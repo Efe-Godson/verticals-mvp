@@ -118,7 +118,7 @@ function NavBar() {
   const mobileBrand = (isFormContext && formName) || pageTitle || 'Verticals'
 
   return (
-    <div style={{ background: 'white', borderBottom: '1px solid var(--color-border)' }}>
+    <div style={{ background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)' }}>
       {/* Full bar: the logo, every link inline, both dropdown buttons - this
           is a desktop layout (a row of horizontal text links plus a 30px
           avatar circle just doesn't fit a phone width) and is hidden below
@@ -164,7 +164,7 @@ function NavBar() {
                   <div style={{ position: 'fixed', inset: 0, zIndex: 15 }} onClick={() => setLinkedMenuOpen(false)} />
                   <div className="dropdown-panel" style={{
                     position: 'absolute', top: '100%', right: 0, marginTop: '0.3rem',
-                    background: 'white', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
+                    background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
                     boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 20, minWidth: '180px', overflow: 'hidden', padding: 0
                   }}>
                     {linkedForms.map(f => (
@@ -203,7 +203,7 @@ function NavBar() {
                 <div style={{ position: 'fixed', inset: 0, zIndex: 15 }} onClick={() => setAccountMenuOpen(false)} />
                 <div className="dropdown-panel" style={{
                   position: 'absolute', top: '100%', right: 0, marginTop: '0.3rem',
-                  background: 'white', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
+                  background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
                   boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 20, minWidth: '170px', overflow: 'hidden', padding: '0.3rem'
                 }}>
                   <Link
@@ -295,7 +295,7 @@ function NavBar() {
       <div
         style={{
           position: 'fixed', top: 0, left: 0, bottom: 0, width: '250px', zIndex: 151,
-          background: 'white', boxShadow: '2px 0 12px rgba(0,0,0,0.2)',
+          background: 'var(--color-surface)', boxShadow: '2px 0 12px rgba(0,0,0,0.2)',
           transform: menuOpen ? 'translateX(0)' : 'translateX(-100%)', transition: 'transform 0.2s ease',
           padding: '1rem', overflowY: 'auto', fontSize: '0.9rem',
         }}
@@ -367,13 +367,10 @@ function NavBar() {
         {/* Brand mark moved here from the drawer's own header - a quiet
             watermark at the very bottom instead of a heading up top, since
             the compact bar's own brand/title already identifies the app
-            before the drawer is even open. A fixed light gray rather than a
-            theme variable: the drawer's own background is hardcoded white
-            (not theme-aware, matching PosSidePanel's drawer elsewhere), so
-            a dark-mode color here would read as too strong against it. */}
+            before the drawer is even open. */}
         <div style={{
           position: 'absolute', bottom: '1rem', left: '1rem', right: 0, textAlign: 'left',
-          fontSize: '0.78rem', fontWeight: 700, fontStyle: 'italic', color: '#d1d5db', letterSpacing: '0.02em',
+          fontSize: '0.78rem', fontWeight: 700, fontStyle: 'italic', color: 'var(--color-muted)', letterSpacing: '0.02em',
         }}>
           Verticals
         </div>

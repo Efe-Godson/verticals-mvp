@@ -31,7 +31,7 @@ function TemplateTile({ template, started, starting, onAdd, onManage }) {
       className="template-tile"
       style={{
         position: 'relative', aspectRatio: '1', border: '1px solid var(--color-border)', borderRadius: '12px',
-        background: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center',
+        background: 'var(--color-surface)', display: 'flex', flexDirection: 'column', alignItems: 'center',
         justifyContent: 'center', gap: '0.5rem', padding: '0.9rem', textAlign: 'center'
       }}
     >
@@ -377,7 +377,7 @@ function Templates() {
           onClick={() => setLocationModalTemplate(null)}
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '1rem' }}
         >
-          <div onClick={(e) => e.stopPropagation()} style={{ background: 'white', borderRadius: '8px', padding: '1.5rem', width: '380px', maxWidth: '100%' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: 'var(--color-surface)', borderRadius: '8px', padding: '1.5rem', width: '380px', maxWidth: '100%' }}>
             <h3 style={{ margin: '0 0 0.4rem' }}>Name this location</h3>
             <p style={{ color: 'var(--color-muted)', fontSize: '0.85rem', margin: '0 0 1rem' }}>
               "{locationModalTemplate.name}" for e.g. your first branch, shop, or site. You can add more locations later.

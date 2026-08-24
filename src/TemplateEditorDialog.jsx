@@ -144,7 +144,7 @@ function TemplateEditorDialog({ template, realForms, onClose, onSaved }) {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ background: 'white', borderRadius: '8px', padding: '1.5rem', width: '620px', maxWidth: '100%', maxHeight: '88vh', overflowY: 'auto' }}
+        style={{ background: 'var(--color-surface)', borderRadius: '8px', padding: '1.5rem', width: '620px', maxWidth: '100%', maxHeight: '88vh', overflowY: 'auto' }}
       >
         <h3 style={{ margin: '0 0 1rem' }}>{isEdit ? `Edit "${template.name}"` : 'New Template'}</h3>
 

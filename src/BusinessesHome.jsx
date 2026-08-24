@@ -33,7 +33,7 @@ function BusinessTile({ template, locationCount, onManage, onDelete }) {
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onManage() } }}
       style={{
         position: 'relative', aspectRatio: '1', border: '1px solid var(--color-border)', borderRadius: '12px',
-        background: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center',
+        background: 'var(--color-surface)', display: 'flex', flexDirection: 'column', alignItems: 'center',
         justifyContent: 'center', gap: '0.4rem', padding: '0.9rem', textAlign: 'center', cursor: 'pointer'
       }}
     >
@@ -57,7 +57,7 @@ function BusinessTile({ template, locationCount, onManage, onDelete }) {
               <div style={{ position: 'fixed', inset: 0, zIndex: 15 }} onClick={() => setMenuOpen(false)} />
               <div className="dropdown-panel" style={{
                 position: 'absolute', top: '100%', right: 0, marginTop: '0.2rem',
-                background: 'white', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
+                background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 20, minWidth: '130px', overflow: 'hidden'
               }}>
                 <div

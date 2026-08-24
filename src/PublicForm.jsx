@@ -95,7 +95,7 @@ function AiRulesModal({ rules, onSave, onClose }) {
       <div
         onClick={(e) => e.stopPropagation()}
         className="card"
-        style={{ background: 'white', padding: '1.5rem', width: '480px', maxWidth: '100%' }}
+        style={{ background: 'var(--color-surface)', padding: '1.5rem', width: '480px', maxWidth: '100%' }}
       >
         <h3 style={{ margin: '0 0 0.3rem' }}>AI Order-Fill Rules</h3>
         <p style={{ fontSize: '0.85rem', color: 'var(--color-muted)', margin: '0 0 0.8rem' }}>
@@ -183,7 +183,7 @@ function AiFillModal({ cartField, fields, rules, showRulesButton, onSaveRules, o
       <div
         onClick={(e) => e.stopPropagation()}
         className="card"
-        style={{ background: 'white', padding: '1.5rem', width: '520px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto' }}
+        style={{ background: 'var(--color-surface)', padding: '1.5rem', width: '520px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto' }}
       >
         <h3 style={{ margin: '0 0 0.3rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <SparkleIcon size={18} /> Fill from Text
@@ -348,7 +348,7 @@ function OrderConfirmationModal({ form, submission, onClose }) {
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.45)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 500, padding: '1rem'
     }}>
-      <div className="card" style={{ background: 'white', padding: '1.75rem', width: '380px', maxWidth: '100%', textAlign: 'center' }}>
+      <div className="card" style={{ background: 'var(--color-surface)', padding: '1.75rem', width: '380px', maxWidth: '100%', textAlign: 'center' }}>
         <CheckIcon />
         <h3 style={{ margin: '0.8rem 0 0.2rem' }}>Order Placed</h3>
         <p style={{ color: 'var(--color-muted)', margin: '0 0 1.2rem' }}>
@@ -1247,7 +1247,7 @@ function PublicForm() {
               {payment && !token ? (
                 <div style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.8rem', flex: 1,
-                  background: 'white', border: '1px solid var(--color-primary)', borderRadius: '6px',
+                  background: 'var(--color-surface)', border: '1px solid var(--color-primary)', borderRadius: '6px',
                   padding: '0.6rem 0.8rem', fontSize: '0.85rem'
                 }}>
                   <span>✓ Paid via {payment.method}</span>
@@ -1506,7 +1506,7 @@ function PublicForm() {
               <div
                 onClick={(e) => e.stopPropagation()}
                 className="card"
-                style={{ background: 'white', padding: '1.5rem', width: '420px', maxWidth: '100%', maxHeight: '80vh', overflowY: 'auto' }}
+                style={{ background: 'var(--color-surface)', padding: '1.5rem', width: '420px', maxWidth: '100%', maxHeight: '80vh', overflowY: 'auto' }}
               >
                 <h3 style={{ margin: '0 0 1rem' }}>Held Orders</h3>
 
@@ -1560,7 +1560,7 @@ function PublicForm() {
               <div
                 onClick={(e) => e.stopPropagation()}
                 className="card"
-                style={{ background: 'white', padding: '1.5rem', width: '420px', maxWidth: '100%', maxHeight: '92vh', overflowY: 'auto' }}
+                style={{ background: 'var(--color-surface)', padding: '1.5rem', width: '420px', maxWidth: '100%', maxHeight: '92vh', overflowY: 'auto' }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '1rem' }}>
                   <h3 style={{ margin: 0 }}>Checkout</h3>

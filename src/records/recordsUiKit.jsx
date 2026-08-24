@@ -53,7 +53,7 @@ export const overlayStyle = { position: 'fixed', inset: 0, zIndex: 15 }
 
 export const dropdownStyle = {
   position: 'absolute', top: '100%', right: 0, marginTop: '0.3rem',
-  background: 'white', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
+  background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
   boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 20, minWidth: '190px', padding: '0.6rem'
 }
 

@@ -38,7 +38,7 @@ function RestockModal({ product, onSave, onCancel }) {
       <div
         onClick={(e) => e.stopPropagation()}
         className="card"
-        style={{ background: 'white', padding: '1.5rem', width: '380px', maxWidth: '100%' }}
+        style={{ background: 'var(--color-surface)', padding: '1.5rem', width: '380px', maxWidth: '100%' }}
       >
         <h3 style={{ margin: '0 0 0.2rem' }}>{product.name}</h3>
         <p style={{ margin: '0 0 1rem', color: 'var(--color-muted)', fontSize: '0.85rem' }}>
@@ -211,7 +211,7 @@ function Inventory() {
             <div className="table-scroll">
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
                 <thead>
-                  <tr style={{ background: '#fafafa' }}>
+                  <tr style={{ background: 'var(--color-bg)' }}>
                     <th style={{ textAlign: 'left', padding: '0.6rem 0.8rem', borderBottom: '1px solid var(--color-border)' }}>Name</th>
                     <th style={{ textAlign: 'left', padding: '0.6rem 0.8rem', borderBottom: '1px solid var(--color-border)' }}>Category</th>
                     <th style={{ textAlign: 'left', padding: '0.6rem 0.8rem', borderBottom: '1px solid var(--color-border)' }}>Price</th>

@@ -73,7 +73,7 @@ function ProductForm({ product, onSave, onCancel }) {
       <div
         onClick={(e) => e.stopPropagation()}
         className="card"
-        style={{ background: 'white', padding: '1.5rem', width: '420px', maxWidth: '100%', margin: '3vh 0' }}
+        style={{ background: 'var(--color-surface)', padding: '1.5rem', width: '420px', maxWidth: '100%', margin: '3vh 0' }}
       >
         <h3 style={{ margin: '0 0 1rem' }}>{product ? 'Edit Product' : 'Add Product'}</h3>
 
@@ -228,7 +228,7 @@ function AiImportModal({ onClose, onImport }) {
       <div
         onClick={(e) => e.stopPropagation()}
         className="card"
-        style={{ background: 'white', padding: '1.5rem', width: '560px', maxWidth: '100%', margin: '3vh 0' }}
+        style={{ background: 'var(--color-surface)', padding: '1.5rem', width: '560px', maxWidth: '100%', margin: '3vh 0' }}
       >
         <h3 style={{ margin: '0 0 0.3rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <SparkleIcon size={18} /> Use AI to add new products
@@ -441,7 +441,7 @@ function ProductManager({ products, onChange, onClose, inline = false, hideAiImp
               <>
                 <div onClick={() => setImportMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 15 }} />
                 <div className="dropdown-panel" style={{
-                  position: 'absolute', top: '100%', left: 0, marginTop: '0.3rem', background: 'white',
+                  position: 'absolute', top: '100%', left: 0, marginTop: '0.3rem', background: 'var(--color-surface)',
                   border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
                   boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 20, minWidth: '200px', padding: '0.4rem'
                 }}>
@@ -530,7 +530,7 @@ function ProductManager({ products, onChange, onClose, inline = false, hideAiImp
           <div className="table-scroll" style={{ marginTop: 0 }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
               <thead>
-                <tr style={{ background: '#fafafa' }}>
+                <tr style={{ background: 'var(--color-bg)' }}>
                   <th style={{ textAlign: 'left', padding: '0.6rem 0.8rem', borderBottom: '1px solid var(--color-border)' }}>Name</th>
                   <th style={{ textAlign: 'left', padding: '0.6rem 0.8rem', borderBottom: '1px solid var(--color-border)' }}>Price</th>
                   <th style={{ textAlign: 'left', padding: '0.6rem 0.8rem', borderBottom: '1px solid var(--color-border)' }}>Unit</th>
@@ -566,7 +566,7 @@ function ProductManager({ products, onChange, onClose, inline = false, hideAiImp
                         <>
                           <div onClick={() => setOpenRowMenuId(null)} style={{ position: 'fixed', inset: 0, zIndex: 15 }} />
                           <div className="dropdown-panel" style={{
-                            position: 'absolute', top: '100%', right: 0, marginTop: '0.3rem', background: 'white',
+                            position: 'absolute', top: '100%', right: 0, marginTop: '0.3rem', background: 'var(--color-surface)',
                             border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
                             boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 20, minWidth: '130px', padding: '0.4rem'
                           }}>
@@ -610,7 +610,7 @@ function ProductManager({ products, onChange, onClose, inline = false, hideAiImp
           <div
             onClick={(e) => e.stopPropagation()}
             className="card"
-            style={{ background: 'white', padding: '1.5rem', width: '720px', maxWidth: '100%', margin: '3vh 0' }}
+            style={{ background: 'var(--color-surface)', padding: '1.5rem', width: '720px', maxWidth: '100%', margin: '3vh 0' }}
           >
             {content}
           </div>
