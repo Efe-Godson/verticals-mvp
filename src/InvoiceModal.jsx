@@ -51,6 +51,7 @@ export function InvoiceModal({ form, submission, onClose, allowDateEdit = false 
   const [downloadedFile, setDownloadedFile] = useState('')
   const [sharing, setSharing] = useState(false)
   const [shareError, setShareError] = useState('')
+  const [showMoreOptions, setShowMoreOptions] = useState(false)
 
   const settings = form.settings || {}
 
@@ -281,25 +282,62 @@ export function InvoiceModal({ form, submission, onClose, allowDateEdit = false 
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: 'var(--color-surface)', borderRadius: 'var(--radius)',
+          position: 'relative', background: 'var(--color-surface)', borderRadius: 'var(--radius)',
           width: viewMode === 'a4' ? 'min(94vw, 880px)' : '620px', maxWidth: '100%',
           maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 18px 45px rgba(0,0,0,0.2)'
         }}
       >
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          style={{
+            position: 'absolute', top: '0.75rem', right: '0.75rem', zIndex: 2,
+            width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            borderRadius: '50%', border: 'none', background: 'transparent', color: 'var(--color-muted)',
+            fontSize: '1.2rem', lineHeight: 1, cursor: 'pointer',
+          }}
+        >
+          &times;
+        </button>
+
         <div style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem',
-          padding: '1rem 1.25rem', borderBottom: '1px solid var(--color-border)', flexWrap: 'wrap'
+          padding: '1rem 2.75rem 1rem 1.25rem', borderBottom: '1px solid var(--color-border)', flexWrap: 'wrap'
         }}>
           <h3 style={{ margin: 0 }}>Invoice</h3>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <button type="button" className="secondary" onClick={handlePrint}>Print</button>
-            <button type="button" className="secondary" onClick={handleShare} disabled={sharing}>
-              {sharing ? 'Preparing...' : 'Share'}
-            </button>
             <button type="button" onClick={handleDownload} disabled={downloading}>
               {downloading ? 'Preparing...' : 'Download PDF'}
             </button>
-            <button type="button" className="secondary" onClick={onClose}>Close</button>
+            <div style={{ position: 'relative' }}>
+              <button type="button" className="secondary" onClick={() => setShowMoreOptions(v => !v)}>
+                More options
+              </button>
+              {showMoreOptions && (
+                <div style={{
+                  position: 'absolute', top: 'calc(100% + 0.4rem)', right: 0, zIndex: 10,
+                  background: 'var(--color-surface)', border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius)', boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+                  display: 'flex', flexDirection: 'column', minWidth: '150px', padding: '0.35rem', gap: '0.15rem',
+                }}>
+                  <button
+                    type="button" className="secondary"
+                    style={{ border: 'none', textAlign: 'left' }}
+                    onClick={() => { setShowMoreOptions(false); handlePrint() }}
+                  >
+                    Print
+                  </button>
+                  <button
+                    type="button" className="secondary" disabled={sharing}
+                    style={{ border: 'none', textAlign: 'left' }}
+                    onClick={() => { setShowMoreOptions(false); handleShare() }}
+                  >
+                    {sharing ? 'Preparing...' : 'Share'}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
