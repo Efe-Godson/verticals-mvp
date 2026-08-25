@@ -6,12 +6,14 @@ import { A4Template } from './A4Template'
 import { A4BoldHeaderTemplate } from './A4BoldHeaderTemplate'
 import { A4MintPillTemplate } from './A4MintPillTemplate'
 import { A4LedgerTemplate } from './A4LedgerTemplate'
+import { A4FormalTemplate } from './A4FormalTemplate'
 
 export const A4_TEMPLATES = [
   { key: 'classic', name: 'Simple', Component: A4Template },
   { key: 'bold-header', name: 'Bold', Component: A4BoldHeaderTemplate },
   { key: 'mint-pill', name: 'Modern', Component: A4MintPillTemplate },
   { key: 'ledger', name: 'Ledger', Component: A4LedgerTemplate },
+  { key: 'formal', name: 'Formal', Component: A4FormalTemplate },
 ]
 
 export function getA4Template(key) {

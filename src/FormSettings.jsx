@@ -37,6 +37,8 @@ function FormSettings() {
   const [paymentAccountNumber, setPaymentAccountNumber] = useState('')
   const [paymentAccountName, setPaymentAccountName] = useState('')
   const [invoiceNotes, setInvoiceNotes] = useState('')
+  const [invoiceAuthorizedBy, setInvoiceAuthorizedBy] = useState('')
+  const [invoiceAuthorizedDesignation, setInvoiceAuthorizedDesignation] = useState('')
 
   useEffect(() => {
     async function loadForm() {
@@ -62,6 +64,8 @@ function FormSettings() {
         setPaymentAccountNumber(data.settings?.paymentAccountNumber ?? '')
         setPaymentAccountName(data.settings?.paymentAccountName ?? '')
         setInvoiceNotes(data.settings?.invoiceNotes ?? '')
+        setInvoiceAuthorizedBy(data.settings?.invoiceAuthorizedBy ?? '')
+        setInvoiceAuthorizedDesignation(data.settings?.invoiceAuthorizedDesignation ?? '')
       }
       setLoading(false)
     }
@@ -83,6 +87,7 @@ function FormSettings() {
       allowMultipleResponses, collectEmail, companyName, companyPhone, companyAddress, companyEmail, receiptPaperWidth,
       staffReportRange, aiFillRules, logoUrl, logoIconKey,
       showVerticalsBranding, defaultInvoiceView, paymentBankName, paymentAccountNumber, paymentAccountName, invoiceNotes,
+      invoiceAuthorizedBy, invoiceAuthorizedDesignation,
     }
 
     const { error } = await supabase
@@ -440,7 +445,7 @@ function FormSettings() {
             />
           </div>
 
-          <div>
+          <div style={{ marginBottom: '1.2rem' }}>
             <label style={{ fontSize: '0.85rem', color: 'var(--color-muted)' }}>Invoice Notes / Footer</label>
             <textarea
               value={invoiceNotes}
@@ -448,6 +453,27 @@ function FormSettings() {
               placeholder={'e.g.\nThank you for your purchase.\nGoods sold in good condition are subject to the store\'s return policy.'}
               rows={3}
               style={{ padding: '0.5rem', width: '100%', marginTop: '0.3rem' }}
+            />
+          </div>
+
+          <div style={{ marginBottom: '0.6rem', fontSize: '0.85rem', color: 'var(--color-muted)' }}>
+            Authorized By
+            <div style={{ fontSize: '0.8rem', marginTop: '-0.1rem' }}>Used by the Formal invoice style's signature block.</div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.8rem' }}>
+            <input
+              type="text"
+              value={invoiceAuthorizedBy}
+              onChange={(e) => setInvoiceAuthorizedBy(e.target.value)}
+              placeholder="Name, e.g. Dr. Charles Akhimien"
+              style={{ padding: '0.5rem' }}
+            />
+            <input
+              type="text"
+              value={invoiceAuthorizedDesignation}
+              onChange={(e) => setInvoiceAuthorizedDesignation(e.target.value)}
+              placeholder="Designation, e.g. Co-founder/Co-CEO"
+              style={{ padding: '0.5rem' }}
             />
           </div>
         </div>

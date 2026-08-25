@@ -3,7 +3,7 @@
 // styles (and InvoiceModal.jsx itself) format submission field values the
 // same way, without duplicating this switch four times.
 
-// A4Template-only (the 4 compact styles keep their existing plain
+// Used by the A4 templates (the compact styles keep their existing plain
 // toLocaleString() formatting unchanged, to avoid changing already-shipped
 // designs).
 export function formatCurrency(amount) {

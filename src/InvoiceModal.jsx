@@ -9,7 +9,7 @@
 //
 // Two independent axes, both re-derived from the same submission/form data
 // (never a second copy of it):
-//   - "Style"/"Color": which of the 4 layouts (src/invoiceTemplates/index.js
+//   - "Style"/"Color": which of the 5 layouts (src/invoiceTemplates/index.js
 //     for Compact, src/invoiceTemplates/a4Templates.js for A4 - same keys/
 //     names in both registries so one Style picker drives whichever view is
 //     active) and which palette (src/invoicePalettes.js) - chosen fresh each
@@ -124,6 +124,8 @@ export function InvoiceModal({ form, submission, onClose, allowDateEdit = false 
   const paymentAccountNumber = settings.paymentAccountNumber?.trim()
   const paymentAccountName = settings.paymentAccountName?.trim()
   const invoiceNotes = settings.invoiceNotes?.trim()
+  const invoiceAuthorizedBy = settings.invoiceAuthorizedBy?.trim()
+  const invoiceAuthorizedDesignation = settings.invoiceAuthorizedDesignation?.trim()
 
   const logoUrl = settings.logoUrl
   const logoIconKey = settings.logoIconKey
@@ -137,6 +139,7 @@ export function InvoiceModal({ form, submission, onClose, allowDateEdit = false 
     businessName, businessAddress, businessPhone, businessEmail, logoElement,
     orderNumber, dateStr, details, items, subtotal, deliveryFee, total, palette, showBranding,
     paymentMethod, paymentBankName, paymentAccountNumber, paymentAccountName, invoiceNotes,
+    invoiceAuthorizedBy, invoiceAuthorizedDesignation,
   }
 
   // The true-size A4 copy is the only thing ever captured/printed for A4 -

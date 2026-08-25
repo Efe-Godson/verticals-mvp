@@ -1,12 +1,12 @@
 // Place at: src/invoiceTemplates/A4Template.jsx
 // The "Simple" A4 style - a proper full-page business-document layout, as
-// opposed to the 4 compact styles in this same folder. Fixed true A4
+// opposed to the compact styles in this same folder. Fixed true A4
 // portrait dimensions (210mm x 297mm) with print-safe margins; this is
 // captured/printed at its real size (see InvoiceModal.jsx's dual-render
-// setup) - never the shrunk-to-fit on-screen preview. Its Bold/Modern/Ledger
-// siblings (A4BoldHeaderTemplate.jsx etc.) share these same page mechanics -
-// see a4Templates.js for the registry that lets the same Style picker drive
-// both the compact and A4 views.
+// setup) - never the shrunk-to-fit on-screen preview. Its Bold/Modern/Ledger/
+// Formal siblings (A4BoldHeaderTemplate.jsx etc.) share these same page
+// mechanics - see a4Templates.js for the registry that lets the same Style
+// picker drive both the compact and A4 views.
 import { formatFieldValue, formatCurrency } from './shared'
 
 export function A4Template({
