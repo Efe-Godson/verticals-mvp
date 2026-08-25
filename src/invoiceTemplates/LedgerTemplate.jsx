@@ -7,8 +7,10 @@ export function LedgerTemplate({
   businessName, businessAddress, businessPhone, businessEmail, logoElement,
   orderNumber, dateStr, details, items, subtotal, deliveryFee, total, palette, showBranding = true,
   paymentBankName, paymentAccountNumber, paymentAccountName, invoiceNotes,
+  invoiceAuthorizedBy, invoiceAuthorizedDesignation,
 }) {
   const hasPaymentInfo = paymentBankName || paymentAccountNumber || paymentAccountName
+  const hasAuthorizedBy = invoiceAuthorizedBy || invoiceAuthorizedDesignation
   return (
     <div style={{ background: '#ffffff', color: '#111', padding: '2rem', fontFamily: 'Arial, Helvetica, sans-serif' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
@@ -119,7 +121,17 @@ export function LedgerTemplate({
         </div>
       )}
 
-      {showBranding && <div style={{ textAlign: 'center', fontSize: '10px', color: '#999', marginTop: '2.5rem' }}>Powered by Verticals</div>}
+      {hasAuthorizedBy && (
+        <div style={{ marginTop: '1.2rem' }}>
+          {invoiceAuthorizedBy && <div style={{ fontSize: '12px', fontWeight: 'bold' }}>Authorized by: {invoiceAuthorizedBy}</div>}
+          {invoiceAuthorizedDesignation && <div style={{ fontSize: '12px', fontWeight: 'bold' }}>Designation: {invoiceAuthorizedDesignation}</div>}
+          <div style={{ fontSize: '12px', marginTop: '0.8rem' }}>
+            Signature: <span style={{ display: 'inline-block', width: '160px', borderBottom: '1px solid #111' }} />
+          </div>
+        </div>
+      )}
+
+      {showBranding && <div style={{ textAlign: 'center', fontSize: '10px', color: '#999', marginTop: hasAuthorizedBy ? '1.5rem' : '2.5rem' }}>Powered by Verticals</div>}
     </div>
   )
 }

@@ -115,10 +115,10 @@ export function FormalTemplate({
         </div>
       )}
 
-      <div style={{ marginTop: '2.5rem' }}>
+      <div style={{ marginTop: '1.2rem' }}>
         {invoiceAuthorizedBy && <div style={{ fontSize: '12px', fontWeight: 'bold' }}>Invoice Authorized by: {invoiceAuthorizedBy}</div>}
         {invoiceAuthorizedDesignation && <div style={{ fontSize: '12px', fontWeight: 'bold' }}>Designation: {invoiceAuthorizedDesignation}</div>}
-        <div style={{ fontSize: '12px', marginTop: '1.2rem' }}>
+        <div style={{ fontSize: '12px', marginTop: '0.8rem' }}>
           Signature: <span style={{ display: 'inline-block', width: '160px', borderBottom: '1px solid #111' }} />
         </div>
       </div>

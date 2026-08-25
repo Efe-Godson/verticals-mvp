@@ -129,17 +129,18 @@ export function A4FormalTemplate({
         </div>
       )}
 
-      <div style={{ marginTop: 'auto' }}>
-        {(invoiceAuthorizedBy || invoiceAuthorizedDesignation) && (
-          <div style={{ marginBottom: '1.2rem' }}>
-            {invoiceAuthorizedBy && <div style={{ fontSize: '13px', fontWeight: 'bold' }}>Invoice Authorized by: {invoiceAuthorizedBy}</div>}
-            {invoiceAuthorizedDesignation && <div style={{ fontSize: '13px', fontWeight: 'bold' }}>Designation: {invoiceAuthorizedDesignation}</div>}
-          </div>
-        )}
-        <div style={{ fontSize: '12px', marginBottom: '1.2rem' }}>
-          Signature: <span style={{ display: 'inline-block', width: '200px', borderBottom: '1px solid #111' }} />
+      {(invoiceAuthorizedBy || invoiceAuthorizedDesignation) && (
+        <div style={{ marginBottom: '1.2rem' }}>
+          {invoiceAuthorizedBy && <div style={{ fontSize: '13px', fontWeight: 'bold' }}>Invoice Authorized by: {invoiceAuthorizedBy}</div>}
+          {invoiceAuthorizedDesignation && <div style={{ fontSize: '13px', fontWeight: 'bold' }}>Designation: {invoiceAuthorizedDesignation}</div>}
         </div>
-        {showBranding && <div style={{ fontSize: '10px', color: '#999', textAlign: 'center' }}>Powered by Verticals</div>}
+      )}
+      <div style={{ fontSize: '12px', marginBottom: '1rem' }}>
+        Signature: <span style={{ display: 'inline-block', width: '200px', borderBottom: '1px solid #111' }} />
+      </div>
+
+      <div style={{ marginTop: 'auto', textAlign: 'center' }}>
+        {showBranding && <div style={{ fontSize: '10px', color: '#999' }}>Powered by Verticals</div>}
       </div>
     </div>
   )

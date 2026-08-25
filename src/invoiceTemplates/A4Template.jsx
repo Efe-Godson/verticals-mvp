@@ -13,8 +13,10 @@ export function A4Template({
   businessName, businessAddress, businessPhone, businessEmail, logoElement,
   orderNumber, dateStr, details, items, subtotal, deliveryFee, total, palette,
   paymentMethod, showBranding, paymentBankName, paymentAccountNumber, paymentAccountName, invoiceNotes,
+  invoiceAuthorizedBy, invoiceAuthorizedDesignation,
 }) {
   const hasPaymentInfo = paymentBankName || paymentAccountNumber || paymentAccountName
+  const hasAuthorizedBy = invoiceAuthorizedBy || invoiceAuthorizedDesignation
   // Details are generic form fields (every retail form defines its own) -
   // split across the two mockup columns rather than trying to guess which
   // ones are "customer" vs "order" fields.
@@ -148,6 +150,16 @@ export function A4Template({
               <div style={{ fontSize: '12px', color: '#444', whiteSpace: 'pre-wrap' }}>{invoiceNotes}</div>
             </div>
           )}
+        </div>
+      )}
+
+      {hasAuthorizedBy && (
+        <div style={{ marginBottom: '1rem' }}>
+          {invoiceAuthorizedBy && <div style={{ fontSize: '12px', fontWeight: 'bold' }}>Authorized by: {invoiceAuthorizedBy}</div>}
+          {invoiceAuthorizedDesignation && <div style={{ fontSize: '12px', fontWeight: 'bold' }}>Designation: {invoiceAuthorizedDesignation}</div>}
+          <div style={{ fontSize: '12px', marginTop: '0.8rem' }}>
+            Signature: <span style={{ display: 'inline-block', width: '160px', borderBottom: '1px solid #111' }} />
+          </div>
         </div>
       )}
 

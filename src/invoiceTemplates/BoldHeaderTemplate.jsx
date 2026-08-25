@@ -7,6 +7,7 @@ export function BoldHeaderTemplate({
   businessName, businessAddress, businessPhone, businessEmail, logoElement,
   orderNumber, dateStr, details, items, subtotal, deliveryFee, total, palette, showBranding = true,
   paymentBankName, paymentAccountNumber, paymentAccountName, invoiceNotes,
+  invoiceAuthorizedBy, invoiceAuthorizedDesignation,
 }) {
   const hasPaymentInfo = paymentBankName || paymentAccountNumber || paymentAccountName
   return (
@@ -107,9 +108,11 @@ export function BoldHeaderTemplate({
         </div>
       )}
 
-      <div style={{ marginTop: '3rem', display: 'flex', justifyContent: 'flex-end' }}>
+      <div style={{ marginTop: '1.2rem', display: 'flex', justifyContent: 'flex-end' }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ borderTop: '1px solid #999', width: '160px', paddingTop: '0.3rem', fontSize: '10px', color: '#888' }}>Authorized Signatory</div>
+          {invoiceAuthorizedBy && <div style={{ fontSize: '12px', fontWeight: 'bold' }}>{invoiceAuthorizedBy}</div>}
+          {invoiceAuthorizedDesignation && <div style={{ fontSize: '11px', color: '#555' }}>{invoiceAuthorizedDesignation}</div>}
+          <div style={{ borderTop: '1px solid #999', width: '160px', paddingTop: '0.3rem', marginTop: invoiceAuthorizedBy || invoiceAuthorizedDesignation ? '0.5rem' : 0, fontSize: '10px', color: '#888' }}>Authorized Signatory</div>
         </div>
       </div>
 

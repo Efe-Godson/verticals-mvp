@@ -48,6 +48,7 @@ export function InvoiceModal({ form, submission, onClose, allowDateEdit = false 
 
   const [downloading, setDownloading] = useState(false)
   const [downloadError, setDownloadError] = useState('')
+  const [downloadedFile, setDownloadedFile] = useState('')
   const [sharing, setSharing] = useState(false)
   const [shareError, setShareError] = useState('')
 
@@ -186,7 +187,12 @@ export function InvoiceModal({ form, submission, onClose, allowDateEdit = false 
     const pageHeight = pdf.internal.pageSize.getHeight()
     const imgWidth = pageWidth
     const imgHeight = (canvas.height * imgWidth) / canvas.width
-    const totalPages = Math.max(1, Math.ceil(imgHeight / pageHeight))
+    // html2canvas/rounding can leave a fraction of a mm of overflow past an
+    // exact page multiple (box-shadow bleed, px->mm rounding) even when the
+    // content itself fits one page - without this tolerance that sliver
+    // spawns an extra, effectively blank trailing page.
+    const PAGE_OVERFLOW_TOLERANCE_MM = 3
+    const totalPages = Math.max(1, Math.ceil((imgHeight - PAGE_OVERFLOW_TOLERANCE_MM) / pageHeight))
 
     let heightLeft = imgHeight
     let position = 0
@@ -201,7 +207,7 @@ export function InvoiceModal({ form, submission, onClose, allowDateEdit = false 
     pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
     stampPageNumber()
     heightLeft -= pageHeight
-    while (heightLeft > 0) {
+    while (heightLeft > PAGE_OVERFLOW_TOLERANCE_MM) {
       position = heightLeft - imgHeight
       pdf.addPage()
       pageNum++
@@ -216,6 +222,7 @@ export function InvoiceModal({ form, submission, onClose, allowDateEdit = false 
   async function handleDownload() {
     setDownloading(true)
     setDownloadError('')
+    setDownloadedFile('')
     try {
       const pdf = await buildPdf()
       // pdf.save() triggers a direct file download (blob + temporary
@@ -224,7 +231,14 @@ export function InvoiceModal({ form, submission, onClose, allowDateEdit = false 
       // than opening a share sheet. (iOS Safari doesn't reliably honor
       // anchor `download` for blob URLs and may open the PDF inline instead
       // - that's a Safari platform limitation, not something fixable here.)
-      pdf.save(`Invoice-${orderNumber}.pdf`)
+      const fileName = `Invoice-${orderNumber}.pdf`
+      pdf.save(fileName)
+      // The browser itself (not this code) decides where that lands - its
+      // configured default download directory unless "ask where to save
+      // each file" is turned on. Nothing client-side JS can do can point at
+      // a different folder, so the best we can do is confirm it happened
+      // and name the file to look for.
+      setDownloadedFile(fileName)
     } catch {
       setDownloadError('Could not create the PDF. Please try again.')
     } finally {
@@ -291,6 +305,11 @@ export function InvoiceModal({ form, submission, onClose, allowDateEdit = false 
 
         {downloadError && (
           <p style={{ color: 'var(--status-critical)', fontSize: '0.85rem', margin: '0.75rem 1.25rem 0' }}>{downloadError}</p>
+        )}
+        {downloadedFile && (
+          <p style={{ color: 'var(--status-good)', fontSize: '0.85rem', margin: '0.75rem 1.25rem 0' }}>
+            Saved as "{downloadedFile}" - check your device's Downloads folder.
+          </p>
         )}
         {shareError && (
           <p style={{ color: 'var(--status-critical)', fontSize: '0.85rem', margin: '0.75rem 1.25rem 0' }}>{shareError}</p>
