@@ -3,6 +3,13 @@
 // styles (and InvoiceModal.jsx itself) format submission field values the
 // same way, without duplicating this switch four times.
 
+// A4Template-only (the 4 compact styles keep their existing plain
+// toLocaleString() formatting unchanged, to avoid changing already-shipped
+// designs).
+export function formatCurrency(amount) {
+  return `₦${Number(amount || 0).toLocaleString()}`
+}
+
 export function formatFieldValue(field, value) {
   if (Array.isArray(value)) return value.join(', ')
   if (field.type === 'multiplechoicegrid' && value && typeof value === 'object') {

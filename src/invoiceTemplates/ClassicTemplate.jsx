@@ -7,8 +7,8 @@
 import { formatFieldValue } from './shared'
 
 export function ClassicTemplate({
-  businessName, businessAddress, businessPhone, logoElement,
-  orderNumber, dateStr, details, items, subtotal, deliveryFee, total, palette,
+  businessName, businessAddress, businessPhone, businessEmail, logoElement,
+  orderNumber, dateStr, details, items, subtotal, deliveryFee, total, palette, showBranding = true,
 }) {
   return (
     <div style={{ background: '#ffffff', color: '#111', padding: '2rem', fontFamily: 'Arial, Helvetica, sans-serif' }}>
@@ -19,6 +19,7 @@ export function ClassicTemplate({
         </div>
         {businessAddress && <div style={{ fontSize: '12px', color: '#444', marginTop: '4px' }}>{businessAddress}</div>}
         {businessPhone && <div style={{ fontSize: '12px', color: '#444' }}>{businessPhone}</div>}
+        {businessEmail && <div style={{ fontSize: '12px', color: '#444' }}>{businessEmail}</div>}
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: `2px solid ${palette.primary}`, borderBottom: `2px solid ${palette.primary}`, padding: '0.6rem 0', margin: '0 0 1.2rem' }}>
@@ -87,7 +88,7 @@ export function ClassicTemplate({
         </div>
       )}
 
-      <div style={{ textAlign: 'center', fontSize: '10px', color: '#999', marginTop: '2.5rem' }}>Powered by Verticals</div>
+      {showBranding && <div style={{ textAlign: 'center', fontSize: '10px', color: '#999', marginTop: '2.5rem' }}>Powered by Verticals</div>}
     </div>
   )
 }

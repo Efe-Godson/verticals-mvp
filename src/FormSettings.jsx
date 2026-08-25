@@ -23,6 +23,7 @@ function FormSettings() {
   const [companyName, setCompanyName] = useState('')
   const [companyPhone, setCompanyPhone] = useState('')
   const [companyAddress, setCompanyAddress] = useState('')
+  const [companyEmail, setCompanyEmail] = useState('')
   const [receiptPaperWidth, setReceiptPaperWidth] = useState(80)
   const [staffReportRange, setStaffReportRange] = useState('today')
   const [aiFillRules, setAiFillRules] = useState('')
@@ -30,6 +31,12 @@ function FormSettings() {
   const [logoIconKey, setLogoIconKey] = useState('')
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [logoError, setLogoError] = useState('')
+  const [showVerticalsBranding, setShowVerticalsBranding] = useState(true)
+  const [defaultInvoiceView, setDefaultInvoiceView] = useState('compact')
+  const [paymentBankName, setPaymentBankName] = useState('')
+  const [paymentAccountNumber, setPaymentAccountNumber] = useState('')
+  const [paymentAccountName, setPaymentAccountName] = useState('')
+  const [invoiceNotes, setInvoiceNotes] = useState('')
 
   useEffect(() => {
     async function loadForm() {
@@ -43,11 +50,18 @@ function FormSettings() {
         setCompanyName(data.settings?.companyName ?? '')
         setCompanyPhone(data.settings?.companyPhone ?? '')
         setCompanyAddress(data.settings?.companyAddress ?? '')
+        setCompanyEmail(data.settings?.companyEmail ?? '')
         setReceiptPaperWidth(data.settings?.receiptPaperWidth ?? 80)
         setStaffReportRange(data.settings?.staffReportRange ?? 'today')
         setAiFillRules(data.settings?.aiFillRules ?? '')
         setLogoUrl(data.settings?.logoUrl ?? '')
         setLogoIconKey(data.settings?.logoIconKey ?? '')
+        setShowVerticalsBranding(data.settings?.showVerticalsBranding ?? true)
+        setDefaultInvoiceView(data.settings?.defaultInvoiceView ?? 'compact')
+        setPaymentBankName(data.settings?.paymentBankName ?? '')
+        setPaymentAccountNumber(data.settings?.paymentAccountNumber ?? '')
+        setPaymentAccountName(data.settings?.paymentAccountName ?? '')
+        setInvoiceNotes(data.settings?.invoiceNotes ?? '')
       }
       setLoading(false)
     }
@@ -66,8 +80,9 @@ function FormSettings() {
     // used to silently delete all of those the moment this page saved.
     const newSettings = {
       ...form.settings,
-      allowMultipleResponses, collectEmail, companyName, companyPhone, companyAddress, receiptPaperWidth,
+      allowMultipleResponses, collectEmail, companyName, companyPhone, companyAddress, companyEmail, receiptPaperWidth,
       staffReportRange, aiFillRules, logoUrl, logoIconKey,
+      showVerticalsBranding, defaultInvoiceView, paymentBankName, paymentAccountNumber, paymentAccountName, invoiceNotes,
     }
 
     const { error } = await supabase
@@ -212,6 +227,19 @@ function FormSettings() {
 
         {isRetail && (
           <div style={{ marginBottom: '1.2rem' }}>
+            <label style={{ fontSize: '0.85rem', color: 'var(--color-muted)' }}>Email</label>
+            <input
+              type="text"
+              value={companyEmail}
+              onChange={(e) => setCompanyEmail(e.target.value)}
+              placeholder="e.g. hello@efesmarket.com"
+              style={{ padding: '0.5rem', width: '100%', marginTop: '0.3rem' }}
+            />
+          </div>
+        )}
+
+        {isRetail && (
+          <div style={{ marginBottom: '1.2rem' }}>
             <label style={{ fontSize: '0.85rem', color: 'var(--color-muted)', display: 'block', marginBottom: '0.5rem' }}>Logo</label>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', marginBottom: '0.8rem' }}>
               <label className="secondary" style={{ display: 'inline-block', cursor: 'pointer', fontSize: '0.85rem' }}>
@@ -295,6 +323,7 @@ function FormSettings() {
                 </div>
                 {companyAddress.trim() && <div style={{ textAlign: 'center', fontSize: '10px', color: '#444' }}>{companyAddress}</div>}
                 {companyPhone.trim() && <div style={{ textAlign: 'center', fontSize: '10px', color: '#444' }}>{companyPhone}</div>}
+                {companyEmail.trim() && <div style={{ textAlign: 'center', fontSize: '10px', color: '#444' }}>{companyEmail}</div>}
                 <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '2px solid #111', borderBottom: '2px solid #111', padding: '0.4rem 0', margin: '0.6rem 0' }}>
                   <span>Invoice #4821</span>
                   <span>10 Aug 2026</span>
@@ -309,7 +338,7 @@ function FormSettings() {
                   <span>Total</span>
                   <span>28.48</span>
                 </div>
-                <div style={{ textAlign: 'center', fontSize: '9px', color: '#999', marginTop: '1rem' }}>Powered by Verticals</div>
+                {showVerticalsBranding && <div style={{ textAlign: 'center', fontSize: '9px', color: '#999', marginTop: '1rem' }}>Powered by Verticals</div>}
               </div>
             </div>
           ) : (
@@ -346,6 +375,83 @@ function FormSettings() {
           )}
         </div>
       </div>
+
+      {isRetail && (
+        <div className="card" style={{ padding: '1.5rem', marginTop: '1.5rem' }}>
+          <h3 style={{ marginTop: 0 }}>Invoice & Receipt Settings</h3>
+
+          <div style={{ marginBottom: '1.2rem' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={showVerticalsBranding}
+                onChange={(e) => setShowVerticalsBranding(e.target.checked)}
+              />
+              <span>
+                VerticalS Branding
+                <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>
+                  Show "Powered by Verticals" on invoices and receipts. Turn this off to send invoices using only your
+                  business branding - can still be switched back on for any single invoice from its own toolbar.
+                </div>
+              </span>
+            </label>
+          </div>
+
+          <div style={{ marginBottom: '1.2rem' }}>
+            <label style={{ fontSize: '0.85rem', color: 'var(--color-muted)' }}>Default Invoice View</label>
+            <select
+              value={defaultInvoiceView}
+              onChange={(e) => setDefaultInvoiceView(e.target.value)}
+              style={{ padding: '0.5rem', width: '100%', marginTop: '0.3rem' }}
+            >
+              <option value="compact">Compact (best for mobile/WhatsApp)</option>
+              <option value="a4">A4 (full-page document)</option>
+            </select>
+            <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)', marginTop: '0.3rem' }}>
+              Can still be switched per-invoice from the invoice toolbar.
+            </div>
+          </div>
+
+          <div style={{ marginBottom: '0.6rem', fontSize: '0.85rem', color: 'var(--color-muted)' }}>
+            Payment Details
+            <div style={{ fontSize: '0.8rem', marginTop: '-0.1rem' }}>Shown on the A4 invoice only when at least one of these is filled in.</div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.8rem', marginBottom: '1.2rem' }}>
+            <input
+              type="text"
+              value={paymentBankName}
+              onChange={(e) => setPaymentBankName(e.target.value)}
+              placeholder="Bank Name"
+              style={{ padding: '0.5rem' }}
+            />
+            <input
+              type="text"
+              value={paymentAccountNumber}
+              onChange={(e) => setPaymentAccountNumber(e.target.value)}
+              placeholder="Account Number"
+              style={{ padding: '0.5rem' }}
+            />
+            <input
+              type="text"
+              value={paymentAccountName}
+              onChange={(e) => setPaymentAccountName(e.target.value)}
+              placeholder="Account Name"
+              style={{ padding: '0.5rem' }}
+            />
+          </div>
+
+          <div>
+            <label style={{ fontSize: '0.85rem', color: 'var(--color-muted)' }}>Invoice Notes / Footer</label>
+            <textarea
+              value={invoiceNotes}
+              onChange={(e) => setInvoiceNotes(e.target.value)}
+              placeholder={'e.g.\nThank you for your purchase.\nGoods sold in good condition are subject to the store\'s return policy.'}
+              rows={3}
+              style={{ padding: '0.5rem', width: '100%', marginTop: '0.3rem' }}
+            />
+          </div>
+        </div>
+      )}
 
       {hasCartField && (
         <div className="card" style={{ padding: '1.5rem', marginTop: '1.5rem' }}>

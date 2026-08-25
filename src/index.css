@@ -730,3 +730,32 @@ input:focus, select:focus, textarea:focus {
     padding-right: 0.75rem;
   }
 }
+
+/* Retail invoice printing (InvoiceModal.jsx's Print button) - hides the
+   whole app and prints only whichever element is marked as the print
+   target (the true-size, unscaled invoice, never the shrunk-to-fit mobile
+   preview). Scoped narrowly so it can't affect anything else that might
+   ever call window.print() in the app. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .invoice-print-target,
+  .invoice-print-target * {
+    visibility: visible;
+  }
+  .invoice-print-target {
+    /* !important because the A4 export copy is normally positioned
+       off-screen via an inline style (see InvoiceModal.jsx) - this is what
+       brings it back on-page for printing. */
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+  }
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+}

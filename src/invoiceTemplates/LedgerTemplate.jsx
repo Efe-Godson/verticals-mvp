@@ -17,8 +17,8 @@ function Badge({ n, palette }) {
 }
 
 export function LedgerTemplate({
-  businessName, businessAddress, businessPhone, logoElement,
-  orderNumber, dateStr, details, items, subtotal, deliveryFee, total, palette,
+  businessName, businessAddress, businessPhone, businessEmail, logoElement,
+  orderNumber, dateStr, details, items, subtotal, deliveryFee, total, palette, showBranding = true,
 }) {
   return (
     <div style={{ background: '#ffffff', color: '#111', padding: '2rem', fontFamily: 'Arial, Helvetica, sans-serif' }}>
@@ -38,6 +38,7 @@ export function LedgerTemplate({
           </div>
           {businessAddress && <div style={{ fontSize: '11px', color: '#555', marginTop: '2px' }}>{businessAddress}</div>}
           {businessPhone && <div style={{ fontSize: '11px', color: '#555' }}>{businessPhone}</div>}
+          {businessEmail && <div style={{ fontSize: '11px', color: '#555' }}>{businessEmail}</div>}
         </div>
       </div>
 
@@ -122,7 +123,7 @@ export function LedgerTemplate({
         </div>
       )}
 
-      <div style={{ textAlign: 'center', fontSize: '10px', color: '#999', marginTop: '2.5rem' }}>Powered by Verticals</div>
+      {showBranding && <div style={{ textAlign: 'center', fontSize: '10px', color: '#999', marginTop: '2.5rem' }}>Powered by Verticals</div>}
     </div>
   )
 }

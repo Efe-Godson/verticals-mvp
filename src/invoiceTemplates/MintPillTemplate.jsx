@@ -16,8 +16,8 @@ function Pill({ children, palette }) {
 }
 
 export function MintPillTemplate({
-  businessName, businessAddress, businessPhone, logoElement,
-  orderNumber, dateStr, details, items, subtotal, deliveryFee, total, palette,
+  businessName, businessAddress, businessPhone, businessEmail, logoElement,
+  orderNumber, dateStr, details, items, subtotal, deliveryFee, total, palette, showBranding = true,
 }) {
   return (
     <div style={{ background: '#ffffff', color: '#111', padding: '2rem', fontFamily: 'Arial, Helvetica, sans-serif' }}>
@@ -34,6 +34,7 @@ export function MintPillTemplate({
             <div style={{ fontWeight: 'bold' }}>{businessName}</div>
             {businessAddress && <div style={{ color: '#555', fontSize: '11px' }}>{businessAddress}</div>}
             {businessPhone && <div style={{ color: '#555', fontSize: '11px' }}>{businessPhone}</div>}
+            {businessEmail && <div style={{ color: '#555', fontSize: '11px' }}>{businessEmail}</div>}
           </div>
         </div>
         {details.length > 0 && (
@@ -97,7 +98,7 @@ export function MintPillTemplate({
         </div>
       )}
 
-      <div style={{ textAlign: 'center', fontSize: '10px', color: '#999', marginTop: '2.5rem' }}>Powered by Verticals</div>
+      {showBranding && <div style={{ textAlign: 'center', fontSize: '10px', color: '#999', marginTop: '2.5rem' }}>Powered by Verticals</div>}
     </div>
   )
 }

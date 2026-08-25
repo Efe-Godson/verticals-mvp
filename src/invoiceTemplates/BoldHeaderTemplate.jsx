@@ -4,8 +4,8 @@
 import { formatFieldValue } from './shared'
 
 export function BoldHeaderTemplate({
-  businessName, businessAddress, businessPhone, logoElement,
-  orderNumber, dateStr, details, items, subtotal, deliveryFee, total, palette,
+  businessName, businessAddress, businessPhone, businessEmail, logoElement,
+  orderNumber, dateStr, details, items, subtotal, deliveryFee, total, palette, showBranding = true,
 }) {
   return (
     <div style={{ background: '#ffffff', color: '#111', padding: '2rem', fontFamily: 'Arial, Helvetica, sans-serif' }}>
@@ -15,6 +15,7 @@ export function BoldHeaderTemplate({
           <div style={{ fontSize: '15px', fontWeight: 'bold', color: palette.primary, marginTop: '0.6rem' }}>{businessName}</div>
           {businessAddress && <div style={{ fontSize: '11px', color: '#555', marginTop: '2px' }}>{businessAddress}</div>}
           {businessPhone && <div style={{ fontSize: '11px', color: '#555' }}>{businessPhone}</div>}
+          {businessEmail && <div style={{ fontSize: '11px', color: '#555' }}>{businessEmail}</div>}
         </div>
         {logoElement && <div>{logoElement}</div>}
       </div>
@@ -91,7 +92,7 @@ export function BoldHeaderTemplate({
         </div>
       </div>
 
-      <div style={{ textAlign: 'center', fontSize: '10px', color: '#999', marginTop: '1.5rem' }}>Powered by Verticals</div>
+      {showBranding && <div style={{ textAlign: 'center', fontSize: '10px', color: '#999', marginTop: '1.5rem' }}>Powered by Verticals</div>}
     </div>
   )
 }
