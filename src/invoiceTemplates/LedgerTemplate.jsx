@@ -1,20 +1,7 @@
 // Place at: src/invoiceTemplates/LedgerTemplate.jsx
 // Big wordmark top-left with a logo box beneath it, business block
-// top-right, numbered circular badges marking each section, thin rule
-// dividers throughout.
+// top-right, thin rule dividers between sections.
 import { formatFieldValue } from './shared'
-
-function Badge({ n, palette }) {
-  return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-      width: '18px', height: '18px', borderRadius: '50%', background: palette.primary,
-      color: '#fff', fontSize: '11px', fontWeight: 700, marginRight: '0.5rem', flexShrink: 0,
-    }}>
-      {n}
-    </span>
-  )
-}
 
 export function LedgerTemplate({
   businessName, businessAddress, businessPhone, businessEmail, logoElement,
@@ -34,10 +21,7 @@ export function LedgerTemplate({
           )}
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
-            <Badge n={1} palette={palette} />
-            <span style={{ fontWeight: 'bold', fontSize: '14px' }}>{businessName}</span>
-          </div>
+          <div style={{ fontWeight: 'bold', fontSize: '14px' }}>{businessName}</div>
           {businessAddress && <div style={{ fontSize: '11px', color: '#555', marginTop: '2px' }}>{businessAddress}</div>}
           {businessPhone && <div style={{ fontSize: '11px', color: '#555' }}>{businessPhone}</div>}
           {businessEmail && <div style={{ fontSize: '11px', color: '#555' }}>{businessEmail}</div>}
@@ -45,18 +29,15 @@ export function LedgerTemplate({
       </div>
 
       <div style={{ borderTop: `1px solid ${palette.border}`, borderBottom: `1px solid ${palette.border}`, padding: '0.7rem 0', margin: '1rem 0' }}>
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.3rem' }}>
-          <Badge n={2} palette={palette} />
-          <span style={{ fontSize: '12px', fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Invoice Details</span>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', paddingLeft: '1.6rem' }}>
+        <div style={{ fontSize: '12px', fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.3rem' }}>Invoice Details</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
           <span>Invoice #: <strong>{orderNumber}</strong></span>
           <span>Date: <strong>{dateStr}</strong></span>
         </div>
       </div>
 
       {details.length > 0 && (
-        <div style={{ marginBottom: '1rem', paddingLeft: '1.6rem' }}>
+        <div style={{ marginBottom: '1rem' }}>
           {details.map(({ field, value }) => (
             <div key={field.id} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.8rem', fontSize: '13px', padding: '0.2rem 0' }}>
               <span style={{ color: '#666' }}>{field.label}</span>
@@ -68,10 +49,7 @@ export function LedgerTemplate({
 
       {items.length > 0 && (
         <>
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.4rem' }}>
-            <Badge n={3} palette={palette} />
-            <span style={{ fontSize: '12px', fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Items</span>
-          </div>
+          <div style={{ fontSize: '12px', fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.4rem' }}>Items</div>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', marginBottom: '1rem' }}>
             <thead>
               <tr style={{ borderBottom: `2px solid ${palette.primary}` }}>
@@ -98,17 +76,14 @@ export function LedgerTemplate({
       {items.length > 0 && (
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <div style={{ width: '240px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.3rem' }}>
-              <Badge n={4} palette={palette} />
-              <span style={{ fontSize: '12px', fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Total</span>
-            </div>
+            <div style={{ fontSize: '12px', fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.3rem' }}>Total</div>
             {deliveryFee > 0 && (
               <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '0.15rem 0 0.15rem 1.6rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '0.15rem 0' }}>
                   <span>Subtotal</span>
                   <span>{subtotal.toLocaleString()}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '0.15rem 0 0.15rem 1.6rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '0.15rem 0' }}>
                   <span>Delivery Fee</span>
                   <span>{deliveryFee.toLocaleString()}</span>
                 </div>
@@ -116,7 +91,7 @@ export function LedgerTemplate({
             )}
             <div style={{
               display: 'flex', justifyContent: 'space-between', fontSize: '17px', fontWeight: 'bold',
-              borderTop: `2px solid ${palette.primary}`, marginTop: '0.3rem', paddingTop: '0.4rem', paddingLeft: '1.6rem'
+              borderTop: `2px solid ${palette.primary}`, marginTop: '0.3rem', paddingTop: '0.4rem',
             }}>
               <span>Total</span>
               <span>{total.toLocaleString()}</span>
@@ -127,25 +102,20 @@ export function LedgerTemplate({
 
       {(hasPaymentInfo || invoiceNotes) && (
         <div style={{ marginTop: '1.2rem', paddingTop: '0.8rem', borderTop: `1px solid ${palette.border}` }}>
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.4rem' }}>
-            <Badge n={5} palette={palette} />
-            <span style={{ fontSize: '12px', fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{hasPaymentInfo ? 'Payment Information' : 'Notes'}</span>
-          </div>
-          <div style={{ paddingLeft: '1.6rem' }}>
-            {hasPaymentInfo && (
-              <div style={{ fontSize: '13px', marginBottom: invoiceNotes ? '0.5rem' : 0 }}>
-                {paymentBankName && <div>Bank: {paymentBankName}</div>}
-                {paymentAccountNumber && <div>Account Number: {paymentAccountNumber}</div>}
-                {paymentAccountName && <div>Account Name: {paymentAccountName}</div>}
-              </div>
-            )}
-            {invoiceNotes && (
-              <>
-                {hasPaymentInfo && <div style={{ fontSize: '11px', fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.2rem' }}>Notes</div>}
-                <div style={{ fontSize: '12px', color: '#444', whiteSpace: 'pre-wrap' }}>{invoiceNotes}</div>
-              </>
-            )}
-          </div>
+          <div style={{ fontSize: '12px', fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.4rem' }}>{hasPaymentInfo ? 'Payment Information' : 'Notes'}</div>
+          {hasPaymentInfo && (
+            <div style={{ fontSize: '13px', marginBottom: invoiceNotes ? '0.5rem' : 0 }}>
+              {paymentBankName && <div>Bank: {paymentBankName}</div>}
+              {paymentAccountNumber && <div>Account Number: {paymentAccountNumber}</div>}
+              {paymentAccountName && <div>Account Name: {paymentAccountName}</div>}
+            </div>
+          )}
+          {invoiceNotes && (
+            <>
+              {hasPaymentInfo && <div style={{ fontSize: '11px', fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.2rem' }}>Notes</div>}
+              <div style={{ fontSize: '12px', color: '#444', whiteSpace: 'pre-wrap' }}>{invoiceNotes}</div>
+            </>
+          )}
         </div>
       )}
 

@@ -31,8 +31,7 @@ export function MintPillTemplate({
 
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1.5rem', margin: '1.4rem 0 1rem', flexWrap: 'wrap' }}>
         <div>
-          <Pill palette={palette}>Business</Pill>
-          <div style={{ marginTop: '0.5rem', fontSize: '13px' }}>
+          <div style={{ fontSize: '13px' }}>
             <div style={{ fontWeight: 'bold' }}>{businessName}</div>
             {businessAddress && <div style={{ color: '#555', fontSize: '11px' }}>{businessAddress}</div>}
             {businessPhone && <div style={{ color: '#555', fontSize: '11px' }}>{businessPhone}</div>}
