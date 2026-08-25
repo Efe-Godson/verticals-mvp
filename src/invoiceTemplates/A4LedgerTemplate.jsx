@@ -1,8 +1,9 @@
-// Place at: src/invoiceTemplates/LedgerTemplate.jsx
-// Big wordmark top-left with a logo box beneath it, business block
-// top-right, numbered circular badges marking each section, thin rule
-// dividers throughout.
-import { formatFieldValue } from './shared'
+// Place at: src/invoiceTemplates/A4LedgerTemplate.jsx
+// A4-sized sibling of LedgerTemplate.jsx: same true A4 page mechanics as
+// A4Template.jsx (fixed 210mm x 297mm, print-safe margins), but the Ledger
+// look - big wordmark top-left with a logo box beneath it, numbered
+// circular badges marking each section, thin rule dividers throughout.
+import { formatFieldValue, formatCurrency } from './shared'
 
 function Badge({ n, palette }) {
   return (
@@ -16,17 +17,25 @@ function Badge({ n, palette }) {
   )
 }
 
-export function LedgerTemplate({
+export function A4LedgerTemplate({
   businessName, businessAddress, businessPhone, businessEmail, logoElement,
-  orderNumber, dateStr, details, items, subtotal, deliveryFee, total, palette, showBranding = true,
-  paymentBankName, paymentAccountNumber, paymentAccountName, invoiceNotes,
+  orderNumber, dateStr, details, items, subtotal, deliveryFee, total, palette,
+  paymentMethod, showBranding, paymentBankName, paymentAccountNumber, paymentAccountName, invoiceNotes,
 }) {
   const hasPaymentInfo = paymentBankName || paymentAccountNumber || paymentAccountName
+  const mid = Math.ceil(details.length / 2)
+  const leftDetails = details.slice(0, mid)
+  const rightDetails = details.slice(mid)
+
   return (
-    <div style={{ background: '#ffffff', color: '#111', padding: '2rem', fontFamily: 'Arial, Helvetica, sans-serif' }}>
+    <div style={{
+      width: '210mm', minHeight: '297mm', boxSizing: 'border-box',
+      padding: '15mm 15mm 18mm', background: '#ffffff', color: '#111',
+      fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '13px', display: 'flex', flexDirection: 'column',
+    }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
         <div>
-          <div style={{ fontSize: '32px', fontWeight: 800, color: palette.primary }}>Invoice</div>
+          <div style={{ fontSize: '34px', fontWeight: 800, color: palette.primary }}>Invoice</div>
           {logoElement && (
             <div style={{ marginTop: '0.7rem', border: `1px solid ${palette.border}`, borderRadius: '6px', padding: '0.5rem', display: 'inline-flex' }}>
               {logoElement}
@@ -41,6 +50,15 @@ export function LedgerTemplate({
           {businessAddress && <div style={{ fontSize: '11px', color: '#555', marginTop: '2px' }}>{businessAddress}</div>}
           {businessPhone && <div style={{ fontSize: '11px', color: '#555' }}>{businessPhone}</div>}
           {businessEmail && <div style={{ fontSize: '11px', color: '#555' }}>{businessEmail}</div>}
+          {paymentMethod && (
+            <div style={{
+              display: 'inline-block', marginTop: '0.4rem', fontSize: '11px', fontWeight: 700,
+              letterSpacing: '0.05em', color: palette.primary, border: `1px solid ${palette.primary}`,
+              borderRadius: '4px', padding: '0.15rem 0.5rem',
+            }}>
+              PAID
+            </div>
+          )}
         </div>
       </div>
 
@@ -55,14 +73,29 @@ export function LedgerTemplate({
         </div>
       </div>
 
-      {details.length > 0 && (
-        <div style={{ marginBottom: '1rem', paddingLeft: '1.6rem' }}>
-          {details.map(({ field, value }) => (
-            <div key={field.id} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.8rem', fontSize: '13px', padding: '0.2rem 0' }}>
-              <span style={{ color: '#666' }}>{field.label}</span>
-              <span style={{ textAlign: 'right' }}>{formatFieldValue(field, value)}</span>
-            </div>
-          ))}
+      {(leftDetails.length > 0 || rightDetails.length > 0) && (
+        <div style={{ marginBottom: '1.2rem', paddingLeft: '1.6rem', display: 'flex', justifyContent: 'space-between', gap: '2rem' }}>
+          <div style={{ flex: 1 }}>
+            {leftDetails.length > 0 && (
+              <>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.4rem' }}>Bill To</div>
+                {leftDetails.map(({ field, value }) => (
+                  <div key={field.id} style={{ fontSize: '12px', padding: '0.15rem 0' }}>
+                    <span style={{ color: '#666' }}>{field.label}: </span>
+                    <span>{formatFieldValue(field, value)}</span>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+          <div style={{ flex: 1, textAlign: 'right' }}>
+            {rightDetails.length > 0 && rightDetails.map(({ field, value }) => (
+              <div key={field.id} style={{ fontSize: '12px', padding: '0.15rem 0' }}>
+                <span style={{ color: '#666' }}>{field.label}: </span>
+                <span>{formatFieldValue(field, value)}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -83,11 +116,11 @@ export function LedgerTemplate({
             </thead>
             <tbody>
               {items.map((item, i) => (
-                <tr key={i} style={{ borderBottom: `1px solid ${palette.border}` }}>
+                <tr key={i} className="invoice-row" style={{ borderBottom: `1px solid ${palette.border}`, breakInside: 'avoid' }}>
                   <td style={{ padding: '0.4rem 0' }}>{item.name}</td>
                   <td style={{ textAlign: 'center', padding: '0.4rem 0' }}>{item.quantity}</td>
-                  <td style={{ textAlign: 'right', padding: '0.4rem 0' }}>{item.price.toLocaleString()}</td>
-                  <td style={{ textAlign: 'right', padding: '0.4rem 0' }}>{(item.price * item.quantity).toLocaleString()}</td>
+                  <td style={{ textAlign: 'right', padding: '0.4rem 0' }}>{formatCurrency(item.price)}</td>
+                  <td style={{ textAlign: 'right', padding: '0.4rem 0' }}>{formatCurrency(item.price * item.quantity)}</td>
                 </tr>
               ))}
             </tbody>
@@ -96,37 +129,35 @@ export function LedgerTemplate({
       )}
 
       {items.length > 0 && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <div style={{ width: '240px' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.2rem' }}>
+          <div style={{ width: '260px' }}>
             <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.3rem' }}>
               <Badge n={4} palette={palette} />
               <span style={{ fontSize: '12px', fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Total</span>
             </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '0.15rem 0 0.15rem 1.6rem' }}>
+              <span>Subtotal</span>
+              <span>{formatCurrency(subtotal)}</span>
+            </div>
             {deliveryFee > 0 && (
-              <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '0.15rem 0 0.15rem 1.6rem' }}>
-                  <span>Subtotal</span>
-                  <span>{subtotal.toLocaleString()}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '0.15rem 0 0.15rem 1.6rem' }}>
-                  <span>Delivery Fee</span>
-                  <span>{deliveryFee.toLocaleString()}</span>
-                </div>
-              </>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '0.15rem 0 0.15rem 1.6rem' }}>
+                <span>Delivery</span>
+                <span>{formatCurrency(deliveryFee)}</span>
+              </div>
             )}
             <div style={{
               display: 'flex', justifyContent: 'space-between', fontSize: '17px', fontWeight: 'bold',
               borderTop: `2px solid ${palette.primary}`, marginTop: '0.3rem', paddingTop: '0.4rem', paddingLeft: '1.6rem'
             }}>
-              <span>Total</span>
-              <span>{total.toLocaleString()}</span>
+              <span>TOTAL</span>
+              <span>{formatCurrency(total)}</span>
             </div>
           </div>
         </div>
       )}
 
       {(hasPaymentInfo || invoiceNotes) && (
-        <div style={{ marginTop: '1.2rem', paddingTop: '0.8rem', borderTop: `1px solid ${palette.border}` }}>
+        <div style={{ borderTop: `1px solid ${palette.border}`, paddingTop: '0.8rem', marginBottom: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.4rem' }}>
             <Badge n={5} palette={palette} />
             <span style={{ fontSize: '12px', fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{hasPaymentInfo ? 'Payment Information' : 'Notes'}</span>
@@ -149,7 +180,9 @@ export function LedgerTemplate({
         </div>
       )}
 
-      {showBranding && <div style={{ textAlign: 'center', fontSize: '10px', color: '#999', marginTop: '2.5rem' }}>Powered by Verticals</div>}
+      <div style={{ marginTop: 'auto', textAlign: 'center' }}>
+        {showBranding && <div style={{ fontSize: '10px', color: '#999' }}>Powered by Verticals</div>}
+      </div>
     </div>
   )
 }

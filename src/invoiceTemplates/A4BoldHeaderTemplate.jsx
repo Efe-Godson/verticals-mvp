@@ -1,23 +1,16 @@
-// Place at: src/invoiceTemplates/A4Template.jsx
-// The "Simple" A4 style - a proper full-page business-document layout, as
-// opposed to the 4 compact styles in this same folder. Fixed true A4
-// portrait dimensions (210mm x 297mm) with print-safe margins; this is
-// captured/printed at its real size (see InvoiceModal.jsx's dual-render
-// setup) - never the shrunk-to-fit on-screen preview. Its Bold/Modern/Ledger
-// siblings (A4BoldHeaderTemplate.jsx etc.) share these same page mechanics -
-// see a4Templates.js for the registry that lets the same Style picker drive
-// both the compact and A4 views.
+// Place at: src/invoiceTemplates/A4BoldHeaderTemplate.jsx
+// A4-sized sibling of BoldHeaderTemplate.jsx: same true A4 page mechanics as
+// A4Template.jsx (fixed 210mm x 297mm, print-safe margins), but the Bold
+// look - big colored "INVOICE" wordmark top-left, zebra-striped colored
+// table header, signature line at the bottom.
 import { formatFieldValue, formatCurrency } from './shared'
 
-export function A4Template({
+export function A4BoldHeaderTemplate({
   businessName, businessAddress, businessPhone, businessEmail, logoElement,
   orderNumber, dateStr, details, items, subtotal, deliveryFee, total, palette,
   paymentMethod, showBranding, paymentBankName, paymentAccountNumber, paymentAccountName, invoiceNotes,
 }) {
   const hasPaymentInfo = paymentBankName || paymentAccountNumber || paymentAccountName
-  // Details are generic form fields (every retail form defines its own) -
-  // split across the two mockup columns rather than trying to guess which
-  // ones are "customer" vs "order" fields.
   const mid = Math.ceil(details.length / 2)
   const leftDetails = details.slice(0, mid)
   const rightDetails = details.slice(mid)
@@ -30,16 +23,18 @@ export function A4Template({
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          {logoElement && <div style={{ marginBottom: '0.6rem' }}>{logoElement}</div>}
-          <div style={{ fontSize: '16px', fontWeight: 'bold' }}>{businessName}</div>
+          <div style={{ fontSize: '30px', fontWeight: 'bold', color: palette.primary, letterSpacing: '0.5px' }}>INVOICE</div>
+          <div style={{ fontSize: '15px', fontWeight: 'bold', color: palette.primary, marginTop: '0.6rem' }}>{businessName}</div>
           {businessAddress && <div style={{ fontSize: '11px', color: '#555', marginTop: '2px' }}>{businessAddress}</div>}
           {businessPhone && <div style={{ fontSize: '11px', color: '#555' }}>{businessPhone}</div>}
           {businessEmail && <div style={{ fontSize: '11px', color: '#555' }}>{businessEmail}</div>}
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: '26px', fontWeight: 800, color: palette.primary }}>INVOICE</div>
-          <div style={{ fontSize: '12px', marginTop: '0.4rem' }}>#{orderNumber}</div>
-          <div style={{ fontSize: '12px', color: '#555' }}>{dateStr}</div>
+          {logoElement && <div style={{ marginBottom: '0.6rem', display: 'flex', justifyContent: 'flex-end' }}>{logoElement}</div>}
+          <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Invoice No.</div>
+          <div style={{ fontSize: '14px', fontWeight: 'bold' }}>{orderNumber}</div>
+          <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '0.4rem' }}>Invoice Date</div>
+          <div style={{ fontSize: '14px', fontWeight: 'bold' }}>{dateStr}</div>
           {paymentMethod && (
             <div style={{
               display: 'inline-block', marginTop: '0.4rem', fontSize: '11px', fontWeight: 700,
@@ -89,15 +84,15 @@ export function A4Template({
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', marginBottom: '1rem' }}>
           <thead>
             <tr style={{ background: palette.primary }}>
-              <th style={{ textAlign: 'left', padding: '0.5rem', color: '#fff', fontWeight: 600 }}>Item</th>
+              <th style={{ textAlign: 'left', padding: '0.5rem', color: '#fff', fontWeight: 600 }}>Description</th>
               <th style={{ textAlign: 'center', padding: '0.5rem', color: '#fff', fontWeight: 600 }}>Qty</th>
-              <th style={{ textAlign: 'right', padding: '0.5rem', color: '#fff', fontWeight: 600 }}>Unit Price</th>
+              <th style={{ textAlign: 'right', padding: '0.5rem', color: '#fff', fontWeight: 600 }}>Rate</th>
               <th style={{ textAlign: 'right', padding: '0.5rem', color: '#fff', fontWeight: 600 }}>Amount</th>
             </tr>
           </thead>
           <tbody>
             {items.map((item, i) => (
-              <tr key={i} className="invoice-row" style={{ borderBottom: '1px solid #eee', breakInside: 'avoid' }}>
+              <tr key={i} className="invoice-row" style={{ borderBottom: '1px solid #eee', background: i % 2 === 1 ? palette.primarySoft : 'transparent', breakInside: 'avoid' }}>
                 <td style={{ padding: '0.5rem' }}>{item.name}</td>
                 <td style={{ textAlign: 'center', padding: '0.5rem' }}>{item.quantity}</td>
                 <td style={{ textAlign: 'right', padding: '0.5rem' }}>{formatCurrency(item.price)}</td>
@@ -133,9 +128,9 @@ export function A4Template({
       )}
 
       {(hasPaymentInfo || invoiceNotes) && (
-        <div style={{ borderTop: '1px solid #ddd', paddingTop: '1rem', marginBottom: '1rem' }}>
+        <div style={{ borderTop: '1px solid #ddd', paddingTop: '1rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', gap: '2rem', flexWrap: 'wrap' }}>
           {hasPaymentInfo && (
-            <div style={{ marginBottom: invoiceNotes ? '0.8rem' : 0 }}>
+            <div>
               <div style={{ fontSize: '11px', fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.3rem' }}>Payment Information</div>
               {paymentBankName && <div style={{ fontSize: '12px' }}>Bank: {paymentBankName}</div>}
               {paymentAccountNumber && <div style={{ fontSize: '12px' }}>Account Number: {paymentAccountNumber}</div>}
@@ -143,7 +138,7 @@ export function A4Template({
             </div>
           )}
           {invoiceNotes && (
-            <div>
+            <div style={{ maxWidth: '320px' }}>
               <div style={{ fontSize: '11px', fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.3rem' }}>Notes</div>
               <div style={{ fontSize: '12px', color: '#444', whiteSpace: 'pre-wrap' }}>{invoiceNotes}</div>
             </div>
@@ -151,8 +146,11 @@ export function A4Template({
         </div>
       )}
 
-      <div style={{ marginTop: 'auto', textAlign: 'center' }}>
-        {showBranding && <div style={{ fontSize: '10px', color: '#999' }}>Powered by Verticals</div>}
+      <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.75rem' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ borderTop: '1px solid #999', width: '160px', paddingTop: '0.3rem', fontSize: '10px', color: '#888' }}>Authorized Signatory</div>
+        </div>
+        {showBranding && <div style={{ fontSize: '10px', color: '#999', width: '100%', textAlign: 'center' }}>Powered by Verticals</div>}
       </div>
     </div>
   )

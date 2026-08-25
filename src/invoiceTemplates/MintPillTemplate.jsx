@@ -18,7 +18,9 @@ function Pill({ children, palette }) {
 export function MintPillTemplate({
   businessName, businessAddress, businessPhone, businessEmail, logoElement,
   orderNumber, dateStr, details, items, subtotal, deliveryFee, total, palette, showBranding = true,
+  paymentBankName, paymentAccountNumber, paymentAccountName, invoiceNotes,
 }) {
+  const hasPaymentInfo = paymentBankName || paymentAccountNumber || paymentAccountName
   return (
     <div style={{ background: '#ffffff', color: '#111', padding: '2rem', fontFamily: 'Arial, Helvetica, sans-serif' }}>
       <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
@@ -75,26 +77,46 @@ export function MintPillTemplate({
         </table>
       )}
 
-      {items.length > 0 && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <div style={{ width: '220px', background: palette.primarySoft, borderRadius: '8px', padding: '0.8rem' }}>
-            {deliveryFee > 0 && (
-              <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '0.15rem 0' }}>
-                  <span>Subtotal</span>
-                  <span>{subtotal.toLocaleString()}</span>
+      {(items.length > 0 || hasPaymentInfo || invoiceNotes) && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1.5rem', flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: '180px' }}>
+            {hasPaymentInfo && (
+              <div style={{ marginBottom: invoiceNotes ? '0.8rem' : 0 }}>
+                <Pill palette={palette}>Payment</Pill>
+                <div style={{ marginTop: '0.5rem', fontSize: '12px' }}>
+                  {paymentBankName && <div>Bank: {paymentBankName}</div>}
+                  {paymentAccountNumber && <div>Account Number: {paymentAccountNumber}</div>}
+                  {paymentAccountName && <div>Account Name: {paymentAccountName}</div>}
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '0.15rem 0' }}>
-                  <span>Delivery Fee</span>
-                  <span>{deliveryFee.toLocaleString()}</span>
-                </div>
-              </>
+              </div>
             )}
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '16px', fontWeight: 'bold', color: palette.primary, marginTop: '0.2rem' }}>
-              <span>Total</span>
-              <span>{total.toLocaleString()}</span>
-            </div>
+            {invoiceNotes && (
+              <div>
+                <Pill palette={palette}>Notes</Pill>
+                <div style={{ marginTop: '0.5rem', fontSize: '12px', color: '#444', whiteSpace: 'pre-wrap' }}>{invoiceNotes}</div>
+              </div>
+            )}
           </div>
+          {items.length > 0 && (
+            <div style={{ width: '220px', background: palette.primarySoft, borderRadius: '8px', padding: '0.8rem', flexShrink: 0 }}>
+              {deliveryFee > 0 && (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '0.15rem 0' }}>
+                    <span>Subtotal</span>
+                    <span>{subtotal.toLocaleString()}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '0.15rem 0' }}>
+                    <span>Delivery Fee</span>
+                    <span>{deliveryFee.toLocaleString()}</span>
+                  </div>
+                </>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '16px', fontWeight: 'bold', color: palette.primary, marginTop: '0.2rem' }}>
+                <span>Total</span>
+                <span>{total.toLocaleString()}</span>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

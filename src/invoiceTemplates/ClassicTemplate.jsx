@@ -9,7 +9,9 @@ import { formatFieldValue } from './shared'
 export function ClassicTemplate({
   businessName, businessAddress, businessPhone, businessEmail, logoElement,
   orderNumber, dateStr, details, items, subtotal, deliveryFee, total, palette, showBranding = true,
+  paymentBankName, paymentAccountNumber, paymentAccountName, invoiceNotes,
 }) {
+  const hasPaymentInfo = paymentBankName || paymentAccountNumber || paymentAccountName
   return (
     <div style={{ background: '#ffffff', color: '#111', padding: '2rem', fontFamily: 'Arial, Helvetica, sans-serif' }}>
       <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
@@ -85,6 +87,25 @@ export function ClassicTemplate({
             <span>Total</span>
             <span>{total.toLocaleString()}</span>
           </div>
+        </div>
+      )}
+
+      {(hasPaymentInfo || invoiceNotes) && (
+        <div style={{ borderTop: `1px solid ${palette.border}`, marginTop: '1.5rem', paddingTop: '1rem' }}>
+          {hasPaymentInfo && (
+            <div style={{ marginBottom: invoiceNotes ? '0.7rem' : 0 }}>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.3rem' }}>Payment Information</div>
+              {paymentBankName && <div style={{ fontSize: '12px' }}>Bank: {paymentBankName}</div>}
+              {paymentAccountNumber && <div style={{ fontSize: '12px' }}>Account Number: {paymentAccountNumber}</div>}
+              {paymentAccountName && <div style={{ fontSize: '12px' }}>Account Name: {paymentAccountName}</div>}
+            </div>
+          )}
+          {invoiceNotes && (
+            <div>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.3rem' }}>Notes</div>
+              <div style={{ fontSize: '12px', color: '#444', whiteSpace: 'pre-wrap' }}>{invoiceNotes}</div>
+            </div>
+          )}
         </div>
       )}
 

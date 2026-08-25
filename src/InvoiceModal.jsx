@@ -9,12 +9,17 @@
 //
 // Two independent axes, both re-derived from the same submission/form data
 // (never a second copy of it):
-//   - "Style"/"Color": which of the 4 compact layouts (src/invoiceTemplates/)
-//     and which palette (src/invoicePalettes.js) - chosen fresh each time
-//     this modal opens, nothing saved.
+//   - "Style"/"Color": which of the 4 layouts (src/invoiceTemplates/index.js
+//     for Compact, src/invoiceTemplates/a4Templates.js for A4 - same keys/
+//     names in both registries so one Style picker drives whichever view is
+//     active) and which palette (src/invoicePalettes.js) - chosen fresh each
+//     time this modal opens, nothing saved.
 //   - "Compact"/"A4": which overall document shape. Session-remembered (not
 //     saved to the business) unless the business has set a default in Form
 //     Settings, in which case that's the starting point for the session.
+// Payment/account info and invoice notes (Settings > Invoice) render on
+// every style in both registries, so switching Style/Color/Compact-A4 never
+// drops them.
 // Backdating the invoice date and the "Powered by Verticals" branding
 // toggle both persist - see handleDateChange and the Branding checkbox.
 import { useEffect, useRef, useState } from 'react'
@@ -22,7 +27,7 @@ import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
 import { supabase } from './supabaseClient'
 import { INVOICE_TEMPLATES, getInvoiceTemplate } from './invoiceTemplates'
-import { A4Template } from './invoiceTemplates/A4Template'
+import { getA4Template } from './invoiceTemplates/a4Templates'
 import { INVOICE_PALETTES, getPalette } from './invoicePalettes'
 import { LogoIcon } from './invoiceLogos'
 
@@ -57,6 +62,7 @@ export function InvoiceModal({ form, submission, onClose, allowDateEdit = false 
   const [paletteKey, setPaletteKey] = useState(INVOICE_PALETTES[0].key)
   const palette = getPalette(paletteKey)
   const TemplateComponent = getInvoiceTemplate(templateKey).Component
+  const A4Component = getA4Template(templateKey).Component
 
   const [invoiceDateInput, setInvoiceDateInput] = useState(
     toDateInputValue(submission.invoice_date ? new Date(submission.invoice_date) : new Date(submission.created_at))
@@ -130,6 +136,7 @@ export function InvoiceModal({ form, submission, onClose, allowDateEdit = false 
   const sharedTemplateProps = {
     businessName, businessAddress, businessPhone, businessEmail, logoElement,
     orderNumber, dateStr, details, items, subtotal, deliveryFee, total, palette, showBranding,
+    paymentMethod, paymentBankName, paymentAccountNumber, paymentAccountName, invoiceNotes,
   }
 
   // The true-size A4 copy is the only thing ever captured/printed for A4 -
@@ -302,24 +309,22 @@ export function InvoiceModal({ form, submission, onClose, allowDateEdit = false 
             </div>
           </div>
 
-          {viewMode === 'compact' && (
-            <div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--color-muted)', marginBottom: '0.3rem' }}>Style</div>
-              <div style={{ display: 'flex', gap: '0.4rem' }}>
-                {INVOICE_TEMPLATES.map(t => (
-                  <button
-                    key={t.key}
-                    type="button"
-                    className={t.key === templateKey ? undefined : 'secondary'}
-                    onClick={() => setTemplateKey(t.key)}
-                    style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem' }}
-                  >
-                    {t.name}
-                  </button>
-                ))}
-              </div>
+          <div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--color-muted)', marginBottom: '0.3rem' }}>Style</div>
+            <div style={{ display: 'flex', gap: '0.4rem' }}>
+              {INVOICE_TEMPLATES.map(t => (
+                <button
+                  key={t.key}
+                  type="button"
+                  className={t.key === templateKey ? undefined : 'secondary'}
+                  onClick={() => setTemplateKey(t.key)}
+                  style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem' }}
+                >
+                  {t.name}
+                </button>
+              ))}
             </div>
-          )}
+          </div>
 
           <div>
             <div style={{ fontSize: '0.75rem', color: 'var(--color-muted)', marginBottom: '0.3rem' }}>Color</div>
@@ -382,14 +387,7 @@ export function InvoiceModal({ form, submission, onClose, allowDateEdit = false 
               <div ref={previewWrapRef} style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
                 <div style={{ width: `${A4_WIDTH_PX * a4Scale}px`, height: `${a4NaturalHeight * a4Scale}px`, overflow: 'hidden' }}>
                   <div style={{ transform: `scale(${a4Scale})`, transformOrigin: 'top left', width: `${A4_WIDTH_PX}px`, boxShadow: '0 4px 18px rgba(0,0,0,0.15)' }}>
-                    <A4Template
-                      {...sharedTemplateProps}
-                      paymentMethod={paymentMethod}
-                      paymentBankName={paymentBankName}
-                      paymentAccountNumber={paymentAccountNumber}
-                      paymentAccountName={paymentAccountName}
-                      invoiceNotes={invoiceNotes}
-                    />
+                    <A4Component {...sharedTemplateProps} />
                   </div>
                 </div>
               </div>
@@ -399,14 +397,7 @@ export function InvoiceModal({ form, submission, onClose, allowDateEdit = false 
                   ref'd element (not a wrapper) so the print stylesheet's
                   .invoice-print-target override actually reaches it. */}
               <div ref={a4ExportRef} className="invoice-print-target" style={{ position: 'fixed', top: 0, left: '-10000px' }}>
-                <A4Template
-                  {...sharedTemplateProps}
-                  paymentMethod={paymentMethod}
-                  paymentBankName={paymentBankName}
-                  paymentAccountNumber={paymentAccountNumber}
-                  paymentAccountName={paymentAccountName}
-                  invoiceNotes={invoiceNotes}
-                />
+                <A4Component {...sharedTemplateProps} />
               </div>
             </>
           )}

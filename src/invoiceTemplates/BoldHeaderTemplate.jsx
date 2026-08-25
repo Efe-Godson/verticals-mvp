@@ -6,7 +6,9 @@ import { formatFieldValue } from './shared'
 export function BoldHeaderTemplate({
   businessName, businessAddress, businessPhone, businessEmail, logoElement,
   orderNumber, dateStr, details, items, subtotal, deliveryFee, total, palette, showBranding = true,
+  paymentBankName, paymentAccountNumber, paymentAccountName, invoiceNotes,
 }) {
+  const hasPaymentInfo = paymentBankName || paymentAccountNumber || paymentAccountName
   return (
     <div style={{ background: '#ffffff', color: '#111', padding: '2rem', fontFamily: 'Arial, Helvetica, sans-serif' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
@@ -83,6 +85,25 @@ export function BoldHeaderTemplate({
             <span>Total</span>
             <span>{total.toLocaleString()}</span>
           </div>
+        </div>
+      )}
+
+      {(hasPaymentInfo || invoiceNotes) && (
+        <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: `1px solid ${palette.border}`, display: 'flex', justifyContent: 'space-between', gap: '2rem', flexWrap: 'wrap' }}>
+          {hasPaymentInfo && (
+            <div>
+              <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.3rem' }}>Payment Information</div>
+              {paymentBankName && <div style={{ fontSize: '12px' }}>Bank: {paymentBankName}</div>}
+              {paymentAccountNumber && <div style={{ fontSize: '12px' }}>Account Number: {paymentAccountNumber}</div>}
+              {paymentAccountName && <div style={{ fontSize: '12px' }}>Account Name: {paymentAccountName}</div>}
+            </div>
+          )}
+          {invoiceNotes && (
+            <div style={{ maxWidth: '260px' }}>
+              <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.3rem' }}>Notes</div>
+              <div style={{ fontSize: '12px', color: '#444', whiteSpace: 'pre-wrap' }}>{invoiceNotes}</div>
+            </div>
+          )}
         </div>
       )}
 
