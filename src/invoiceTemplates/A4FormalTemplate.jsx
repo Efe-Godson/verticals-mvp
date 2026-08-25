@@ -4,7 +4,7 @@
 // look - accent bar next to the business name/date, a single bordered
 // "Bill To" box, an S/N-numbered item table with a solid total row, and the
 // "Invoice Authorized by" + Designation + Signature block.
-import { formatFieldValue, formatCurrency } from './shared'
+import { formatFieldValue } from './shared'
 
 export function A4FormalTemplate({
   businessName, businessAddress, businessPhone, businessEmail, logoElement,
@@ -21,8 +21,9 @@ export function A4FormalTemplate({
       fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '13px', display: 'flex', flexDirection: 'column',
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div style={{ display: 'flex', gap: '0.7rem' }}>
-          <div style={{ width: '4px', background: palette.primary, borderRadius: '2px' }} />
+        <div style={{ display: 'flex' }}>
+          <div style={{ width: '3px', background: palette.primary, marginRight: '2px' }} />
+          <div style={{ width: '3px', background: palette.primary, marginRight: '0.7rem' }} />
           <div>
             <div style={{ fontSize: '15px', fontWeight: 'bold', textTransform: 'uppercase' }}>{businessName}</div>
             <div style={{ fontSize: '13px', fontWeight: 'bold', marginTop: '2px' }}>{dateStr}</div>
@@ -52,9 +53,8 @@ export function A4FormalTemplate({
           <div style={{ background: palette.primarySoft, color: palette.primary, fontWeight: 700, fontSize: '12px', padding: '0.5rem 0.8rem' }}>Bill To</div>
           <div style={{ border: `1px solid ${palette.border}`, borderTop: 'none', padding: '0.7rem 0.8rem' }}>
             {details.map(({ field, value }) => (
-              <div key={field.id} style={{ fontSize: '12px', padding: '0.15rem 0' }}>
-                <span style={{ color: '#666' }}>{field.label}: </span>
-                <span>{formatFieldValue(field, value)}</span>
+              <div key={field.id} style={{ fontSize: '12px', fontWeight: 'bold', padding: '0.15rem 0' }}>
+                {formatFieldValue(field, value)}
               </div>
             ))}
           </div>
@@ -66,10 +66,10 @@ export function A4FormalTemplate({
           <thead>
             <tr style={{ background: palette.primary }}>
               <th style={{ padding: '0.5rem', color: '#fff', textAlign: 'left', width: '40px' }}>S/N</th>
-              <th style={{ padding: '0.5rem', color: '#fff', textAlign: 'left' }}>Item Description</th>
-              <th style={{ padding: '0.5rem', color: '#fff', textAlign: 'center' }}>Unit</th>
-              <th style={{ padding: '0.5rem', color: '#fff', textAlign: 'right' }}>Unit Price</th>
-              <th style={{ padding: '0.5rem', color: '#fff', textAlign: 'right' }}>Cost</th>
+              <th style={{ padding: '0.5rem', color: '#fff', textAlign: 'left' }}>ITEM DESCRIPTION</th>
+              <th style={{ padding: '0.5rem', color: '#fff', textAlign: 'center' }}>UNIT</th>
+              <th style={{ padding: '0.5rem', color: '#fff', textAlign: 'right' }}>UNIT PRICE (NGN)</th>
+              <th style={{ padding: '0.5rem', color: '#fff', textAlign: 'right' }}>COST (NGN)</th>
             </tr>
           </thead>
           <tbody>
@@ -78,21 +78,21 @@ export function A4FormalTemplate({
                 <td style={{ padding: '0.5rem' }}>{i + 1}</td>
                 <td style={{ padding: '0.5rem' }}>{item.name}</td>
                 <td style={{ padding: '0.5rem', textAlign: 'center' }}>{item.quantity}</td>
-                <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatCurrency(item.price)}</td>
-                <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatCurrency(item.price * item.quantity)}</td>
+                <td style={{ padding: '0.5rem', textAlign: 'right' }}>{item.price.toLocaleString()}</td>
+                <td style={{ padding: '0.5rem', textAlign: 'right' }}>{(item.price * item.quantity).toLocaleString()}</td>
               </tr>
             ))}
             {deliveryFee > 0 && (
               <tr style={{ borderBottom: '1px solid #eee' }}>
                 <td colSpan={4} style={{ padding: '0.5rem', textAlign: 'right', color: '#666' }}>Delivery</td>
-                <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatCurrency(deliveryFee)}</td>
+                <td style={{ padding: '0.5rem', textAlign: 'right' }}>{deliveryFee.toLocaleString()}</td>
               </tr>
             )}
           </tbody>
           <tfoot>
             <tr style={{ background: palette.primary }}>
               <td colSpan={4} style={{ padding: '0.6rem', color: '#fff', fontWeight: 'bold', textAlign: 'center', fontSize: '15px' }}>TOTAL</td>
-              <td style={{ padding: '0.6rem', color: '#fff', fontWeight: 'bold', textAlign: 'right', fontSize: '15px' }}>{formatCurrency(total)}</td>
+              <td style={{ padding: '0.6rem', color: '#fff', fontWeight: 'bold', textAlign: 'right', fontSize: '15px' }}>{total.toLocaleString()}</td>
             </tr>
           </tfoot>
         </table>

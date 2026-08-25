@@ -18,8 +18,9 @@ export function FormalTemplate({
   return (
     <div style={{ background: '#ffffff', color: '#111', padding: '2rem', fontFamily: 'Arial, Helvetica, sans-serif' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-        <div style={{ display: 'flex', gap: '0.6rem' }}>
-          <div style={{ width: '4px', background: palette.primary, borderRadius: '2px' }} />
+        <div style={{ display: 'flex' }}>
+          <div style={{ width: '3px', background: palette.primary, marginRight: '2px' }} />
+          <div style={{ width: '3px', background: palette.primary, marginRight: '0.6rem' }} />
           <div>
             <div style={{ fontSize: '13px', fontWeight: 'bold', textTransform: 'uppercase' }}>{businessName}</div>
             <div style={{ fontSize: '12px', fontWeight: 'bold', marginTop: '2px' }}>{dateStr}</div>
@@ -38,9 +39,8 @@ export function FormalTemplate({
           <div style={{ background: palette.primarySoft, color: palette.primary, fontWeight: 700, fontSize: '12px', padding: '0.4rem 0.7rem' }}>Bill To</div>
           <div style={{ border: `1px solid ${palette.border}`, borderTop: 'none', padding: '0.6rem 0.7rem' }}>
             {details.map(({ field, value }) => (
-              <div key={field.id} style={{ fontSize: '12px', padding: '0.1rem 0' }}>
-                <span style={{ color: '#666' }}>{field.label}: </span>
-                <span>{formatFieldValue(field, value)}</span>
+              <div key={field.id} style={{ fontSize: '12px', fontWeight: 'bold', padding: '0.1rem 0' }}>
+                {formatFieldValue(field, value)}
               </div>
             ))}
           </div>
@@ -52,10 +52,10 @@ export function FormalTemplate({
           <thead>
             <tr style={{ background: palette.primary }}>
               <th style={{ padding: '0.4rem', color: '#fff', textAlign: 'left', width: '34px' }}>S/N</th>
-              <th style={{ padding: '0.4rem', color: '#fff', textAlign: 'left' }}>Item Description</th>
-              <th style={{ padding: '0.4rem', color: '#fff', textAlign: 'center' }}>Unit</th>
-              <th style={{ padding: '0.4rem', color: '#fff', textAlign: 'right' }}>Unit Price</th>
-              <th style={{ padding: '0.4rem', color: '#fff', textAlign: 'right' }}>Cost</th>
+              <th style={{ padding: '0.4rem', color: '#fff', textAlign: 'left' }}>ITEM DESCRIPTION</th>
+              <th style={{ padding: '0.4rem', color: '#fff', textAlign: 'center' }}>UNIT</th>
+              <th style={{ padding: '0.4rem', color: '#fff', textAlign: 'right' }}>UNIT PRICE (NGN)</th>
+              <th style={{ padding: '0.4rem', color: '#fff', textAlign: 'right' }}>COST (NGN)</th>
             </tr>
           </thead>
           <tbody>
