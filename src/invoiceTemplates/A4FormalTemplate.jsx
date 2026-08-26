@@ -10,7 +10,7 @@ export function A4FormalTemplate({
   businessName, businessAddress, businessPhone, businessEmail, logoElement,
   orderNumber, dateStr, details, items, deliveryFee, total, palette,
   paymentMethod, showBranding, paymentBankName, paymentAccountNumber, paymentAccountName, invoiceNotes,
-  invoiceAuthorizedBy, invoiceAuthorizedDesignation,
+  invoiceAuthorizedBy, invoiceAuthorizedDesignation, signatureElement,
 }) {
   const hasPaymentInfo = paymentBankName || paymentAccountNumber || paymentAccountName
 
@@ -136,7 +136,7 @@ export function A4FormalTemplate({
         </div>
       )}
       <div style={{ fontSize: '12px', marginBottom: '1rem' }}>
-        Signature: <span style={{ display: 'inline-block', width: '200px', borderBottom: '1px solid #111' }} />
+        Signature: <span style={{ display: 'inline-block', width: '200px', textAlign: 'center', borderBottom: '1px solid #111' }}>{signatureElement}</span>
       </div>
 
       <div style={{ marginTop: 'auto', textAlign: 'center' }}>

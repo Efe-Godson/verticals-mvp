@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import PosSidePanel from './PosSidePanel'
@@ -39,6 +39,14 @@ function FormSettings() {
   const [invoiceNotes, setInvoiceNotes] = useState('')
   const [invoiceAuthorizedBy, setInvoiceAuthorizedBy] = useState('')
   const [invoiceAuthorizedDesignation, setInvoiceAuthorizedDesignation] = useState('')
+  const [signatureUrl, setSignatureUrl] = useState('')
+  const [signatureMode, setSignatureMode] = useState('draw')
+  const [uploadingSignature, setUploadingSignature] = useState(false)
+  const [signatureError, setSignatureError] = useState('')
+  const [hasDrawnSignature, setHasDrawnSignature] = useState(false)
+  const signatureCanvasRef = useRef(null)
+  const signatureDrawingRef = useRef(false)
+  const signatureLastPointRef = useRef(null)
 
   useEffect(() => {
     async function loadForm() {
@@ -66,6 +74,7 @@ function FormSettings() {
         setInvoiceNotes(data.settings?.invoiceNotes ?? '')
         setInvoiceAuthorizedBy(data.settings?.invoiceAuthorizedBy ?? '')
         setInvoiceAuthorizedDesignation(data.settings?.invoiceAuthorizedDesignation ?? '')
+        setSignatureUrl(data.settings?.signatureUrl ?? '')
       }
       setLoading(false)
     }
@@ -87,7 +96,7 @@ function FormSettings() {
       allowMultipleResponses, collectEmail, companyName, companyPhone, companyAddress, companyEmail, receiptPaperWidth,
       staffReportRange, aiFillRules, logoUrl, logoIconKey,
       showVerticalsBranding, defaultInvoiceView, paymentBankName, paymentAccountNumber, paymentAccountName, invoiceNotes,
-      invoiceAuthorizedBy, invoiceAuthorizedDesignation,
+      invoiceAuthorizedBy, invoiceAuthorizedDesignation, signatureUrl,
     }
 
     const { error } = await supabase
@@ -134,6 +143,97 @@ function FormSettings() {
     setLogoUrl(data.publicUrl)
     setLogoIconKey('')
     setUploadingLogo(false)
+  }
+
+  // Same immediate-upload convention as handleLogoChange.
+  async function handleSignatureUpload(file) {
+    setSignatureError('')
+    if (file.type !== 'image/png') {
+      setSignatureError('Only PNG signatures are supported.')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setSignatureError('Signature must be under 5MB.')
+      return
+    }
+
+    setUploadingSignature(true)
+    const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_')
+    const path = `signatures/${id}/${Date.now()}-${safeName}`
+    const { error: uploadError } = await supabase.storage.from('form-uploads').upload(path, file)
+    if (uploadError) {
+      setUploadingSignature(false)
+      setSignatureError('Could not upload the signature: ' + uploadError.message)
+      return
+    }
+
+    const { data } = supabase.storage.from('form-uploads').getPublicUrl(path)
+    setSignatureUrl(data.publicUrl)
+    setUploadingSignature(false)
+  }
+
+  // Coordinates come from getBoundingClientRect rather than assuming the
+  // canvas's CSS size matches its pixel attributes, so drawing stays
+  // accurate however the canvas ends up scaled (e.g. narrow phone screens).
+  function signaturePointFromEvent(e) {
+    const canvas = signatureCanvasRef.current
+    const rect = canvas.getBoundingClientRect()
+    const scaleX = canvas.width / rect.width
+    const scaleY = canvas.height / rect.height
+    return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY }
+  }
+
+  function handleSignaturePointerDown(e) {
+    e.preventDefault()
+    signatureCanvasRef.current.setPointerCapture(e.pointerId)
+    signatureDrawingRef.current = true
+    signatureLastPointRef.current = signaturePointFromEvent(e)
+  }
+
+  function handleSignaturePointerMove(e) {
+    if (!signatureDrawingRef.current) return
+    const canvas = signatureCanvasRef.current
+    const ctx = canvas.getContext('2d')
+    const point = signaturePointFromEvent(e)
+    ctx.strokeStyle = '#111'
+    ctx.lineWidth = 2.5
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    ctx.beginPath()
+    ctx.moveTo(signatureLastPointRef.current.x, signatureLastPointRef.current.y)
+    ctx.lineTo(point.x, point.y)
+    ctx.stroke()
+    signatureLastPointRef.current = point
+    if (!hasDrawnSignature) setHasDrawnSignature(true)
+  }
+
+  function handleSignaturePointerUp() {
+    signatureDrawingRef.current = false
+  }
+
+  function clearSignatureCanvas() {
+    const canvas = signatureCanvasRef.current
+    canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height)
+    setHasDrawnSignature(false)
+  }
+
+  async function saveDrawnSignature() {
+    setSignatureError('')
+    const canvas = signatureCanvasRef.current
+    setUploadingSignature(true)
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'))
+    const path = `signatures/${id}/${Date.now()}-drawn.png`
+    const { error: uploadError } = await supabase.storage.from('form-uploads').upload(path, blob, { contentType: 'image/png' })
+    if (uploadError) {
+      setUploadingSignature(false)
+      setSignatureError('Could not save the signature: ' + uploadError.message)
+      return
+    }
+
+    const { data } = supabase.storage.from('form-uploads').getPublicUrl(path)
+    setSignatureUrl(data.publicUrl)
+    setUploadingSignature(false)
+    clearSignatureCanvas()
   }
 
   if (loading) return <LoadingState label="Loading settings..." />
@@ -458,9 +558,9 @@ function FormSettings() {
 
           <div style={{ marginBottom: '0.6rem', fontSize: '0.85rem', color: 'var(--color-muted)' }}>
             Authorized By
-            <div style={{ fontSize: '0.8rem', marginTop: '-0.1rem' }}>Used by the Formal invoice style's signature block.</div>
+            <div style={{ fontSize: '0.8rem', marginTop: '-0.1rem' }}>Shown on every invoice style's signature line.</div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.8rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.8rem', marginBottom: '1.2rem' }}>
             <input
               type="text"
               value={invoiceAuthorizedBy}
@@ -476,6 +576,85 @@ function FormSettings() {
               style={{ padding: '0.5rem' }}
             />
           </div>
+
+          <div style={{ marginBottom: '0.6rem', fontSize: '0.85rem', color: 'var(--color-muted)' }}>
+            Signature
+            <div style={{ fontSize: '0.8rem', marginTop: '-0.1rem' }}>Shown centered on the signature line of every invoice style.</div>
+          </div>
+
+          {signatureUrl && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', marginBottom: '0.8rem' }}>
+              <div style={{ border: '1px solid var(--color-border)', borderRadius: 'var(--radius)', padding: '0.4rem 0.8rem', background: '#fff' }}>
+                <img src={signatureUrl} alt="" style={{ maxHeight: '48px', maxWidth: '160px', objectFit: 'contain', display: 'block' }} />
+              </div>
+              <button type="button" className="secondary" style={{ fontSize: '0.85rem' }} onClick={() => setSignatureUrl('')}>
+                Remove signature
+              </button>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.6rem' }}>
+            <button
+              type="button"
+              className={signatureMode === 'draw' ? '' : 'secondary'}
+              style={{ fontSize: '0.8rem' }}
+              onClick={() => setSignatureMode('draw')}
+            >
+              Draw
+            </button>
+            <button
+              type="button"
+              className={signatureMode === 'upload' ? '' : 'secondary'}
+              style={{ fontSize: '0.8rem' }}
+              onClick={() => setSignatureMode('upload')}
+            >
+              Upload image
+            </button>
+          </div>
+
+          {signatureMode === 'draw' ? (
+            <div>
+              <canvas
+                ref={signatureCanvasRef}
+                width={420}
+                height={140}
+                style={{
+                  width: '100%', maxWidth: '420px', height: '140px', display: 'block',
+                  border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
+                  background: '#fff', touchAction: 'none', cursor: 'crosshair',
+                }}
+                onPointerDown={handleSignaturePointerDown}
+                onPointerMove={handleSignaturePointerMove}
+                onPointerUp={handleSignaturePointerUp}
+                onPointerLeave={handleSignaturePointerUp}
+              />
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem' }}>
+                <button type="button" className="secondary" style={{ fontSize: '0.85rem' }} onClick={clearSignatureCanvas} disabled={!hasDrawnSignature}>
+                  Clear
+                </button>
+                <button
+                  type="button"
+                  style={{ fontSize: '0.85rem' }}
+                  disabled={!hasDrawnSignature || uploadingSignature}
+                  onClick={saveDrawnSignature}
+                >
+                  {uploadingSignature ? 'Saving...' : 'Save Signature'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <label className="secondary" style={{ display: 'inline-block', cursor: 'pointer', fontSize: '0.85rem' }}>
+              {uploadingSignature ? 'Uploading...' : 'Upload PNG signature'}
+              <input
+                type="file"
+                accept="image/png"
+                disabled={uploadingSignature}
+                onChange={(e) => { if (e.target.files[0]) handleSignatureUpload(e.target.files[0]); e.target.value = '' }}
+                style={{ display: 'none' }}
+              />
+            </label>
+          )}
+          {signatureError && <p style={{ color: '#c0392b', fontSize: '0.8rem', marginTop: '0.5rem' }}>{signatureError}</p>}
         </div>
       )}
 

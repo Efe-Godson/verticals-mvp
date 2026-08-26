@@ -1,9 +1,10 @@
 // Place at: src/MobileBottomNav.jsx
-// Persistent mobile tab bar - Menu/Home/Records/Reports, the app's
-// top-level sections kept in one thumb-reachable row instead of a lone
-// floating hamburger. Rendered by NavBar.jsx (mobile only, see the
-// navbar-bottom-bar CSS in index.css), which owns opening/closing the
-// menu sheet itself - this component just reports the tap.
+// Persistent mobile tab bar - Home/Records/Reports, the app's three
+// top-level sections kept in one thumb-reachable row. Menu now lives as a
+// hamburger in the compact top bar instead of a fourth tab here (see
+// NavBar.jsx's navbar-mobile-row) - it's a secondary/admin surface
+// (Templates, Lab, Recycle Bin, account), not a primary destination, so it
+// doesn't belong at equal weight with Home/Records/Reports.
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from './AuthContext'
 
@@ -30,14 +31,6 @@ function ReportsIcon({ size = 22 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M4 20V12M10 20V6M16 20v-8M3 20h18" />
-    </svg>
-  )
-}
-
-function MenuIcon({ size = 22 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-      <path d="M4 6h16M4 12h16M4 18h16" />
     </svg>
   )
 }
@@ -73,7 +66,7 @@ function NavItem({ as: As = Link, active, label, ariaLabel, icon, ...rest }) {
   )
 }
 
-function MobileBottomNav({ onOpenMenu }) {
+function MobileBottomNav() {
   const location = useLocation()
   const { staffFormId } = useAuth()
 
@@ -95,7 +88,6 @@ function MobileBottomNav({ onOpenMenu }) {
 
   return (
     <nav className="navbar-bottom-bar" aria-label="Primary navigation">
-      <NavItem as="button" type="button" onClick={onOpenMenu} icon={<MenuIcon />} label="Menu" ariaLabel="Open menu" />
       <NavItem to="/" active={isHome} icon={<HomeIcon />} label="Home" />
       <NavItem to={recordsTo} active={isRecords} icon={<RecordsIcon />} label="Records" ariaLabel="Open Records" />
       <NavItem to={reportsTo} active={isReports} icon={<ReportsIcon />} label="Reports" ariaLabel="Open Reports" />

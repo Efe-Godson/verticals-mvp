@@ -593,6 +593,7 @@ input:focus, select:focus, textarea:focus {
   .navbar-mobile-row {
     display: flex !important;
     align-items: center;
+    justify-content: space-between;
     gap: 0.6rem;
     padding: 0.7rem 1rem;
   }
@@ -611,6 +612,46 @@ input:focus, select:focus, textarea:focus {
     border-top: 1px solid var(--color-border);
     padding: 0 0.3rem env(safe-area-inset-bottom);
   }
+
+  /* DarkModeToggle.jsx's floating eye button: same fixed bottom-right spot
+     as desktop, just lifted clear of the mobile bottom tab bar (68px +
+     safe-area) instead of sitting under it. */
+  .dark-mode-toggle {
+    bottom: calc(68px + env(safe-area-inset-bottom) + 0.8rem) !important;
+  }
+
+  /* Shared convention for a page's own "Options" menu (Report.jsx's Print/
+     Download/Report Builder, Records.jsx's Export/Save View/Recycle Bin):
+     below 768px the trigger moves to the compact top bar's "⋯" button (see
+     usePageOptions in PageTitleContext.jsx / NavBar.jsx) instead of this
+     inline one, since a page's own filter row is often already tight on a
+     phone. The inline trigger + its desktop-anchored dropdown both hide
+     here; a separate portaled version (rendered straight into
+     document.body - see Report.jsx/Records.jsx) takes over instead. It's
+     portaled rather than just repositioned in place because some pages
+     nest the dropdown inside an element with backdrop-filter for a sticky-
+     blur look (Report.jsx's .report-filter-bar), and that makes the
+     ancestor a containing block for position:fixed descendants - a "fixed"
+     panel left in place there ends up positioned relative to that bar
+     instead of the viewport, not flush under the top bar like intended. */
+  .page-options-trigger,
+  .page-options-panel-desktop {
+    display: none !important;
+  }
+  .page-options-panel-mobile {
+    display: block;
+  }
+}
+
+/* Default (desktop): the portaled mobile panel never shows, even though
+   it's always mounted in the DOM whenever its page's optionsMenuOpen is
+   true - the in-place .page-options-panel-desktop version above handles
+   desktop instead. */
+.page-options-panel-mobile {
+  display: none;
+}
+
+@media (max-width: 768px) {
 
   /* PosSidePanel's menu/back buttons: same top-corner floating buttons as
      desktop, just re-anchored to the bottom corners here - a top corner is

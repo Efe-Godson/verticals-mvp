@@ -36,6 +36,7 @@ import ResetPassword from './ResetPassword'
 import Templates from './Templates'
 import AccountPage from './AccountPage'
 import NavBar from './NavBar'
+import DarkModeToggle from './DarkModeToggle'
 import { LoadingState } from './LoadingState'
 import OfflineBanner from './OfflineBanner'
 
@@ -105,6 +106,7 @@ function AppShell() {
     <>
       <OfflineBanner />
       {showNavBar && <NavBar />}
+      {showNavBar && <DarkModeToggle />}
       {/* Only pages with NavBar get its fixed navbar-bottom-bar on mobile,
           so only they need the matching bottom padding reserved (see the
           .app-content-under-navbar rule in index.css) - a focus-mode/public

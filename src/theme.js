@@ -50,7 +50,7 @@ function mix(hex, towardHex, amount) {
   })
 }
 
-function isDarkMode() {
+export function isDarkMode() {
   // A forced mode (see applyThemeMode) wins over the OS setting - index.css's
   // dark block is scoped to data-theme="dark" OR (no data-theme and OS
   // dark), so this mirrors that same precedence for the accent-color mix.

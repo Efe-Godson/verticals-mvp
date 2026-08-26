@@ -1,5 +1,6 @@
 // Place at: src/Report.jsx
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
@@ -19,6 +20,7 @@ import { formatNaira, median } from './report/helpers/analysisUtils'
 import { DATE_RANGE_OPTIONS, getDateRangeBounds, getDateRangeLabel } from './report/helpers/dateRange'
 import { LoadingState } from './LoadingState'
 import { ErrorState } from './ErrorState'
+import { usePageOptions } from './PageTitleContext'
 
 function getPreviousDateRangeBounds(range, customStart, customEnd) {
   if (range === 'all') return { start: null, end: null }
@@ -133,6 +135,11 @@ function Report() {
     loadData()
   }, [id, staffFormId])
 
+  // Only shows the compact bar's "⋯" button once there's an actual report
+  // (and Options menu) to open - not during loading/error/empty-state,
+  // which render early below instead of the filter bar this menu lives in.
+  usePageOptions(!loading && !error && submissions.length > 0, () => setOptionsMenuOpen(v => !v))
+
   if (loading) return <LoadingState label="Loading report..." />
   if (error) return <ErrorState message={error} />
 
@@ -205,6 +212,45 @@ function Report() {
     exportReportToPPTX(form, filteredSubmissions, buildFilterSummary())
   }
 
+  // Shared between the desktop-anchored dropdown and the mobile portal
+  // version below, so the two don't drift out of sync with each other.
+  const optionsMenuItemStyle = { display: 'block', width: '100%', textAlign: 'left', border: 'none', background: 'transparent', padding: '0.45rem 0.3rem', fontSize: '0.85rem' }
+  const optionsMenuItems = (
+    <>
+      <button className="secondary" onClick={() => { handlePrint(); setOptionsMenuOpen(false) }} style={optionsMenuItemStyle}>
+        Print
+      </button>
+      <button className="secondary" onClick={() => { setShowAIPanel(true); setOptionsMenuOpen(false) }} style={optionsMenuItemStyle}>
+        AI recommendations
+      </button>
+
+      <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.3rem 0' }} />
+
+      <button className="secondary" onClick={() => { handleDownloadPDF(); setOptionsMenuOpen(false) }} style={optionsMenuItemStyle}>
+        Download PDF
+      </button>
+      <button className="secondary" onClick={() => { handleDownloadPPTX(); setOptionsMenuOpen(false) }} style={optionsMenuItemStyle}>
+        Download PowerPoint
+      </button>
+      <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.3rem 0' }} />
+      <button className="secondary" onClick={() => { setMoreMenuOpen(true); setOptionsMenuOpen(false) }} style={optionsMenuItemStyle}>
+        + Add Metric
+      </button>
+      {!isStaffView && (
+        <>
+          <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.3rem 0' }} />
+          <button
+            className="secondary"
+            onClick={() => { navigate(`/form/${id}/report/builder`); setOptionsMenuOpen(false) }}
+            style={optionsMenuItemStyle}
+          >
+            Report Builder
+          </button>
+        </>
+      )}
+    </>
+  )
+
   return (
     <div className="page" style={{ maxWidth: '960px', ...(isFocusMode ? { paddingTop: '4rem' } : {}) }} ref={reportContentRef}>
       {/* Reserves room for PosSidePanel's fixed top-left hamburger so it
@@ -265,96 +311,77 @@ function Report() {
                 ))}
               </select>
               {dateRange === 'specific' && (
-                <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} style={{ padding: '0.5rem' }} />
+                <div className="date-range-group">
+                  <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} style={{ padding: '0.5rem' }} />
+                </div>
               )}
               {dateRange === 'custom' && (
-                <>
+                <div className="date-range-group">
                   <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} style={{ padding: '0.5rem' }} />
                   <span style={{ color: 'var(--color-muted)', fontSize: '0.9rem' }}>to</span>
                   <input
                     type="date" value={customEnd} title="Leave blank to filter to just the start date"
                     onChange={(e) => setCustomEnd(e.target.value)} style={{ padding: '0.5rem' }}
                   />
-                </>
+                </div>
               )}
             </>
           )}
         </div>
 
         <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <div style={{ position: 'relative', flexShrink: 0 }}>
-          <button className="secondary" onClick={() => setOptionsMenuOpen(!optionsMenuOpen)}>
-            Options ▾
-          </button>
-          {optionsMenuOpen && (
-            <>
-              <div
-                style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 15 }}
-                onClick={() => setOptionsMenuOpen(false)}
-              />
-              <div className="dropdown-panel" style={{
-                position: 'absolute', top: '100%', right: 0, marginTop: '0.3rem',
-                background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 20, minWidth: '220px', padding: '0.6rem',
-                overflow: 'hidden'
-              }}>
-                <button
-                  className="secondary"
-                  onClick={() => { handlePrint(); setOptionsMenuOpen(false) }}
-                  style={{ display: 'block', width: '100%', textAlign: 'left', border: 'none', background: 'transparent', padding: '0.45rem 0.3rem', fontSize: '0.85rem' }}
-                >
-                  Print
-                </button>
-                <button
-                  className="secondary"
-                  onClick={() => { setShowAIPanel(true); setOptionsMenuOpen(false) }}
-                  style={{ display: 'block', width: '100%', textAlign: 'left', border: 'none', background: 'transparent', padding: '0.45rem 0.3rem', fontSize: '0.85rem' }}
-                >
-                  AI recommendations
-                </button>
-
-                <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.3rem 0' }} />
-
-                <button
-                  className="secondary"
-                  onClick={() => { handleDownloadPDF(); setOptionsMenuOpen(false) }}
-                  style={{ display: 'block', width: '100%', textAlign: 'left', border: 'none', background: 'transparent', padding: '0.45rem 0.3rem', fontSize: '0.85rem' }}
-                >
-                  Download PDF
-                </button>
-                <button
-                  className="secondary"
-                  onClick={() => { handleDownloadPPTX(); setOptionsMenuOpen(false) }}
-                  style={{ display: 'block', width: '100%', textAlign: 'left', border: 'none', background: 'transparent', padding: '0.45rem 0.3rem', fontSize: '0.85rem' }}
-                >
-                  Download PowerPoint
-                </button>
-                <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.3rem 0' }} />
-                <button
-                  className="secondary"
-                  onClick={() => { setMoreMenuOpen(true); setOptionsMenuOpen(false) }}
-                  style={{ display: 'block', width: '100%', textAlign: 'left', border: 'none', background: 'transparent', padding: '0.45rem 0.3rem', fontSize: '0.85rem' }}
-                >
-                  + Add Metric
-                </button>
-                {!isStaffView && (
-                  <>
-                    <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.3rem 0' }} />
-                    <button
-                      className="secondary"
-                      onClick={() => { navigate(`/form/${id}/report/builder`); setOptionsMenuOpen(false) }}
-                      style={{ display: 'block', width: '100%', textAlign: 'left', border: 'none', background: 'transparent', padding: '0.45rem 0.3rem', fontSize: '0.85rem' }}
-                    >
-                      Report Builder
-                    </button>
-                  </>
-                )}
-              </div>
-            </>
-          )}
-        </div>
+          {/* Desktop only (see .page-options-panel-desktop in index.css) -
+              a small dropdown anchored right under this button. Below 768px
+              this whole thing hides in favor of the portaled version further
+              down: this button lives inside .report-filter-bar, which gets
+              backdrop-filter on mobile for its sticky-blur look, and an
+              ancestor with backdrop-filter becomes a containing block for
+              position:fixed descendants - so a "fixed" panel nested in here
+              would end up positioned relative to this bar instead of the
+              viewport. Portaling to document.body sidesteps that (and any
+              other ancestor transform/filter) entirely rather than chasing
+              it with more CSS. */}
+          <div className="page-options-panel-desktop" style={{ position: 'relative', flexShrink: 0 }}>
+            <button className="secondary page-options-trigger" onClick={() => setOptionsMenuOpen(!optionsMenuOpen)}>
+              Options ▾
+            </button>
+            {optionsMenuOpen && (
+              <>
+                <div
+                  style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 15 }}
+                  onClick={() => setOptionsMenuOpen(false)}
+                />
+                <div className="dropdown-panel" style={{
+                  position: 'absolute', top: '100%', right: 0, marginTop: '0.3rem',
+                  background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 20, minWidth: '220px', padding: '0.6rem',
+                  overflow: 'hidden'
+                }}>
+                  {optionsMenuItems}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
+
+      {optionsMenuOpen && createPortal(
+        <div className="page-options-panel-mobile">
+          <div
+            style={{ position: 'fixed', inset: 0, zIndex: 149 }}
+            onClick={() => setOptionsMenuOpen(false)}
+          />
+          <div className="dropdown-panel" style={{
+            position: 'fixed', top: '4.2rem', right: '0.8rem',
+            background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 150, minWidth: '220px', padding: '0.6rem',
+            overflow: 'hidden'
+          }}>
+            {optionsMenuItems}
+          </div>
+        </div>,
+        document.body
+      )}
 
       {filteredSubmissions.length === 0 ? (
         <div className="card" style={{ padding: '1.8rem', marginBottom: '1.2rem' }}>
@@ -514,7 +541,7 @@ function OverviewCard({ form, submissions }) {
   return (
     <div className="card" style={{ padding: '1.5rem', marginBottom: '1.2rem', background: 'linear-gradient(135deg, var(--color-surface) 0%, var(--color-primary-soft) 100%)' }}>
       {hasCartData ? (
-        <div style={{ fontSize: '1.15rem', color: '#000', lineHeight: 1.5 }}>
+        <div style={{ fontSize: '1.15rem', color: 'var(--color-text)', lineHeight: 1.5 }}>
           Your business generated{' '}
           <span style={{ fontSize: '2rem', fontWeight: 800, letterSpacing: '-0.01em', fontVariantNumeric: 'tabular-nums' }}>
             {formatNaira(totalRevenue)}
@@ -522,7 +549,7 @@ function OverviewCard({ form, submissions }) {
           during this period.
         </div>
       ) : (
-        <div style={{ fontSize: '1.15rem', color: '#000', lineHeight: 1.5 }}>
+        <div style={{ fontSize: '1.15rem', color: 'var(--color-text)', lineHeight: 1.5 }}>
           You received{' '}
           <span style={{ fontSize: '2rem', fontWeight: 800, letterSpacing: '-0.01em', fontVariantNumeric: 'tabular-nums' }}>
             {totalResponses.toLocaleString()}

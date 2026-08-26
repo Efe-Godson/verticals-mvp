@@ -137,11 +137,16 @@ export function InvoiceModal({ form, submission, onClose, allowDateEdit = false 
       ? <LogoIcon iconKey={logoIconKey} color={palette.primary} size={40} />
       : null
 
+  const signatureUrl = settings.signatureUrl
+  const signatureElement = signatureUrl
+    ? <img src={signatureUrl} alt="" style={{ maxHeight: '36px', maxWidth: '100%', objectFit: 'contain', display: 'inline-block' }} crossOrigin="anonymous" />
+    : null
+
   const sharedTemplateProps = {
     businessName, businessAddress, businessPhone, businessEmail, logoElement,
     orderNumber, dateStr, details, items, subtotal, deliveryFee, total, palette, showBranding,
     paymentMethod, paymentBankName, paymentAccountNumber, paymentAccountName, invoiceNotes,
-    invoiceAuthorizedBy, invoiceAuthorizedDesignation,
+    invoiceAuthorizedBy, invoiceAuthorizedDesignation, signatureElement,
   }
 
   // The true-size A4 copy is the only thing ever captured/printed for A4 -

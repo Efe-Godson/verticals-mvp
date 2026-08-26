@@ -7,7 +7,7 @@ export function LedgerTemplate({
   businessName, businessAddress, businessPhone, businessEmail, logoElement,
   orderNumber, dateStr, details, items, subtotal, deliveryFee, total, palette, showBranding = true,
   paymentBankName, paymentAccountNumber, paymentAccountName, invoiceNotes,
-  invoiceAuthorizedBy, invoiceAuthorizedDesignation,
+  invoiceAuthorizedBy, invoiceAuthorizedDesignation, signatureElement,
 }) {
   const hasPaymentInfo = paymentBankName || paymentAccountNumber || paymentAccountName
   const hasAuthorizedBy = invoiceAuthorizedBy || invoiceAuthorizedDesignation
@@ -126,7 +126,7 @@ export function LedgerTemplate({
           {invoiceAuthorizedBy && <div style={{ fontSize: '12px', fontWeight: 'bold' }}>Authorized by: {invoiceAuthorizedBy}</div>}
           {invoiceAuthorizedDesignation && <div style={{ fontSize: '12px', fontWeight: 'bold' }}>Designation: {invoiceAuthorizedDesignation}</div>}
           <div style={{ fontSize: '12px', marginTop: '0.8rem' }}>
-            Signature: <span style={{ display: 'inline-block', width: '160px', borderBottom: '1px solid #111' }} />
+            Signature: <span style={{ display: 'inline-block', width: '160px', textAlign: 'center', borderBottom: '1px solid #111' }}>{signatureElement}</span>
           </div>
         </div>
       )}

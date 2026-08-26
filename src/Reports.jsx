@@ -19,25 +19,25 @@ function ReportTile({ template, locationCount, onOpen }) {
       tabIndex={0}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen() } }}
       style={{
-        position: 'relative', aspectRatio: '1', border: '1px solid var(--color-border)', borderRadius: '12px',
+        border: '1px solid var(--color-border)', borderRadius: '12px',
         background: 'var(--color-surface)', display: 'flex', flexDirection: 'column', alignItems: 'center',
-        justifyContent: 'center', gap: '0.4rem', padding: '0.9rem', textAlign: 'center', cursor: 'pointer'
+        padding: '0.9rem 0.8rem 0.85rem', textAlign: 'center', cursor: 'pointer'
       }}
     >
       <div style={{
-        width: '44px', height: '44px', borderRadius: '10px', background: `${color}16`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center'
+        width: '40px', height: '40px', borderRadius: '10px', background: `${color}16`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '0.7rem'
       }}>
         <CategoryIcon category={template.category} color={color} />
       </div>
       <span style={{
-        fontSize: '0.8rem', fontWeight: 600, lineHeight: 1.25,
+        fontSize: '0.85rem', fontWeight: 600, lineHeight: 1.25, marginBottom: '0.3rem',
         display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
       }}>
         {template.name}
       </span>
       {locationCount > 0 && (
-        <span style={{ fontSize: '0.7rem', color: 'var(--color-muted)' }}>
+        <span style={{ fontSize: '0.72rem', color: 'var(--color-muted)' }}>
           {locationCount} location{locationCount !== 1 ? 's' : ''}
         </span>
       )}
@@ -90,7 +90,15 @@ function Reports() {
     load()
   }, [session])
 
-  function openReport({ singleFormId }) {
+  // A template with more than one location (Restaurant, Retail, ...) has no
+  // single obvious "report" to jump into - route through the location
+  // picker first (see TemplateLocations.jsx's ?goto=report handling)
+  // instead of silently opening whichever location happened to load first.
+  function openReport({ template, singleFormId, locationCount }) {
+    if (!template.bundle?.length && locationCount > 1) {
+      navigate(`/templates/${template.slug}/locations?goto=report`)
+      return
+    }
     navigate(`/form/${singleFormId}/report`)
   }
 
@@ -102,14 +110,13 @@ function Reports() {
         .template-tile:active { transform: translateY(0); box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
       `}</style>
 
-      <h1 style={{ margin: 0 }}>Reports</h1>
-      <p style={{ color: 'var(--color-muted)', marginTop: '0.3rem', marginBottom: '1.5rem' }}>
-        Pick a business to jump straight into its report.
+      <p style={{ color: 'var(--color-muted)', margin: '0 0 1.5rem' }}>
+        Choose a workflow to view its reports.
       </p>
 
       {loading ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.8rem' }}>
-          {[0, 1, 2].map(i => <div key={i} className="card" style={{ aspectRatio: '1' }} />)}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.8rem' }}>
+          {[0, 1, 2].map(i => <div key={i} className="card" style={{ minHeight: '150px' }} />)}
         </div>
       ) : usedTemplates.length === 0 ? (
         <div className="card" style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--color-muted)' }}>
@@ -117,13 +124,13 @@ function Reports() {
           <Link to="/templates"><button>Browse Templates</button></Link>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.8rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.8rem' }}>
           {usedTemplates.map(({ template, locationCount, singleFormId }) => (
             <ReportTile
               key={template.slug}
               template={template}
               locationCount={template.bundle?.length > 0 ? 0 : locationCount}
-              onOpen={() => openReport({ singleFormId })}
+              onOpen={() => openReport({ template, singleFormId, locationCount })}
             />
           ))}
         </div>

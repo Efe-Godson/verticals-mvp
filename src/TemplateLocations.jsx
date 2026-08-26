@@ -4,7 +4,7 @@
 // "+ Add Location" for the next one. Reached from BusinessesHome.jsx's
 // grid, or from Templates.jsx's "Manage" once a template is already in use.
 import { useEffect, useRef, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
 import { useToast } from './Toast'
@@ -159,8 +159,16 @@ function AddLocationTile({ onClick }) {
 function TemplateLocations() {
   const { slug } = useParams()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { session } = useAuth()
   const { showToast } = useToast()
+
+  // Reached with ?goto=records or ?goto=report from RecordsHome.jsx/
+  // Reports.jsx when a template has more than one location - there's no
+  // single obvious "this location" to jump into directly, so the user
+  // picks one here first, then lands on that location's records/report
+  // instead of its usual builder/order-screen destination.
+  const goto = searchParams.get('goto')
 
   const { setTrigger } = useRecycleBinTrigger()
 
@@ -395,6 +403,11 @@ function TemplateLocations() {
           live on each card's own ⋮ menu) - the way back to All Businesses
           is the ← button usePageBack registers in the mobile nav bar's own
           right-hand corner instead of a link drawn in the page body. */}
+      {goto && (
+        <p style={{ color: 'var(--color-muted)', margin: '0 0 1.2rem' }}>
+          Choose a location to view its {goto === 'report' ? 'reports' : 'records'}.
+        </p>
+      )}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.8rem' }}>
         {locations.map(location => (
           <LocationTile
@@ -402,7 +415,7 @@ function TemplateLocations() {
             location={location}
             color={color}
             uploading={uploadingLogoId === location.id}
-            onManage={() => navigate(locationDestination(template, location.id))}
+            onManage={() => navigate(goto ? `/form/${location.id}/${goto}` : locationDestination(template, location.id))}
             onDuplicate={() => openDuplicateModal(location)}
             onDelete={() => requestDeleteLocation(location.id)}
             onLogoChange={(file) => handleLogoChange(location, file)}

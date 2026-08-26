@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
 import { useRecycleBinTrigger } from './RecycleBinContext'
-import { useCurrentPageTitle, useCurrentPageBack } from './PageTitleContext'
+import { useCurrentPageTitle, useCurrentPageBack, useCurrentPageOptions } from './PageTitleContext'
 import { TEMPLATE_ADMIN_USER_ID } from './adminAccount'
 import ArrowLeftIcon from './ArrowLeftIcon'
 import MobileBottomNav from './MobileBottomNav'
@@ -11,6 +11,42 @@ import MobileBottomNav from './MobileBottomNav'
 // Sheet drag-to-dismiss: how far down (px) a drag has to travel before
 // releasing counts as "close" rather than snapping back open.
 const SHEET_CLOSE_THRESHOLD = 80
+
+const MENU_SECTION_LABEL_STYLE = {
+  fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+  color: 'var(--color-muted)', margin: '0 0 0.4rem',
+}
+
+// One tappable row in the menu sheet - a navigational Link when `to` is
+// given, otherwise a button (Recycle Bin opens a dialog instead of routing).
+// Every row gets a trailing chevron and an optional count badge (Recycle
+// Bin), so Templates/Lab/Recycle Bin/Profile/Builder/etc. all read the same
+// way instead of some looking tappable and others not.
+function MenuRow({ to, onClick, active, badge, children }) {
+  const style = {
+    display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%',
+    padding: '0.7rem 0', color: active ? 'var(--color-primary)' : 'var(--color-text)',
+    background: 'transparent', border: 'none', textAlign: 'left', textDecoration: 'none',
+    fontSize: '0.92rem', cursor: 'pointer',
+  }
+  const inner = (
+    <>
+      <span style={{ flex: '1 1 auto', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{children}</span>
+      {badge > 0 && (
+        <span style={{
+          background: 'var(--color-border)', color: 'var(--color-text)', fontSize: '0.72rem', fontWeight: 700,
+          borderRadius: '999px', padding: '0.1rem 0.45rem', minWidth: '1.3rem', textAlign: 'center', flexShrink: 0,
+        }}>
+          {badge}
+        </span>
+      )}
+      <span style={{ color: 'var(--color-muted)', fontSize: '1rem', flexShrink: 0 }}>›</span>
+    </>
+  )
+  return to
+    ? <Link to={to} style={style} onClick={onClick}>{inner}</Link>
+    : <button type="button" style={style} onClick={onClick}>{inner}</button>
+}
 
 function NavBar() {
   const location = useLocation()
@@ -24,6 +60,7 @@ function NavBar() {
   const { trigger: binTrigger } = useRecycleBinTrigger()
   const pageTitle = useCurrentPageTitle()
   const pageBack = useCurrentPageBack()
+  const pageOptions = useCurrentPageOptions()
 
   // Swipe-down-to-close on the mobile menu sheet (see the drag-handle strip
   // below) - dragY is the live offset while a finger's down, reset once it's
@@ -60,6 +97,14 @@ function NavBar() {
   const match = location.pathname.match(/^\/form\/([^/]+)/)
   const id = match ? match[1] : null
   const isFormContext = !!id
+
+  // Every page reachable from the bottom bar's Records/Reports tabs - both
+  // the picker (/records, /reports, no form in context yet) and the actual
+  // per-workflow page (/form/:id/records, /form/:id/report). Menu never
+  // falls back to showing here, even on the picker where there's no
+  // Options menu to show instead - Options-or-nothing, since Menu is meant
+  // to only be reachable from Home now (see the pageOptions ternary below).
+  const isRecordsOrReportsRoute = /^\/(records|reports)$|^\/form\/[^/]+\/(records|report)$/.test(location.pathname)
 
   // Lightweight settings-only lookup per form navigation, cheap enough not
   // to be worth a shared context for a couple of booleans/a short list.
@@ -238,29 +283,79 @@ function NavBar() {
           TemplateLocations.jsx -> "/") - it stays paired with the title up
           here, since it means something different from the persistent
           Home/Records/Reports tabs below (see MobileBottomNav.jsx): this is
-          "back to where I came from", not "jump to a top-level section". */}
+          "back to where I came from", not "jump to a top-level section".
+          The hamburger on the right opens the same bottom sheet the old
+          Menu tab used to - Menu is secondary/admin surface (Templates,
+          Lab, Recycle Bin, account), so it doesn't belong at equal weight
+          with Home/Records/Reports in the primary tab bar below. */}
       <div className="navbar-mobile-row">
-        {pageBack && (
-          <Link
-            to={pageBack.to}
-            aria-label={pageBack.label ? `Back to ${pageBack.label}` : 'Back'}
+        <div style={{ display: 'flex', alignItems: 'center', flex: '1 1 auto', minWidth: 0 }}>
+          {pageBack && (
+            <Link
+              to={pageBack.to}
+              aria-label={pageBack.label ? `Back to ${pageBack.label}` : 'Back'}
+              style={{
+                width: '44px', height: '44px', flexShrink: 0, color: 'var(--color-text)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: '-0.4rem',
+              }}
+            >
+              <ArrowLeftIcon size={22} />
+            </Link>
+          )}
+          <span style={{
+            fontWeight: 'bold', fontSize: '1rem', flex: '1 1 auto', minWidth: 0,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {mobileBrand}
+          </span>
+        </div>
+        {/* A page with its own Options menu (Report.jsx/Records.jsx) gets
+            that button here INSTEAD OF the hamburger, not alongside it -
+            one top-right button, not two. Menu (Templates/Lab/Recycle
+            Bin/Account) is reachable from Home's hamburger; every page under
+            Records/Reports trades that slot for Options instead (or nothing,
+            on the picker pages that have no Options of their own yet -
+            never falling back to Menu there, see isRecordsOrReportsRoute
+            above), since Home is one tap away on the bottom bar regardless. */}
+        {pageOptions ? (
+          <button
+            type="button"
+            onClick={pageOptions.onClick}
+            aria-label="Page options"
             style={{
-              width: '44px', height: '44px', flexShrink: 0, color: 'var(--color-text)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: '-0.4rem',
+              width: '44px', height: '44px', flexShrink: 0, marginRight: '-0.4rem',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'transparent', border: 'none', color: 'var(--color-text)', cursor: 'pointer', padding: 0,
             }}
           >
-            <ArrowLeftIcon size={22} />
-          </Link>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="5" cy="12" r="1.9" />
+              <circle cx="12" cy="12" r="1.9" />
+              <circle cx="19" cy="12" r="1.9" />
+            </svg>
+          </button>
+        ) : isRecordsOrReportsRoute ? null : (
+          <button
+            type="button"
+            onClick={() => setMenuOpen(true)}
+            aria-label="Open menu"
+            style={{
+              width: '44px', height: '44px', flexShrink: 0, marginRight: '-0.4rem',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'transparent', border: 'none', color: 'var(--color-text)', cursor: 'pointer', padding: 0,
+            }}
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
         )}
-        <span style={{ fontWeight: 'bold', fontSize: '1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {mobileBrand}
-        </span>
       </div>
 
-      {/* Fixed bottom tab bar - Menu/Home/Records/Reports, see
+      {/* Fixed bottom tab bar - Home/Records/Reports, see
           MobileBottomNav.jsx. Only ever shown alongside navbar-mobile-row
           above (same breakpoint), see the matching CSS in index.css. */}
-      <MobileBottomNav onOpenMenu={() => setMenuOpen(true)} />
+      <MobileBottomNav />
 
       {menuOpen && (
         <div
@@ -302,10 +397,15 @@ function NavBar() {
           // just clip past 80vh with no way to scroll to the rest).
           flex: '1 1 auto', minHeight: 0, overflowY: 'auto', padding: '0 1rem calc(1rem + env(safe-area-inset-bottom))',
         }}>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.8rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+          <span style={{ fontSize: '1.1rem', fontWeight: 700 }}>Menu</span>
           <button
             onClick={() => setMenuOpen(false)} aria-label="Close menu"
-            style={{ background: 'transparent', border: 'none', fontSize: '1.3rem', cursor: 'pointer', lineHeight: 1, padding: 0 }}
+            style={{
+              width: '44px', height: '44px', marginRight: '-0.5rem', flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'transparent', border: 'none', fontSize: '1.2rem', cursor: 'pointer', padding: 0,
+            }}
           >
             ✕
           </button>
@@ -313,68 +413,78 @@ function NavBar() {
 
         {/* Home/Records/Reports live in the persistent bottom tab bar now
             (see MobileBottomNav.jsx) - not repeated here too. */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          <Link to="/templates" style={{ color: location.pathname === '/templates' ? 'var(--color-primary)' : 'var(--color-text)' }} onClick={() => setMenuOpen(false)}>Templates</Link>
+        <div style={MENU_SECTION_LABEL_STYLE}>Workspace</div>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <MenuRow to="/templates" active={location.pathname === '/templates'} onClick={() => setMenuOpen(false)}>Templates</MenuRow>
           {isAdmin && (
-            <Link to="/lab" style={{ color: location.pathname === '/lab' ? 'var(--color-primary)' : 'var(--color-text)' }} onClick={() => setMenuOpen(false)}>Lab</Link>
+            <MenuRow to="/lab" active={location.pathname === '/lab'} onClick={() => setMenuOpen(false)}>Lab</MenuRow>
           )}
           {binTrigger && (
-            <button
-              onClick={() => { setMenuOpen(false); binTrigger.onOpen() }}
-              style={{ background: 'transparent', border: 'none', padding: 0, textAlign: 'left', color: 'var(--color-text)', fontSize: '0.9rem', cursor: 'pointer' }}
-            >
-              Recycle Bin{binTrigger.count > 0 ? ` (${binTrigger.count})` : ''}
-            </button>
+            <MenuRow badge={binTrigger.count} onClick={() => { setMenuOpen(false); binTrigger.onOpen() }}>Recycle Bin</MenuRow>
           )}
+        </div>
 
-          {/* Records/Report are deliberately not repeated here either - the
-              bottom tab bar's Records/Reports already jump straight into
-              this same form's records/report when there's one in context. */}
-          {isFormContext && (
-            <>
-              <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.2rem 0' }} />
-              <Link to={`/form/${id}/edit`} style={{ color: linkColor('/edit') }} onClick={() => setMenuOpen(false)}>Builder</Link>
-              {isPayrollForm && <Link to={`/form/${id}/payroll`} style={{ color: linkColor('/payroll') }} onClick={() => setMenuOpen(false)}>Payroll</Link>}
-              <Link to={`/form/${id}/ai-analyst`} style={{ color: linkColor('/ai-analyst') }} onClick={() => setMenuOpen(false)}>AI Analyst</Link>
-              <Link to={`/form/${id}/settings`} style={{ color: linkColor('/settings') }} onClick={() => setMenuOpen(false)}>Settings</Link>
+        {/* Records/Report are deliberately not repeated here either - the
+            bottom tab bar's Records/Reports already jump straight into
+            this same form's records/report when there's one in context. */}
+        {isFormContext && (
+          <>
+            <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.7rem 0' }} />
+            <div style={MENU_SECTION_LABEL_STYLE}>This Form</div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <MenuRow to={`/form/${id}/edit`} active={location.pathname.includes('/edit')} onClick={() => setMenuOpen(false)}>Builder</MenuRow>
+              {isPayrollForm && <MenuRow to={`/form/${id}/payroll`} active={location.pathname.includes('/payroll')} onClick={() => setMenuOpen(false)}>Payroll</MenuRow>}
+              <MenuRow to={`/form/${id}/ai-analyst`} active={location.pathname.includes('/ai-analyst')} onClick={() => setMenuOpen(false)}>AI Analyst</MenuRow>
+              <MenuRow to={`/form/${id}/settings`} active={location.pathname.includes('/settings')} onClick={() => setMenuOpen(false)}>Settings</MenuRow>
               {linkedForms.map(f => (
-                <Link key={f.id} to={`/form/${f.id}/records`} style={{ color: 'var(--color-muted)' }} onClick={() => setMenuOpen(false)}>
+                <Link key={f.id} to={`/form/${f.id}/records`} style={{ color: 'var(--color-muted)', fontSize: '0.88rem', padding: '0.4rem 0' }} onClick={() => setMenuOpen(false)}>
                   → {f.name}
                 </Link>
               ))}
-            </>
-          )}
+            </div>
+          </>
+        )}
 
-          {/* Account actions live only in the desktop avatar dropdown above
-              768px - folded into the sheet here since that dropdown's
-              trigger button is part of the now-hidden desktop row. */}
-          <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.2rem 0' }} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-muted)', fontSize: '0.8rem' }}>
-            <span style={{
-              width: '22px', height: '22px', borderRadius: '50%', background: 'var(--color-primary)',
-              color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 700, flexShrink: 0,
-            }}>
-              {initials}
-            </span>
-            Account
-          </div>
-          <Link to="/account" style={{ color: 'var(--color-text)' }} onClick={() => setMenuOpen(false)}>Profile</Link>
-          <button
-            onClick={() => { setMenuOpen(false); supabase.auth.signOut() }}
-            style={{ background: 'transparent', border: 'none', padding: 0, textAlign: 'left', color: '#c0392b', fontSize: '0.9rem', cursor: 'pointer' }}
-          >
-            Log out
-          </button>
-
-          {/* Quiet watermark closing out the list, rather than a heading up
-              top - the compact bar's own title already identifies the app
-              before the sheet is even open. */}
-          <div style={{
-            fontSize: '0.78rem', fontWeight: 700, fontStyle: 'italic', color: 'var(--color-muted)',
-            letterSpacing: '0.02em', marginTop: '0.5rem',
+        {/* Account actions live only in the desktop avatar dropdown above
+            768px - folded into the sheet here since that dropdown's
+            trigger button is part of the now-hidden desktop row. */}
+        <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.7rem 0' }} />
+        <div style={MENU_SECTION_LABEL_STYLE}>Account</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', padding: '0.3rem 0 0.5rem' }}>
+          <span style={{
+            width: '38px', height: '38px', borderRadius: '50%', background: 'var(--color-primary)',
+            color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem', fontWeight: 700, flexShrink: 0,
           }}>
-            Verticals
+            {initials}
+          </span>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: '0.92rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {displayName || session?.user?.email}
+            </div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--color-muted)' }}>Account</div>
           </div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <MenuRow to="/account" onClick={() => setMenuOpen(false)}>Profile</MenuRow>
+        </div>
+        <button
+          onClick={() => { setMenuOpen(false); supabase.auth.signOut() }}
+          style={{
+            background: 'transparent', border: 'none', padding: '0.7rem 0 0', marginTop: '0.3rem',
+            textAlign: 'left', color: '#c0392b', fontSize: '0.92rem', fontWeight: 600, cursor: 'pointer',
+          }}
+        >
+          Log out
+        </button>
+
+        <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.9rem 0 0.6rem' }} />
+
+        {/* Quiet watermark closing out the sheet. */}
+        <div style={{
+          fontSize: '0.78rem', fontWeight: 700, fontStyle: 'italic', color: 'var(--color-muted)',
+          letterSpacing: '0.02em',
+        }}>
+          Verticals
         </div>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, Fragment } from 'react'
+import { createPortal } from 'react-dom'
 import { useParams, useSearchParams } from 'react-router-dom'
 import PosSidePanel from './PosSidePanel'
 import { supabase } from './supabaseClient'
@@ -15,6 +16,7 @@ import ConfirmDialog from './ConfirmDialog'
 import { useToast } from './Toast'
 import { LoadingState } from './LoadingState'
 import { ErrorState } from './ErrorState'
+import { usePageOptions } from './PageTitleContext'
 
 const PAGE_SIZE = 10
 const META_COLUMNS = [
@@ -205,6 +207,11 @@ function Records() {
     window.addEventListener('message', handleMessage)
     return () => window.removeEventListener('message', handleMessage)
   }, [id])
+
+  // Only shows the compact bar's "⋯" button once the records view itself
+  // is up - not during the loading/error early returns just below, which
+  // render before this page's own Options menu ever exists.
+  usePageOptions(!loading && !error, () => setActiveMenu(current => current === 'options' ? null : 'options'))
 
   if (loading) return <LoadingState label="Loading records..." />
   if (error) return <ErrorState message={error} />
@@ -590,6 +597,121 @@ function Records() {
     setCurrentPage(1)
   }
 
+  // Shared between the desktop-anchored dropdown and the mobile portal
+  // version below, so the two don't drift out of sync with each other.
+  const optionsMenuItems = (
+    <>
+      {!hasCartField && (
+        <>
+          <DropdownItem onClick={() => { handleDownloadFillTemplate(); setActiveMenu(null) }}>
+            Download Fill-In Template (.xlsx)
+          </DropdownItem>
+          <label
+            className="secondary"
+            style={{
+              display: 'block', width: '100%', textAlign: 'left', border: 'none',
+              padding: '0.45rem 0.3rem', fontSize: '0.85rem', background: 'transparent', cursor: 'pointer'
+            }}
+          >
+            Upload Filled Sheet (.xlsx)
+            <input type="file" accept=".xlsx,.xls" onChange={(e) => { handleUploadFilledSheet(e); setActiveMenu(null) }} style={{ display: 'none' }} />
+          </label>
+          <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.7rem 0 0.5rem' }} />
+        </>
+      )}
+
+      {visible.length > 0 && (
+        <>
+          <DropdownItem onClick={() => { handlePrintTable(); setActiveMenu(null) }}>Print</DropdownItem>
+          <DropdownItem onClick={() => { handleExportExcel(); setActiveMenu(null) }}>Download Excel (.xlsx)</DropdownItem>
+          <DropdownItem onClick={() => { handleExportPDF(); setActiveMenu(null) }}>Download PDF (.pdf)</DropdownItem>
+          <DropdownItem onClick={() => { handleExportCSV(); setActiveMenu(null) }}>Download CSV (.csv)</DropdownItem>
+          {form.settings?.googleSheetId && (
+            <DropdownItem onClick={() => { window.open(`https://docs.google.com/spreadsheets/d/${form.settings.googleSheetId}`, '_blank', 'noopener,noreferrer'); setActiveMenu(null) }}>
+              Open Google Sheet
+            </DropdownItem>
+          )}
+          <DropdownItem onClick={() => { handleSyncGoogleSheet(); setActiveMenu(null) }}>
+            {form.settings?.googleSheetId ? 'Sync to Google Sheet' : 'Connect Google Sheets'}
+          </DropdownItem>
+          <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.7rem 0 0.5rem' }} />
+        </>
+      )}
+
+      <div
+        onClick={() => setColumnsExpanded(e => !e)}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer',
+          fontWeight: 600, fontSize: '0.75rem', color: 'var(--color-muted)',
+          textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '0.4rem'
+        }}
+      >
+        <span>Columns</span>
+        <span style={{ transform: columnsExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>▾</span>
+      </div>
+      {columnsExpanded && (
+        <>
+          {form.fields.filter(f => f.type !== 'section').map(field => (
+            <label key={field.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.3rem 0', fontSize: '0.85rem', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={!hiddenFieldIds.includes(field.id)}
+                onChange={() => toggleColumnVisibility(field.id)}
+              />
+              {field.label}
+            </label>
+          ))}
+          {META_COLUMNS.map(col => (
+            <label key={col.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.3rem 0', fontSize: '0.85rem', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={!hiddenFieldIds.includes(col.id)}
+                onChange={() => toggleColumnVisibility(col.id)}
+              />
+              {col.label}
+            </label>
+          ))}
+        </>
+      )}
+
+      <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.7rem 0 0.5rem' }} />
+
+      <div style={{ fontWeight: 600, fontSize: '0.75rem', color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '0.4rem' }}>
+        Presets
+      </div>
+      {presets.length === 0 && (
+        <p style={{ fontSize: '0.8rem', color: 'var(--color-muted)', margin: '0 0 0.5rem' }}>No saved presets yet.</p>
+      )}
+      {presets.map((preset, i) => (
+        <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6rem', padding: '0.3rem 0' }}>
+          <span onClick={() => { applyPreset(preset); setActiveMenu(null) }} style={{ cursor: 'pointer', fontSize: '0.85rem' }}>
+            {preset.name}
+          </span>
+          <span onClick={() => deletePreset(i)} style={{ cursor: 'pointer', color: '#c0392b', fontSize: '0.75rem' }}>
+            Delete
+          </span>
+        </div>
+      ))}
+      <button
+        className="secondary"
+        onClick={() => { setActiveMenu(null); setShowSaveDialog(true) }}
+        style={{ marginTop: '0.5rem', width: '100%', fontSize: '0.8rem' }}
+      >
+        + Save current filters
+      </button>
+
+      <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.7rem 0 0.5rem' }} />
+
+      <button
+        className="secondary"
+        onClick={() => { setActiveMenu(null); openBin() }}
+        style={{ width: '100%', fontSize: '0.8rem' }}
+      >
+        Recycle Bin{binCount > 0 ? ` (${binCount})` : ''}
+      </button>
+    </>
+  )
+
   return (
     <div className="page" style={isFocusMode ? { paddingTop: '4rem' } : undefined}>
       <style>{`
@@ -674,7 +796,6 @@ function Records() {
           just the top reserve stays. Only rendered/needed in focus mode,
           the same condition PosSidePanel itself renders under below. */}
       {isFocusMode && <PosSidePanel formId={form.id} hasCartField={hasCartField} />}
-      <h1 style={{ margin: 0 }}>{form.name}</h1>
 
       {hasCartField && (
         <div style={{ position: 'relative', margin: '1rem 0' }}>
@@ -783,8 +904,15 @@ function Records() {
       </div>
 
       <div className="options-menu-row" style={{ marginTop: '0.6rem' }}>
-        <div className="options-menu-anchor" style={{ position: 'relative', flexShrink: 0, display: 'inline-block' }}>
-          <button className="secondary options-menu-button" onClick={() => setActiveMenu(activeMenu === 'options' ? null : 'options')}>
+        {/* Desktop only (see .page-options-panel-desktop in index.css) - a
+            dropdown anchored under this button. Below 768px this whole
+            thing hides in favor of the portaled version further down (see
+            the same reasoning in Report.jsx: escaping any ancestor
+            transform/filter/backdrop-filter that would otherwise hijack a
+            "fixed" panel's containing block, rather than chasing it with
+            more CSS). */}
+        <div className="options-menu-anchor page-options-panel-desktop" style={{ position: 'relative', flexShrink: 0, display: 'inline-block' }}>
+          <button className="secondary options-menu-button page-options-trigger" onClick={() => setActiveMenu(activeMenu === 'options' ? null : 'options')}>
             Options ▾
           </button>
           {activeMenu === 'options' && (
@@ -799,119 +927,27 @@ function Records() {
                   rightward from the button instead, which actually stays
                   on screen. */}
               <div className="dropdown-panel" style={{ ...dropdownStyle, left: 0, right: 'auto', minWidth: '220px' }} onClick={(e) => e.stopPropagation()}>
-                {!hasCartField && (
-                  <>
-                    <DropdownItem onClick={() => { handleDownloadFillTemplate(); setActiveMenu(null) }}>
-                      Download Fill-In Template (.xlsx)
-                    </DropdownItem>
-                    <label
-                      className="secondary"
-                      style={{
-                        display: 'block', width: '100%', textAlign: 'left', border: 'none',
-                        padding: '0.45rem 0.3rem', fontSize: '0.85rem', background: 'transparent', cursor: 'pointer'
-                      }}
-                    >
-                      Upload Filled Sheet (.xlsx)
-                      <input type="file" accept=".xlsx,.xls" onChange={(e) => { handleUploadFilledSheet(e); setActiveMenu(null) }} style={{ display: 'none' }} />
-                    </label>
-                    <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.7rem 0 0.5rem' }} />
-                  </>
-                )}
-
-                {visible.length > 0 && (
-                  <>
-                    <DropdownItem onClick={() => { handlePrintTable(); setActiveMenu(null) }}>Print</DropdownItem>
-                    <DropdownItem onClick={() => { handleExportExcel(); setActiveMenu(null) }}>Download Excel (.xlsx)</DropdownItem>
-                    <DropdownItem onClick={() => { handleExportPDF(); setActiveMenu(null) }}>Download PDF (.pdf)</DropdownItem>
-                    <DropdownItem onClick={() => { handleExportCSV(); setActiveMenu(null) }}>Download CSV (.csv)</DropdownItem>
-                    {form.settings?.googleSheetId && (
-                      <DropdownItem onClick={() => { window.open(`https://docs.google.com/spreadsheets/d/${form.settings.googleSheetId}`, '_blank', 'noopener,noreferrer'); setActiveMenu(null) }}>
-                        Open Google Sheet
-                      </DropdownItem>
-                    )}
-                    <DropdownItem onClick={() => { handleSyncGoogleSheet(); setActiveMenu(null) }}>
-                      {form.settings?.googleSheetId ? 'Sync to Google Sheet' : 'Connect Google Sheets'}
-                    </DropdownItem>
-                    <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.7rem 0 0.5rem' }} />
-                  </>
-                )}
-
-                <div
-                  onClick={() => setColumnsExpanded(e => !e)}
-                  style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer',
-                    fontWeight: 600, fontSize: '0.75rem', color: 'var(--color-muted)',
-                    textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '0.4rem'
-                  }}
-                >
-                  <span>Columns</span>
-                  <span style={{ transform: columnsExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>▾</span>
-                </div>
-                {columnsExpanded && (
-                  <>
-                    {form.fields.filter(f => f.type !== 'section').map(field => (
-                      <label key={field.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.3rem 0', fontSize: '0.85rem', cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={!hiddenFieldIds.includes(field.id)}
-                          onChange={() => toggleColumnVisibility(field.id)}
-                        />
-                        {field.label}
-                      </label>
-                    ))}
-                    {META_COLUMNS.map(col => (
-                      <label key={col.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.3rem 0', fontSize: '0.85rem', cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={!hiddenFieldIds.includes(col.id)}
-                          onChange={() => toggleColumnVisibility(col.id)}
-                        />
-                        {col.label}
-                      </label>
-                    ))}
-                  </>
-                )}
-
-                <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.7rem 0 0.5rem' }} />
-
-                <div style={{ fontWeight: 600, fontSize: '0.75rem', color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '0.4rem' }}>
-                  Presets
-                </div>
-                {presets.length === 0 && (
-                  <p style={{ fontSize: '0.8rem', color: 'var(--color-muted)', margin: '0 0 0.5rem' }}>No saved presets yet.</p>
-                )}
-                {presets.map((preset, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6rem', padding: '0.3rem 0' }}>
-                    <span onClick={() => { applyPreset(preset); setActiveMenu(null) }} style={{ cursor: 'pointer', fontSize: '0.85rem' }}>
-                      {preset.name}
-                    </span>
-                    <span onClick={() => deletePreset(i)} style={{ cursor: 'pointer', color: '#c0392b', fontSize: '0.75rem' }}>
-                      Delete
-                    </span>
-                  </div>
-                ))}
-                <button
-                  className="secondary"
-                  onClick={() => { setActiveMenu(null); setShowSaveDialog(true) }}
-                  style={{ marginTop: '0.5rem', width: '100%', fontSize: '0.8rem' }}
-                >
-                  + Save current filters
-                </button>
-
-                <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.7rem 0 0.5rem' }} />
-
-                <button
-                  className="secondary"
-                  onClick={() => { setActiveMenu(null); openBin() }}
-                  style={{ width: '100%', fontSize: '0.8rem' }}
-                >
-                  Recycle Bin{binCount > 0 ? ` (${binCount})` : ''}
-                </button>
+                {optionsMenuItems}
               </div>
             </>
           )}
         </div>
       </div>
+
+      {activeMenu === 'options' && createPortal(
+        <div className="page-options-panel-mobile">
+          <div style={{ position: 'fixed', inset: 0, zIndex: 149 }} onClick={() => setActiveMenu(null)} />
+          <div className="dropdown-panel" style={{
+            position: 'fixed', top: '4.2rem', right: '0.8rem',
+            background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 150, minWidth: '220px', padding: '0.6rem',
+            overflow: 'hidden'
+          }}>
+            {optionsMenuItems}
+          </div>
+        </div>,
+        document.body
+      )}
 
       {selectedIds.length > 0 && (
         <div style={{

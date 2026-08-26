@@ -9,7 +9,7 @@ export function A4BoldHeaderTemplate({
   businessName, businessAddress, businessPhone, businessEmail, logoElement,
   orderNumber, dateStr, details, items, subtotal, deliveryFee, total, palette,
   paymentMethod, showBranding, paymentBankName, paymentAccountNumber, paymentAccountName, invoiceNotes,
-  invoiceAuthorizedBy, invoiceAuthorizedDesignation,
+  invoiceAuthorizedBy, invoiceAuthorizedDesignation, signatureElement,
 }) {
   const hasPaymentInfo = paymentBankName || paymentAccountNumber || paymentAccountName
   const mid = Math.ceil(details.length / 2)
@@ -151,7 +151,10 @@ export function A4BoldHeaderTemplate({
         <div style={{ textAlign: 'center' }}>
           {invoiceAuthorizedBy && <div style={{ fontSize: '12px', fontWeight: 'bold' }}>{invoiceAuthorizedBy}</div>}
           {invoiceAuthorizedDesignation && <div style={{ fontSize: '11px', color: '#555' }}>{invoiceAuthorizedDesignation}</div>}
-          <div style={{ borderTop: '1px solid #999', width: '160px', paddingTop: '0.3rem', marginTop: invoiceAuthorizedBy || invoiceAuthorizedDesignation ? '0.5rem' : 0, fontSize: '10px', color: '#888' }}>Authorized Signatory</div>
+          <div style={{ width: '160px', margin: '0 auto', marginTop: invoiceAuthorizedBy || invoiceAuthorizedDesignation ? '0.5rem' : 0 }}>
+            {signatureElement && <div style={{ marginBottom: '0.2rem' }}>{signatureElement}</div>}
+            <div style={{ borderTop: '1px solid #999', paddingTop: '0.3rem', fontSize: '10px', color: '#888' }}>Authorized Signatory</div>
+          </div>
         </div>
       </div>
 
