@@ -109,7 +109,7 @@ export default function EmployeePayrollModal({ formId, form, month, employee, re
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
         <span style={{ fontSize: '0.85rem', color: 'var(--color-muted)' }}>
-          {[employee.job_title, employee.department_name].filter(Boolean).join(' · ')}
+          {[employee.job_title, employee.department_name, employee.location_name].filter(Boolean).join(' · ')}
         </span>
         <RecordStatusBadge status={record.status} />
       </div>

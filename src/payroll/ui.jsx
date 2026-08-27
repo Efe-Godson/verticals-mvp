@@ -19,6 +19,26 @@ export function monthLabel(month) {
   return new Date(y, m - 1, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
 }
 
+// "All Locations" + one option per active location. `value` is '' for all.
+export function LocationFilter({ locations = [], value, onChange, style }) {
+  if (!locations.length) return null
+  return (
+    <select value={value} onChange={(e) => onChange(e.target.value)} style={style}>
+      <option value="">All Locations</option>
+      {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+    </select>
+  )
+}
+
+// Keep rows whose employee is at `locationId` (or all when it's empty).
+export function atLocation(rows, locationId, getEmployeeId, employeesById) {
+  if (!locationId) return rows
+  return rows.filter(r => {
+    const emp = employeesById[getEmployeeId(r)]
+    return emp && emp.primary_location_id === locationId
+  })
+}
+
 export function MonthPicker({ value, onChange, style }) {
   return (
     <input

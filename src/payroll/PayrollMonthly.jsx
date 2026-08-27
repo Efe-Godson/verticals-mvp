@@ -6,9 +6,9 @@ import { useToast } from '../Toast'
 import { LoadingState } from '../LoadingState'
 import { ErrorState } from '../ErrorState'
 import ConfirmDialog from '../ConfirmDialog'
-import { MonthPicker, PayrollModal, money, monthLabel, currentMonth, RecordStatusBadge } from './ui'
+import { MonthPicker, LocationFilter, PayrollModal, money, monthLabel, currentMonth, RecordStatusBadge } from './ui'
 import {
-  payrollSettings, listEmployees, listDepartments, listEntries, loadRecordsForMonth,
+  payrollSettings, listEmployees, listDepartments, listLocations, listEntries, loadRecordsForMonth,
   runPayroll, bulkSetRecordStatus, createPaymentBatch,
 } from './payrollApi'
 import { exportPayrollToCSV, exportPayrollToExcel, exportPayrollToPDF } from './payrollExport'
@@ -20,10 +20,12 @@ export default function PayrollMonthly() {
   const settings = useMemo(() => payrollSettings(form), [form])
 
   const [month, setMonth] = useState(currentMonth())
+  const [location, setLocation] = useState('')
   const [employees, setEmployees] = useState([])
   const [departments, setDepartments] = useState([])
+  const [locations, setLocations] = useState([])
   const [entries, setEntries] = useState([])
-  const [records, setRecords] = useState([])
+  const [allRecords, setRecords] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [running, setRunning] = useState(false)
@@ -36,12 +38,13 @@ export default function PayrollMonthly() {
     setLoading(true)
     setError('')
     try {
-      const [emps, depts, ents, recs] = await Promise.all([
-        listEmployees(formId), listDepartments(formId),
+      const [emps, depts, locs, ents, recs] = await Promise.all([
+        listEmployees(formId), listDepartments(formId), listLocations(formId),
         listEntries(formId, { month }), loadRecordsForMonth(formId, month),
       ])
       setEmployees(emps)
       setDepartments(depts)
+      setLocations(locs)
       setEntries(ents)
       setRecords(recs)
       setSelected([])
@@ -56,7 +59,14 @@ export default function PayrollMonthly() {
 
   const empById = useMemo(() => Object.fromEntries(employees.map(e => [e.id, e])), [employees])
   const deptName = useMemo(() => Object.fromEntries(departments.map(d => [d.id, d.name])), [departments])
-  const hasDraftRun = records.length > 0
+  const locName = useMemo(() => Object.fromEntries(locations.map(l => [l.id, l.name])), [locations])
+  // Run Payroll always covers every active employee; the location filter is a
+  // view over the produced records.
+  const records = useMemo(
+    () => location ? allRecords.filter(r => empById[r.employee_id]?.primary_location_id === location) : allRecords,
+    [allRecords, location, empById]
+  )
+  const hasDraftRun = allRecords.length > 0
 
   async function handleRun() {
     setRunning(true)
@@ -117,7 +127,10 @@ export default function PayrollMonthly() {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem', marginBottom: '1rem' }}>
-        <MonthPicker value={month} onChange={setMonth} />
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <MonthPicker value={month} onChange={setMonth} />
+          <LocationFilter locations={locations} value={location} onChange={setLocation} />
+        </div>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           {hasDraftRun && <button className="secondary" onClick={() => setExportOpen(true)}>Export</button>}
           {hasDraftRun && approvable.length > 0 && <button className="secondary" onClick={() => setConfirmApproveAll(true)}>Approve All</button>}
@@ -164,7 +177,11 @@ export default function PayrollMonthly() {
                       </td>
                       <td style={{ padding: '0.55rem 0.7rem', borderBottom: '1px solid var(--color-border)' }}>
                         {emp?.full_name || '—'}
-                        {emp?.department_id && <span style={{ color: 'var(--color-muted)', fontSize: '0.78rem' }}> · {deptName[emp.department_id]}</span>}
+                        {(emp?.department_id || emp?.primary_location_id) && (
+                          <span style={{ color: 'var(--color-muted)', fontSize: '0.78rem' }}>
+                            {' · '}{[deptName[emp.department_id], locName[emp.primary_location_id]].filter(Boolean).join(' — ')}
+                          </span>
+                        )}
                       </td>
                       <td style={{ padding: '0.55rem 0.7rem', borderBottom: '1px solid var(--color-border)', textAlign: 'right' }}>{money(r.base_salary)}</td>
                       <td style={{ padding: '0.55rem 0.7rem', borderBottom: '1px solid var(--color-border)', textAlign: 'right', color: r.total_additions > 0 ? 'var(--status-good)' : 'inherit' }}>{money(r.total_additions)}</td>
@@ -190,7 +207,7 @@ export default function PayrollMonthly() {
           formId={formId}
           form={form}
           month={month}
-          employee={{ ...openEmp, department_name: deptName[openEmp.department_id] }}
+          employee={{ ...openEmp, department_name: deptName[openEmp.department_id], location_name: locName[openEmp.primary_location_id] }}
           record={openRecord}
           entries={entries.filter(e => e.employee_id === openEmpId)}
           settings={settings}
