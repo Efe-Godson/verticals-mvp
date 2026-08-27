@@ -7,9 +7,9 @@ import { useToast } from '../Toast'
 import { LoadingState } from '../LoadingState'
 import { ErrorState } from '../ErrorState'
 import StatTile from '../report/components/StatTile'
-import { MonthPicker, PayrollModal, Field, Select, TextInput, money, monthLabel, currentMonth } from './ui'
+import { MonthPicker, LocationFilter, PayrollModal, Field, Select, TextInput, money, monthLabel, currentMonth } from './ui'
 import {
-  listEmployees, loadRecordsForMonth, listBatches, setRecordStatus, bulkSetRecordStatus,
+  listEmployees, listLocations, loadRecordsForMonth, listBatches, setRecordStatus, bulkSetRecordStatus,
 } from './payrollApi'
 
 const PAY_METHODS = [
@@ -52,8 +52,10 @@ export default function PayrollPayments() {
   const { showToast } = useToast()
 
   const [month, setMonth] = useState(currentMonth())
+  const [location, setLocation] = useState('')
   const [employees, setEmployees] = useState([])
-  const [records, setRecords] = useState([])
+  const [locations, setLocations] = useState([])
+  const [allRecords, setRecords] = useState([])
   const [batches, setBatches] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -65,10 +67,11 @@ export default function PayrollPayments() {
     setLoading(true)
     setError('')
     try {
-      const [emps, recs, bats] = await Promise.all([
-        listEmployees(formId), loadRecordsForMonth(formId, month), listBatches(formId, month),
+      const [emps, locs, recs, bats] = await Promise.all([
+        listEmployees(formId), listLocations(formId), loadRecordsForMonth(formId, month), listBatches(formId, month),
       ])
       setEmployees(emps)
+      setLocations(locs)
       setRecords(recs)
       setBatches(bats)
     } catch (err) {
@@ -81,6 +84,10 @@ export default function PayrollPayments() {
   useEffect(() => { load() }, [formId, month]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const empById = useMemo(() => Object.fromEntries(employees.map(e => [e.id, e])), [employees])
+  const records = useMemo(
+    () => location ? allRecords.filter(r => empById[r.employee_id]?.primary_location_id === location) : allRecords,
+    [allRecords, location, empById]
+  )
 
   if (loading) return <LoadingState />
   if (error) return <ErrorState message={error} onRetry={load} />
@@ -116,7 +123,10 @@ export default function PayrollPayments() {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem', marginBottom: '1rem' }}>
-        <MonthPicker value={month} onChange={setMonth} />
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <MonthPicker value={month} onChange={setMonth} />
+          <LocationFilter locations={locations} value={location} onChange={setLocation} />
+        </div>
         {awaiting.length > 0 && <button onClick={payAllAwaiting}>Pay {awaiting.length} Employees</button>}
       </div>
 

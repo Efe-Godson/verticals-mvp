@@ -87,8 +87,45 @@ export async function createDepartment(payrollFormId, name, description = '') {
   return data
 }
 
+export async function updateDepartment(id, values) {
+  const { data, error } = await supabase.from('payroll_departments')
+    .update(values).eq('id', id).select().single()
+  if (error) throw error
+  return data
+}
+
 export async function archiveDepartment(id) {
   const { error } = await supabase.from('payroll_departments').update({ status: 'archived' }).eq('id', id)
+  if (error) throw error
+}
+
+// --- locations -------------------------------------------------------
+
+export async function listLocations(payrollFormId) {
+  const { data, error } = await supabase.from('payroll_locations').select('*')
+    .eq('payroll_form_id', payrollFormId).eq('status', 'active').order('name')
+  if (error) throw error
+  return data || []
+}
+
+export async function createLocation(payrollFormId, values) {
+  const payload = typeof values === 'string' ? { name: values.trim() } : { ...values, name: (values.name || '').trim() }
+  const { data, error } = await supabase.from('payroll_locations')
+    .insert([{ payroll_form_id: payrollFormId, ...payload }]).select().single()
+  if (error) throw error
+  await logAudit(payrollFormId, 'location', data.id, 'created', null, data)
+  return data
+}
+
+export async function updateLocation(id, values) {
+  const { data, error } = await supabase.from('payroll_locations')
+    .update(values).eq('id', id).select().single()
+  if (error) throw error
+  return data
+}
+
+export async function archiveLocation(id) {
+  const { error } = await supabase.from('payroll_locations').update({ status: 'archived' }).eq('id', id)
   if (error) throw error
 }
 
@@ -222,6 +259,15 @@ export async function createEntries(payrollFormId, rows, employeesById, settings
   if (error) throw error
   await logAudit(payrollFormId, 'entry', null, 'created', null, { count: data?.length || 0 })
   return data || []
+}
+
+// Spreadsheet import: rows already have employee_id / entry_category /
+// entry_type resolved by importer/parse.js; createEntries still freezes the
+// day-type amounts. Kept separate only so the audit trail says "imported".
+export async function importEntries(payrollFormId, rows, employeesById, settings) {
+  const created = await createEntries(payrollFormId, rows, employeesById, settings)
+  await logAudit(payrollFormId, 'entry', null, 'imported', null, { count: created.length })
+  return created
 }
 
 export async function updateEntry(payrollFormId, id, values, employee, settings) {

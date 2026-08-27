@@ -6,10 +6,10 @@ import { LoadingState } from '../LoadingState'
 import { ErrorState } from '../ErrorState'
 import StatTile from '../report/components/StatTile'
 import PieChart from '../report/components/PieChart'
-import { MonthPicker, money, monthLabel, currentMonth } from './ui'
+import { MonthPicker, LocationFilter, money, monthLabel, currentMonth } from './ui'
 import { calculateEmployeePayroll, ENTRY_TYPE_LABELS } from './calculatePayroll'
 import {
-  payrollSettings, listEmployees, listEntries, loadRecordsForMonth, runPayroll,
+  payrollSettings, listEmployees, listLocations, listEntries, loadRecordsForMonth, runPayroll,
 } from './payrollApi'
 import AddEntryModal from './AddEntryModal'
 
@@ -19,7 +19,9 @@ export default function PayrollOverview() {
   const settings = useMemo(() => payrollSettings(form), [form])
 
   const [month, setMonth] = useState(currentMonth())
+  const [location, setLocation] = useState('')
   const [employees, setEmployees] = useState([])
+  const [locations, setLocations] = useState([])
   const [entries, setEntries] = useState([])
   const [records, setRecords] = useState([])
   const [loading, setLoading] = useState(true)
@@ -31,12 +33,14 @@ export default function PayrollOverview() {
     setLoading(true)
     setError('')
     try {
-      const [emps, ents, recs] = await Promise.all([
+      const [emps, locs, ents, recs] = await Promise.all([
         listEmployees(formId),
+        listLocations(formId),
         listEntries(formId, { month }),
         loadRecordsForMonth(formId, month),
       ])
       setEmployees(emps)
+      setLocations(locs)
       setEntries(ents)
       setRecords(recs)
     } catch (err) {
@@ -48,15 +52,18 @@ export default function PayrollOverview() {
 
   useEffect(() => { load() }, [formId, month]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const empById = useMemo(() => Object.fromEntries(employees.map(e => [e.id, e])), [employees])
+  const inScope = (empId) => !location || empById[empId]?.primary_location_id === location
+
   const breakdowns = useMemo(() => {
-    const active = employees.filter(e => e.employment_status !== 'terminated')
+    const active = employees.filter(e => e.employment_status !== 'terminated' && (!location || e.primary_location_id === location))
     return active.map(emp => calculateEmployeePayroll({
       employee: emp,
       entries: entries.filter(en => en.employee_id === emp.id && en.status !== 'rejected'),
       payrollMonth: month,
       settings,
     }))
-  }, [employees, entries, month, settings])
+  }, [employees, entries, month, settings, location])
 
   if (loading) return <LoadingState />
   if (error) return <ErrorState message={error} onRetry={load} />
@@ -66,13 +73,15 @@ export default function PayrollOverview() {
   const totalAdditions = breakdowns.reduce((s, b) => s + b.totalAdditions, 0)
   const finalPayroll = breakdowns.reduce((s, b) => s + b.finalAmount, 0)
 
-  const paidRecords = records.filter(r => r.status === 'paid')
+  const scopedRecords = records.filter(r => inScope(r.employee_id))
+  const paidRecords = scopedRecords.filter(r => r.status === 'paid')
   const paidAmount = paidRecords.reduce((s, r) => s + Number(r.final_amount || 0), 0)
   const pendingCount = Math.max(0, breakdowns.length - paidRecords.length)
+  const staffCount = employees.filter(e => e.employment_status !== 'terminated' && (!location || e.primary_location_id === location)).length
 
-  const recent = entries.slice(0, 8).map(e => ({
+  const recent = entries.filter(e => inScope(e.employee_id)).slice(0, 8).map(e => ({
     id: e.id,
-    text: `${e.employee?.full_name || 'Someone'} — ${ENTRY_TYPE_LABELS[e.entry_type] || e.entry_type}${e.reason ? ` (${e.reason})` : ''}`,
+    text: `${e.employee?.full_name || empById[e.employee_id]?.full_name || 'Someone'} — ${ENTRY_TYPE_LABELS[e.entry_type] || e.entry_type}${e.reason ? ` (${e.reason})` : ''}`,
     amount: `${e.entry_category === 'deduction' ? '-' : '+'}${money(e.amount)}`,
     deduction: e.entry_category === 'deduction',
   }))
@@ -92,7 +101,10 @@ export default function PayrollOverview() {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.7rem', marginBottom: '1.2rem' }}>
-        <MonthPicker value={month} onChange={setMonth} />
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <MonthPicker value={month} onChange={setMonth} />
+          <LocationFilter locations={locations} value={location} onChange={setLocation} />
+        </div>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           <button className="secondary" onClick={() => setAddOpen(true)}>+ Add Entry</button>
           <button onClick={handleRun} disabled={running}>{running ? 'Running…' : 'Run Payroll'}</button>
@@ -100,7 +112,7 @@ export default function PayrollOverview() {
       </div>
 
       <div style={{ display: 'flex', gap: '0.7rem', flexWrap: 'wrap' }}>
-        <StatTile label="Total Staff" value={employees.filter(e => e.employment_status !== 'terminated').length} />
+        <StatTile label="Total Staff" value={staffCount} />
         <StatTile label="Base Payroll" value={money(basePayroll)} />
         <StatTile label="Total Deductions" value={money(totalDeductions)} />
         <StatTile label="Total Additions" value={money(totalAdditions)} />
@@ -113,7 +125,7 @@ export default function PayrollOverview() {
           <div style={{ fontSize: '0.85rem', color: 'var(--color-muted)', marginBottom: '0.6rem' }}>
             Payment Progress — {monthLabel(month)}
           </div>
-          {records.length === 0 ? (
+          {scopedRecords.length === 0 ? (
             <p style={{ color: 'var(--color-muted)', fontSize: '0.85rem' }}>Payroll not run for this month yet.</p>
           ) : (
             <PieChart size={150} data={[{ label: 'Paid', count: paidRecords.length }, { label: 'Pending', count: pendingCount }]} />

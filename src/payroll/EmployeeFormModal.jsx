@@ -1,15 +1,15 @@
 // Add / edit an employee (doc sections 5-8). Personal + employment + salary,
-// with an inline "create department" shortcut and a collapsed bank-details
-// block (optional, for future API payouts).
+// with inline "create department / location" shortcuts and a collapsed
+// bank-details block (optional, for future API payouts).
 import { useState } from 'react'
 import { useToast } from '../Toast'
 import { PayrollModal, Field, TextInput, Select } from './ui'
-import { createEmployee, updateEmployee, createDepartment } from './payrollApi'
+import { createEmployee, updateEmployee, createDepartment, createLocation } from './payrollApi'
 
 const STATUSES = ['active', 'on_leave', 'suspended', 'inactive', 'terminated']
 const STATUS_LABEL = { active: 'Active', on_leave: 'On Leave', suspended: 'Suspended', inactive: 'Inactive', terminated: 'Terminated' }
 
-export default function EmployeeFormModal({ formId, settings, employee, departments, onClose, onSaved }) {
+export default function EmployeeFormModal({ formId, settings, employee, departments, locations = [], onClose, onSaved }) {
   const { showToast } = useToast()
   const editing = !!employee
   const [v, setV] = useState({
@@ -19,6 +19,7 @@ export default function EmployeeFormModal({ formId, settings, employee, departme
     email: employee?.email || '',
     job_title: employee?.job_title || '',
     department_id: employee?.department_id || '',
+    primary_location_id: employee?.primary_location_id || '',
     employment_status: employee?.employment_status || 'active',
     start_date: employee?.start_date || '',
     monthly_salary: employee?.monthly_salary ?? '',
@@ -28,7 +29,9 @@ export default function EmployeeFormModal({ formId, settings, employee, departme
     payment_provider: employee?.payment_provider || '',
   })
   const [depts, setDepts] = useState(departments)
+  const [locs, setLocs] = useState(locations)
   const [newDept, setNewDept] = useState('')
+  const [newLoc, setNewLoc] = useState('')
   const [showBank, setShowBank] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -46,6 +49,18 @@ export default function EmployeeFormModal({ formId, settings, employee, departme
     }
   }
 
+  async function addLocation() {
+    if (!newLoc.trim()) return
+    try {
+      const l = await createLocation(formId, { name: newLoc.trim() })
+      setLocs(cur => [...cur, l].sort((a, b) => a.name.localeCompare(b.name)))
+      setV(cur => ({ ...cur, primary_location_id: l.id }))
+      setNewLoc('')
+    } catch (err) {
+      showToast('Could not add location: ' + err.message, 'error')
+    }
+  }
+
   async function save() {
     if (!v.full_name.trim()) { showToast('Employee name is required.', 'error'); return }
     if (v.monthly_salary === '' || Number(v.monthly_salary) < 0) { showToast('Enter a monthly salary.', 'error'); return }
@@ -58,6 +73,7 @@ export default function EmployeeFormModal({ formId, settings, employee, departme
         email: v.email.trim() || null,
         job_title: v.job_title.trim() || null,
         department_id: v.department_id || null,
+        primary_location_id: v.primary_location_id || null,
         employment_status: v.employment_status,
         start_date: v.start_date || null,
         monthly_salary: Number(v.monthly_salary),
@@ -100,6 +116,12 @@ export default function EmployeeFormModal({ formId, settings, employee, departme
             {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
           </Select>
         </Field>
+        <Field label="Location">
+          <Select value={v.primary_location_id} onChange={set('primary_location_id')}>
+            <option value="">— None —</option>
+            {locs.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+          </Select>
+        </Field>
       </div>
 
       <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end', marginBottom: '0.9rem' }}>
@@ -107,6 +129,10 @@ export default function EmployeeFormModal({ formId, settings, employee, departme
           <Field label="Create department"><TextInput value={newDept} onChange={(e) => setNewDept(e.target.value)} placeholder="New department name" /></Field>
         </div>
         <button className="secondary" type="button" onClick={addDepartment} style={{ marginBottom: '0.9rem' }}>+ Add</button>
+        <div style={{ flex: 1 }}>
+          <Field label="Create location"><TextInput value={newLoc} onChange={(e) => setNewLoc(e.target.value)} placeholder="New location name" /></Field>
+        </div>
+        <button className="secondary" type="button" onClick={addLocation} style={{ marginBottom: '0.9rem' }}>+ Add</button>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 0.9rem' }}>

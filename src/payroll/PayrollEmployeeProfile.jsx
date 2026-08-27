@@ -9,7 +9,7 @@ import { ErrorState } from '../ErrorState'
 import { money, monthLabel, EmployeeStatusBadge, RecordStatusBadge } from './ui'
 import { getDailyRate, ENTRY_TYPE_LABELS } from './calculatePayroll'
 import {
-  payrollSettings, getEmployee, listDepartments, listEntries, deleteEmployee,
+  payrollSettings, getEmployee, listDepartments, listLocations, listEntries, deleteEmployee,
 } from './payrollApi'
 import { supabase } from '../supabaseClient'
 import EmployeeFormModal from './EmployeeFormModal'
@@ -38,6 +38,7 @@ export default function PayrollEmployeeProfile() {
 
   const [employee, setEmployee] = useState(null)
   const [departments, setDepartments] = useState([])
+  const [locations, setLocations] = useState([])
   const [entries, setEntries] = useState([])
   const [records, setRecords] = useState([])
   const [loading, setLoading] = useState(true)
@@ -51,9 +52,10 @@ export default function PayrollEmployeeProfile() {
     setLoading(true)
     setError('')
     try {
-      const [emp, depts] = await Promise.all([getEmployee(empId), listDepartments(formId)])
+      const [emp, depts, locs] = await Promise.all([getEmployee(empId), listDepartments(formId), listLocations(formId)])
       setEmployee(emp)
       setDepartments(depts)
+      setLocations(locs)
       const [ents, allRecords] = await Promise.all([
         listEntries(formId, { employeeId: empId }),
         supabase.from('payroll_records').select('*').eq('payroll_form_id', formId).eq('employee_id', empId).order('payroll_month', { ascending: false }),
@@ -73,6 +75,7 @@ export default function PayrollEmployeeProfile() {
   if (error) return <ErrorState message={error} onRetry={load} />
 
   const deptName = departments.find(d => d.id === employee.department_id)?.name
+  const locNameVal = locations.find(l => l.id === employee.primary_location_id)?.name
   const dailyRate = getDailyRate(employee.monthly_salary, currentMonthStr(), settings)
   const thisMonthEntries = entries.filter(e => e.payroll_month === currentMonthStr())
   const lastPaid = records.find(r => r.status === 'paid')
@@ -96,7 +99,7 @@ export default function PayrollEmployeeProfile() {
         <div>
           <h2 style={{ margin: 0 }}>{employee.full_name}</h2>
           <div style={{ color: 'var(--color-muted)', fontSize: '0.9rem' }}>
-            {[employee.job_title, deptName].filter(Boolean).join(' · ') || 'No role set'}
+            {[employee.job_title, deptName, locNameVal].filter(Boolean).join(' · ') || 'No role set'}
             {employee.employee_number ? ` · ${employee.employee_number}` : ''}
           </div>
           <div style={{ marginTop: '0.4rem' }}><EmployeeStatusBadge status={employee.employment_status} /></div>
@@ -202,7 +205,7 @@ export default function PayrollEmployeeProfile() {
       )}
 
       {editOpen && (
-        <EmployeeFormModal formId={formId} settings={settings} employee={employee} departments={departments} onClose={() => setEditOpen(false)} onSaved={load} />
+        <EmployeeFormModal formId={formId} settings={settings} employee={employee} departments={departments} locations={locations} onClose={() => setEditOpen(false)} onSaved={load} />
       )}
       {addType && (
         <AddEntryModal formId={formId} settings={settings} employees={[employee]} presetEmployeeId={employee.id} presetType={addType} onClose={() => setAddType(null)} onSaved={load} />
