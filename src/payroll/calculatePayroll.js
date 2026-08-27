@@ -1,84 +1,150 @@
-// Place at: src/payroll/calculatePayroll.js
-// Pure calculation, no data fetching: takes an employee record, that
-// employee's salary events for one pay period, and the payroll settings,
-// and returns the breakdown described in the Staff Payment Tracker spec:
-//   Monthly Salary − Missed Days − Fines − Advances + Bonuses + Overtime + Extra Days = Final Salary
+// Pure payroll math - no data fetching. Takes a typed payroll_employees row,
+// that employee's payroll_entries rows for one month, and the form's payroll
+// settings, and returns the breakdown described in the Staff Payments design
+// doc section 37:
+//
+//   daily_salary          = monthly_salary / days_in_period
+//   missed_day_deduction  = daily_salary * missed_days
+//   extra_day_pay         = daily_salary * extra_days
+//   total_deductions      = missed_day_deduction + fines + advances + other deductions
+//   total_additions       = extra_day_pay + bonuses + allowances + ... + other additions
+//   final_amount          = monthly_salary + total_additions - total_deductions
+//
+// The daily rate is kept at full precision and never pre-rounded (doc section
+// 38) - rounding only happens at display time.
 
-// Field ids match the Employees/Salary Events forms seeded by the
-// Staff Payment Tracker template (supabase/seed_staff_payment_template.sql).
-const EMPLOYEE_FIELDS = { name: 'f1', staffId: 'f2', department: 'f3', position: 'f4', monthlySalary: 'f5', status: 'f6' }
-const EVENT_FIELDS = { employee: 'f1', date: 'f2', type: 'f3', amount: 'f4', days: 'f5', notes: 'f6' }
+export const DEDUCTION_TYPES = ['fine', 'missed_day', 'salary_advance', 'loan_repayment', 'damage', 'other_deduction']
+export const ADDITION_TYPES = ['extra_day', 'bonus', 'allowance', 'reimbursement', 'commission', 'other_addition']
 
-export function getDailySalary(monthlySalary, payrollSettings, period) {
-  const daysMode = payrollSettings?.daysMode || 'fixed30'
-  if (daysMode === 'calendar') {
-    const [year, month] = period.split('-').map(Number)
-    const daysInMonth = new Date(year, month, 0).getDate()
-    return monthlySalary / daysInMonth
-  }
-  const fixedDays = payrollSettings?.fixedDays || 30
-  return monthlySalary / fixedDays
+export const ENTRY_TYPE_LABELS = {
+  fine: 'Fine',
+  missed_day: 'Missed Day',
+  extra_day: 'Extra Day',
+  bonus: 'Bonus',
+  salary_advance: 'Salary Advance',
+  loan_repayment: 'Loan Repayment',
+  allowance: 'Allowance',
+  reimbursement: 'Reimbursement',
+  commission: 'Commission',
+  damage: 'Damage / Loss',
+  other_deduction: 'Other Deduction',
+  other_addition: 'Other Addition',
 }
 
-// One line item per event, signed so callers can just sum `signedAmount`
-// for the final total instead of re-implementing the per-type rules.
-function eventLineItem(event, dailySalary) {
-  const type = event.data[EVENT_FIELDS.type]
-  const amount = Number(event.data[EVENT_FIELDS.amount]) || 0
-  const days = Number(event.data[EVENT_FIELDS.days]) || 0
-
-  switch (type) {
-    case 'Missed Day':
-      return { type, category: 'deduction', signedAmount: -(days || 1) * dailySalary }
-    case 'Half Day':
-      return { type, category: 'deduction', signedAmount: -0.5 * (days || 1) * dailySalary }
-    case 'Fine':
-      return { type, category: 'deduction', signedAmount: -amount }
-    case 'Advance Payment':
-      return { type, category: 'deduction', signedAmount: -amount }
-    case 'Bonus':
-      return { type, category: 'addition', signedAmount: amount }
-    case 'Allowance':
-      return { type, category: 'addition', signedAmount: amount }
-    case 'Overtime':
-      return { type, category: 'addition', signedAmount: amount || days * dailySalary }
-    case 'Extra Work Day':
-      return { type, category: 'addition', signedAmount: (days || 1) * dailySalary }
-    default: // "Other Adjustment", sign comes from whatever amount was entered
-      return { type, category: amount >= 0 ? 'addition' : 'deduction', signedAmount: amount }
-  }
+// 'YYYY-MM' -> number of days used to divide the monthly salary.
+export function daysInPeriod(payrollMonth, method = 'calendar_days', workingDays = 30) {
+  if (method === 'fixed_working_days') return Number(workingDays) || 30
+  const [year, month] = String(payrollMonth).split('-').map(Number)
+  if (!year || !month) return 30
+  return new Date(year, month, 0).getDate() // day 0 of next month = last day of this one
 }
 
-// `employee` and `events` are raw submission rows ({ id, data }). `events`
-// should already be filtered to this employee + the target period.
-export function calculateEmployeePayroll(employee, events, payrollSettings, period) {
-  const monthlySalary = Number(employee.data[EMPLOYEE_FIELDS.monthlySalary]) || 0
-  const dailySalary = getDailySalary(monthlySalary, payrollSettings, period)
+export function getDailyRate(monthlySalary, payrollMonth, settings) {
+  const days = daysInPeriod(payrollMonth, settings?.daysMode, settings?.workingDays)
+  return (Number(monthlySalary) || 0) / days
+}
 
-  const lineItems = events.map(event => eventLineItem(event, dailySalary))
-  const deductions = lineItems.filter(i => i.category === 'deduction').reduce((sum, i) => sum - i.signedAmount, 0)
-  const additions = lineItems.filter(i => i.category === 'addition').reduce((sum, i) => sum + i.signedAmount, 0)
-  const finalSalary = monthlySalary - deductions + additions
+// Sign an entry the way it is displayed and summed everywhere: the stored
+// entry_category is the single source of truth, `amount` is always positive.
+export function signedAmount(entry) {
+  const amount = Number(entry.amount) || 0
+  return entry.entry_category === 'deduction' ? -amount : amount
+}
+
+// For missed_day / extra_day the amount is normally computed and frozen at
+// entry time; fall back to quantity * dailyRate when it is missing.
+function entryAmount(entry, dailyRate) {
+  if (entry.amount != null && entry.amount !== '') return Number(entry.amount) || 0
+  if (entry.entry_type === 'missed_day' || entry.entry_type === 'extra_day') {
+    return (Number(entry.quantity) || 0) * dailyRate
+  }
+  return 0
+}
+
+// `employee` is a payroll_employees row. `entries` should already be filtered
+// to this employee + the target month and exclude soft-deleted / rejected.
+export function calculateEmployeePayroll({ employee, entries = [], payrollMonth, settings }) {
+  const baseSalary = Number(employee.monthly_salary) || 0
+  const periodDays = daysInPeriod(payrollMonth, settings?.daysMode, settings?.workingDays)
+  const dailyRate = baseSalary / periodDays
+
+  const lineItems = entries.map(entry => {
+    const amount = entryAmount(entry, dailyRate)
+    return {
+      id: entry.id,
+      type: entry.entry_type,
+      label: ENTRY_TYPE_LABELS[entry.entry_type] || entry.entry_type,
+      category: entry.entry_category,
+      quantity: entry.quantity != null ? Number(entry.quantity) : null,
+      reason: entry.reason || '',
+      amount,
+      signedAmount: entry.entry_category === 'deduction' ? -amount : amount,
+    }
+  })
+
+  const sumType = type => lineItems.filter(i => i.type === type).reduce((s, i) => s + i.amount, 0)
+  const sumQty = type => lineItems.filter(i => i.type === type).reduce((s, i) => s + (i.quantity || 0), 0)
+
+  const missedDays = sumQty('missed_day')
+  const missedDayDeduction = sumType('missed_day')
+  const extraDays = sumQty('extra_day')
+  const extraDayPay = sumType('extra_day')
+  const totalFines = sumType('fine')
+
+  const totalOtherDeductions = lineItems
+    .filter(i => i.category === 'deduction' && i.type !== 'missed_day' && i.type !== 'fine')
+    .reduce((s, i) => s + i.amount, 0)
+
+  const totalDeductions = lineItems
+    .filter(i => i.category === 'deduction')
+    .reduce((s, i) => s + i.amount, 0)
+
+  const totalAdditions = lineItems
+    .filter(i => i.category === 'addition')
+    .reduce((s, i) => s + i.amount, 0)
+
+  const grossAdjustedPay = baseSalary + totalAdditions
+  const finalAmount = grossAdjustedPay - totalDeductions
 
   return {
     employeeId: employee.id,
-    name: employee.data[EMPLOYEE_FIELDS.name] || 'Unnamed',
-    monthlySalary,
-    dailySalary,
+    name: employee.full_name || 'Unnamed',
+    baseSalary,
+    daysInPeriod: periodDays,
+    dailyRate,
+    missedDays,
+    missedDayDeduction,
+    extraDays,
+    extraDayPay,
+    totalFines,
+    totalOtherDeductions,
+    totalAdditions,
+    grossAdjustedPay,
+    totalDeductions,
+    finalAmount,
     lineItems,
-    deductions,
-    additions,
-    finalSalary,
   }
 }
 
-export function eventPeriod(event) {
-  const date = event.data[EVENT_FIELDS.date]
-  return typeof date === 'string' ? date.slice(0, 7) : null
+// Shape a breakdown for an upsert into payroll_records.
+export function breakdownToRecordRow(breakdown, { payrollFormId, payrollMonth, payrollPeriodId = null }) {
+  return {
+    payroll_form_id: payrollFormId,
+    employee_id: breakdown.employeeId,
+    payroll_period_id: payrollPeriodId,
+    payroll_month: payrollMonth,
+    base_salary: breakdown.baseSalary,
+    days_in_period: breakdown.daysInPeriod,
+    daily_rate: breakdown.dailyRate,
+    missed_days: breakdown.missedDays,
+    missed_day_deduction: breakdown.missedDayDeduction,
+    extra_days: breakdown.extraDays,
+    extra_day_pay: breakdown.extraDayPay,
+    total_fines: breakdown.totalFines,
+    total_other_deductions: breakdown.totalOtherDeductions,
+    total_additions: breakdown.totalAdditions,
+    gross_adjusted_pay: breakdown.grossAdjustedPay,
+    total_deductions: breakdown.totalDeductions,
+    final_amount: breakdown.finalAmount,
+  }
 }
-
-export function eventEmployeeId(event) {
-  return event.data[EVENT_FIELDS.employee]?.recordId
-}
-
-export { EMPLOYEE_FIELDS, EVENT_FIELDS }

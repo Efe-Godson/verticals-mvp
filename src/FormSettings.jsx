@@ -89,7 +89,7 @@ function FormSettings() {
     // `settings` is a shared JSONB bag - other pages stash their own keys in
     // it (templateSlug/locationName from locations.js, primaryFormId/
     // payrollRole from Templates.jsx, hiddenColumns/recordPresets from
-    // Records.jsx, payroll from PayrollPage.jsx...). Replacing it outright
+    // Records.jsx, payroll from the Payroll module...). Replacing it outright
     // used to silently delete all of those the moment this page saved.
     const newSettings = {
       ...form.settings,
