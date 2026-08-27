@@ -147,12 +147,25 @@ export async function getEmployee(id) {
 }
 
 const COMP_METHOD = { calendar_days: 'calendar_days', fixed_working_days: 'fixed_working_days' }
+const SALARY_TYPES = ['monthly', 'daily', 'hourly', 'shift']
 
-async function writeCompensationRow(payrollFormId, employee, settings) {
+// Real columns on payroll_employees. Callers (esp. the importer) pass bags
+// that also carry compensation-only fields like salary_type - drop anything
+// that isn't a column so the insert doesn't fail against the schema cache.
+const EMPLOYEE_COLUMNS = [
+  'employee_number', 'full_name', 'phone', 'email', 'job_title', 'department_id',
+  'primary_location_id', 'employment_status', 'start_date', 'end_date',
+  'monthly_salary', 'bank_name', 'account_number', 'account_name', 'payment_provider',
+]
+function employeeColumns(values) {
+  return Object.fromEntries(Object.entries(values).filter(([k]) => EMPLOYEE_COLUMNS.includes(k)))
+}
+
+async function writeCompensationRow(payrollFormId, employee, settings, salaryType) {
   await supabase.from('payroll_employee_compensation').insert([{
     payroll_form_id: payrollFormId,
     employee_id: employee.id,
-    salary_type: 'monthly',
+    salary_type: SALARY_TYPES.includes(salaryType) ? salaryType : 'monthly',
     base_salary: Number(employee.monthly_salary) || 0,
     currency: settings?.currency || 'NGN',
     daily_rate_method: COMP_METHOD[settings?.daysMode] || 'calendar_days',
@@ -162,9 +175,9 @@ async function writeCompensationRow(payrollFormId, employee, settings) {
 
 export async function createEmployee(payrollFormId, values, settings) {
   const { data, error } = await supabase.from('payroll_employees')
-    .insert([{ ...values, payroll_form_id: payrollFormId }]).select().single()
+    .insert([{ ...employeeColumns(values), payroll_form_id: payrollFormId }]).select().single()
   if (error) throw error
-  await writeCompensationRow(payrollFormId, data, settings)
+  await writeCompensationRow(payrollFormId, data, settings, values.salary_type)
   await logAudit(payrollFormId, 'employee', data.id, 'created', null, data)
   return data
 }
@@ -172,13 +185,13 @@ export async function createEmployee(payrollFormId, values, settings) {
 export async function updateEmployee(payrollFormId, id, values, settings) {
   const before = await getEmployee(id)
   const { data, error } = await supabase.from('payroll_employees')
-    .update(values).eq('id', id).select().single()
+    .update(employeeColumns(values)).eq('id', id).select().single()
   if (error) throw error
   if (Number(before.monthly_salary) !== Number(data.monthly_salary)) {
     await supabase.from('payroll_employee_compensation')
       .update({ effective_to: new Date().toISOString().slice(0, 10) })
       .eq('employee_id', id).is('effective_to', null)
-    await writeCompensationRow(payrollFormId, data, settings)
+    await writeCompensationRow(payrollFormId, data, settings, values.salary_type)
   }
   await logAudit(payrollFormId, 'employee', id, 'updated', before, data)
   return data
@@ -191,14 +204,18 @@ export async function deleteEmployee(payrollFormId, id) {
   await logAudit(payrollFormId, 'employee', id, 'deleted', null, null)
 }
 
-// Bulk insert for spreadsheet import: rows are { full_name, job_title, department_id, monthly_salary, ... }
+// Bulk insert for spreadsheet import: rows are the bags from importer/parse.js
+// (which also carry salary_type - split off to the compensation row).
 export async function importEmployees(payrollFormId, rows, settings) {
-  const payload = rows.map(r => ({ ...r, payroll_form_id: payrollFormId }))
+  const payload = rows.map(r => ({ ...employeeColumns(r), payroll_form_id: payrollFormId }))
   const { data, error } = await supabase.from('payroll_employees').insert(payload).select()
   if (error) throw error
-  for (const emp of data || []) await writeCompensationRow(payrollFormId, emp, settings)
-  await logAudit(payrollFormId, 'employee', null, 'imported', null, { count: data?.length || 0 })
-  return data || []
+  const created = data || []
+  for (let i = 0; i < created.length; i++) {
+    await writeCompensationRow(payrollFormId, created[i], settings, rows[i]?.salary_type)
+  }
+  await logAudit(payrollFormId, 'employee', null, 'imported', null, { count: created.length })
+  return created
 }
 
 // --- entries ---------------------------------------------------------
