@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { usePayroll } from './PayrollShell'
 import { LoadingState } from '../LoadingState'
 import { ErrorState } from '../ErrorState'
-import { money, EmployeeStatusBadge, LocationFilter } from './ui'
+import { money, EmployeeStatusBadge, LocationFilter, roleList, deptIds, locationIds, namesFor } from './ui'
 import { payrollSettings, listEmployees, listDepartments, listLocations } from './payrollApi'
 import EmployeeFormModal from './EmployeeFormModal'
 import ImportModal from './ImportModal'
@@ -50,11 +50,17 @@ export default function PayrollEmployees() {
 
   const deptName = useMemo(() => Object.fromEntries(departments.map(d => [d.id, d.name])), [departments])
   const locName = useMemo(() => Object.fromEntries(locations.map(l => [l.id, l.name])), [locations])
+  // Every role string already in use, for the Add/Edit form's autocomplete.
+  const roleSuggestions = useMemo(
+    () => Array.from(new Set(employees.flatMap(roleList))).sort((a, b) => a.localeCompare(b)),
+    [employees],
+  )
 
   const filtered = useMemo(() => employees.filter(e => {
-    if (search && !e.full_name.toLowerCase().includes(search.toLowerCase()) && !(e.job_title || '').toLowerCase().includes(search.toLowerCase())) return false
-    if (deptFilter && e.department_id !== deptFilter) return false
-    if (locFilter && e.primary_location_id !== locFilter) return false
+    const roles = roleList(e).join(' ').toLowerCase()
+    if (search && !e.full_name.toLowerCase().includes(search.toLowerCase()) && !roles.includes(search.toLowerCase())) return false
+    if (deptFilter && !deptIds(e).includes(deptFilter)) return false
+    if (locFilter && !locationIds(e).includes(locFilter)) return false
     if (statusFilter && e.employment_status !== statusFilter) return false
     return true
   }), [employees, search, deptFilter, locFilter, statusFilter])
@@ -101,9 +107,9 @@ export default function PayrollEmployees() {
                   {e.full_name}
                   {e.employee_number && <span style={{ color: 'var(--color-muted)', fontSize: '0.78rem' }}> · {e.employee_number}</span>}
                 </td>
-                <td style={{ padding: '0.6rem 0.7rem', borderBottom: '1px solid var(--color-border)' }}>{e.job_title || '—'}</td>
-                <td style={{ padding: '0.6rem 0.7rem', borderBottom: '1px solid var(--color-border)' }}>{deptName[e.department_id] || '—'}</td>
-                <td style={{ padding: '0.6rem 0.7rem', borderBottom: '1px solid var(--color-border)', color: 'var(--color-muted)' }}>{locName[e.primary_location_id] || '—'}</td>
+                <td style={{ padding: '0.6rem 0.7rem', borderBottom: '1px solid var(--color-border)' }}>{roleList(e).join(', ') || '—'}</td>
+                <td style={{ padding: '0.6rem 0.7rem', borderBottom: '1px solid var(--color-border)' }}>{namesFor(deptIds(e), deptName) || '—'}</td>
+                <td style={{ padding: '0.6rem 0.7rem', borderBottom: '1px solid var(--color-border)', color: 'var(--color-muted)' }}>{namesFor(locationIds(e), locName) || '—'}</td>
                 <td style={{ padding: '0.6rem 0.7rem', borderBottom: '1px solid var(--color-border)', textAlign: 'right' }}>{money(e.monthly_salary)}</td>
                 <td style={{ padding: '0.6rem 0.7rem', borderBottom: '1px solid var(--color-border)' }}><EmployeeStatusBadge status={e.employment_status} /></td>
               </tr>
@@ -118,6 +124,7 @@ export default function PayrollEmployees() {
           settings={settings}
           departments={departments}
           locations={locations}
+          roleSuggestions={roleSuggestions}
           onClose={() => setAddOpen(false)}
           onSaved={load}
         />

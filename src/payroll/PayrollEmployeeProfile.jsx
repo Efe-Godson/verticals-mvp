@@ -6,7 +6,7 @@ import { usePayroll } from './PayrollShell'
 import { useToast } from '../Toast'
 import { LoadingState } from '../LoadingState'
 import { ErrorState } from '../ErrorState'
-import { money, monthLabel, EmployeeStatusBadge, RecordStatusBadge } from './ui'
+import { money, monthLabel, EmployeeStatusBadge, RecordStatusBadge, roleList, deptIds, locationIds, namesFor } from './ui'
 import { getDailyRate, ENTRY_TYPE_LABELS } from './calculatePayroll'
 import {
   payrollSettings, getEmployee, listDepartments, listLocations, listEntries, deleteEmployee,
@@ -74,8 +74,11 @@ export default function PayrollEmployeeProfile() {
   if (loading) return <LoadingState />
   if (error) return <ErrorState message={error} onRetry={load} />
 
-  const deptName = departments.find(d => d.id === employee.department_id)?.name
-  const locNameVal = locations.find(l => l.id === employee.primary_location_id)?.name
+  const deptNameById = Object.fromEntries(departments.map(d => [d.id, d.name]))
+  const locNameById = Object.fromEntries(locations.map(l => [l.id, l.name]))
+  const roleText = roleList(employee).join(', ')
+  const deptText = namesFor(deptIds(employee), deptNameById)
+  const locText = namesFor(locationIds(employee), locNameById)
   const dailyRate = getDailyRate(employee.monthly_salary, currentMonthStr(), settings)
   const thisMonthEntries = entries.filter(e => e.payroll_month === currentMonthStr())
   const lastPaid = records.find(r => r.status === 'paid')
@@ -99,7 +102,7 @@ export default function PayrollEmployeeProfile() {
         <div>
           <h2 style={{ margin: 0 }}>{employee.full_name}</h2>
           <div style={{ color: 'var(--color-muted)', fontSize: '0.9rem' }}>
-            {[employee.job_title, deptName, locNameVal].filter(Boolean).join(' · ') || 'No role set'}
+            {[roleText, deptText, locText].filter(Boolean).join(' · ') || 'No role set'}
             {employee.employee_number ? ` · ${employee.employee_number}` : ''}
           </div>
           <div style={{ marginTop: '0.4rem' }}><EmployeeStatusBadge status={employee.employment_status} /></div>
@@ -205,7 +208,7 @@ export default function PayrollEmployeeProfile() {
       )}
 
       {editOpen && (
-        <EmployeeFormModal formId={formId} settings={settings} employee={employee} departments={departments} locations={locations} onClose={() => setEditOpen(false)} onSaved={load} />
+        <EmployeeFormModal formId={formId} settings={settings} employee={employee} departments={departments} locations={locations} roleSuggestions={roleList(employee)} onClose={() => setEditOpen(false)} onSaved={load} />
       )}
       {addType && (
         <AddEntryModal formId={formId} settings={settings} employees={[employee]} presetEmployeeId={employee.id} presetType={addType} onClose={() => setAddType(null)} onSaved={load} />

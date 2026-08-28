@@ -154,12 +154,47 @@ const SALARY_TYPES = ['monthly', 'daily', 'hourly', 'shift']
 // that also carry compensation-only fields like salary_type - drop anything
 // that isn't a column so the insert doesn't fail against the schema cache.
 const EMPLOYEE_COLUMNS = [
-  'employee_number', 'full_name', 'phone', 'email', 'job_title', 'department_id',
-  'primary_location_id', 'employment_status', 'start_date', 'end_date',
+  'employee_number', 'full_name', 'phone', 'email',
+  'job_title', 'job_titles', 'department_id', 'department_ids',
+  'primary_location_id', 'location_ids', 'employment_status', 'start_date', 'end_date',
   'monthly_salary', 'bank_name', 'account_number', 'account_name', 'payment_provider',
 ]
+
+// Role / department / location are multi-value (job_titles / department_ids /
+// location_ids). The legacy single columns are kept in lock-step with
+// element 0 so older read paths keep working; conversely a caller that only
+// supplies the single column (the spreadsheet importer) gets a matching
+// one-element array. See 20260828120000_payroll_multi_category.sql.
+function syncCategoryFields(values) {
+  const v = { ...values }
+
+  if (Array.isArray(v.job_titles)) {
+    v.job_titles = v.job_titles.map(s => String(s).trim()).filter(Boolean)
+    v.job_title = v.job_titles.join(' / ') || null
+  } else if (typeof v.job_title === 'string' && v.job_titles === undefined) {
+    v.job_titles = v.job_title.split('/').map(s => s.trim()).filter(Boolean)
+  }
+
+  if (Array.isArray(v.department_ids)) {
+    v.department_ids = v.department_ids.filter(Boolean)
+    v.department_id = v.department_ids[0] || null
+  } else if (v.department_id && v.department_ids === undefined) {
+    v.department_ids = [v.department_id]
+  }
+
+  if (Array.isArray(v.location_ids)) {
+    v.location_ids = v.location_ids.filter(Boolean)
+    v.primary_location_id = v.location_ids[0] || null
+  } else if (v.primary_location_id && v.location_ids === undefined) {
+    v.location_ids = [v.primary_location_id]
+  }
+
+  return v
+}
+
 function employeeColumns(values) {
-  return Object.fromEntries(Object.entries(values).filter(([k]) => EMPLOYEE_COLUMNS.includes(k)))
+  const v = syncCategoryFields(values)
+  return Object.fromEntries(Object.entries(v).filter(([k]) => EMPLOYEE_COLUMNS.includes(k)))
 }
 
 async function writeCompensationRow(payrollFormId, employee, settings, salaryType) {

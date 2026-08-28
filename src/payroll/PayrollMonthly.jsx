@@ -8,7 +8,7 @@ import { LoadingState } from '../LoadingState'
 import { ErrorState } from '../ErrorState'
 import ConfirmDialog from '../ConfirmDialog'
 import useIsMobile from '../hooks/useIsMobile'
-import { MonthPicker, LocationFilter, PayrollModal, money, moneyShort, monthLabel, currentMonth, RecordStatusBadge, friendlyError } from './ui'
+import { MonthPicker, LocationFilter, PayrollModal, money, moneyShort, monthLabel, currentMonth, RecordStatusBadge, friendlyError, locationIds, deptIds, namesFor } from './ui'
 import { calculateEmployeePayroll } from './calculatePayroll'
 import {
   payrollSettings, listEmployees, listDepartments, listLocations, listEntries, loadRecordsForMonth,
@@ -77,7 +77,7 @@ export default function PayrollMonthly() {
   // Run Payroll always covers every active employee; the location filter is a
   // view over the produced records.
   const records = useMemo(
-    () => location ? allRecords.filter(r => empById[r.employee_id]?.primary_location_id === location) : allRecords,
+    () => location ? allRecords.filter(r => locationIds(empById[r.employee_id]).includes(location)) : allRecords,
     [allRecords, location, empById]
   )
   const hasRun = allRecords.length > 0
@@ -85,7 +85,7 @@ export default function PayrollMonthly() {
   // Live projection for the KPI cards - covers the selected location and
   // stays useful before Run Payroll has produced any records.
   const kpi = useMemo(() => {
-    const active = employees.filter(e => e.employment_status !== 'terminated' && (!location || e.primary_location_id === location))
+    const active = employees.filter(e => e.employment_status !== 'terminated' && (!location || locationIds(e).includes(location)))
     const bd = active.map(emp => calculateEmployeePayroll({
       employee: emp,
       entries: entries.filter(en => en.employee_id === emp.id && en.status !== 'rejected'),
@@ -116,7 +116,7 @@ export default function PayrollMonthly() {
       showToast(`Payroll started for ${recs.length} employees. Review each one below.`, 'success')
       // Sort the review queue so the location filter (if any) leads.
       const ordered = recs
-        .filter(r => !location || empById[r.employee_id]?.primary_location_id === location)
+        .filter(r => !location || locationIds(empById[r.employee_id]).includes(location))
         .map(r => r.employee_id)
       if (ordered.length) { setReviewQueue(ordered); setReviewIdx(0) }
     } catch (err) {
@@ -464,11 +464,10 @@ export default function PayrollMonthly() {
                           {name
                             ? <span style={{ fontWeight: 600 }}>{name}</span>
                             : <span style={{ color: 'var(--status-serious)', fontWeight: 600 }}>⚠ Unnamed employee</span>}
-                          {(emp?.department_id || emp?.primary_location_id) && (
-                            <span style={{ color: 'var(--color-muted)', fontSize: '0.78rem' }}>
-                              {' · '}{[deptName[emp.department_id], locName[emp.primary_location_id]].filter(Boolean).join(' — ')}
-                            </span>
-                          )}
+                          {(() => {
+                            const meta = [namesFor(deptIds(emp), deptName), namesFor(locationIds(emp), locName)].filter(Boolean).join(' — ')
+                            return meta && <span style={{ color: 'var(--color-muted)', fontSize: '0.78rem' }}>{' · '}{meta}</span>
+                          })()}
                         </td>
                         <td style={{ padding: '0.55rem 0.7rem', borderBottom: '1px solid var(--color-border)', textAlign: 'right' }}>{money(r.base_salary)}</td>
                         <td style={{ padding: '0.55rem 0.7rem', borderBottom: '1px solid var(--color-border)', textAlign: 'right', fontSize: '0.85rem', lineHeight: 1.35 }}>
@@ -501,7 +500,7 @@ export default function PayrollMonthly() {
           formId={formId}
           form={form}
           month={month}
-          employee={{ ...reviewEmp, department_name: deptName[reviewEmp.department_id], location_name: locName[reviewEmp.primary_location_id] }}
+          employee={{ ...reviewEmp, department_name: namesFor(deptIds(reviewEmp), deptName), location_name: namesFor(locationIds(reviewEmp), locName) }}
           record={reviewRecord}
           entries={entries.filter(e => e.employee_id === reviewEmpId)}
           settings={settings}

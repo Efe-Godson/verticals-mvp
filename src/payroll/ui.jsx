@@ -149,4 +149,25 @@ export function categoryOf(entryType) {
   return DEDUCTION_TYPES.includes(entryType) ? 'deduction' : 'addition'
 }
 
+// Role / department / location are multi-value (job_titles / department_ids /
+// location_ids). These read them back tolerant of the legacy single columns
+// (job_title / department_id / primary_location_id) still present on older
+// rows. See 20260828120000_payroll_multi_category.sql.
+export function roleList(emp) {
+  if (emp?.job_titles?.length) return emp.job_titles
+  if (emp?.job_title) return emp.job_title.split('/').map(s => s.trim()).filter(Boolean)
+  return []
+}
+export function deptIds(emp) {
+  if (emp?.department_ids?.length) return emp.department_ids
+  return emp?.department_id ? [emp.department_id] : []
+}
+export function locationIds(emp) {
+  if (emp?.location_ids?.length) return emp.location_ids
+  return emp?.primary_location_id ? [emp.primary_location_id] : []
+}
+export function namesFor(ids, nameById) {
+  return (ids || []).map(id => nameById[id]).filter(Boolean).join(', ')
+}
+
 export const DAY_ENTRY_TYPES = ['missed_day', 'extra_day']
