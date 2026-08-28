@@ -82,8 +82,14 @@ export async function listDepartments(payrollFormId) {
 }
 
 export async function createDepartment(payrollFormId, name, description = '') {
+  const clean = name.trim()
+  // Reuse an existing active department with the same name (case-insensitive)
+  // instead of piling up duplicates - the column has no unique constraint.
+  const { data: dupe } = await supabase.from('payroll_departments').select('*')
+    .eq('payroll_form_id', payrollFormId).eq('status', 'active').ilike('name', clean).limit(1)
+  if (dupe?.[0]) return dupe[0]
   const { data, error } = await supabase.from('payroll_departments')
-    .insert([{ payroll_form_id: payrollFormId, name: name.trim(), description }]).select().single()
+    .insert([{ payroll_form_id: payrollFormId, name: clean, description }]).select().single()
   if (error) throw error
   return data
 }
@@ -111,6 +117,10 @@ export async function listLocations(payrollFormId) {
 
 export async function createLocation(payrollFormId, values) {
   const payload = typeof values === 'string' ? { name: values.trim() } : { ...values, name: (values.name || '').trim() }
+  // Reuse an existing active location with the same name (case-insensitive).
+  const { data: dupe } = await supabase.from('payroll_locations').select('*')
+    .eq('payroll_form_id', payrollFormId).eq('status', 'active').ilike('name', payload.name).limit(1)
+  if (dupe?.[0]) return dupe[0]
   const { data, error } = await supabase.from('payroll_locations')
     .insert([{ payroll_form_id: payrollFormId, ...payload }]).select().single()
   if (error) throw error

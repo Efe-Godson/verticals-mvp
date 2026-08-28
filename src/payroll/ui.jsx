@@ -170,4 +170,19 @@ export function namesFor(ids, nameById) {
   return (ids || []).map(id => nameById[id]).filter(Boolean).join(', ')
 }
 
+// payroll_departments / payroll_locations have no unique-name constraint, and
+// the inline "+ Add" + the importer have historically created duplicates
+// ("Main Kitchen" as three rows). Collapse same-name rows (case/space
+// -insensitive) to the first for pickers and filters; keep the full list for
+// resolving any id -> name.
+export function dedupeByName(rows = []) {
+  const seen = new Set()
+  return rows.filter(r => {
+    const k = String(r?.name || '').trim().toLowerCase()
+    if (!k || seen.has(k)) return false
+    seen.add(k)
+    return true
+  })
+}
+
 export const DAY_ENTRY_TYPES = ['missed_day', 'extra_day']

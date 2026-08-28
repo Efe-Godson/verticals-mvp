@@ -1,14 +1,14 @@
 // The Payments page (index tab): the month's payroll at a glance (KPI
 // strip), Run Payroll, the per-employee table + modal, and the bulk
 // review / approve / mark-paid actions.
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { usePayroll } from './PayrollShell'
 import { useToast } from '../Toast'
 import { LoadingState } from '../LoadingState'
 import { ErrorState } from '../ErrorState'
 import ConfirmDialog from '../ConfirmDialog'
 import useIsMobile from '../hooks/useIsMobile'
-import { MonthPicker, LocationFilter, PayrollModal, money, moneyShort, monthLabel, currentMonth, RecordStatusBadge, friendlyError, locationIds, deptIds, namesFor } from './ui'
+import { MonthPicker, LocationFilter, PayrollModal, money, moneyShort, monthLabel, currentMonth, RecordStatusBadge, friendlyError, locationIds, deptIds, namesFor, dedupeByName } from './ui'
 import { calculateEmployeePayroll } from './calculatePayroll'
 import {
   payrollSettings, listEmployees, listDepartments, listLocations, listEntries, loadRecordsForMonth,
@@ -16,6 +16,8 @@ import {
 } from './payrollApi'
 import { exportPayrollToCSV, exportPayrollToExcel, exportPayrollToPDF } from './payrollExport'
 import EmployeePayrollModal from './EmployeePayrollModal'
+
+const norm = (s) => String(s || '').trim().toLowerCase()
 
 export default function PayrollMonthly() {
   const { form, formId } = usePayroll()
@@ -74,18 +76,28 @@ export default function PayrollMonthly() {
   const empById = useMemo(() => Object.fromEntries(employees.map(e => [e.id, e])), [employees])
   const deptName = useMemo(() => Object.fromEntries(departments.map(d => [d.id, d.name])), [departments])
   const locName = useMemo(() => Object.fromEntries(locations.map(l => [l.id, l.name])), [locations])
+  // The location <select> lists each name once; match employees by location
+  // NAME so a same-named duplicate location still counts (departments/
+  // locations have no unique-name constraint - see ui.jsx's dedupeByName).
+  const locOptions = useMemo(() => dedupeByName(locations), [locations])
+  const selLocName = location ? norm(locName[location]) : ''
+  const atLoc = useCallback(
+    (emp) => !selLocName || locationIds(emp).some(id => norm(locName[id]) === selLocName),
+    [selLocName, locName],
+  )
+
   // Run Payroll always covers every active employee; the location filter is a
   // view over the produced records.
   const records = useMemo(
-    () => location ? allRecords.filter(r => locationIds(empById[r.employee_id]).includes(location)) : allRecords,
-    [allRecords, location, empById]
+    () => selLocName ? allRecords.filter(r => atLoc(empById[r.employee_id])) : allRecords,
+    [allRecords, selLocName, atLoc, empById]
   )
   const hasRun = allRecords.length > 0
 
   // Live projection for the KPI cards - covers the selected location and
   // stays useful before Run Payroll has produced any records.
   const kpi = useMemo(() => {
-    const active = employees.filter(e => e.employment_status !== 'terminated' && (!location || locationIds(e).includes(location)))
+    const active = employees.filter(e => e.employment_status !== 'terminated' && atLoc(e))
     const bd = active.map(emp => calculateEmployeePayroll({
       employee: emp,
       entries: entries.filter(en => en.employee_id === emp.id && en.status !== 'rejected'),
@@ -102,7 +114,7 @@ export default function PayrollMonthly() {
       paidAmount: paidRecs.reduce((s, r) => s + Number(r.final_amount || 0), 0),
       paidCount: paidRecs.length,
     }
-  }, [employees, entries, records, month, settings, location])
+  }, [employees, entries, records, month, settings, atLoc])
 
   const headcount = hasRun ? records.length : kpi.staff
   const progressPct = kpi.net > 0 ? Math.round((kpi.paidAmount / kpi.net) * 100) : 0
@@ -116,7 +128,7 @@ export default function PayrollMonthly() {
       showToast(`Payroll started for ${recs.length} employees. Review each one below.`, 'success')
       // Sort the review queue so the location filter (if any) leads.
       const ordered = recs
-        .filter(r => !location || locationIds(empById[r.employee_id]).includes(location))
+        .filter(r => atLoc(empById[r.employee_id]))
         .map(r => r.employee_id)
       if (ordered.length) { setReviewQueue(ordered); setReviewIdx(0) }
     } catch (err) {
@@ -319,7 +331,7 @@ export default function PayrollMonthly() {
       {isMobile ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginBottom: '1.2rem' }}>
           <MonthPicker value={month} onChange={setMonth} style={{ width: '100%' }} />
-          <LocationFilter locations={locations} value={location} onChange={setLocation} style={{ width: '100%' }} />
+          <LocationFilter locations={locOptions} value={location} onChange={setLocation} style={{ width: '100%' }} />
           {!hasRun ? (
             <>
               <button onClick={handleRun} disabled={running} style={{ width: '100%', minHeight: 48, fontSize: '0.95rem' }}>{running ? 'Starting…' : 'Start Payroll'}</button>
@@ -339,7 +351,7 @@ export default function PayrollMonthly() {
         <div className="pay-toolbar">
           <div className="pay-toolbar-left">
             <MonthPicker value={month} onChange={setMonth} />
-            <LocationFilter locations={locations} value={location} onChange={setLocation} />
+            <LocationFilter locations={locOptions} value={location} onChange={setLocation} />
           </div>
           <div className="pay-toolbar-right">
             {!hasRun ? (

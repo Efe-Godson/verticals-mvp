@@ -9,8 +9,10 @@
 // to create a new one on the spot.
 import { useMemo, useState } from 'react'
 import { useToast } from '../Toast'
-import { PayrollModal, Field, TextInput, Select, roleList, deptIds, locationIds } from './ui'
+import { PayrollModal, Field, TextInput, Select, roleList, deptIds, locationIds, dedupeByName } from './ui'
 import { createEmployee, updateEmployee, createDepartment, createLocation } from './payrollApi'
+
+const norm = (s) => String(s || '').trim().toLowerCase()
 
 const STATUSES = ['active', 'on_leave', 'suspended', 'inactive', 'terminated']
 const STATUS_LABEL = { active: 'Active', on_leave: 'On Leave', suspended: 'Suspended', inactive: 'Inactive', terminated: 'Terminated' }
@@ -68,10 +70,13 @@ function TagInput({ values, onChange, placeholder, suggestions = [], listId }) {
 }
 
 // Pick several from a known list (departments / locations). Chips for the
-// chosen ones + a dropdown of the rest.
+// chosen ones + a dropdown of the rest. `options` is the full list (so any
+// chosen id resolves to a name); the dropdown is deduped by name and drops
+// any name already chosen - the lists have historical same-name duplicates.
 function MultiSelectChips({ values, onChange, options, placeholder }) {
   const byId = Object.fromEntries(options.map(o => [o.id, o.name]))
-  const unchosen = options.filter(o => !values.includes(o.id))
+  const chosenNames = new Set(values.map(id => norm(byId[id])))
+  const unchosen = dedupeByName(options).filter(o => !chosenNames.has(norm(o.name)))
   return (
     <div>
       {values.length > 0 && (

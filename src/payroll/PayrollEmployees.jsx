@@ -5,11 +5,13 @@ import { useNavigate } from 'react-router-dom'
 import { usePayroll } from './PayrollShell'
 import { LoadingState } from '../LoadingState'
 import { ErrorState } from '../ErrorState'
-import { money, EmployeeStatusBadge, LocationFilter, roleList, deptIds, locationIds, namesFor } from './ui'
+import { money, EmployeeStatusBadge, LocationFilter, roleList, deptIds, locationIds, namesFor, dedupeByName } from './ui'
 import { payrollSettings, listEmployees, listDepartments, listLocations } from './payrollApi'
 import EmployeeFormModal from './EmployeeFormModal'
 import ImportModal from './ImportModal'
 import PayrollSettingsModal from './PayrollSettingsModal'
+
+const norm = (s) => String(s || '').trim().toLowerCase()
 
 export default function PayrollEmployees() {
   const { form, formId, reloadForm } = usePayroll()
@@ -50,20 +52,28 @@ export default function PayrollEmployees() {
 
   const deptName = useMemo(() => Object.fromEntries(departments.map(d => [d.id, d.name])), [departments])
   const locName = useMemo(() => Object.fromEntries(locations.map(l => [l.id, l.name])), [locations])
+  // Dropdowns show each name once; filtering then matches by name so an
+  // employee tagged with any same-named duplicate still shows up.
+  const deptOptions = useMemo(() => dedupeByName(departments), [departments])
+  const locOptions = useMemo(() => dedupeByName(locations), [locations])
   // Every role string already in use, for the Add/Edit form's autocomplete.
   const roleSuggestions = useMemo(
     () => Array.from(new Set(employees.flatMap(roleList))).sort((a, b) => a.localeCompare(b)),
     [employees],
   )
 
-  const filtered = useMemo(() => employees.filter(e => {
-    const roles = roleList(e).join(' ').toLowerCase()
-    if (search && !e.full_name.toLowerCase().includes(search.toLowerCase()) && !roles.includes(search.toLowerCase())) return false
-    if (deptFilter && !deptIds(e).includes(deptFilter)) return false
-    if (locFilter && !locationIds(e).includes(locFilter)) return false
-    if (statusFilter && e.employment_status !== statusFilter) return false
-    return true
-  }), [employees, search, deptFilter, locFilter, statusFilter])
+  const filtered = useMemo(() => {
+    const deptFilterName = deptFilter ? norm(deptName[deptFilter]) : ''
+    const locFilterName = locFilter ? norm(locName[locFilter]) : ''
+    return employees.filter(e => {
+      const roles = roleList(e).join(' ').toLowerCase()
+      if (search && !e.full_name.toLowerCase().includes(search.toLowerCase()) && !roles.includes(search.toLowerCase())) return false
+      if (deptFilterName && !deptIds(e).some(id => norm(deptName[id]) === deptFilterName)) return false
+      if (locFilterName && !locationIds(e).some(id => norm(locName[id]) === locFilterName)) return false
+      if (statusFilter && e.employment_status !== statusFilter) return false
+      return true
+    })
+  }, [employees, search, deptFilter, locFilter, statusFilter, deptName, locName])
 
   if (loading) return <LoadingState />
   if (error) return <ErrorState message={error} onRetry={load} />
@@ -75,9 +85,9 @@ export default function PayrollEmployees() {
           <input placeholder="Search employees…" value={search} onChange={(e) => setSearch(e.target.value)} style={{ minWidth: '170px' }} />
           <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)}>
             <option value="">All Departments</option>
-            {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+            {deptOptions.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
           </select>
-          <LocationFilter locations={locations} value={locFilter} onChange={setLocFilter} />
+          <LocationFilter locations={locOptions} value={locFilter} onChange={setLocFilter} />
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
             <option value="">All Statuses</option>
             {['active', 'on_leave', 'suspended', 'inactive', 'terminated'].map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
