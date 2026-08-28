@@ -112,7 +112,6 @@ export default function EmployeePayrollModal({
             <>
               <button className="secondary" onClick={() => setAddOpen(true)} disabled={busy}>+ Add Entry</button>
               {!reviewPosition && record.status !== 'on_hold' && <button className="secondary" onClick={() => setHoldOpen(true)} disabled={busy}>Hold</button>}
-              {record.status !== 'approved' && <button className="secondary" onClick={() => move('approved')} disabled={busy}>Approve</button>}
               <button onClick={() => setPayOpen(true)} disabled={busy}>Pay</button>
             </>
           )}
