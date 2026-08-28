@@ -34,8 +34,7 @@ export default function PayrollMonthly() {
   const [error, setError] = useState('')
   const [running, setRunning] = useState(false)
   const [selected, setSelected] = useState([])
-  const [openEmpId, setOpenEmpId] = useState(null)
-  const [confirmApproveAll, setConfirmApproveAll] = useState(false)
+  const [confirmPayAll, setConfirmPayAll] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
   // Guided review after Run Payroll: walk each employee's breakdown one modal
   // at a time and approve / pay / hold before moving on.
@@ -107,14 +106,14 @@ export default function PayrollMonthly() {
       const recs = await runPayroll(formId, month, form)
       setRecords(recs)
       setSelected([])
-      showToast(`Payroll run for ${recs.length} employees. Review each one below.`, 'success')
+      showToast(`Payroll started for ${recs.length} employees. Review each one below.`, 'success')
       // Sort the review queue so the location filter (if any) leads.
       const ordered = recs
         .filter(r => !location || empById[r.employee_id]?.primary_location_id === location)
         .map(r => r.employee_id)
       if (ordered.length) { setReviewQueue(ordered); setReviewIdx(0) }
     } catch (err) {
-      showToast('Run Payroll failed: ' + err.message, 'error')
+      showToast('Start Payroll failed: ' + err.message, 'error')
     } finally {
       setRunning(false)
     }
@@ -127,6 +126,16 @@ export default function PayrollMonthly() {
     if (!q.length) { showToast('Nothing left to review.', 'info'); return }
     setReviewQueue(q)
     setReviewIdx(0)
+  }
+
+  // Clicking a row / card opens the same navigable modal, positioned at
+  // that employee, so you can page back and forth through the whole table.
+  function openAt(empId) {
+    const q = records.map(r => r.employee_id)
+    const i = q.indexOf(empId)
+    if (i < 0) return
+    setReviewQueue(q)
+    setReviewIdx(i)
   }
 
   function advanceReview() {
@@ -166,27 +175,25 @@ export default function PayrollMonthly() {
     }
   }
 
-  const approvable = records.filter(r => r.status === 'draft' || r.status === 'pending_approval')
+  const payable = records.filter(r => r.status !== 'paid' && r.status !== 'cancelled' && r.status !== 'on_hold')
   const excluded = records.filter(r => r.status === 'on_hold')
-  const approveAllTotal = approvable.reduce((s, r) => s + Number(r.final_amount || 0), 0)
+  const payAllTotal = payable.reduce((s, r) => s + Number(r.final_amount || 0), 0)
 
-  async function doApproveAll() {
-    setConfirmApproveAll(false)
+  async function doPayAll() {
+    setConfirmPayAll(false)
     try {
-      await bulkSetRecordStatus(formId, approvable, 'approved')
-      await createPaymentBatch(formId, month, approvable)
-      showToast(`Approved ${approvable.length} employees; payment batch created.`, 'success')
+      await bulkSetRecordStatus(formId, payable, 'paid')
+      await createPaymentBatch(formId, month, payable)
+      showToast(`${payable.length} employees marked paid; payment batch created.`, 'success')
       load()
     } catch (err) {
-      showToast('Approve All failed: ' + err.message, 'error')
+      showToast('Mark All Paid failed: ' + err.message, 'error')
     }
   }
 
   if (loading) return <LoadingState />
   if (error) return <ErrorState message={error} onRetry={load} />
 
-  const openEmp = openEmpId ? empById[openEmpId] : null
-  const openRecord = openEmpId ? records.find(r => r.employee_id === openEmpId) : null
   const totalFinal = records.reduce((s, r) => s + Number(r.final_amount || 0), 0)
 
   // Guided-review current employee
@@ -223,8 +230,8 @@ export default function PayrollMonthly() {
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
             {hasDraftRun && <button className="secondary" onClick={() => setExportOpen(true)}>Export</button>}
             {hasDraftRun && unreviewed.length > 0 && <button className="secondary" onClick={() => startReview(['draft', 'pending_approval', 'on_hold'])}>Review payroll ({unreviewed.length})</button>}
-            {hasDraftRun && approvable.length > 0 && <button className="secondary" onClick={() => setConfirmApproveAll(true)}>Approve All</button>}
-            <button onClick={handleRun} disabled={running}>{running ? 'Running…' : hasDraftRun ? 'Re-run Payroll' : 'Run Payroll'}</button>
+            {hasDraftRun && payable.length > 0 && <button className="secondary" onClick={() => setConfirmPayAll(true)}>Mark All Paid</button>}
+            <button onClick={handleRun} disabled={running}>{running ? 'Starting…' : 'Start Payroll'}</button>
           </div>
         )}
       </div>
@@ -232,13 +239,13 @@ export default function PayrollMonthly() {
       {isMobile && (
         <div style={{ marginBottom: '1rem' }}>
           <button onClick={handleRun} disabled={running} style={{ width: '100%', minHeight: 48, fontSize: '0.95rem' }}>
-            {running ? 'Running…' : hasDraftRun ? 'Re-run Payroll' : 'Run Payroll'}
+            {running ? 'Starting…' : 'Start Payroll'}
           </button>
           {hasDraftRun && (
             <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
               {unreviewed.length > 0 && <button className="secondary" style={{ flex: 1, minWidth: 130 }} onClick={() => startReview(['draft', 'pending_approval', 'on_hold'])}>Review ({unreviewed.length})</button>}
               <button className="secondary" style={{ flex: 1 }} onClick={() => setExportOpen(true)}>Export</button>
-              {approvable.length > 0 && <button className="secondary" style={{ flex: 1 }} onClick={() => setConfirmApproveAll(true)}>Approve All</button>}
+              {payable.length > 0 && <button className="secondary" style={{ flex: 1 }} onClick={() => setConfirmPayAll(true)}>Mark All Paid</button>}
             </div>
           )}
         </div>
@@ -280,16 +287,15 @@ export default function PayrollMonthly() {
       {!hasDraftRun ? (
         <div className="card" style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-muted)' }}>
           Payroll has not been run for {monthLabel(month)}.<br />
-          Add entries first, then press <strong>Run Payroll</strong> to generate each employee's record.
+          Add entries first, then press <strong>Start Payroll</strong> to generate each employee's record.
         </div>
       ) : (
         <>
           {selected.length > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', padding: '0.6rem 1rem', background: 'var(--color-warning-soft)', borderRadius: 'var(--radius)', marginBottom: '0.8rem' }}>
               <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>{selected.length} selected</span>
-              <button className="secondary" onClick={() => bulk('approved')}>Approve Selected</button>
-              <button className="secondary" onClick={() => bulk('on_hold')}>Hold Selected</button>
               <button className="secondary" onClick={() => bulk('paid')}>Mark Paid</button>
+              <button className="secondary" onClick={() => bulk('on_hold')}>Hold Selected</button>
               <button className="secondary" onClick={() => setSelected([])}>Clear</button>
             </div>
           )}
@@ -303,7 +309,7 @@ export default function PayrollMonthly() {
                   name={empById[r.employee_id]?.full_name || '—'}
                   selected={selected.includes(r.id)}
                   onToggle={() => toggle(r.id)}
-                  onOpen={() => setOpenEmpId(r.employee_id)}
+                  onOpen={() => openAt(r.employee_id)}
                 />
               ))}
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0.2rem', fontWeight: 700 }}>
@@ -329,7 +335,7 @@ export default function PayrollMonthly() {
                     const emp = empById[r.employee_id]
                     const adj = Number(r.total_additions || 0) - Number(r.total_deductions || 0)
                     return (
-                      <tr key={r.id} style={{ cursor: 'pointer' }} onClick={() => setOpenEmpId(r.employee_id)}>
+                      <tr key={r.id} style={{ cursor: 'pointer', background: r.status === 'paid' ? 'var(--color-primary-soft)' : undefined }} onClick={() => openAt(r.employee_id)}>
                         <td style={{ padding: '0.55rem 0.5rem', borderBottom: '1px solid var(--color-border)' }} onClick={(e) => e.stopPropagation()}>
                           <input type="checkbox" checked={selected.includes(r.id)} onChange={() => toggle(r.id)} />
                         </td>
@@ -362,22 +368,8 @@ export default function PayrollMonthly() {
         </>
       )}
 
-      {/* one-off open from a row / card */}
-      {reviewIdx == null && openEmp && openRecord && (
-        <EmployeePayrollModal
-          formId={formId}
-          form={form}
-          month={month}
-          employee={{ ...openEmp, department_name: deptName[openEmp.department_id], location_name: locName[openEmp.primary_location_id] }}
-          record={openRecord}
-          entries={entries.filter(e => e.employee_id === openEmpId)}
-          settings={settings}
-          onClose={() => setOpenEmpId(null)}
-          onChanged={() => load({ quiet: true })}
-        />
-      )}
-
-      {/* guided review after Run Payroll */}
+      {/* the navigable per-employee modal - opened by Start Payroll, the
+          Review button, or clicking any row / card */}
       {reviewIdx != null && reviewEmp && reviewRecord && (
         <EmployeePayrollModal
           key={reviewEmpId}
@@ -396,13 +388,13 @@ export default function PayrollMonthly() {
         />
       )}
 
-      {confirmApproveAll && (
+      {confirmPayAll && (
         <ConfirmDialog
-          title="Approve Payroll?"
-          message={`You are approving ${approvable.length} employees for a total of ${money(approveAllTotal)}.${excluded.length ? ` ${excluded.length} on-hold employee${excluded.length > 1 ? 's are' : ' is'} excluded.` : ''}`}
-          confirmLabel="Approve Payroll"
-          onConfirm={doApproveAll}
-          onCancel={() => setConfirmApproveAll(false)}
+          title="Mark all as paid?"
+          message={`Marking ${payable.length} employees paid for a total of ${money(payAllTotal)}.${excluded.length ? ` ${excluded.length} on-hold employee${excluded.length > 1 ? 's are' : ' is'} excluded.` : ''}`}
+          confirmLabel="Mark Paid"
+          onConfirm={doPayAll}
+          onCancel={() => setConfirmPayAll(false)}
         />
       )}
 
@@ -438,7 +430,7 @@ function Kpi({ cls, label, value, short }) {
 function EmployeePayCard({ record: r, name, selected, onToggle, onOpen }) {
   const adj = Number(r.total_additions || 0) - Number(r.total_deductions || 0)
   return (
-    <div className="card" style={{ padding: '0.9rem 1rem' }}>
+    <div className="card" style={{ padding: '0.9rem 1rem', background: r.status === 'paid' ? 'var(--color-primary-soft)' : undefined }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem' }}>
         <input type="checkbox" checked={selected} onChange={onToggle} onClick={(e) => e.stopPropagation()} />
         <span style={{ fontWeight: 700, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
