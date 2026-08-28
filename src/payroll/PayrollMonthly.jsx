@@ -312,7 +312,6 @@ export default function PayrollMonthly() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginBottom: '1rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
             <MonthPicker value={month} onChange={setMonth} />
-            <StatusPill status={payrollStatus} />
           </div>
           <LocationFilter locations={locations} value={location} onChange={setLocation} style={{ width: '100%' }} />
           {payrollStatus === 'not_started' && (
@@ -342,7 +341,6 @@ export default function PayrollMonthly() {
           <div className="pay-toolbar-left">
             <MonthPicker value={month} onChange={setMonth} />
             <LocationFilter locations={locations} value={location} onChange={setLocation} />
-            <StatusPill status={payrollStatus} />
           </div>
           <div className="pay-toolbar-right">
             {payrollStatus === 'not_started' && (
@@ -548,24 +546,6 @@ function Kpi({ cls, label, value, short, amountColor }) {
       <div className="l">{label}</div>
       <div className="v" style={{ color: amountColor }}>{short ? moneyShort(value) : money(value)}</div>
     </div>
-  )
-}
-
-const STATUS_PILL = {
-  not_started: { dot: '●', text: 'Not started', color: 'var(--color-muted)', bg: 'var(--color-bg)', border: 'var(--color-border)' },
-  in_progress: { dot: '●', text: 'In progress', color: 'var(--status-warning)', bg: 'var(--color-warning-soft)', border: 'var(--color-warning-soft)' },
-  completed: { dot: '✓', text: 'Completed', color: 'var(--status-good)', bg: 'var(--color-primary-soft)', border: 'var(--color-primary-soft)' },
-}
-function StatusPill({ status }) {
-  const s = STATUS_PILL[status] || STATUS_PILL.not_started
-  return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: '0.35rem', whiteSpace: 'nowrap',
-      fontSize: '0.78rem', fontWeight: 600, padding: '0.32rem 0.65rem', borderRadius: 999,
-      background: s.bg, color: s.color, border: `1px solid ${s.border}`,
-    }}>
-      <span aria-hidden style={{ fontSize: '0.7rem' }}>{s.dot}</span>{s.text}
-    </span>
   )
 }
 
