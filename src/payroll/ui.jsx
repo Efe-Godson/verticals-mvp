@@ -9,6 +9,17 @@ export function money(value, decimals = 0) {
   return formatNaira(value, decimals)
 }
 
+// Abbreviated currency for tight spaces (mobile KPI cards): ₦3.27M, ₦42.5K.
+// Pair with title={money(value)} so the exact figure is a tap/hover away.
+export function moneyShort(value) {
+  const n = Number(value) || 0
+  const abs = Math.abs(n)
+  const sign = n < 0 ? '-' : ''
+  if (abs >= 1_000_000) return `${sign}₦${(abs / 1_000_000).toFixed(abs >= 10_000_000 ? 1 : 2).replace(/\.?0+$/, '')}M`
+  if (abs >= 10_000) return `${sign}₦${(abs / 1_000).toFixed(abs >= 100_000 ? 0 : 1).replace(/\.?0+$/, '')}K`
+  return `${sign}₦${abs.toLocaleString()}`
+}
+
 export function currentMonth() {
   const now = new Date()
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
