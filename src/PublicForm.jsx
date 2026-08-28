@@ -168,21 +168,8 @@ function AiFillModal({ cartField, fields, rules, showRulesButton, onSaveRules, o
 
   return (
     <>
-    <div
-      onClick={onClose}
-      style={{
-        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 400, padding: '1rem'
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="card"
-        style={{ background: 'var(--color-surface)', padding: '1.5rem', width: '520px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto' }}
-      >
-        <h3 style={{ margin: '0 0 0.3rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <SparkleIcon size={18} /> Fill from Text
-        </h3>
+    <Modal size="md" onClose={onClose} title={<span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><SparkleIcon size={18} /> Fill from Text</span>}>
+      <div>
 
         {!isReviewing ? (
           <>
@@ -297,7 +284,7 @@ function AiFillModal({ cartField, fields, rules, showRulesButton, onSaveRules, o
           </>
         )}
       </div>
-    </div>
+    </Modal>
 
     {showRulesEditor && (
       <AiRulesModal

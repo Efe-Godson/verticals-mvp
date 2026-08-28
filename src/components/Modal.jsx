@@ -24,7 +24,7 @@ export const modalCardStyle = {
 
 export default function Modal({
   open = true, onClose, title, children, footer,
-  size = 'md', sheetOnMobile = true, closeLabel = 'Close',
+  size = 'md', sheetOnMobile = true,
   bodyStyle, cardStyle, hideHeader = false, bare = false,
 }) {
   const isPhone = useIsMobile(600)
@@ -44,6 +44,7 @@ export default function Modal({
 
   const px = SIZES[size]
   const card = {
+    position: 'relative',
     background: bare ? 'transparent' : 'var(--color-surface)',
     border: bare ? 'none' : '1px solid var(--color-border)',
     display: 'flex', flexDirection: 'column', overflow: 'hidden',
@@ -70,15 +71,30 @@ export default function Modal({
   return createPortal(
     <div onClick={onClose} style={overlay}>
       <div ref={sheetRef} onClick={(e) => e.stopPropagation()} style={card} role="dialog" aria-modal="true" aria-label={typeof title === 'string' ? title : undefined}>
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            style={{
+              position: 'absolute', top: 8, right: 8, zIndex: 3,
+              width: 30, height: 30, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              borderRadius: '999px', fontSize: '1rem', lineHeight: 1,
+              background: 'var(--color-surface)', color: 'var(--color-muted)',
+              border: '1px solid var(--color-border)', cursor: 'pointer', flexShrink: 0,
+            }}
+          >
+            ✕
+          </button>
+        )}
         {asSheet && (
           <div {...handleProps} style={{ padding: '0.5rem 0 0.25rem', display: 'flex', justifyContent: 'center', flexShrink: 0, cursor: 'grab', touchAction: 'none' }}>
             <div style={{ width: 36, height: 4, borderRadius: 999, background: 'var(--color-border)' }} />
           </div>
         )}
         {!hideHeader && (title || onClose) && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', padding: asSheet ? '0.4rem 1.1rem 0.8rem' : '1.1rem 1.3rem', borderBottom: '1px solid var(--color-border)', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: asSheet ? '0.4rem 3rem 0.8rem 1.1rem' : '1.1rem 3rem 1.1rem 1.3rem', borderBottom: '1px solid var(--color-border)', flexShrink: 0 }}>
             <h3 style={{ margin: 0, fontSize: '1.05rem', overflow: 'hidden', textOverflow: 'ellipsis' }}>{title}</h3>
-            {onClose && <button className="secondary" onClick={onClose} style={{ padding: '0.3rem 0.7rem', fontSize: '0.85rem', flexShrink: 0 }}>{closeLabel}</button>}
           </div>
         )}
         <div style={{ padding: bare ? 0 : '1.2rem 1.3rem', overflowY: 'auto', flex: 1, ...bodyStyle }}>
