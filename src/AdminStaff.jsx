@@ -9,6 +9,8 @@ import { useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { useToast } from './Toast'
 import PosSidePanel from './PosSidePanel'
+import Modal from './components/Modal'
+import ConfirmDialog from './ConfirmDialog'
 import { LoadingState } from './LoadingState'
 import { ErrorState } from './ErrorState'
 
@@ -262,19 +264,19 @@ function AdminStaff() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
           {staff.map(s => (
-            <div key={s.id} className="card" style={{ padding: '0.9rem 1.1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontWeight: 600 }}>{s.email.split('@')[0]}</div>
-                <div style={{ fontSize: '0.78rem', color: 'var(--color-muted)' }}>
+            <div key={s.id} className="card" style={{ padding: '0.9rem 1.1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.7rem' }}>
+              <div style={{ minWidth: 0, flex: '1 1 200px' }}>
+                <div style={{ fontWeight: 600, overflowWrap: 'anywhere' }}>{s.email.split('@')[0]}</div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--color-muted)', overflowWrap: 'anywhere' }}>
                   Login: {s.email} · Added {new Date(s.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                 </div>
                 <div style={{ marginTop: '0.3rem' }}>
                   <StaffStatusBadge lastSeenAt={s.last_seen_at} />
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                 <button className="secondary" onClick={() => { setResetTarget(s); setResetPassword('') }}>Reset Password</button>
-                <button className="secondary" style={{ color: '#c0392b' }} onClick={() => setPendingDeleteId(s.id)}>Remove</button>
+                <button className="secondary" style={{ color: 'var(--status-critical)' }} onClick={() => setPendingDeleteId(s.id)}>Remove</button>
               </div>
             </div>
           ))}
@@ -282,50 +284,37 @@ function AdminStaff() {
       )}
 
       {resetTarget && (
-        <div
-          onClick={() => setResetTarget(null)}
-          style={{
-            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: '1rem'
-          }}
+        <Modal
+          size="sm"
+          onClose={() => setResetTarget(null)}
+          title={`Reset Password for ${resetTarget.email.split('@')[0]}`}
         >
-          <div onClick={(e) => e.stopPropagation()} className="card" style={{ background: 'var(--color-surface)', padding: '1.5rem', width: '360px', maxWidth: '100%' }}>
-            <h3 style={{ margin: '0 0 1rem' }}>Reset Password for {resetTarget.email.split('@')[0]}</h3>
-            <form onSubmit={submitResetPassword}>
-              <div style={{ marginBottom: '1rem' }}>
-                <PasswordInput
-                  autoFocus value={resetPassword}
-                  onChange={(e) => setResetPassword(e.target.value)}
-                  placeholder="New password"
-                  style={{ width: '100%', padding: '0.5rem' }}
-                />
-              </div>
-              <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                <button type="button" className="secondary" onClick={() => setResetTarget(null)}>Cancel</button>
-                <button type="submit">Save</button>
-              </div>
-            </form>
-          </div>
-        </div>
+          <form onSubmit={submitResetPassword}>
+            <div style={{ marginBottom: '1rem' }}>
+              <PasswordInput
+                autoFocus value={resetPassword}
+                onChange={(e) => setResetPassword(e.target.value)}
+                placeholder="New password"
+                style={{ width: '100%', padding: '0.5rem' }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+              <button type="button" className="secondary" onClick={() => setResetTarget(null)}>Cancel</button>
+              <button type="submit">Save</button>
+            </div>
+          </form>
+        </Modal>
       )}
 
       {pendingDeleteId && (
-        <div
-          onClick={() => setPendingDeleteId(null)}
-          style={{
-            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: '1rem'
-          }}
-        >
-          <div onClick={(e) => e.stopPropagation()} className="card" style={{ background: 'var(--color-surface)', padding: '1.5rem', width: '360px', maxWidth: '100%' }}>
-            <h3 style={{ margin: '0 0 0.6rem' }}>Remove this staff login?</h3>
-            <p style={{ color: 'var(--color-muted)', fontSize: '0.9rem' }}>They'll immediately lose access and won't be able to sign in again.</p>
-            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
-              <button className="secondary" onClick={() => setPendingDeleteId(null)}>Cancel</button>
-              <button style={{ background: '#c0392b' }} onClick={confirmDelete}>Remove</button>
-            </div>
-          </div>
-        </div>
+        <ConfirmDialog
+          title="Remove this staff login?"
+          message="They'll immediately lose access and won't be able to sign in again."
+          confirmLabel="Remove"
+          danger
+          onConfirm={confirmDelete}
+          onCancel={() => setPendingDeleteId(null)}
+        />
       )}
     </div>
   )

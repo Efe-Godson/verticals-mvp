@@ -1,6 +1,7 @@
-// Small shared bits for the Payroll module: the modal shell (the app has no
-// shared Modal component - this is the same recipe as ConfirmDialog.jsx),
-// money/month helpers, and status-badge mapping.
+// Small shared bits for the Payroll module: the modal shell (now an alias
+// over the app-wide src/components/Modal.jsx), money/month helpers, and
+// status-badge mapping.
+import Modal from '../components/Modal'
 import { formatNaira } from '../report/helpers/analysisUtils'
 import { DEDUCTION_TYPES, ADDITION_TYPES, ENTRY_TYPE_LABELS } from './calculatePayroll'
 
@@ -50,34 +51,19 @@ export function MonthPicker({ value, onChange, style }) {
   )
 }
 
-// Centered overlay + card. `wide` bumps the max width; on narrow screens the
-// card fills the viewport (doc section 52 - don't squeeze the desktop modal).
+// Now a thin alias over the shared <Modal> (src/components/Modal.jsx) so
+// payroll modals get the same bottom-sheet-on-phone behaviour as the rest
+// of the app. `wide` -> size="lg", otherwise size="md".
 export function PayrollModal({ title, onClose, children, footer, wide = false, maxWidth }) {
   return (
-    <div
-      onClick={onClose}
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: '1rem' }}
+    <Modal
+      size={maxWidth ? 'lg' : (wide ? 'lg' : 'md')}
+      onClose={onClose}
+      title={title}
+      footer={footer}
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: 'var(--color-surface)', borderRadius: 'var(--radius)',
-          width: maxWidth || (wide ? '640px' : '480px'), maxWidth: '100%',
-          maxHeight: '88vh', display: 'flex', flexDirection: 'column',
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', padding: '1.1rem 1.3rem', borderBottom: '1px solid var(--color-border)' }}>
-          <h3 style={{ margin: 0, fontSize: '1.05rem' }}>{title}</h3>
-          <button className="secondary" onClick={onClose} style={{ padding: '0.3rem 0.6rem', fontSize: '0.85rem' }}>Close</button>
-        </div>
-        <div style={{ padding: '1.3rem', overflowY: 'auto' }}>{children}</div>
-        {footer && (
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', padding: '1rem 1.3rem', borderTop: '1px solid var(--color-border)', flexWrap: 'wrap' }}>
-            {footer}
-          </div>
-        )}
-      </div>
-    </div>
+      {children}
+    </Modal>
   )
 }
 

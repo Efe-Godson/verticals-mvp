@@ -3,6 +3,7 @@
 // Aggregated Data (the numbers behind the chart, with % / rank / vs-mean)
 // and Source Records (the raw rows that produced them).
 import { useState } from 'react'
+import Modal from '../../components/Modal'
 import { formatCell } from '../../records/recordsUiKit'
 import { valueFormatter, formatPercent, formatNumber } from './format'
 
@@ -18,18 +19,14 @@ export default function ViewDataModal({ visual, result, form, submissions, onClo
   const fields = (form?.fields || []).filter(f => f.type !== 'section' && f.type !== 'fileupload').slice(0, 14)
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: '1rem' }}>
-      <div onClick={e => e.stopPropagation()} className="card" style={{ width: '820px', maxWidth: '100%', maxHeight: '85vh', display: 'flex', flexDirection: 'column', padding: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.9rem 1.1rem', borderBottom: '1px solid var(--color-border)' }}>
-          <strong>{visual.title} — Data</strong>
-          <button className="secondary" onClick={onClose}>Close</button>
-        </div>
-        <div style={{ display: 'flex', gap: '0.4rem', padding: '0.6rem 1.1rem 0' }}>
+    <Modal size="xl" onClose={onClose} title={`${visual.title} — Data`} bodyStyle={{ padding: '0.8rem 1.1rem 1.1rem' }}>
+      <div>
+        <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.6rem', flexWrap: 'wrap' }}>
           <button className={tab === 'agg' ? '' : 'secondary'} style={{ fontSize: '0.8rem' }} onClick={() => setTab('agg')}>Aggregated Data</button>
           <button className={tab === 'src' ? '' : 'secondary'} style={{ fontSize: '0.8rem' }} onClick={() => setTab('src')}>Source Records ({sourceRows.length})</button>
         </div>
 
-        <div style={{ overflow: 'auto', margin: '0.8rem 1.1rem 1.1rem', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)' }}>
+        <div className="table-wrap" style={{ marginTop: 0 }}>
           {tab === 'agg' ? (
             result?.matrix?.colLabels?.length ? (
               <MatrixView matrix={result.matrix} fmt={result.matrix.percentMode ? (v) => formatPercent(v) : fmt} />
@@ -79,12 +76,12 @@ export default function ViewDataModal({ visual, result, form, submissions, onClo
           )}
         </div>
         {tab === 'agg' && result?.population && (
-          <div style={{ padding: '0 1.1rem 1rem', fontSize: '0.76rem', color: 'var(--color-muted)' }}>
+          <div style={{ padding: '0.6rem 0 0', fontSize: '0.76rem', color: 'var(--color-muted)' }}>
             Population: {formatNumber(result.population.count)} values · mean {fmt(result.population.mean)} · median {fmt(result.population.median)} · min {fmt(result.population.min)} · max {fmt(result.population.max)}
           </div>
         )}
       </div>
-    </div>
+    </Modal>
   )
 }
 

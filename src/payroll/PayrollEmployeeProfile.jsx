@@ -156,7 +156,7 @@ export default function PayrollEmployeeProfile() {
       )}
 
       {tab === 'entries' && (
-        <div className="table-scroll">
+        <div className="table-wrap table-bleed">
           <table className="records-table" style={{ borderCollapse: 'collapse', width: '100%' }}>
             <thead><tr>{['Date', 'Type', 'Reason', 'Amount', 'Payroll'].map(h => (
               <th key={h} style={{ textAlign: h === 'Amount' ? 'right' : 'left', padding: '0.5rem 0.7rem', borderBottom: '2px solid var(--color-border)', fontSize: '0.8rem', color: 'var(--color-muted)' }}>{h}</th>
@@ -180,7 +180,7 @@ export default function PayrollEmployeeProfile() {
       )}
 
       {(tab === 'history' || tab === 'payments') && (
-        <div className="table-scroll">
+        <div className="table-wrap table-bleed">
           <table className="records-table" style={{ borderCollapse: 'collapse', width: '100%' }}>
             <thead><tr>{['Month', 'Base', 'Additions', 'Deductions', 'Final', 'Status'].map(h => (
               <th key={h} style={{ textAlign: h === 'Month' || h === 'Status' ? 'left' : 'right', padding: '0.5rem 0.7rem', borderBottom: '2px solid var(--color-border)', fontSize: '0.8rem', color: 'var(--color-muted)' }}>{h}</th>

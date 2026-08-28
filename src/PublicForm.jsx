@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useParams } from 'react-router-dom'
+import useIsMobile from './hooks/useIsMobile'
+import Modal from './components/Modal'
 import PosSidePanel from './PosSidePanel'
 import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
@@ -85,36 +87,29 @@ function AiRulesModal({ rules, onSave, onClose }) {
   }
 
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 450, padding: '1rem'
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="card"
-        style={{ background: 'var(--color-surface)', padding: '1.5rem', width: '480px', maxWidth: '100%' }}
-      >
-        <h3 style={{ margin: '0 0 0.3rem' }}>AI Order-Fill Rules</h3>
-        <p style={{ fontSize: '0.85rem', color: 'var(--color-muted)', margin: '0 0 0.8rem' }}>
-          Extra guidance for how "Fill from Text" should read a pasted order - one rule per line works well. These are
-          suggestions it weighs, not guarantees - it still only ever picks from your actual products/field options.
-        </p>
-        <textarea
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          placeholder={'e.g.\nIf the message says "urgent" or "ASAP", set Delivery Type to Express.\nDefault Payment Method to Cash unless another method is mentioned.'}
-          rows={6}
-          style={{ width: '100%', padding: '0.6rem', fontSize: '0.9rem' }}
-        />
-        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '0.8rem' }}>
+    <Modal
+      size="md"
+      onClose={onClose}
+      title="AI Order-Fill Rules"
+      footer={
+        <>
           <button type="button" className="secondary" onClick={onClose}>Cancel</button>
           <button type="button" disabled={saving} onClick={handleSave}>{saving ? 'Saving...' : 'Save Rules'}</button>
-        </div>
-      </div>
-    </div>
+        </>
+      }
+    >
+      <p style={{ fontSize: '0.85rem', color: 'var(--color-muted)', margin: '0 0 0.8rem' }}>
+        Extra guidance for how "Fill from Text" should read a pasted order - one rule per line works well. These are
+        suggestions it weighs, not guarantees - it still only ever picks from your actual products/field options.
+      </p>
+      <textarea
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder={'e.g.\nIf the message says "urgent" or "ASAP", set Delivery Type to Express.\nDefault Payment Method to Cash unless another method is mentioned.'}
+        rows={6}
+        style={{ width: '100%', padding: '0.6rem', fontSize: '0.9rem' }}
+      />
+    </Modal>
   )
 }
 
@@ -344,11 +339,8 @@ function OrderConfirmationModal({ form, submission, onClose }) {
   }
 
   return (
-    <div style={{
-      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.45)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 500, padding: '1rem'
-    }}>
-      <div className="card" style={{ background: 'var(--color-surface)', padding: '1.75rem', width: '380px', maxWidth: '100%', textAlign: 'center' }}>
+    <Modal size="sm" onClose={onClose} hideHeader bodyStyle={{ textAlign: 'center' }}>
+      <div>
         <CheckIcon />
         <h3 style={{ margin: '0.8rem 0 0.2rem' }}>Order Placed</h3>
         <p style={{ color: 'var(--color-muted)', margin: '0 0 1.2rem' }}>
@@ -375,7 +367,7 @@ function OrderConfirmationModal({ form, submission, onClose }) {
           </button>
         </div>
       </div>
-    </div>
+    </Modal>
   )
 }
 
@@ -409,19 +401,12 @@ function PublicForm() {
   const [editLink, setEditLink] = useState(null)
   const [linkedOptions, setLinkedOptions] = useState({}) // { [fieldId]: [{ recordId, label }] }
   const [pageIndex, setPageIndex] = useState(0)
-  // Same isMobile-via-resize pattern as HorizontalBarChart.jsx: the product
-  // catalogue swaps from a 2-column card grid (fine on a tablet/desktop
-  // width) to a single-column list of slim rows on a phone, where a grid of
-  // padded cards burns too much vertical space per item to browse quickly.
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
+  // The product catalogue swaps from a 2-column card grid (fine on a
+  // tablet/desktop width) to a single-column list of slim rows on a phone,
+  // where a grid of padded cards burns too much vertical space per item.
+  const isMobile = useIsMobile(768)
   const [showAiFill, setShowAiFill] = useState(false)
   const [orderConfirmation, setOrderConfirmation] = useState(null) // snapshot of the just-placed order, or null
-
-  useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth < 768)
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
-  }, [])
 
   const pages = useMemo(() => buildPages(form?.fields || []), [form])
   const currentPage = pages[pageIndex] || pages[0]
@@ -1496,19 +1481,8 @@ function PublicForm() {
 
           {/* Held orders panel */}
           {heldPanelFieldId === field.id && (
-            <div
-              onClick={() => setHeldPanelFieldId(null)}
-              style={{
-                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: '1rem'
-              }}
-            >
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className="card"
-                style={{ background: 'var(--color-surface)', padding: '1.5rem', width: '420px', maxWidth: '100%', maxHeight: '80vh', overflowY: 'auto' }}
-              >
-                <h3 style={{ margin: '0 0 1rem' }}>Held Orders</h3>
+            <Modal size="sm" onClose={() => setHeldPanelFieldId(null)} title="Held Orders">
+              <div>
 
                 {(heldOrders[field.id] || []).length === 0 ? (
                   <p style={{ color: 'var(--color-muted)', fontSize: '0.9rem' }}>No held orders right now.</p>
@@ -1545,23 +1519,13 @@ function PublicForm() {
                   <button type="button" className="secondary" onClick={() => setHeldPanelFieldId(null)}>Close</button>
                 </div>
               </div>
-            </div>
+            </Modal>
           )}
 
           {/* Checkout modal */}
           {checkoutFieldId === field.id && (
-            <div
-              onClick={closeCheckout}
-              style={{
-                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: '1rem'
-              }}
-            >
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className="card"
-                style={{ background: 'var(--color-surface)', padding: '1.5rem', width: '420px', maxWidth: '100%', maxHeight: '92vh', overflowY: 'auto' }}
-              >
+            <Modal size="sm" onClose={closeCheckout} hideHeader>
+              <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '1rem' }}>
                   <h3 style={{ margin: 0 }}>Checkout</h3>
                   <span style={{ fontSize: '0.85rem', color: 'var(--color-muted)' }}>Order #{orderNumber}</span>
@@ -1720,7 +1684,7 @@ function PublicForm() {
                   </button>
                 </div>
               </div>
-            </div>
+            </Modal>
           )}
         </div>
       )
@@ -1812,7 +1776,7 @@ function PublicForm() {
       }
 
       return (
-        <div className="table-scroll" style={{ overflowX: 'auto' }}>
+        <div className="table-wrap">
           <table style={{ borderCollapse: 'collapse', width: '100%' }}>
             <thead>
               <tr>
@@ -1856,7 +1820,7 @@ function PublicForm() {
       }
 
       return (
-        <div className="table-scroll" style={{ overflowX: 'auto' }}>
+        <div className="table-wrap">
           <table style={{ borderCollapse: 'collapse', width: '100%' }}>
             <thead>
               <tr>

@@ -410,7 +410,7 @@ function FormSettings() {
             Preview
           </label>
           {isRetail ? (
-            <div style={{ background: '#eef0f2', padding: '1.2rem', borderRadius: 'var(--radius)', display: 'flex', justifyContent: 'center' }}>
+            <div style={{ background: 'var(--color-bg)', padding: '1.2rem', borderRadius: 'var(--radius)', display: 'flex', justifyContent: 'center', overflowX: 'auto' }}>
               <div style={{
                 fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '12px', color: '#111',
                 width: '100%', maxWidth: '360px', background: 'white', padding: '1.2rem',
@@ -447,7 +447,7 @@ function FormSettings() {
               </div>
             </div>
           ) : (
-            <div style={{ background: '#eef0f2', padding: '1.2rem', borderRadius: 'var(--radius)', display: 'flex', justifyContent: 'center' }}>
+            <div style={{ background: 'var(--color-bg)', padding: '1.2rem', borderRadius: 'var(--radius)', display: 'flex', justifyContent: 'center', overflowX: 'auto' }}>
               <div style={{
                 fontFamily: "'Courier New', monospace", fontSize: '12px', color: '#000',
                 width: `${receiptPaperWidth}mm`, background: 'white', padding: '5mm 4mm',

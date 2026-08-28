@@ -15,6 +15,7 @@ import { useParams, useSearchParams } from 'react-router-dom'
 import PosSidePanel from './PosSidePanel'
 import { supabase } from './supabaseClient'
 import { useToast } from './Toast'
+import Modal from './components/Modal'
 import { LoadingState } from './LoadingState'
 import { ErrorState } from './ErrorState'
 
@@ -28,19 +29,8 @@ function RestockModal({ product, onSave, onCancel }) {
   const canSet = setQty !== '' && Number(setQty) >= 0
 
   return (
-    <div
-      onClick={onCancel}
-      style={{
-        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 400, padding: '1rem'
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="card"
-        style={{ background: 'var(--color-surface)', padding: '1.5rem', width: '380px', maxWidth: '100%' }}
-      >
-        <h3 style={{ margin: '0 0 0.2rem' }}>{product.name}</h3>
+    <Modal size="sm" onClose={onCancel} title={product.name}>
+      <div>
         <p style={{ margin: '0 0 1rem', color: 'var(--color-muted)', fontSize: '0.85rem' }}>
           Current stock: {Number(product.stockQuantity) || 0}{product.unit ? ` ${product.unit}` : ''}
         </p>
@@ -71,7 +61,7 @@ function RestockModal({ product, onSave, onCancel }) {
           <button type="button" className="secondary" onClick={onCancel}>Cancel</button>
         </div>
       </div>
-    </div>
+    </Modal>
   )
 }
 
@@ -208,7 +198,7 @@ function Inventory() {
           {filtered.length === 0 ? (
             <p style={{ color: 'var(--color-muted)' }}>No products match your search.</p>
           ) : (
-            <div className="table-scroll">
+            <div className="table-wrap table-bleed">
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
                 <thead>
                   <tr style={{ background: 'var(--color-bg)' }}>
@@ -216,7 +206,7 @@ function Inventory() {
                     <th style={{ textAlign: 'left', padding: '0.6rem 0.8rem', borderBottom: '1px solid var(--color-border)' }}>Category</th>
                     <th style={{ textAlign: 'left', padding: '0.6rem 0.8rem', borderBottom: '1px solid var(--color-border)' }}>Price</th>
                     <th style={{ textAlign: 'left', padding: '0.6rem 0.8rem', borderBottom: '1px solid var(--color-border)' }}>Stock</th>
-                    <th style={{ width: '110px', borderBottom: '1px solid var(--color-border)' }} />
+                    <th style={{ minWidth: '92px', borderBottom: '1px solid var(--color-border)' }} />
                   </tr>
                 </thead>
                 <tbody>

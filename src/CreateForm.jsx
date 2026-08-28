@@ -653,7 +653,7 @@ function CreateForm() {
       </div>
 
       {recentlyRemoved && (
-        <div style={{
+        <div className="builder-undo-toast" style={{
           position: 'fixed', bottom: '1.5rem', left: '50%', transform: 'translateX(-50%)',
           background: '#1a1a1a', color: 'white', padding: '0.7rem 1.2rem', borderRadius: '8px',
           display: 'flex', alignItems: 'center', gap: '1rem', boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
@@ -688,7 +688,8 @@ function CreateForm() {
         type="button"
         onClick={() => setShowPreview(true)}
         title="Preview form"
-        style={{
+        className="preview-fab"
+          style={{
           position: 'fixed', bottom: '2rem', right: '2rem', zIndex: 150,
           borderRadius: '999px', padding: '0.8rem 1.3rem', fontSize: '0.9rem',
           boxShadow: '0 6px 18px rgba(0,0,0,0.22)'

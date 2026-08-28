@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
 import { useToast } from './Toast'
+import Modal from './components/Modal'
 import { TEMPLATE_ADMIN_USER_ID } from './adminAccount'
 import TemplateEditorDialog from './TemplateEditorDialog'
 import { categoryColor, CategoryIcon } from './templateVisuals'
@@ -373,28 +374,22 @@ function Templates() {
       )}
 
       {locationModalTemplate && (
-        <div
-          onClick={() => setLocationModalTemplate(null)}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '1rem' }}
-        >
-          <div onClick={(e) => e.stopPropagation()} style={{ background: 'var(--color-surface)', borderRadius: '8px', padding: '1.5rem', width: '380px', maxWidth: '100%' }}>
-            <h3 style={{ margin: '0 0 0.4rem' }}>Name this location</h3>
-            <p style={{ color: 'var(--color-muted)', fontSize: '0.85rem', margin: '0 0 1rem' }}>
-              "{locationModalTemplate.name}" for e.g. your first branch, shop, or site. You can add more locations later.
-            </p>
-            <form onSubmit={confirmCreateFirstLocation}>
-              <input
-                type="text" required autoFocus value={locationNameInput}
-                onChange={(e) => setLocationNameInput(e.target.value)}
-                style={{ width: '100%', padding: '0.5rem', marginBottom: '1rem' }}
-              />
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem' }}>
-                <button type="button" className="secondary" onClick={() => setLocationModalTemplate(null)}>Cancel</button>
-                <button type="submit" disabled={creatingLocation}>{creatingLocation ? 'Creating...' : 'Create'}</button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <Modal size="sm" onClose={() => setLocationModalTemplate(null)} title="Name this location">
+          <p style={{ color: 'var(--color-muted)', fontSize: '0.85rem', margin: '0 0 1rem' }}>
+            "{locationModalTemplate.name}" for e.g. your first branch, shop, or site. You can add more locations later.
+          </p>
+          <form onSubmit={confirmCreateFirstLocation}>
+            <input
+              type="text" required autoFocus value={locationNameInput}
+              onChange={(e) => setLocationNameInput(e.target.value)}
+              style={{ width: '100%', padding: '0.5rem', marginBottom: '1rem' }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem' }}>
+              <button type="button" className="secondary" onClick={() => setLocationModalTemplate(null)}>Cancel</button>
+              <button type="submit" disabled={creatingLocation}>{creatingLocation ? 'Creating...' : 'Create'}</button>
+            </div>
+          </form>
+        </Modal>
       )}
     </div>
   )
