@@ -446,7 +446,8 @@ export default function PayrollMonthly() {
                 <tbody>
                   {records.map(r => {
                     const emp = empById[r.employee_id]
-                    const adj = Number(r.total_additions || 0) - Number(r.total_deductions || 0)
+                    const add = Number(r.total_additions || 0)
+                    const ded = Number(r.total_deductions || 0)
                     return (
                       <tr key={r.id} style={{ cursor: 'pointer', background: r.status === 'paid' ? 'var(--color-primary-soft)' : undefined }} onClick={() => openAt(r.employee_id)}>
                         <td style={{ padding: '0.55rem 0.5rem', borderBottom: '1px solid var(--color-border)' }} onClick={(e) => e.stopPropagation()}>
@@ -461,8 +462,10 @@ export default function PayrollMonthly() {
                           )}
                         </td>
                         <td style={{ padding: '0.55rem 0.7rem', borderBottom: '1px solid var(--color-border)', textAlign: 'right' }}>{money(r.base_salary)}</td>
-                        <td style={{ padding: '0.55rem 0.7rem', borderBottom: '1px solid var(--color-border)', textAlign: 'right', color: adj > 0 ? 'var(--status-good)' : adj < 0 ? 'var(--status-critical)' : 'var(--color-muted)' }}>
-                          {adj === 0 ? money(0) : `${adj > 0 ? '+' : '−'}${money(Math.abs(adj))}`}
+                        <td style={{ padding: '0.55rem 0.7rem', borderBottom: '1px solid var(--color-border)', textAlign: 'right', fontSize: '0.85rem', lineHeight: 1.35 }}>
+                          {add === 0 && ded === 0 && <span style={{ color: 'var(--color-muted)' }}>{money(0)}</span>}
+                          {add > 0 && <div style={{ color: 'var(--status-good)' }}>+{money(add)}</div>}
+                          {ded > 0 && <div style={{ color: 'var(--status-critical)' }}>−{money(ded)}</div>}
                         </td>
                         <td style={{ padding: '0.55rem 0.7rem', borderBottom: '1px solid var(--color-border)', textAlign: 'right', fontWeight: 700 }}>{money(r.final_amount)}</td>
                         <td style={{ padding: '0.55rem 0.7rem', borderBottom: '1px solid var(--color-border)' }}><RecordStatusBadge status={r.status} /></td>
@@ -584,7 +587,8 @@ function OptionsMenu({ open, setOpen, items, fullWidth }) {
 // Mobile row -> compact payment card (doc: don't squeeze the 6-col table
 // onto a phone).
 function EmployeePayCard({ record: r, name, selected, onToggle, onOpen }) {
-  const adj = Number(r.total_additions || 0) - Number(r.total_deductions || 0)
+  const add = Number(r.total_additions || 0)
+  const ded = Number(r.total_deductions || 0)
   return (
     <div className="card" style={{ padding: '0.9rem 1rem', background: r.status === 'paid' ? 'var(--color-primary-soft)' : undefined }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem' }}>
@@ -600,8 +604,10 @@ function EmployeePayCard({ record: r, name, selected, onToggle, onOpen }) {
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.83rem', color: 'var(--color-muted)' }}>
         <span>Adjustments</span>
-        <span style={{ color: adj > 0 ? 'var(--status-good)' : adj < 0 ? 'var(--status-critical)' : 'inherit' }}>
-          {adj === 0 ? money(0) : `${adj > 0 ? '+' : '−'}${money(Math.abs(adj))}`}
+        <span style={{ display: 'flex', gap: '0.6rem' }}>
+          {add === 0 && ded === 0 && money(0)}
+          {add > 0 && <span style={{ color: 'var(--status-good)' }}>+{money(add)}</span>}
+          {ded > 0 && <span style={{ color: 'var(--status-critical)' }}>−{money(ded)}</span>}
         </span>
       </div>
       <button className="secondary" onClick={onOpen} style={{ width: '100%', marginTop: '0.7rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
