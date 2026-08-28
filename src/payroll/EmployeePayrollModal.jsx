@@ -27,7 +27,10 @@ function LineRow({ label, sub, value, strong, color }) {
   )
 }
 
-export default function EmployeePayrollModal({ formId, form, month, employee, record: initialRecord, entries: initialEntries, settings, onClose, onChanged }) {
+export default function EmployeePayrollModal({
+  formId, form, month, employee, record: initialRecord, entries: initialEntries, settings,
+  onClose, onChanged, reviewPosition, onNext, onPrev,
+}) {
   const { showToast } = useToast()
   const [record, setRecord] = useState(initialRecord)
   const [entries, setEntries] = useState(initialEntries || [])
@@ -80,6 +83,8 @@ export default function EmployeePayrollModal({ formId, form, month, employee, re
       setRecord(updated)
       onChanged?.()
       showToast(`Marked ${status.replace('_', ' ')}.`, 'success')
+      // In the guided review, acting on this employee advances to the next one.
+      if (reviewPosition && onNext) { setHoldOpen(false); setPayOpen(false); onNext() }
     } catch (err) {
       showToast('Could not update: ' + err.message, 'error')
     } finally {
@@ -89,24 +94,49 @@ export default function EmployeePayrollModal({ formId, form, month, employee, re
     }
   }
 
+  const isLastInReview = reviewPosition && reviewPosition.index >= reviewPosition.total
+
   return (
     <PayrollModal
-      title={`${employee.full_name} — ${monthLabel(month)}`}
+      title={`${employee.full_name} — ${monthLabel(month)}${reviewPosition ? `  (${reviewPosition.index} of ${reviewPosition.total})` : ''}`}
       onClose={onClose}
       wide
-      footer={locked ? (
-        <span style={{ fontSize: '0.82rem', color: 'var(--color-muted)' }}>
-          This payroll is {record.status}. Use “Create Adjustment” from the employee profile for corrections.
-        </span>
-      ) : (
+      footer={
         <>
-          <button className="secondary" onClick={() => setAddOpen(true)} disabled={busy}>+ Add Entry</button>
-          {record.status !== 'on_hold' && <button className="secondary" onClick={() => setHoldOpen(true)} disabled={busy}>Hold</button>}
-          {record.status !== 'approved' && <button className="secondary" onClick={() => move('approved')} disabled={busy}>Approve</button>}
-          <button onClick={() => setPayOpen(true)} disabled={busy}>Pay</button>
+          {reviewPosition && onPrev && reviewPosition.index > 1 && (
+            <button className="secondary" onClick={onPrev} disabled={busy} style={{ marginRight: 'auto' }}>← Back</button>
+          )}
+          {locked ? (
+            <span style={{ fontSize: '0.82rem', color: 'var(--color-muted)' }}>
+              This payroll is {record.status}.
+            </span>
+          ) : (
+            <>
+              <button className="secondary" onClick={() => setAddOpen(true)} disabled={busy}>+ Add Entry</button>
+              {record.status !== 'on_hold' && <button className="secondary" onClick={() => setHoldOpen(true)} disabled={busy}>Hold</button>}
+              {record.status !== 'approved' && <button className="secondary" onClick={() => move('approved')} disabled={busy}>Approve</button>}
+              <button onClick={() => setPayOpen(true)} disabled={busy}>Pay</button>
+            </>
+          )}
+          {reviewPosition && (
+            <button className="secondary" onClick={onNext} disabled={busy}>
+              {isLastInReview ? 'Finish' : (locked ? 'Next →' : 'Skip →')}
+            </button>
+          )}
         </>
-      )}
+      }
     >
+      {reviewPosition && (
+        <div style={{ marginBottom: '0.7rem' }}>
+          <div style={{ fontSize: '0.78rem', color: 'var(--color-muted)', marginBottom: '0.3rem' }}>
+            Reviewing {reviewPosition.index} of {reviewPosition.total}
+          </div>
+          <div style={{ height: 5, borderRadius: 999, background: 'var(--color-primary-soft)', overflow: 'hidden' }}>
+            <div style={{ width: `${Math.round((reviewPosition.index / reviewPosition.total) * 100)}%`, height: '100%', background: 'var(--color-primary)' }} />
+          </div>
+        </div>
+      )}
+
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
         <span style={{ fontSize: '0.85rem', color: 'var(--color-muted)' }}>
           {[employee.job_title, employee.department_name, employee.location_name].filter(Boolean).join(' · ')}

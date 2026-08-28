@@ -37,9 +37,13 @@ export default function PayrollMonthly() {
   const [openEmpId, setOpenEmpId] = useState(null)
   const [confirmApproveAll, setConfirmApproveAll] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
+  // Guided review after Run Payroll: walk each employee's breakdown one modal
+  // at a time and approve / pay / hold before moving on.
+  const [reviewQueue, setReviewQueue] = useState([]) // employee ids
+  const [reviewIdx, setReviewIdx] = useState(null)   // null = not reviewing
 
-  async function load() {
-    setLoading(true)
+  async function load({ quiet = false } = {}) {
+    if (!quiet) setLoading(true)
     setError('')
     try {
       const [emps, depts, locs, ents, recs] = await Promise.all([
@@ -103,12 +107,44 @@ export default function PayrollMonthly() {
       const recs = await runPayroll(formId, month, form)
       setRecords(recs)
       setSelected([])
-      showToast(`Payroll run for ${recs.length} employees.`, 'success')
+      showToast(`Payroll run for ${recs.length} employees. Review each one below.`, 'success')
+      // Sort the review queue so the location filter (if any) leads.
+      const ordered = recs
+        .filter(r => !location || empById[r.employee_id]?.primary_location_id === location)
+        .map(r => r.employee_id)
+      if (ordered.length) { setReviewQueue(ordered); setReviewIdx(0) }
     } catch (err) {
       showToast('Run Payroll failed: ' + err.message, 'error')
     } finally {
       setRunning(false)
     }
+  }
+
+  function startReview(fromStatuses) {
+    const q = records
+      .filter(r => !fromStatuses || fromStatuses.includes(r.status))
+      .map(r => r.employee_id)
+    if (!q.length) { showToast('Nothing left to review.', 'info'); return }
+    setReviewQueue(q)
+    setReviewIdx(0)
+  }
+
+  function advanceReview() {
+    if (reviewIdx == null) return
+    if (reviewIdx + 1 < reviewQueue.length) {
+      setReviewIdx(reviewIdx + 1)
+    } else {
+      setReviewIdx(null)
+      setReviewQueue([])
+      showToast('Payroll review complete.', 'success')
+      load({ quiet: true })
+    }
+  }
+
+  function exitReview() {
+    setReviewIdx(null)
+    setReviewQueue([])
+    load({ quiet: true })
   }
 
   function toggle(id) {
@@ -153,6 +189,12 @@ export default function PayrollMonthly() {
   const openRecord = openEmpId ? records.find(r => r.employee_id === openEmpId) : null
   const totalFinal = records.reduce((s, r) => s + Number(r.final_amount || 0), 0)
 
+  // Guided-review current employee
+  const reviewEmpId = reviewIdx != null ? reviewQueue[reviewIdx] : null
+  const reviewEmp = reviewEmpId ? empById[reviewEmpId] : null
+  const reviewRecord = reviewEmpId ? records.find(r => r.employee_id === reviewEmpId) : null
+  const unreviewed = records.filter(r => ['draft', 'pending_approval', 'on_hold'].includes(r.status))
+
   return (
     <div>
       <style>{`
@@ -180,6 +222,7 @@ export default function PayrollMonthly() {
         {!isMobile && (
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
             {hasDraftRun && <button className="secondary" onClick={() => setExportOpen(true)}>Export</button>}
+            {hasDraftRun && unreviewed.length > 0 && <button className="secondary" onClick={() => startReview(['draft', 'pending_approval', 'on_hold'])}>Review payroll ({unreviewed.length})</button>}
             {hasDraftRun && approvable.length > 0 && <button className="secondary" onClick={() => setConfirmApproveAll(true)}>Approve All</button>}
             <button onClick={handleRun} disabled={running}>{running ? 'Running…' : hasDraftRun ? 'Re-run Payroll' : 'Run Payroll'}</button>
           </div>
@@ -192,7 +235,8 @@ export default function PayrollMonthly() {
             {running ? 'Running…' : hasDraftRun ? 'Re-run Payroll' : 'Run Payroll'}
           </button>
           {hasDraftRun && (
-            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+              {unreviewed.length > 0 && <button className="secondary" style={{ flex: 1, minWidth: 130 }} onClick={() => startReview(['draft', 'pending_approval', 'on_hold'])}>Review ({unreviewed.length})</button>}
               <button className="secondary" style={{ flex: 1 }} onClick={() => setExportOpen(true)}>Export</button>
               {approvable.length > 0 && <button className="secondary" style={{ flex: 1 }} onClick={() => setConfirmApproveAll(true)}>Approve All</button>}
             </div>
@@ -318,7 +362,8 @@ export default function PayrollMonthly() {
         </>
       )}
 
-      {openEmp && openRecord && (
+      {/* one-off open from a row / card */}
+      {reviewIdx == null && openEmp && openRecord && (
         <EmployeePayrollModal
           formId={formId}
           form={form}
@@ -328,7 +373,26 @@ export default function PayrollMonthly() {
           entries={entries.filter(e => e.employee_id === openEmpId)}
           settings={settings}
           onClose={() => setOpenEmpId(null)}
-          onChanged={load}
+          onChanged={() => load({ quiet: true })}
+        />
+      )}
+
+      {/* guided review after Run Payroll */}
+      {reviewIdx != null && reviewEmp && reviewRecord && (
+        <EmployeePayrollModal
+          key={reviewEmpId}
+          formId={formId}
+          form={form}
+          month={month}
+          employee={{ ...reviewEmp, department_name: deptName[reviewEmp.department_id], location_name: locName[reviewEmp.primary_location_id] }}
+          record={reviewRecord}
+          entries={entries.filter(e => e.employee_id === reviewEmpId)}
+          settings={settings}
+          reviewPosition={{ index: reviewIdx + 1, total: reviewQueue.length }}
+          onNext={advanceReview}
+          onPrev={() => setReviewIdx(i => Math.max(0, (i ?? 0) - 1))}
+          onClose={exitReview}
+          onChanged={() => load({ quiet: true })}
         />
       )}
 
