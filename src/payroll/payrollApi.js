@@ -458,6 +458,19 @@ export async function createPaymentBatch(payrollFormId, month, records) {
   return data
 }
 
+// Clears the generated payroll for one month: the payroll_records and any
+// payment batches. Staff, salaries and payroll_entries are untouched - the
+// month can be re-generated from them with runPayroll().
+export async function resetPayrollMonth(payrollFormId, month) {
+  const { error: e1 } = await supabase.from('payroll_records').delete()
+    .eq('payroll_form_id', payrollFormId).eq('payroll_month', month)
+  if (e1) throw e1
+  const { error: e2 } = await supabase.from('payroll_payment_batches').delete()
+    .eq('payroll_form_id', payrollFormId).eq('payroll_month', month)
+  if (e2) throw e2
+  await logAudit(payrollFormId, 'payroll_run', null, 'reset', null, { month })
+}
+
 export async function listBatches(payrollFormId, month) {
   let q = supabase.from('payroll_payment_batches').select('*')
     .eq('payroll_form_id', payrollFormId).order('created_at', { ascending: false })

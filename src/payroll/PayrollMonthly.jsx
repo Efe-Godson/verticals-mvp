@@ -12,7 +12,7 @@ import { MonthPicker, LocationFilter, PayrollModal, money, moneyShort, monthLabe
 import { calculateEmployeePayroll } from './calculatePayroll'
 import {
   payrollSettings, listEmployees, listDepartments, listLocations, listEntries, loadRecordsForMonth,
-  runPayroll, bulkSetRecordStatus, createPaymentBatch,
+  runPayroll, bulkSetRecordStatus, createPaymentBatch, resetPayrollMonth,
 } from './payrollApi'
 import { exportPayrollToCSV, exportPayrollToExcel, exportPayrollToPDF } from './payrollExport'
 import EmployeePayrollModal from './EmployeePayrollModal'
@@ -35,9 +35,11 @@ export default function PayrollMonthly() {
   const [running, setRunning] = useState(false)
   const [selected, setSelected] = useState([])
   const [confirmPayAll, setConfirmPayAll] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   // { title, message, confirmLabel, danger?, run } for one-off confirmations
   const [confirmAction, setConfirmAction] = useState(null)
   const ask = (cfg) => setConfirmAction(cfg)
+  const askPayAll = () => setConfirmPayAll(true)
   const [exportOpen, setExportOpen] = useState(false)
   // Guided review after Run Payroll: walk each employee's breakdown one modal
   // at a time and approve / pay / hold before moving on.
@@ -124,13 +126,10 @@ export default function PayrollMonthly() {
 
   function handleRun() {
     if (running) return
-    const paid = records.filter(r => r.status === 'paid').length
     ask({
-      title: hasDraftRun ? 'Re-generate payroll?' : `Start payroll for ${monthLabel(month)}?`,
-      message: hasDraftRun
-        ? `Every unpaid record for ${monthLabel(month)} will be recalculated from the current entries.${paid ? ` ${paid} already-paid record${paid > 1 ? 's are' : ' is'} left untouched.` : ''}`
-        : `This creates a payroll record for every active employee, then walks you through each one to review and pay.`,
-      confirmLabel: hasDraftRun ? 'Re-generate' : 'Start Payroll',
+      title: `Start ${monthLabel(month)} payroll?`,
+      message: `${kpi.staff} employee${kpi.staff === 1 ? '' : 's'} · base ${money(kpi.total)}, − ${money(kpi.deductions)} deductions, + ${money(kpi.additions)} additions → estimated net ${money(kpi.net)}. A record is created for each, then you review and pay them one by one.`,
+      confirmLabel: 'Start Payroll',
       run: doRun,
     })
   }
@@ -211,7 +210,6 @@ export default function PayrollMonthly() {
 
   const payable = records.filter(r => r.status !== 'paid' && r.status !== 'cancelled' && r.status !== 'on_hold')
   const excluded = records.filter(r => r.status === 'on_hold')
-  const payAllTotal = payable.reduce((s, r) => s + Number(r.final_amount || 0), 0)
 
   async function doPayAll() {
     setConfirmPayAll(false)
@@ -225,6 +223,51 @@ export default function PayrollMonthly() {
     }
   }
 
+  async function doRecalc() {
+    try {
+      await runPayroll(formId, month, form)
+      showToast(`${monthLabel(month)} payroll recalculated from current salaries and events.`, 'success')
+      load({ quiet: true })
+    } catch (err) {
+      showToast(friendlyError(err, "Couldn't recalculate this month's payroll."), 'error')
+    }
+  }
+
+  async function doReset() {
+    try {
+      await resetPayrollMonth(formId, month)
+      showToast(`${monthLabel(month)} payroll reset. Staff, salaries and events are unchanged.`, 'success')
+      setReviewIdx(null); setReviewQueue([]); setSelected([])
+      load()
+    } catch (err) {
+      showToast(friendlyError(err, "Couldn't reset this month's payroll."), 'error')
+    }
+  }
+
+  const OPTIONS = [
+    { label: 'Export payroll', onClick: () => setExportOpen(true), disabled: !hasDraftRun },
+    { label: 'Download payslips', onClick: () => showToast('Payslip downloads are coming soon.', 'info'), disabled: !hasDraftRun },
+    { label: 'Print payroll', onClick: () => { if (hasDraftRun) window.print() }, disabled: !hasDraftRun },
+    { divider: true },
+    {
+      label: 'Recalculate payroll', disabled: !hasDraftRun,
+      onClick: () => ask({
+        title: `Recalculate ${monthLabel(month)} payroll?`,
+        message: `Every unpaid record is updated to match the current staff salaries and payroll events. Paid records are left as they are.`,
+        confirmLabel: 'Recalculate', run: doRecalc,
+      }),
+    },
+    { divider: true },
+    {
+      label: 'Reset payroll', danger: true, disabled: !hasDraftRun,
+      onClick: () => ask({
+        title: `Reset ${monthLabel(month)} payroll?`,
+        message: `This clears the generated payroll and payment records for ${monthLabel(month)} so it can be started fresh. Staff, salaries and payroll events are NOT affected.`,
+        confirmLabel: 'Reset payroll', danger: true, run: doReset,
+      }),
+    },
+  ]
+
   if (loading) return <LoadingState />
   if (error) return <ErrorState message={error} onRetry={load} />
 
@@ -234,11 +277,21 @@ export default function PayrollMonthly() {
   const reviewEmpId = reviewIdx != null ? reviewQueue[reviewIdx] : null
   const reviewEmp = reviewEmpId ? empById[reviewEmpId] : null
   const reviewRecord = reviewEmpId ? records.find(r => r.employee_id === reviewEmpId) : null
-  const unreviewed = records.filter(r => ['draft', 'pending_approval', 'on_hold'].includes(r.status))
+
+  // Payroll lifecycle for the selected month/location view.
+  const remaining = records.filter(r => r.status !== 'paid' && r.status !== 'cancelled')
+  const remainingCount = remaining.length
+  const remainingAmount = Math.max(0, kpi.net - kpi.paidAmount)
+  const payrollStatus = !hasDraftRun ? 'not_started' : (remainingCount === 0 ? 'completed' : 'in_progress')
 
   return (
     <div>
       <style>{`
+        .pay-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 1rem; }
+        .pay-toolbar-left, .pay-toolbar-right { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+        .pay-complete { display: inline-flex; align-items: center; gap: 0.4rem; font-weight: 700; font-size: 0.88rem;
+          color: var(--status-good); padding: 0.45rem 0.85rem; border: 1px solid var(--color-primary);
+          border-radius: var(--radius); background: var(--color-primary-soft); }
         .pay-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.7rem; margin-bottom: 1.1rem; }
         .pay-kpi { border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); padding: 0.9rem 1rem; }
         .pay-kpi .l { font-size: 0.72rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-muted); }
@@ -254,42 +307,64 @@ export default function PayrollMonthly() {
         }
       `}</style>
 
-      {/* controls */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem', marginBottom: '1rem' }}>
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <MonthPicker value={month} onChange={setMonth} />
-          <LocationFilter locations={locations} value={location} onChange={setLocation} />
-        </div>
-        {!isMobile && (
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            {hasDraftRun && <button className="secondary" onClick={() => setExportOpen(true)}>Export</button>}
-            {hasDraftRun && unreviewed.length > 0 && <button className="secondary" onClick={() => startReview(['draft', 'pending_approval', 'on_hold'])}>Review payroll ({unreviewed.length})</button>}
-            {hasDraftRun && payable.length > 0 && <button className="secondary" onClick={() => setConfirmPayAll(true)}>Mark All Paid</button>}
-            <button onClick={handleRun} disabled={running}>{running ? 'Starting…' : 'Start Payroll'}</button>
+      {/* toolbar */}
+      {isMobile ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+            <MonthPicker value={month} onChange={setMonth} />
+            <StatusPill status={payrollStatus} />
           </div>
-        )}
-      </div>
-
-      {isMobile && (
-        <div style={{ marginBottom: '1rem' }}>
-          <button onClick={handleRun} disabled={running} style={{ width: '100%', minHeight: 48, fontSize: '0.95rem' }}>
-            {running ? 'Starting…' : 'Start Payroll'}
-          </button>
-          {hasDraftRun && (
-            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
-              {unreviewed.length > 0 && <button className="secondary" style={{ flex: 1, minWidth: 130 }} onClick={() => startReview(['draft', 'pending_approval', 'on_hold'])}>Review ({unreviewed.length})</button>}
-              <button className="secondary" style={{ flex: 1 }} onClick={() => setExportOpen(true)}>Export</button>
-              {payable.length > 0 && <button className="secondary" style={{ flex: 1 }} onClick={() => setConfirmPayAll(true)}>Mark All Paid</button>}
-            </div>
+          <LocationFilter locations={locations} value={location} onChange={setLocation} style={{ width: '100%' }} />
+          {payrollStatus === 'not_started' && (
+            <>
+              <button onClick={handleRun} disabled={running} style={{ width: '100%', minHeight: 48, fontSize: '0.95rem' }}>{running ? 'Starting…' : 'Start Payroll'}</button>
+              <OptionsMenu open={menuOpen} setOpen={setMenuOpen} items={OPTIONS} fullWidth />
+            </>
           )}
+          {payrollStatus === 'in_progress' && (
+            <>
+              <button onClick={() => startReview(['draft', 'pending_approval', 'on_hold'])} style={{ width: '100%', minHeight: 48, fontSize: '0.95rem' }}>Review payroll · {remainingCount}</button>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                {payable.length > 0 && <button className="secondary" style={{ flex: 1, minHeight: 44 }} onClick={askPayAll}>Mark all paid</button>}
+                <div style={{ flex: 1 }}><OptionsMenu open={menuOpen} setOpen={setMenuOpen} items={OPTIONS} fullWidth /></div>
+              </div>
+            </>
+          )}
+          {payrollStatus === 'completed' && (
+            <>
+              <span className="pay-complete" style={{ width: '100%', justifyContent: 'center', minHeight: 48, boxSizing: 'border-box' }}>✓ Payroll complete</span>
+              <OptionsMenu open={menuOpen} setOpen={setMenuOpen} items={OPTIONS} fullWidth />
+            </>
+          )}
+        </div>
+      ) : (
+        <div className="pay-toolbar">
+          <div className="pay-toolbar-left">
+            <MonthPicker value={month} onChange={setMonth} />
+            <LocationFilter locations={locations} value={location} onChange={setLocation} />
+            <StatusPill status={payrollStatus} />
+          </div>
+          <div className="pay-toolbar-right">
+            {payrollStatus === 'not_started' && (
+              <button onClick={handleRun} disabled={running}>{running ? 'Starting…' : 'Start Payroll'}</button>
+            )}
+            {payrollStatus === 'in_progress' && (
+              <>
+                <button onClick={() => startReview(['draft', 'pending_approval', 'on_hold'])}>Review payroll · {remainingCount}</button>
+                {payable.length > 0 && <button className="secondary" onClick={askPayAll}>Mark all paid</button>}
+              </>
+            )}
+            {payrollStatus === 'completed' && <span className="pay-complete">✓ Payroll complete</span>}
+            <OptionsMenu open={menuOpen} setOpen={setMenuOpen} items={OPTIONS} />
+          </div>
         </div>
       )}
 
       {/* 4 KPI cards */}
       <div className="pay-kpis">
         <Kpi cls="k-total" label="Total Payroll" value={kpi.total} short={isMobile} />
-        <Kpi cls="k-ded" label="Deductions" value={kpi.deductions} short={isMobile} />
-        <Kpi cls="k-add" label="Additions" value={kpi.additions} short={isMobile} />
+        <Kpi cls="k-ded" label="Deductions" value={kpi.deductions} short={isMobile} amountColor="var(--status-critical)" />
+        <Kpi cls="k-add" label="Additions" value={kpi.additions} short={isMobile} amountColor="var(--status-good)" />
         <Kpi cls="net" label="Net Payroll" value={kpi.net} short={isMobile} />
       </div>
 
@@ -297,19 +372,25 @@ export default function PayrollMonthly() {
       <div className="card" style={{ padding: '0.9rem 1.1rem', marginBottom: '1.3rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: '0.4rem' }}>
           <strong style={{ fontSize: '0.9rem' }}>Payment progress</strong>
-          <span style={{ fontSize: '0.85rem', color: 'var(--color-muted)' }}>
-            {isMobile
-              ? <>{kpi.paidCount} of {headcount} paid · <strong style={{ color: 'var(--color-text)' }}>{progressPct}%</strong></>
-              : <>{money(kpi.paidAmount)} of {money(kpi.net)} paid · {kpi.paidCount} of {headcount} employees</>}
-          </span>
+          {isMobile
+            ? <strong style={{ fontSize: '0.9rem', color: 'var(--color-text)' }}>{progressPct}%</strong>
+            : <span style={{ fontSize: '0.85rem', color: 'var(--color-muted)' }}>
+                {money(kpi.paidAmount)} paid · {money(remainingAmount)} remaining
+                <span style={{ marginLeft: '0.8rem' }}>{kpi.paidCount} of {headcount} employees paid</span>
+              </span>}
         </div>
+        {isMobile && (
+          <div style={{ fontSize: '0.82rem', color: 'var(--color-muted)', margin: '0.15rem 0 0' }}>
+            {kpi.paidCount} of {headcount} employees paid
+          </div>
+        )}
         <div style={{ height: 8, borderRadius: 999, background: 'var(--color-primary-soft)', overflow: 'hidden', margin: '0.55rem 0 0.35rem' }}>
           <div style={{ width: `${progressPct}%`, height: '100%', background: 'var(--color-primary)' }} />
         </div>
         {isMobile
           ? <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
               <span>{money(kpi.paidAmount)} paid</span>
-              <span style={{ color: 'var(--color-muted)' }}>{money(Math.max(0, kpi.net - kpi.paidAmount))} remaining</span>
+              <span style={{ color: 'var(--color-muted)' }}>{money(remainingAmount)} remaining</span>
             </div>
           : <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>{progressPct}%</div>}
       </div>
@@ -424,9 +505,9 @@ export default function PayrollMonthly() {
 
       {confirmPayAll && (
         <ConfirmDialog
-          title="Mark all as paid?"
-          message={`Marking ${payable.length} employees paid for a total of ${money(payAllTotal)}.${excluded.length ? ` ${excluded.length} on-hold employee${excluded.length > 1 ? 's are' : ' is'} excluded.` : ''}`}
-          confirmLabel="Mark Paid"
+          title="Mark all employees as paid?"
+          message={`This marks the ${payable.length} remaining employee${payable.length === 1 ? '' : 's'} in the ${monthLabel(month)} payroll as paid — ${money(remainingAmount)} across ${payable.length}.${excluded.length ? ` ${excluded.length} on-hold employee${excluded.length > 1 ? 's are' : ' is'} excluded.` : ''}`}
+          confirmLabel="Mark all paid"
           onConfirm={doPayAll}
           onCancel={() => setConfirmPayAll(false)}
         />
@@ -461,11 +542,61 @@ export default function PayrollMonthly() {
   )
 }
 
-function Kpi({ cls, label, value, short }) {
+function Kpi({ cls, label, value, short, amountColor }) {
   return (
     <div className={`pay-kpi ${cls}`} title={short ? money(value) : undefined}>
       <div className="l">{label}</div>
-      <div className="v">{short ? moneyShort(value) : money(value)}</div>
+      <div className="v" style={{ color: amountColor }}>{short ? moneyShort(value) : money(value)}</div>
+    </div>
+  )
+}
+
+const STATUS_PILL = {
+  not_started: { dot: '●', text: 'Not started', color: 'var(--color-muted)', bg: 'var(--color-bg)', border: 'var(--color-border)' },
+  in_progress: { dot: '●', text: 'In progress', color: 'var(--status-warning)', bg: 'var(--color-warning-soft)', border: 'var(--color-warning-soft)' },
+  completed: { dot: '✓', text: 'Completed', color: 'var(--status-good)', bg: 'var(--color-primary-soft)', border: 'var(--color-primary-soft)' },
+}
+function StatusPill({ status }) {
+  const s = STATUS_PILL[status] || STATUS_PILL.not_started
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: '0.35rem', whiteSpace: 'nowrap',
+      fontSize: '0.78rem', fontWeight: 600, padding: '0.32rem 0.65rem', borderRadius: 999,
+      background: s.bg, color: s.color, border: `1px solid ${s.border}`,
+    }}>
+      <span aria-hidden style={{ fontSize: '0.7rem' }}>{s.dot}</span>{s.text}
+    </span>
+  )
+}
+
+// Secondary payroll actions. `items`: { label, onClick, disabled?, danger? } | { divider: true }
+function OptionsMenu({ open, setOpen, items, fullWidth }) {
+  return (
+    <div style={{ position: 'relative', ...(fullWidth ? { width: '100%' } : {}) }}>
+      <button className="secondary" onClick={() => setOpen(o => !o)} style={fullWidth ? { width: '100%', minHeight: 44 } : undefined}>
+        Options ▾
+      </button>
+      {open && (
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+          <div style={{
+            position: 'absolute', right: 0, top: 'calc(100% + 0.3rem)', zIndex: 41, minWidth: 210,
+            background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.16)', padding: '0.3rem', display: 'flex', flexDirection: 'column',
+          }}>
+            {items.map((it, i) => it.divider
+              ? <div key={i} style={{ height: 1, background: 'var(--color-border)', margin: '0.3rem 0' }} />
+              : (
+                <button key={i} className="secondary" disabled={it.disabled}
+                  onClick={() => { setOpen(false); it.onClick() }}
+                  style={{ border: 'none', background: 'transparent', textAlign: 'left', justifyContent: 'flex-start',
+                    padding: '0.5rem 0.6rem', fontSize: '0.85rem', color: it.danger ? 'var(--status-critical)' : 'var(--color-text)' }}>
+                  {it.label}
+                </button>
+              ))}
+          </div>
+        </>
+      )}
     </div>
   )
 }
