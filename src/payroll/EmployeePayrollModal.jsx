@@ -15,18 +15,27 @@ const PAY_METHODS = [
   { value: 'other', label: 'Other' },
 ]
 
-// One line on the payslip: description on the left, amount on the right,
-// sharing a single amount axis. `sep` draws the short rule above a subtotal.
-function Row({ label, amount, amountColor, strong, muted, sep, onRemove, disabled }) {
-  const cls = sep ? ' sep' : ''
+// One payslip line: label left, amount right. Everything is explicit inline
+// style - no shared CSS to leak a colour across rows.
+function Row({ label, amount, color = 'var(--color-text)', amountColor, bold, small, indent, top, onRemove, disabled }) {
   return (
-    <>
-      <div className={`pr-l${cls}`} style={{ color: muted ? 'var(--color-muted)' : undefined, fontWeight: strong ? 700 : undefined }}>
+    <div style={{
+      display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'baseline',
+      padding: small ? '0.12rem 0' : '0.4rem 0',
+      paddingLeft: indent ? '1rem' : 0,
+      marginTop: top ? '0.5rem' : 0,
+      borderTop: top ? '1px solid var(--color-border)' : undefined,
+      paddingTop: top ? '0.55rem' : undefined,
+      fontSize: small ? '0.82rem' : '0.95rem',
+      fontWeight: bold ? 700 : 400,
+      color,
+    }}>
+      <span style={{ color: small ? 'var(--color-text)' : undefined }}>
         {label}
         {onRemove && <button className="secondary" onClick={onRemove} disabled={disabled} style={{ marginLeft: '0.4rem', padding: '0 0.35rem', fontSize: '0.7rem' }}>×</button>}
-      </div>
-      <div className={`pr-a${cls}`} style={{ color: amountColor, fontWeight: strong ? 700 : undefined }}>{amount}</div>
-    </>
+      </span>
+      <span style={{ whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', color: amountColor }}>{amount}</span>
+    </div>
   )
 }
 
@@ -146,50 +155,44 @@ export default function EmployeePayrollModal({
         </div>
       )}
 
-      <style>{`
-        .pr-grid { display: grid; grid-template-columns: 1fr auto; column-gap: 1rem; row-gap: 0.05rem;
-          align-items: baseline; margin-top: 0.2rem; }
-        .pr-grid .pr-l { padding: 0.3rem 0; }
-        .pr-grid .pr-a { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; padding: 0.3rem 0; }
-        .pr-grid .pr-head { grid-column: 1 / -1; margin-top: 1rem; font-size: 0.72rem; font-weight: 800;
-          letter-spacing: 0.07em; text-transform: uppercase; padding-bottom: 0.3rem; border-bottom: 1px solid currentColor; }
-        .pr-grid .sep { border-top: 1px solid var(--color-border); margin-top: 0.1rem; padding-top: 0.4rem; }
-        .pr-grid .pr-fl, .pr-grid .pr-fa { border-top: 2px solid var(--color-text); margin-top: 1rem; padding-top: 0.7rem; }
-        .pr-grid .pr-fa { text-align: right; font-size: 1.5rem; font-weight: 800; font-variant-numeric: tabular-nums; align-self: center; }
-      `}</style>
-
       {/* centred name, daily rate small underneath */}
-      <div style={{ textAlign: 'center', marginBottom: '0.6rem' }}>
-        <div style={{ fontSize: '1.55rem', fontWeight: 800, lineHeight: 1.15 }}>{employee.full_name}</div>
-        <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)', fontVariantNumeric: 'tabular-nums', marginTop: '0.15rem' }}>
+      <div style={{ textAlign: 'center', marginBottom: '0.9rem' }}>
+        <div style={{ fontSize: '1.4rem', fontWeight: 800, lineHeight: 1.15, color: 'var(--color-text)' }}>{employee.full_name}</div>
+        <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)', fontVariantNumeric: 'tabular-nums', marginTop: '0.1rem' }}>
           {money(breakdown.dailyRate, 2)} / day
         </div>
       </div>
 
-      <div className="pr-grid">
-        <Row label="Base Pay" amount={money(breakdown.baseSalary)} strong />
+      <Row label="Base Pay" amount={money(breakdown.baseSalary)} bold />
 
-        <div className="pr-head" style={{ color: 'var(--status-critical)' }}>Deductions</div>
-        {deductions.map(item => (
-          <Row key={item.id} label={eventLabel(item)} amount={money(item.amount)} amountColor="var(--status-critical)"
-            onRemove={!locked ? () => removeEntry(item.id) : undefined} disabled={busy} />
-        ))}
-        <Row label="Total Deductions" amount={`- ${money(breakdown.totalDeductions)}`} amountColor="var(--status-critical)" strong sep={deductions.length > 0} />
+      <div style={{ marginTop: '0.9rem', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--status-critical)' }}>
+        Deductions
+      </div>
+      {deductions.map(item => (
+        <Row key={item.id} small indent label={eventLabel(item)} amount={money(item.amount)}
+          color="var(--status-critical)"
+          onRemove={!locked ? () => removeEntry(item.id) : undefined} disabled={busy} />
+      ))}
+      <Row top bold label="Total Deductions" amount={`- ${money(breakdown.totalDeductions)}`} color="var(--status-critical)" />
 
-        <div className="pr-head" style={{ color: 'var(--status-good)' }}>Additions</div>
-        {additions.map(item => (
-          <Row key={item.id} label={eventLabel(item)} amount={money(item.amount)} amountColor="var(--status-good)"
-            onRemove={!locked ? () => removeEntry(item.id) : undefined} disabled={busy} />
-        ))}
-        <Row label="Total Additions" amount={`+ ${money(breakdown.totalAdditions)}`} amountColor="var(--status-good)" strong sep={additions.length > 0} />
+      <div style={{ marginTop: '0.9rem', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--status-good)' }}>
+        Additions
+      </div>
+      {additions.map(item => (
+        <Row key={item.id} small indent label={eventLabel(item)} amount={money(item.amount)}
+          color="var(--status-good)"
+          onRemove={!locked ? () => removeEntry(item.id) : undefined} disabled={busy} />
+      ))}
+      <Row top bold label="Total Additions" amount={`+ ${money(breakdown.totalAdditions)}`} color="var(--status-good)" />
 
-        <div className="pr-fl">
-          <div style={{ fontWeight: 800, fontSize: '0.95rem', letterSpacing: '0.04em' }}>FINAL PAY</div>
-          <div style={{ fontSize: '0.76rem', color: 'var(--color-muted)', fontVariantNumeric: 'tabular-nums' }}>
-            {money(breakdown.baseSalary)} − {money(breakdown.totalDeductions)} + {money(breakdown.totalAdditions)}
-          </div>
-        </div>
-        <div className="pr-fa">{money(breakdown.finalAmount)}</div>
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+        borderTop: '2px solid var(--color-text)', marginTop: '1rem', paddingTop: '0.8rem',
+      }}>
+        <span style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--color-text)' }}>Final Pay</span>
+        <span style={{ fontWeight: 800, fontSize: '1.5rem', color: 'var(--color-text)', fontVariantNumeric: 'tabular-nums' }}>
+          {money(breakdown.finalAmount)}
+        </span>
       </div>
 
       {record.status === 'on_hold' && record.hold_reason && (
