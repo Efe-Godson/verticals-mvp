@@ -3,6 +3,7 @@
 // payment forward. Adding an entry here recalculates in place - no refresh.
 import { useMemo, useState } from 'react'
 import { useToast } from '../Toast'
+import ConfirmDialog from '../ConfirmDialog'
 import { PayrollModal, Field, TextInput, Select, money, monthLabel } from './ui'
 import { calculateEmployeePayroll } from './calculatePayroll'
 import { recalcEmployeeRecord, setRecordStatus, deleteEntry } from './payrollApi'
@@ -40,10 +41,11 @@ function Row({ label, amount, color = 'var(--color-text)', amountColor, bold, sm
 }
 
 // "Late Arrival · Aug 12" / "Missed Day · Aug 6" - reason if there is one,
-// else the entry-type label, plus the event date.
-function eventLabel(item) {
+// else the entry-type label, plus the event date when `withDate` (the
+// "Show entry dates" payroll setting).
+function eventLabel(item, withDate) {
   const desc = (item.reason && item.reason.trim()) || item.label
-  if (!item.date) return desc
+  if (!withDate || !item.date) return desc
   const d = new Date(item.date)
   return isNaN(d) ? desc : `${desc} · ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
 }
@@ -60,6 +62,8 @@ export default function EmployeePayrollModal({
   const [holdOpen, setHoldOpen] = useState(false)
   const [holdReason, setHoldReason] = useState('')
   const [payOpen, setPayOpen] = useState(false)
+  const [confirmRemove, setConfirmRemove] = useState(null) // the entry pending removal
+  const showDates = settings?.showEntryDates !== false
   const [payMethod, setPayMethod] = useState('bank_transfer')
   const [payRef, setPayRef] = useState('')
 
@@ -119,7 +123,7 @@ export default function EmployeePayrollModal({
 
   return (
     <PayrollModal
-      title={`${employee.full_name} — ${monthLabel(month)}${reviewPosition ? `  (${reviewPosition.index} of ${reviewPosition.total})` : ''}`}
+      hideHeader
       onClose={onClose}
       wide
       footer={
@@ -132,12 +136,12 @@ export default function EmployeePayrollModal({
           ) : (
             <>
               <button className="secondary" onClick={() => setAddOpen(true)} disabled={busy}>+ Add Entry</button>
-              {!reviewPosition && record.status !== 'on_hold' && <button className="secondary" onClick={() => setHoldOpen(true)} disabled={busy}>Hold</button>}
+              {record.status !== 'on_hold' && <button className="secondary" onClick={() => setHoldOpen(true)} disabled={busy}>Hold</button>}
               <button onClick={() => setPayOpen(true)} disabled={busy}>Pay</button>
             </>
           )}
           {reviewPosition && (
-            <button onClick={onNext} disabled={busy}>
+            <button className="secondary" onClick={onNext} disabled={busy}>
               {isLastInReview ? 'Finish' : 'Next →'}
             </button>
           )}
@@ -155,23 +159,23 @@ export default function EmployeePayrollModal({
         </div>
       )}
 
-      {/* centred name, daily rate small underneath */}
-      <div style={{ textAlign: 'center', marginBottom: '0.9rem' }}>
+      {/* centred name, daily rate + month small underneath */}
+      <div style={{ textAlign: 'center', marginBottom: '0.7rem' }}>
         <div style={{ fontSize: '1.4rem', fontWeight: 800, lineHeight: 1.15, color: 'var(--color-text)' }}>{employee.full_name}</div>
-        <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)', fontVariantNumeric: 'tabular-nums', marginTop: '0.1rem' }}>
-          {money(breakdown.dailyRate, 2)} / day
+        <div style={{ fontSize: '0.82rem', color: 'var(--color-text)', fontVariantNumeric: 'tabular-nums', marginTop: '0.15rem' }}>
+          {money(breakdown.dailyRate, 2)} per day · {monthLabel(month)}
         </div>
       </div>
 
-      <Row label="Base Pay" amount={money(breakdown.baseSalary)} bold />
+      <Row label="Base Pay" amount={money(breakdown.baseSalary)} color="var(--status-good)" bold />
 
       <div style={{ marginTop: '0.9rem', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--status-critical)' }}>
         Deductions
       </div>
       {deductions.map(item => (
-        <Row key={item.id} small indent label={eventLabel(item)} amount={money(item.amount)}
+        <Row key={item.id} small indent label={eventLabel(item, showDates)} amount={money(item.amount)}
           color="var(--status-critical)"
-          onRemove={!locked ? () => removeEntry(item.id) : undefined} disabled={busy} />
+          onRemove={!locked ? () => setConfirmRemove(item) : undefined} disabled={busy} />
       ))}
       <Row top bold label="Total Deductions" amount={`- ${money(breakdown.totalDeductions)}`} color="var(--status-critical)" />
 
@@ -179,9 +183,9 @@ export default function EmployeePayrollModal({
         Additions
       </div>
       {additions.map(item => (
-        <Row key={item.id} small indent label={eventLabel(item)} amount={money(item.amount)}
+        <Row key={item.id} small indent label={eventLabel(item, showDates)} amount={money(item.amount)}
           color="var(--status-good)"
-          onRemove={!locked ? () => removeEntry(item.id) : undefined} disabled={busy} />
+          onRemove={!locked ? () => setConfirmRemove(item) : undefined} disabled={busy} />
       ))}
       <Row top bold label="Total Additions" amount={`+ ${money(breakdown.totalAdditions)}`} color="var(--status-good)" />
 
@@ -190,7 +194,7 @@ export default function EmployeePayrollModal({
         borderTop: '2px solid var(--color-text)', marginTop: '1rem', paddingTop: '0.8rem',
       }}>
         <span style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--color-text)' }}>Final Pay</span>
-        <span style={{ fontWeight: 800, fontSize: '1.5rem', color: 'var(--color-text)', fontVariantNumeric: 'tabular-nums' }}>
+        <span style={{ fontWeight: 800, fontSize: '1.5rem', color: 'var(--status-good)', fontVariantNumeric: 'tabular-nums' }}>
           {money(breakdown.finalAmount)}
         </span>
       </div>
@@ -198,17 +202,22 @@ export default function EmployeePayrollModal({
       {record.status === 'on_hold' && record.hold_reason && (
         <p style={{ fontSize: '0.82rem', color: 'var(--status-serious)', marginTop: '0.6rem' }}>On hold: {record.hold_reason}</p>
       )}
-      {reviewPosition && !locked && record.status !== 'on_hold' && (
-        <button className="secondary" onClick={() => setHoldOpen(true)} disabled={busy}
-          style={{ marginTop: '0.8rem', fontSize: '0.8rem', padding: '0.3rem 0.7rem' }}>
-          Hold payment
-        </button>
-      )}
       {record.status === 'paid' && (
         <p style={{ fontSize: '0.82rem', color: 'var(--color-muted)', marginTop: '0.6rem' }}>
           Paid {record.paid_at ? new Date(record.paid_at).toLocaleDateString('en-GB') : ''} · {PAY_METHODS.find(m => m.value === record.payment_method)?.label || record.payment_method || '—'}
           {record.payment_reference ? ` · ref ${record.payment_reference}` : ''}
         </p>
+      )}
+
+      {confirmRemove && (
+        <ConfirmDialog
+          title="Remove this entry?"
+          message={`"${eventLabel(confirmRemove, showDates)}" (${money(confirmRemove.amount)}) will be deleted and ${employee.full_name}'s payroll recalculated.`}
+          confirmLabel="Remove"
+          danger
+          onConfirm={() => { const id = confirmRemove.id; setConfirmRemove(null); removeEntry(id) }}
+          onCancel={() => setConfirmRemove(null)}
+        />
       )}
 
       {addOpen && (

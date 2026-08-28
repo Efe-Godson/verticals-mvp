@@ -21,6 +21,7 @@ export default function PayrollSettingsModal({ form, formId, reloadForm, onClose
   const [daysMode, setDaysMode] = useState(initial.daysMode)
   const [workingDays, setWorkingDays] = useState(initial.workingDays)
   const [approvalRequired, setApprovalRequired] = useState(!!initial.approvalRequired)
+  const [showEntryDates, setShowEntryDates] = useState(initial.showEntryDates !== false)
   const [enabled, setEnabled] = useState(initial.enabledEntryTypes || ALL_TYPES)
   const [saving, setSaving] = useState(false)
 
@@ -45,6 +46,7 @@ export default function PayrollSettingsModal({ form, formId, reloadForm, onClose
         daysMode,
         workingDays: Number(workingDays) || 30,
         approvalRequired,
+        showEntryDates,
         enabledEntryTypes: enabled.length === ALL_TYPES.length ? null : enabled,
         currency: 'NGN',
       })
@@ -86,6 +88,11 @@ export default function PayrollSettingsModal({ form, formId, reloadForm, onClose
         <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', marginTop: '0.5rem' }}>
           <input type="checkbox" checked={approvalRequired} onChange={(e) => setApprovalRequired(e.target.checked)} />
           Require payroll approval before payment
+        </label>
+
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', marginTop: '0.5rem' }}>
+          <input type="checkbox" checked={showEntryDates} onChange={(e) => setShowEntryDates(e.target.checked)} />
+          Show the date on each entry in the payroll breakdown
         </label>
 
         <div style={{ marginTop: '1rem' }}>

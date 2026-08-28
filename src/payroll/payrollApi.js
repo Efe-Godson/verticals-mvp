@@ -27,6 +27,7 @@ export function payrollSettings(form) {
     currency: 'NGN',
     approvalRequired: false,
     enabledEntryTypes: null, // null = all enabled
+    showEntryDates: true, // show the date on each entry line in the breakdown
     ...(form?.settings?.payroll || {}),
   }
 }

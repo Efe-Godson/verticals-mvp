@@ -72,13 +72,14 @@ export function MonthPicker({ value, onChange, style }) {
 // Now a thin alias over the shared <Modal> (src/components/Modal.jsx) so
 // payroll modals get the same bottom-sheet-on-phone behaviour as the rest
 // of the app. `wide` -> size="lg", otherwise size="md".
-export function PayrollModal({ title, onClose, children, footer, wide = false, maxWidth }) {
+export function PayrollModal({ title, onClose, children, footer, wide = false, maxWidth, hideHeader = false }) {
   return (
     <Modal
       size={maxWidth ? 'lg' : (wide ? 'lg' : 'md')}
       onClose={onClose}
       title={title}
       footer={footer}
+      hideHeader={hideHeader}
     >
       {children}
     </Modal>
