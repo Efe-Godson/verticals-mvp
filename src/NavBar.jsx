@@ -320,7 +320,7 @@ function NavBar() {
             on the picker pages that have no Options of their own yet -
             never falling back to Menu there, see isRecordsOrReportsRoute
             above), since Home is one tap away on the bottom bar regardless. */}
-        {pageOptions ? (
+        {isPayrollEnv ? null : pageOptions ? (
           <button
             type="button"
             onClick={pageOptions.onClick}
@@ -355,11 +355,15 @@ function NavBar() {
         )}
       </div>
 
+      {/* Payroll's own section nav lives here, right under the bar, at every
+          width - Payroll runs as a contained environment (see the trimmed
+          links above). */}
+      {isPayrollEnv && id && <PayrollNavTabs id={id} pathname={location.pathname} />}
+
       {/* Fixed bottom tab bar - Home/Records/Reports, see
           MobileBottomNav.jsx. Only ever shown alongside navbar-mobile-row
           above (same breakpoint), see the matching CSS in index.css.
-          Hidden in the contained Payroll environment - its own slide-out
-          is the section nav there. */}
+          Hidden in the contained Payroll environment. */}
       {!isPayrollEnv && <MobileBottomNav />}
 
       {menuOpen && (
@@ -493,6 +497,37 @@ function NavBar() {
         </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+// Payroll section nav (Payments / Staff / Events), shown under the app bar
+// on every /form/:id/payroll* route at all widths.
+function PayrollNavTabs({ id, pathname }) {
+  const tabs = [
+    { to: `/form/${id}/payroll`, label: 'Payments', active: /\/payroll\/?$/.test(pathname) },
+    { to: `/form/${id}/payroll/staff`, label: 'Staff', active: pathname.includes('/payroll/staff') },
+    { to: `/form/${id}/payroll/events`, label: 'Events', active: pathname.includes('/payroll/events') },
+  ]
+  return (
+    <div style={{
+      display: 'flex', gap: '0.2rem', padding: '0 1.5rem', overflowX: 'auto',
+      borderTop: '1px solid var(--color-border)',
+    }}>
+      {tabs.map(t => (
+        <Link
+          key={t.label}
+          to={t.to}
+          style={{
+            padding: '0.6rem 0.9rem', fontSize: '0.9rem', fontWeight: 600, whiteSpace: 'nowrap',
+            color: t.active ? 'var(--color-primary)' : 'var(--color-muted)',
+            borderBottom: t.active ? '2px solid var(--color-primary)' : '2px solid transparent',
+            marginBottom: '-1px',
+          }}
+        >
+          {t.label}
+        </Link>
+      ))}
     </div>
   )
 }
