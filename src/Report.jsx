@@ -15,6 +15,7 @@ import AIRecommendationsModal from './report/ai/AIRecommendationsModal'
 import HorizontalBarChart from './report/components/HorizontalBarChart'
 import PieChart from './report/components/PieChart'
 import PivotTable from './report/components/PivotTable'
+import PromotedVisuals from './report/PromotedVisuals'
 import { getGroupableFields, getMeasureOptions, computePivot, toChartData } from './report/helpers/pivotEngine'
 import { formatNaira, median } from './report/helpers/analysisUtils'
 import { DATE_RANGE_OPTIONS, getDateRangeBounds, getDateRangeLabel } from './report/helpers/dateRange'
@@ -244,7 +245,7 @@ function Report() {
             onClick={() => { navigate(`/form/${id}/report/builder`); setOptionsMenuOpen(false) }}
             style={optionsMenuItemStyle}
           >
-            Report Builder
+            Open Report Builder
           </button>
         </>
       )}
@@ -479,6 +480,8 @@ function Report() {
               ))}
             </div>
           )}
+
+          <PromotedVisuals form={form} submissions={filteredSubmissions} />
         </>
       )}
 

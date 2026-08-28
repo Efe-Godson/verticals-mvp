@@ -17,7 +17,7 @@ import Records from './Records'
 import Inventory from './Inventory'
 import ShortLinkRedirect from './ShortLinkRedirect'
 import Report from './Report'
-import ReportBuilder from './ReportBuilder'
+import ReportBuilderWorkspace from './report/builder/ReportBuilderWorkspace'
 import AIAnalystPage from './AIAnalystPage'
 import FormSettings from './FormSettings'
 import AdminStaff from './AdminStaff'
@@ -106,7 +106,10 @@ function AppShell() {
   // append this so those pages open on their own, without the app's nav -
   // a cashier jumping over to edit the menu shouldn't land in the full app shell.
   const isFocusMode = new URLSearchParams(location.search).get('focus') === '1'
-  const showNavBar = !isPublicForm && !isShortLink && !isQuizPlayer && !isLogin && !isSignUp && !isConfirmEmail && !isResetPassword && !isFocusMode
+  // The Report Builder is a contained full-screen workspace with its own
+  // chrome (see report/builder/ReportBuilderWorkspace.jsx) - no app NavBar.
+  const isReportBuilder = /^\/form\/[^/]+\/report\/builder\/?$/.test(location.pathname)
+  const showNavBar = !isPublicForm && !isShortLink && !isQuizPlayer && !isLogin && !isSignUp && !isConfirmEmail && !isResetPassword && !isFocusMode && !isReportBuilder
 
   return (
     <>
@@ -158,7 +161,7 @@ function AppShell() {
         {/* Deliberately NOT added to StaffScopedRoute's allowed-paths regex above -
             staff navigating here directly get bounced back to their order screen,
             same as /settings and /admin do today, so this stays owner-only. */}
-        <Route path="/form/:id/report/builder" element={<PrivateRoute><StaffScopedRoute><ReportBuilder /></StaffScopedRoute></PrivateRoute>} />
+        <Route path="/form/:id/report/builder" element={<PrivateRoute><StaffScopedRoute><ReportBuilderWorkspace /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/form/:id/ai-analyst" element={<PrivateRoute><StaffScopedRoute><AIAnalystPage /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/form/:id/settings" element={<PrivateRoute><StaffScopedRoute><FormSettings /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/form/:id/admin" element={<PrivateRoute><StaffScopedRoute><AdminStaff /></StaffScopedRoute></PrivateRoute>} />
