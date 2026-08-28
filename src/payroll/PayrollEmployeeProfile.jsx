@@ -85,7 +85,7 @@ export default function PayrollEmployeeProfile() {
     try {
       await deleteEmployee(formId, empId)
       showToast('Employee removed.', 'success')
-      navigate('/form/' + formId + '/payroll/employees')
+      navigate('/form/' + formId + '/payroll/staff')
     } catch (err) {
       showToast('Could not remove: ' + err.message, 'error')
     }

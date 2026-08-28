@@ -1,6 +1,6 @@
 // Layout for every /form/:id/payroll/* tab. Loads the anchor form once,
-// renders the 6-section sub-nav (doc section 74), and hands the form down to
-// child routes via <Outlet context>. Child pages read it with
+// renders the 3-section sub-nav (Payments / Staff / Events), and hands the
+// form down to child routes via <Outlet context>. Child pages read it with
 // usePayroll() and call reloadForm() after they change form.settings.
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, NavLink, Outlet, useOutletContext } from 'react-router-dom'
@@ -9,12 +9,9 @@ import { LoadingState } from '../LoadingState'
 import { ErrorState } from '../ErrorState'
 
 const TABS = [
-  { to: '', label: 'Overview', end: true },
-  { to: 'employees', label: 'Employees' },
-  { to: 'entries', label: 'Entries' },
-  { to: 'monthly', label: 'Payroll' },
-  { to: 'payments', label: 'Payments' },
-  { to: 'settings', label: 'Settings' },
+  { to: '', label: 'Payments', end: true },
+  { to: 'staff', label: 'Staff' },
+  { to: 'events', label: 'Events' },
 ]
 
 export function usePayroll() {

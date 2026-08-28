@@ -1,8 +1,7 @@
-// Payroll settings (doc sections 59, 62) + Departments & Locations management.
-// Persisted into form.settings.payroll and the payroll_departments /
-// payroll_locations tables.
+// Payroll settings + Departments & Locations management, opened as a modal
+// from the Staff page's gear button. Persisted into form.settings.payroll
+// and the payroll_departments / payroll_locations tables.
 import { useEffect, useMemo, useState } from 'react'
-import { usePayroll } from './PayrollShell'
 import { useToast } from '../Toast'
 import ConfirmDialog from '../ConfirmDialog'
 import { Field, Select, TextInput, PayrollModal } from './ui'
@@ -15,8 +14,7 @@ import {
 
 const ALL_TYPES = [...DEDUCTION_TYPES, ...ADDITION_TYPES]
 
-export default function PayrollSettings() {
-  const { form, formId, reloadForm } = usePayroll()
+export default function PayrollSettingsModal({ form, formId, reloadForm, onClose }) {
   const { showToast } = useToast()
   const initial = useMemo(() => payrollSettings(form), [form])
 
@@ -60,7 +58,12 @@ export default function PayrollSettings() {
   }
 
   return (
-    <div style={{ maxWidth: '620px' }}>
+    <PayrollModal
+      title="Payroll Settings"
+      wide
+      onClose={onClose}
+      footer={<button className="secondary" onClick={onClose}>Done</button>}
+    >
       <div className="card" style={{ padding: '1.3rem', marginBottom: '1rem' }}>
         <h3 style={{ marginTop: 0, fontSize: '1rem' }}>Payroll rules</h3>
 
@@ -128,7 +131,7 @@ export default function PayrollSettings() {
         onArchive={archiveLocation}
         afterChange={loadLists}
       />
-    </div>
+    </PayrollModal>
   )
 }
 

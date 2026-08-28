@@ -28,13 +28,10 @@ import QuizRoom from './QuizRoom'
 import QuizAdminDashboard from './QuizAdminDashboard'
 import QuizPointHistory from './QuizPointHistory'
 import PayrollShell from './payroll/PayrollShell'
-import PayrollOverview from './payroll/PayrollOverview'
 import PayrollEmployees from './payroll/PayrollEmployees'
 import PayrollEmployeeProfile from './payroll/PayrollEmployeeProfile'
 import PayrollEntries from './payroll/PayrollEntries'
 import PayrollMonthly from './payroll/PayrollMonthly'
-import PayrollPayments from './payroll/PayrollPayments'
-import PayrollSettings from './payroll/PayrollSettings'
 import Login from './Login'
 import SignUp from './SignUp'
 import ConfirmEmail from './ConfirmEmail'
@@ -169,13 +166,10 @@ function AppShell() {
             StaffScopedRoute's allow-list on purpose). PayrollShell loads the
             anchor form once and shares it with every tab via <Outlet>. */}
         <Route path="/form/:id/payroll" element={<PrivateRoute><StaffScopedRoute><PayrollShell /></StaffScopedRoute></PrivateRoute>}>
-          <Route index element={<PayrollOverview />} />
-          <Route path="employees" element={<PayrollEmployees />} />
-          <Route path="employees/:empId" element={<PayrollEmployeeProfile />} />
-          <Route path="entries" element={<PayrollEntries />} />
-          <Route path="monthly" element={<PayrollMonthly />} />
-          <Route path="payments" element={<PayrollPayments />} />
-          <Route path="settings" element={<PayrollSettings />} />
+          <Route index element={<PayrollMonthly />} />
+          <Route path="staff" element={<PayrollEmployees />} />
+          <Route path="staff/:empId" element={<PayrollEmployeeProfile />} />
+          <Route path="events" element={<PayrollEntries />} />
         </Route>
       </Routes>
       </div>

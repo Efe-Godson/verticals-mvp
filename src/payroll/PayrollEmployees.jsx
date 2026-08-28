@@ -9,9 +9,10 @@ import { money, EmployeeStatusBadge, LocationFilter } from './ui'
 import { payrollSettings, listEmployees, listDepartments, listLocations } from './payrollApi'
 import EmployeeFormModal from './EmployeeFormModal'
 import ImportModal from './ImportModal'
+import PayrollSettingsModal from './PayrollSettingsModal'
 
 export default function PayrollEmployees() {
-  const { form, formId } = usePayroll()
+  const { form, formId, reloadForm } = usePayroll()
   const navigate = useNavigate()
   const settings = useMemo(() => payrollSettings(form), [form])
 
@@ -26,6 +27,7 @@ export default function PayrollEmployees() {
   const [statusFilter, setStatusFilter] = useState('')
   const [addOpen, setAddOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   async function load() {
     setLoading(true)
@@ -75,7 +77,8 @@ export default function PayrollEmployees() {
             {['active', 'on_leave', 'suspended', 'inactive', 'terminated'].map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
           </select>
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button className="secondary" onClick={() => setSettingsOpen(true)} title="Payroll settings, departments &amp; locations">⚙ Settings</button>
           <button className="secondary" onClick={() => setImportOpen(true)}>Import</button>
           <button onClick={() => setAddOpen(true)}>+ Add Employee</button>
         </div>
@@ -128,6 +131,15 @@ export default function PayrollEmployees() {
           locations={locations}
           onClose={() => setImportOpen(false)}
           onSaved={load}
+        />
+      )}
+
+      {settingsOpen && (
+        <PayrollSettingsModal
+          form={form}
+          formId={formId}
+          reloadForm={reloadForm}
+          onClose={() => { setSettingsOpen(false); load() }}
         />
       )}
     </div>

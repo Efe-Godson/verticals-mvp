@@ -1,12 +1,15 @@
-// Monthly payroll run (doc sections 21-22, 29-30): Run Payroll, the
-// simplified table, the employee modal, and the bulk review actions.
+// The Payments page (index tab): the month's payroll at a glance (KPI
+// strip), Run Payroll, the per-employee table + modal, and the bulk
+// review / approve / mark-paid actions.
 import { useEffect, useMemo, useState } from 'react'
 import { usePayroll } from './PayrollShell'
 import { useToast } from '../Toast'
 import { LoadingState } from '../LoadingState'
 import { ErrorState } from '../ErrorState'
 import ConfirmDialog from '../ConfirmDialog'
+import StatTile from '../report/components/StatTile'
 import { MonthPicker, LocationFilter, PayrollModal, money, monthLabel, currentMonth, RecordStatusBadge } from './ui'
+import { calculateEmployeePayroll } from './calculatePayroll'
 import {
   payrollSettings, listEmployees, listDepartments, listLocations, listEntries, loadRecordsForMonth,
   runPayroll, bulkSetRecordStatus, createPaymentBatch,
@@ -67,6 +70,28 @@ export default function PayrollMonthly() {
     [allRecords, location, empById]
   )
   const hasDraftRun = allRecords.length > 0
+
+  // Live projection for the KPI strip - covers the selected location and
+  // stays useful before Run Payroll has produced any records.
+  const kpi = useMemo(() => {
+    const active = employees.filter(e => e.employment_status !== 'terminated' && (!location || e.primary_location_id === location))
+    const bd = active.map(emp => calculateEmployeePayroll({
+      employee: emp,
+      entries: entries.filter(en => en.employee_id === emp.id && en.status !== 'rejected'),
+      payrollMonth: month,
+      settings,
+    }))
+    const paidAmount = records.filter(r => r.status === 'paid').reduce((s, r) => s + Number(r.final_amount || 0), 0)
+    return {
+      staff: bd.length,
+      base: bd.reduce((s, b) => s + b.baseSalary, 0),
+      deductions: bd.reduce((s, b) => s + b.totalDeductions, 0),
+      additions: bd.reduce((s, b) => s + b.totalAdditions, 0),
+      final: bd.reduce((s, b) => s + b.finalAmount, 0),
+      paidAmount,
+      paidCount: records.filter(r => r.status === 'paid').length,
+    }
+  }, [employees, entries, records, month, settings, location])
 
   async function handleRun() {
     setRunning(true)
@@ -136,6 +161,15 @@ export default function PayrollMonthly() {
           {hasDraftRun && approvable.length > 0 && <button className="secondary" onClick={() => setConfirmApproveAll(true)}>Approve All</button>}
           <button onClick={handleRun} disabled={running}>{running ? 'Running…' : hasDraftRun ? 'Re-run Payroll' : 'Run Payroll'}</button>
         </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: '0.7rem', flexWrap: 'wrap', marginBottom: '1.2rem' }}>
+        <StatTile label="Staff" value={kpi.staff} />
+        <StatTile label="Base Payroll" value={money(kpi.base)} />
+        <StatTile label="Deductions" value={money(kpi.deductions)} />
+        <StatTile label="Additions" value={money(kpi.additions)} />
+        <StatTile label="Final Payroll" value={money(kpi.final)} />
+        <StatTile label="Paid" value={`${money(kpi.paidAmount)} / ${money(kpi.final)}`} />
       </div>
 
       {!hasDraftRun ? (
