@@ -15,15 +15,25 @@ const PAY_METHODS = [
   { value: 'other', label: 'Other' },
 ]
 
-function LineRow({ label, sub, value, strong, color }) {
+// A ledger row: label in column 1, an optional line-item amount in column 2,
+// and an optional running-total in column 3 (Base Pay / subtotals / Net Pay
+// stack down that outer column so the arithmetic reads top to bottom).
+function LRow({ label, sub, amount, total, amountColor, totalColor, strong, grand, indent, muted, top, onRemove, disabled }) {
+  const bold = strong || grand
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', padding: '0.35rem 0', fontWeight: strong ? 700 : 400 }}>
-      <span style={{ color: color || 'inherit' }}>
+    <>
+      <div className={`pr-lbl${indent ? ' i' : ''}${top ? ' t' : ''}${grand ? ' g' : ''}`}
+        style={{ color: muted ? 'var(--color-muted)' : undefined, fontWeight: bold ? 700 : undefined, fontSize: grand ? '1.05rem' : undefined }}>
         {label}
-        {sub && <span style={{ display: 'block', fontSize: '0.76rem', color: 'var(--color-muted)', fontWeight: 400 }}>{sub}</span>}
-      </span>
-      <span style={{ color: color || 'inherit', whiteSpace: 'nowrap' }}>{value}</span>
-    </div>
+        {onRemove && <button className="secondary" onClick={onRemove} disabled={disabled} style={{ marginLeft: '0.4rem', padding: '0 0.35rem', fontSize: '0.7rem' }}>×</button>}
+        {sub && <span style={{ display: 'block', fontSize: '0.74rem', color: 'var(--color-muted)', fontWeight: 400 }}>{sub}</span>}
+      </div>
+      <div className={`pr-amt${top ? ' t' : ''}`} style={{ color: amountColor }}>{amount || ''}</div>
+      <div className={`pr-amt${top ? ' t' : ''}${grand ? ' g' : ''}`}
+        style={{ color: totalColor, fontWeight: bold ? 800 : undefined, fontSize: grand ? '1.2rem' : undefined }}>
+        {total || ''}
+      </div>
+    </>
   )
 }
 
@@ -134,49 +144,60 @@ export default function EmployeePayrollModal({
         </div>
       )}
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-        <span style={{ fontSize: '0.85rem', color: 'var(--color-muted)' }}>
-          {[employee.job_title, employee.department_name, employee.location_name].filter(Boolean).join(' · ')}
-        </span>
-        <RecordStatusBadge status={record.status} />
+      <style>{`
+        .pr-ledger { display: grid; grid-template-columns: 1fr minmax(84px, auto) minmax(96px, auto);
+          column-gap: 0.9rem; row-gap: 0.1rem; align-items: baseline; margin-top: 0.4rem; }
+        .pr-ledger .pr-lbl { padding: 0.32rem 0; }
+        .pr-ledger .pr-lbl.i { padding-left: 0.9rem; }
+        .pr-ledger .pr-amt { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; padding: 0.32rem 0; }
+        .pr-ledger .pr-sec { grid-column: 1 / -1; margin-top: 0.75rem; font-size: 0.72rem; font-weight: 700;
+          letter-spacing: 0.05em; text-transform: uppercase; color: var(--color-muted); }
+        .pr-ledger .t { border-bottom: 1px dotted var(--color-border); }
+        .pr-ledger .g { border-top: 2px solid var(--color-border); margin-top: 0.35rem; padding-top: 0.55rem; }
+      `}</style>
+
+      {/* centred name, with the daily rate small above it */}
+      <div style={{ textAlign: 'center', marginBottom: '0.4rem' }}>
+        <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)', fontVariantNumeric: 'tabular-nums' }}>
+          {money(breakdown.dailyRate, 2)} / day · {breakdown.daysInPeriod} days
+        </div>
+        <div style={{ fontSize: '1.55rem', fontWeight: 800, lineHeight: 1.15, margin: '0.1rem 0 0.35rem' }}>
+          {employee.full_name}
+        </div>
+        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap', fontSize: '0.82rem', color: 'var(--color-muted)' }}>
+          <span>{[employee.job_title, employee.department_name, employee.location_name].filter(Boolean).join(' · ')}</span>
+          <RecordStatusBadge status={record.status} />
+        </div>
       </div>
 
-      <LineRow label="Base Salary" value={money(breakdown.baseSalary)} strong />
-      <LineRow label="Daily Rate" sub={`${breakdown.daysInPeriod} days in period`} value={money(breakdown.dailyRate, 2)} />
+      <div className="pr-ledger">
+        <LRow top label="Base Pay" total={money(breakdown.baseSalary)} />
 
-      <div style={{ marginTop: '0.9rem', fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.04em', color: 'var(--color-muted)' }}>ADDITIONS</div>
-      {additions.length === 0 && <div style={{ color: 'var(--color-muted)', fontSize: '0.85rem', padding: '0.35rem 0' }}>No additions</div>}
-      {additions.map(item => (
-        <LineRow
-          key={item.id}
-          label={<>{item.label}{!locked && <button className="secondary" onClick={() => removeEntry(item.id)} style={{ marginLeft: '0.5rem', padding: '0 0.4rem', fontSize: '0.72rem' }} disabled={busy}>×</button>}</>}
-          sub={item.reason}
-          value={`+${money(item.amount, 2)}`}
-          color="var(--status-good)"
-        />
-      ))}
-      <LineRow label="Total Additions" value={`+${money(breakdown.totalAdditions)}`} strong color="var(--status-good)" />
+        <div className="pr-sec">Deductions</div>
+        {deductions.length === 0
+          ? <LRow indent muted label="No deductions" />
+          : deductions.map(item => (
+            <LRow key={item.id} indent
+              label={item.label} sub={item.reason}
+              amount={`− ${money(item.amount, 2)}`} amountColor="var(--status-critical)"
+              onRemove={!locked ? () => removeEntry(item.id) : undefined} disabled={busy}
+            />
+          ))}
+        <LRow top label="Total Deductions" total={`− ${money(breakdown.totalDeductions)}`} totalColor="var(--status-critical)" strong />
 
-      <div style={{ marginTop: '0.9rem', fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.04em', color: 'var(--color-muted)' }}>DEDUCTIONS</div>
-      {deductions.length === 0 && <div style={{ color: 'var(--color-muted)', fontSize: '0.85rem', padding: '0.35rem 0' }}>No deductions</div>}
-      {deductions.map(item => (
-        <LineRow
-          key={item.id}
-          label={<>{item.label}{!locked && <button className="secondary" onClick={() => removeEntry(item.id)} style={{ marginLeft: '0.5rem', padding: '0 0.4rem', fontSize: '0.72rem' }} disabled={busy}>×</button>}</>}
-          sub={item.reason}
-          value={`-${money(item.amount, 2)}`}
-          color="var(--status-critical)"
-        />
-      ))}
-      <LineRow label="Total Deductions" value={`-${money(breakdown.totalDeductions)}`} strong color="var(--status-critical)" />
+        <div className="pr-sec">Additions</div>
+        {additions.length === 0
+          ? <LRow indent muted label="No additions" />
+          : additions.map(item => (
+            <LRow key={item.id} indent
+              label={item.label} sub={item.reason}
+              amount={`+ ${money(item.amount, 2)}`} amountColor="var(--status-good)"
+              onRemove={!locked ? () => removeEntry(item.id) : undefined} disabled={busy}
+            />
+          ))}
+        <LRow top label="Total Additions" total={`+ ${money(breakdown.totalAdditions)}`} totalColor="var(--status-good)" strong />
 
-      <div style={{ borderTop: '2px solid var(--color-border)', marginTop: '0.9rem', paddingTop: '0.6rem' }}>
-        <LineRow
-          label={<span style={{ fontSize: '1.05rem' }}>Final Amount</span>}
-          sub={`${money(breakdown.baseSalary)} + ${money(breakdown.totalAdditions)} − ${money(breakdown.totalDeductions)}`}
-          value={<span style={{ fontSize: '1.15rem' }}>{money(breakdown.finalAmount)}</span>}
-          strong
-        />
+        <LRow grand label="Net Pay" total={money(breakdown.finalAmount)} />
       </div>
 
       {record.status === 'on_hold' && record.hold_reason && (
@@ -232,7 +253,10 @@ export default function EmployeePayrollModal({
             </button>
           </>}
         >
-          <LineRow label="Final Amount" value={<span style={{ fontSize: '1.1rem' }}>{money(breakdown.finalAmount)}</span>} strong />
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, marginBottom: '0.9rem' }}>
+            <span>Net Pay</span>
+            <span style={{ fontSize: '1.1rem' }}>{money(breakdown.finalAmount)}</span>
+          </div>
           <Field label="Payment Method">
             <Select value={payMethod} onChange={(e) => setPayMethod(e.target.value)}>
               {PAY_METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
