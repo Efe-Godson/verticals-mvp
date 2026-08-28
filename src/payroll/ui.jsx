@@ -5,8 +5,12 @@ import Modal from '../components/Modal'
 import { formatNaira } from '../report/helpers/analysisUtils'
 import { DEDUCTION_TYPES, ADDITION_TYPES, ENTRY_TYPE_LABELS } from './calculatePayroll'
 
+// Segoe UI (the default on Windows/Chrome) draws the ₦ glyph with long
+// horizontal strike bars that visually run into the following digits, so a
+// figure reads as struck-through. A narrow no-break space after the symbol
+// separates them cleanly.
 export function money(value, decimals = 0) {
-  return formatNaira(value, decimals)
+  return formatNaira(value, decimals).replace('₦', '₦ ')
 }
 
 // Abbreviated currency for tight spaces (mobile KPI cards): ₦3.27M, ₦42.5K.
@@ -18,9 +22,9 @@ export function moneyShort(value) {
   const n = Number(value) || 0
   const abs = Math.abs(n)
   const sign = n < 0 ? '-' : ''
-  if (abs >= 1_000_000) return `${sign}₦${trimZeros((abs / 1_000_000).toFixed(abs >= 10_000_000 ? 1 : 2))}M`
-  if (abs >= 10_000) return `${sign}₦${trimZeros((abs / 1_000).toFixed(abs >= 100_000 ? 0 : 1))}K`
-  return `${sign}₦${abs.toLocaleString()}`
+  if (abs >= 1_000_000) return `${sign}₦ ${trimZeros((abs / 1_000_000).toFixed(abs >= 10_000_000 ? 1 : 2))}M`
+  if (abs >= 10_000) return `${sign}₦ ${trimZeros((abs / 1_000).toFixed(abs >= 100_000 ? 0 : 1))}K`
+  return `${sign}₦ ${abs.toLocaleString()}`
 }
 
 export function currentMonth() {

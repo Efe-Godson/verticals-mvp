@@ -103,24 +103,22 @@ export default function EmployeePayrollModal({
       wide
       footer={
         <>
-          {reviewPosition && onPrev && reviewPosition.index > 1 && (
-            <button className="secondary" onClick={onPrev} disabled={busy} style={{ marginRight: 'auto' }}>← Back</button>
+          {reviewPosition && (
+            <button className="secondary" onClick={onPrev} disabled={busy || reviewPosition.index <= 1} style={{ marginRight: 'auto' }}>← Back</button>
           )}
           {locked ? (
-            <span style={{ fontSize: '0.82rem', color: 'var(--color-muted)' }}>
-              This payroll is {record.status}.
-            </span>
+            <span style={{ fontSize: '0.82rem', color: 'var(--color-muted)' }}>This payroll is {record.status}.</span>
           ) : (
             <>
               <button className="secondary" onClick={() => setAddOpen(true)} disabled={busy}>+ Add Entry</button>
-              {record.status !== 'on_hold' && <button className="secondary" onClick={() => setHoldOpen(true)} disabled={busy}>Hold</button>}
+              {!reviewPosition && record.status !== 'on_hold' && <button className="secondary" onClick={() => setHoldOpen(true)} disabled={busy}>Hold</button>}
               {record.status !== 'approved' && <button className="secondary" onClick={() => move('approved')} disabled={busy}>Approve</button>}
               <button onClick={() => setPayOpen(true)} disabled={busy}>Pay</button>
             </>
           )}
           {reviewPosition && (
-            <button className="secondary" onClick={onNext} disabled={busy}>
-              {isLastInReview ? 'Finish' : (locked ? 'Next →' : 'Skip →')}
+            <button onClick={onNext} disabled={busy}>
+              {isLastInReview ? 'Finish' : 'Next →'}
             </button>
           )}
         </>
@@ -144,7 +142,8 @@ export default function EmployeePayrollModal({
         <RecordStatusBadge status={record.status} />
       </div>
 
-      <LineRow label="Base Salary" sub={`Daily rate ${money(breakdown.dailyRate, 2)} · ${breakdown.daysInPeriod} days`} value={money(breakdown.baseSalary)} strong />
+      <LineRow label="Base Salary" value={money(breakdown.baseSalary)} strong />
+      <LineRow label="Daily Rate" sub={`${breakdown.daysInPeriod} days in period`} value={money(breakdown.dailyRate, 2)} />
 
       <div style={{ marginTop: '0.9rem', fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.04em', color: 'var(--color-muted)' }}>ADDITIONS</div>
       {additions.length === 0 && <div style={{ color: 'var(--color-muted)', fontSize: '0.85rem', padding: '0.35rem 0' }}>No additions</div>}
@@ -183,6 +182,12 @@ export default function EmployeePayrollModal({
 
       {record.status === 'on_hold' && record.hold_reason && (
         <p style={{ fontSize: '0.82rem', color: 'var(--status-serious)', marginTop: '0.6rem' }}>On hold: {record.hold_reason}</p>
+      )}
+      {reviewPosition && !locked && record.status !== 'on_hold' && (
+        <button className="secondary" onClick={() => setHoldOpen(true)} disabled={busy}
+          style={{ marginTop: '0.8rem', fontSize: '0.8rem', padding: '0.3rem 0.7rem' }}>
+          Hold payment
+        </button>
       )}
       {record.status === 'paid' && (
         <p style={{ fontSize: '0.82rem', color: 'var(--color-muted)', marginTop: '0.6rem' }}>
