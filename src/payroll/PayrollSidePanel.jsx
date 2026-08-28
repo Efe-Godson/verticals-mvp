@@ -1,9 +1,10 @@
 // Place at: src/payroll/PayrollSidePanel.jsx
 // Payroll runs as its own contained environment - the app NavBar is hidden
-// on /form/:id/payroll* (see App.jsx's isPayrollEnv). This is the section
-// nav: a fixed hamburger + left slide-out (Payments / Staff / Events) and a
-// fixed back arrow, exactly like the restaurant/retail POS flow
-// (src/PosSidePanel.jsx).
+// on /form/:id/payroll* (see App.jsx's isPayrollEnv). This is the whole
+// nav for it: a fixed hamburger + left slide-out drawer and a fixed back
+// arrow, exactly like the restaurant/retail POS flow (src/PosSidePanel.jsx).
+// The drawer holds the three payroll sections up top, then the same
+// "jump to the rest of this form" options the POS panel carries.
 import { useState } from 'react'
 import { NavLink, Link } from 'react-router-dom'
 import ArrowLeftIcon from '../ArrowLeftIcon'
@@ -16,6 +17,18 @@ const SECTIONS = [
 
 export default function PayrollSidePanel({ formId }) {
   const [open, setOpen] = useState(false)
+  const close = () => setOpen(false)
+
+  const sectionTo = (s) => (s.to ? `/form/${formId}/payroll/${s.to}` : `/form/${formId}/payroll`)
+
+  // Same "rest of this form" destinations the POS side panel pins, so you
+  // can get to Records / Reports / Settings without leaving payroll first.
+  // ?focus=1 keeps them out of the app NavBar (see App.jsx's isFocusMode).
+  const MORE = [
+    { label: 'Records', to: `/form/${formId}/records?focus=1` },
+    { label: 'Reports', to: `/form/${formId}/report?focus=1` },
+    { label: 'Settings', to: `/form/${formId}/settings?focus=1` },
+  ]
 
   return (
     <>
@@ -51,7 +64,7 @@ export default function PayrollSidePanel({ formId }) {
       </Link>
 
       {open && (
-        <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 150 }} />
+        <div onClick={close} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 150 }} />
       )}
 
       <div style={{
@@ -59,11 +72,11 @@ export default function PayrollSidePanel({ formId }) {
         background: 'var(--color-primary)', color: 'white', zIndex: 151,
         transform: open ? 'translateX(0)' : 'translateX(-100%)', transition: 'transform 0.2s ease',
         padding: 'calc(1rem + env(safe-area-inset-top)) 1rem calc(1rem + env(safe-area-inset-bottom))',
-        boxShadow: '2px 0 12px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column',
+        boxShadow: '2px 0 12px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', overflowY: 'auto',
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.4rem' }}>
           <span style={{ fontWeight: 700 }}>Payroll</span>
-          <button type="button" onClick={() => setOpen(false)} aria-label="Close menu"
+          <button type="button" onClick={close} aria-label="Close menu"
             style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '1.3rem', lineHeight: 1, cursor: 'pointer', padding: 0 }}>
             ✕
           </button>
@@ -73,9 +86,9 @@ export default function PayrollSidePanel({ formId }) {
           {SECTIONS.map(s => (
             <NavLink
               key={s.to || 'payments'}
-              to={s.to ? `/form/${formId}/payroll/${s.to}` : `/form/${formId}/payroll`}
+              to={sectionTo(s)}
               end={s.end}
-              onClick={() => setOpen(false)}
+              onClick={close}
               style={({ isActive }) => ({
                 color: 'white', textDecoration: 'none', padding: '0.7rem 0.6rem', borderRadius: 6, fontSize: '0.92rem',
                 fontWeight: isActive ? 700 : 400,
@@ -85,11 +98,24 @@ export default function PayrollSidePanel({ formId }) {
               {s.label}
             </NavLink>
           ))}
+
+          <div style={{ height: 1, background: 'rgba(255,255,255,0.22)', margin: '0.55rem 0.2rem' }} />
+
+          {MORE.map(link => (
+            <Link
+              key={link.label}
+              to={link.to}
+              onClick={close}
+              style={{ color: 'white', textDecoration: 'none', padding: '0.7rem 0.6rem', borderRadius: 6, fontSize: '0.92rem' }}
+            >
+              {link.label}
+            </Link>
+          ))}
         </nav>
 
         <Link
           to="/"
-          onClick={() => setOpen(false)}
+          onClick={close}
           style={{ marginTop: 'auto', color: 'rgba(255,255,255,0.85)', textDecoration: 'none', padding: '0.7rem 0.6rem', fontSize: '0.85rem' }}
         >
           ← All businesses
