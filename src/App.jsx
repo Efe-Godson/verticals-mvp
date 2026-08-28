@@ -107,7 +107,10 @@ function AppShell() {
   // The Report Builder is a contained full-screen workspace with its own
   // chrome (see report/builder/ReportBuilderWorkspace.jsx) - no app NavBar.
   const isReportBuilder = /^\/form\/[^/]+\/report\/builder\/?$/.test(location.pathname)
-  const showNavBar = !isPublicForm && !isShortLink && !isQuizPlayer && !isLogin && !isSignUp && !isConfirmEmail && !isResetPassword && !isFocusMode && !isReportBuilder
+  // Payroll is a contained environment with its own slide-out nav + back
+  // button (see payroll/PayrollSidePanel.jsx), like the POS focus flow.
+  const isPayrollEnv = /^\/form\/[^/]+\/payroll(\/|$)/.test(location.pathname)
+  const showNavBar = !isPublicForm && !isShortLink && !isQuizPlayer && !isLogin && !isSignUp && !isConfirmEmail && !isResetPassword && !isFocusMode && !isReportBuilder && !isPayrollEnv
 
   return (
     <>
