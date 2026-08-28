@@ -17,6 +17,7 @@ import Records from './Records'
 import Inventory from './Inventory'
 import ShortLinkRedirect from './ShortLinkRedirect'
 import Report from './Report'
+import ErrorBoundary from './ErrorBoundary'
 import ReportBuilderWorkspace from './report/builder/ReportBuilderWorkspace'
 import AIAnalystPage from './AIAnalystPage'
 import FormSettings from './FormSettings'
@@ -119,6 +120,7 @@ function AppShell() {
           form page has no such bar and would just get pointless empty
           space at the bottom otherwise. */}
       <div className={showNavBar ? 'app-content-under-navbar' : undefined}>
+      <ErrorBoundary key={location.pathname}>
       <Routes>
         <Route path="/s/:code" element={<ShortLinkRedirect />} />
         <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
@@ -172,6 +174,7 @@ function AppShell() {
           <Route path="events" element={<PayrollEntries />} />
         </Route>
       </Routes>
+      </ErrorBoundary>
       </div>
     </>
   )
