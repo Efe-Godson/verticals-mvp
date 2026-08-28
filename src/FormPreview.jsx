@@ -4,6 +4,7 @@
 // "Preview" button on the Create/Edit form pages so builders can see exactly
 // what a respondent will see without saving or leaving the editor.
 import { useState } from 'react'
+import Modal from './components/Modal'
 import { COUNTRIES, statesFor, citiesForField } from './lib/locationData'
 
 // Mirrors PublicForm.jsx's buildPages, kept as a separate copy rather than
@@ -253,28 +254,8 @@ function FormPreviewModal({ formName, description, fields, onClose }) {
   const isLastPage = pageIndex >= pages.length - 1
 
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.55)',
-        zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'flex-start',
-        padding: '3rem 1rem', overflowY: 'auto'
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="card"
-        style={{ maxWidth: '640px', width: '100%', padding: '1.5rem', background: 'var(--color-surface)', position: 'relative' }}
-      >
-        <div style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          marginBottom: '1rem', paddingBottom: '0.8rem', borderBottom: '1px solid var(--color-border)'
-        }}>
-          <span style={{ fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-muted)' }}>
-            Preview - respondent view
-          </span>
-          <button className="secondary" onClick={onClose}>Close</button>
-        </div>
+    <Modal size="lg" onClose={onClose} title="Preview — respondent view">
+      <div>
 
         <h1 style={{ marginTop: 0 }}>{formName || 'Untitled Form'}</h1>
         {description && <p>{description}</p>}
@@ -336,7 +317,7 @@ function FormPreviewModal({ formName, description, fields, onClose }) {
           </div>
         )}
       </div>
-    </div>
+    </Modal>
   )
 }
 

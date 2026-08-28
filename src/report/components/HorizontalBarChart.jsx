@@ -1,7 +1,8 @@
 // Place at: src/report/components/HorizontalBarChart.jsx
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import ChartTooltip, { useChartTooltip } from './ChartTooltip'
+import useIsMobile from '../../hooks/useIsMobile'
 
 // Category chart. Renders as vertical columns when there are 5 or fewer
 // categories (easier to compare at a glance), and falls back to the
@@ -40,13 +41,7 @@ function HorizontalBarChart({
     const [hovered, setHovered] = useState(null)
     const { tooltip, showTooltip, moveTooltip, hideTooltip } = useChartTooltip()
 
-    const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
-
-    useEffect(() => {
-        const resize = () => setIsMobile(window.innerWidth < 768)
-        window.addEventListener("resize", resize)
-        return () => window.removeEventListener("resize", resize)
-    }, [])
+    const isMobile = useIsMobile(768)
 
     // A fixed px label width either wastes space or truncates too hard
     // depending on how much room the row actually has (e.g. a focus-mode

@@ -5,6 +5,7 @@
 import { useState } from 'react'
 import { supabase } from './supabaseClient'
 import { useToast } from './Toast'
+import Modal from './components/Modal'
 import TemplateFieldEditor from './TemplateFieldEditor'
 
 export const CATEGORY_OPTIONS = ['Retail', 'Restaurant', 'Education', 'Healthcare', 'Nonprofit', 'Events', 'HR & Operations', 'Other']
@@ -134,20 +135,18 @@ function TemplateEditorDialog({ template, realForms, onClose, onSaved }) {
   }
 
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-        background: 'rgba(0,0,0,0.4)', display: 'flex',
-        alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '1rem'
-      }}
+    <Modal
+      size="lg"
+      onClose={onClose}
+      title={isEdit ? `Edit "${template.name}"` : 'New Template'}
+      footer={
+        <>
+          <button className="secondary" onClick={onClose}>Cancel</button>
+          <button onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Publish Template'}</button>
+        </>
+      }
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{ background: 'var(--color-surface)', borderRadius: '8px', padding: '1.5rem', width: '620px', maxWidth: '100%', maxHeight: '88vh', overflowY: 'auto' }}
-      >
-        <h3 style={{ margin: '0 0 1rem' }}>{isEdit ? `Edit "${template.name}"` : 'New Template'}</h3>
-
+      <div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
           <div style={{ display: 'flex', gap: '0.6rem' }}>
             <div style={{ flex: 2 }}>
@@ -213,12 +212,8 @@ function TemplateEditorDialog({ template, realForms, onClose, onSaved }) {
           </div>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', marginTop: '1.3rem' }}>
-          <button className="secondary" onClick={onClose}>Cancel</button>
-          <button onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Publish Template'}</button>
-        </div>
       </div>
-    </div>
+    </Modal>
   )
 }
 

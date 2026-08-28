@@ -9,6 +9,7 @@
 // definition for now; there's no shared catalog across forms yet.
 import { useState } from 'react'
 import * as XLSX from 'xlsx'
+import Modal from './components/Modal'
 import PackageBuilder from './PackageBuilder'
 import ConfirmDialog from './ConfirmDialog'
 import SparkleIcon from './SparkleIcon'
@@ -63,20 +64,8 @@ function ProductForm({ product, onSave, onCancel }) {
   }
 
   return (
-    <div
-      onClick={onCancel}
-      style={{
-        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)',
-        display: 'grid', placeItems: 'start center', overflowY: 'auto', zIndex: 400, padding: '1rem'
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="card"
-        style={{ background: 'var(--color-surface)', padding: '1.5rem', width: '420px', maxWidth: '100%', margin: '3vh 0' }}
-      >
-        <h3 style={{ margin: '0 0 1rem' }}>{product ? 'Edit Product' : 'Add Product'}</h3>
-
+    <Modal size="sm" onClose={onCancel} title={product ? 'Edit Product' : 'Add Product'}>
+      <div>
         <label style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>Product Name</label>
         <input
           type="text" value={values.name} onChange={(e) => set({ name: e.target.value })}
@@ -176,7 +165,7 @@ function ProductForm({ product, onSave, onCancel }) {
           <button type="button" disabled={!canSave} onClick={handleSave}>Save Product</button>
         </div>
       </div>
-    </div>
+    </Modal>
   )
 }
 
@@ -218,18 +207,8 @@ function AiImportModal({ onClose, onImport }) {
   }
 
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)',
-        display: 'grid', placeItems: 'start center', overflowY: 'auto', zIndex: 400, padding: '1rem'
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="card"
-        style={{ background: 'var(--color-surface)', padding: '1.5rem', width: '560px', maxWidth: '100%', margin: '3vh 0' }}
-      >
+    <Modal size="md" onClose={onClose}>
+      <div>
         <h3 style={{ margin: '0 0 0.3rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <SparkleIcon size={18} /> Use AI to add new products
         </h3>
@@ -300,7 +279,7 @@ function AiImportModal({ onClose, onImport }) {
           </>
         )}
       </div>
-    </div>
+    </Modal>
   )
 }
 
@@ -527,7 +506,7 @@ function ProductManager({ products, onChange, onClose, inline = false, hideAiImp
           // uses) keeps the overflow contained to just this table instead
           // of either clipping the Category column/menu button off-screen
           // or forcing the whole page to scroll sideways.
-          <div className="table-scroll" style={{ marginTop: 0 }}>
+          <div className="table-wrap" style={{ marginTop: 0 }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
               <thead>
                 <tr style={{ background: 'var(--color-bg)' }}>
@@ -600,21 +579,7 @@ function ProductManager({ products, onChange, onClose, inline = false, hideAiImp
       {inline ? (
         <div style={{ marginTop: '0.8rem' }}>{content}</div>
       ) : (
-        <div
-          onClick={onClose}
-          style={{
-            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)',
-            display: 'grid', placeItems: 'start center', overflowY: 'auto', zIndex: 300, padding: '1rem'
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="card"
-            style={{ background: 'var(--color-surface)', padding: '1.5rem', width: '720px', maxWidth: '100%', margin: '3vh 0' }}
-          >
-            {content}
-          </div>
-        </div>
+        <Modal size="lg" onClose={onClose}>{content}</Modal>
       )}
 
       {editingProduct && (
@@ -626,17 +591,9 @@ function ProductManager({ products, onChange, onClose, inline = false, hideAiImp
       )}
 
       {showPackageBuilder && (
-        <div
-          onClick={() => setShowPackageBuilder(false)}
-          style={{
-            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)',
-            display: 'grid', placeItems: 'start center', overflowY: 'auto', zIndex: 400, padding: '1rem'
-          }}
-        >
-          <div onClick={(e) => e.stopPropagation()} style={{ width: '420px', maxWidth: '100%', margin: '3vh 0' }}>
-            <PackageBuilder products={products} onCreate={addPackage} onCancel={() => setShowPackageBuilder(false)} />
-          </div>
-        </div>
+        <Modal size="sm" onClose={() => setShowPackageBuilder(false)} hideHeader bare>
+          <PackageBuilder products={products} onCreate={addPackage} onCancel={() => setShowPackageBuilder(false)} />
+        </Modal>
       )}
 
       {showAiImport && (

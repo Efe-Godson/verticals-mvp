@@ -104,7 +104,7 @@ export default function EmployeeFormModal({ formId, settings, employee, departme
         <button onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save Employee'}</button>
       </>}
     >
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 0.9rem' }}>
+      <div className="form-2col">
         <Field label="Employee Name"><TextInput value={v.full_name} onChange={set('full_name')} /></Field>
         <Field label="Staff ID" hint="Optional — e.g. RCH-001"><TextInput value={v.employee_number} onChange={set('employee_number')} /></Field>
         <Field label="Phone"><TextInput value={v.phone} onChange={set('phone')} /></Field>
@@ -135,7 +135,7 @@ export default function EmployeeFormModal({ formId, settings, employee, departme
         <button className="secondary" type="button" onClick={addLocation} style={{ marginBottom: '0.9rem' }}>+ Add</button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 0.9rem' }}>
+      <div className="form-2col">
         <Field label="Start Date"><TextInput type="date" value={v.start_date} onChange={set('start_date')} /></Field>
         <Field label="Employment Status">
           <Select value={v.employment_status} onChange={set('employment_status')}>
@@ -155,7 +155,7 @@ export default function EmployeeFormModal({ formId, settings, employee, departme
       </button>
 
       {showBank && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 0.9rem' }}>
+        <div className="form-2col">
           <Field label="Bank Name"><TextInput value={v.bank_name} onChange={set('bank_name')} /></Field>
           <Field label="Account Number"><TextInput value={v.account_number} onChange={set('account_number')} /></Field>
           <Field label="Account Name"><TextInput value={v.account_name} onChange={set('account_name')} /></Field>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
+import Modal from './components/Modal'
 import { COUNTRIES, statesFor, citiesForField } from './lib/locationData'
 
 const TYPES_WITH_GRID = ['multiplechoicegrid', 'checkboxgrid']
@@ -123,19 +124,13 @@ function ManageCitiesModal({ field, index, updateField, onClose }) {
   }
 
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 400, padding: '1rem'
-      }}
+    <Modal
+      size="sm"
+      onClose={onClose}
+      title="Add Missing Cities"
+      footer={<button type="button" className="secondary" onClick={onClose}>Done</button>}
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="card"
-        style={{ background: 'var(--color-surface)', padding: '1.5rem', width: '420px', maxWidth: '100%', maxHeight: '85vh', overflowY: 'auto' }}
-      >
-        <h3 style={{ margin: '0 0 0.3rem' }}>Add Missing Cities</h3>
+      <div>
         <p style={{ fontSize: '0.85rem', color: 'var(--color-muted)', margin: '0 0 1rem' }}>
           If a city isn't in the list for a state, add it here - it'll show up alongside the built-in ones for this field.
         </p>
@@ -176,11 +171,8 @@ function ManageCitiesModal({ field, index, updateField, onClose }) {
           ))
         )}
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
-          <button type="button" className="secondary" onClick={onClose}>Done</button>
-        </div>
       </div>
-    </div>
+    </Modal>
   )
 }
 

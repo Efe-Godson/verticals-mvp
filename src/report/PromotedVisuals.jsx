@@ -8,6 +8,7 @@ import { useMemo, useRef, useState } from 'react'
 import RGL, { WidthProvider } from 'react-grid-layout/legacy'
 import 'react-grid-layout/css/styles.css'
 import { supabase } from '../supabaseClient'
+import useIsMobile from '../hooks/useIsMobile'
 import { runQuery } from './engine'
 import VisualRenderer from './builder/visuals/VisualRenderer'
 
@@ -23,6 +24,7 @@ export default function PromotedVisuals({ form, submissions }) {
   const [visuals, setVisuals] = useState(() => (form?.settings?.reportBuilder?.visuals || []).filter(v => v.reportVisibility))
   const [editing, setEditing] = useState(false)
   const settingsRef = useRef(form?.settings || {})
+  const isMobile = useIsMobile(720)
 
   const results = useMemo(() => {
     const out = {}
@@ -36,7 +38,12 @@ export default function PromotedVisuals({ form, submissions }) {
 
   if (!visuals.length) return null
 
-  const layout = visuals.map((v, i) => ({ i: v.id, ...defaultReportLayout(v, i), minW: 2, minH: 3 }))
+  const layout = visuals.map((v, i) => {
+    const base = defaultReportLayout(v, i)
+    return isMobile
+      ? { i: v.id, x: 0, y: i * base.h, w: 12, h: base.h, minW: 2, minH: 3, static: !editing }
+      : { i: v.id, ...base, minW: 2, minH: 3 }
+  })
 
   async function persist(nextVisuals) {
     // merge back into the full visuals array (promoted + not) so we don't drop the others
@@ -53,7 +60,7 @@ export default function PromotedVisuals({ form, submissions }) {
   }
 
   function onLayoutChange(next) {
-    if (!editing) return
+    if (!editing || isMobile) return // mobile layout is forced single-column; don't persist it over the desktop layout
     const updated = visuals.map(v => {
       const l = next.find(x => x.i === v.id)
       return l ? { ...v, reportLayout: { x: l.x, y: l.y, w: l.w, h: l.h } } : v
@@ -107,8 +114,8 @@ export default function PromotedVisuals({ form, submissions }) {
       >
         {visuals.map(v => (
           <div key={v.id} className="card" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.45rem 0.7rem', borderBottom: '1px solid var(--color-border)' }}>
-              <span style={{ fontWeight: 600, fontSize: '0.85rem', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.title}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.45rem 0.7rem', borderBottom: '1px solid var(--color-border)', flexWrap: 'wrap' }}>
+              <span style={{ fontWeight: 600, fontSize: '0.85rem', flex: '1 1 120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.title}</span>
               {editing && (
                 <>
                   <button className="secondary rb-promoted-btn" style={btn} title="Wider" onClick={() => resize(v.id, 2, 0)}>＋W</button>

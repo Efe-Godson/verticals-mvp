@@ -14,7 +14,7 @@ export function SummaryTableViz({ result }) {
   const fmt = valueFormatter(result)
   const dimName = 'Group'
   return (
-    <div className="table-scroll" style={{ marginTop: 0, maxHeight: '100%' }}>
+    <div className="table-wrap" style={{ marginTop: 0, maxHeight: '100%' }}>
       <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '0.86rem' }}>
         <thead>
           <tr>
@@ -55,7 +55,7 @@ export function DataTableViz({ result, form }) {
   if (!records.length) return <EmptyViz message="No records match." />
   const fields = (form?.fields || []).filter(f => f.type !== 'section' && f.type !== 'fileupload').slice(0, 12)
   return (
-    <div className="table-scroll" style={{ marginTop: 0, maxHeight: '100%' }}>
+    <div className="table-wrap" style={{ marginTop: 0, maxHeight: '100%' }}>
       <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '0.82rem' }}>
         <thead>
           <tr>

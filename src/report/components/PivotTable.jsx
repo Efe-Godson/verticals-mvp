@@ -24,7 +24,7 @@ function PivotTable({ pivotResult, formatValue = (v) => v.toLocaleString() }) {
   if (!rowLabels) {
     if (data.length === 0) return <p style={{ color: 'var(--color-muted)' }}>Not enough data yet.</p>
     return (
-      <div className="table-scroll">
+      <div className="table-wrap">
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead><tr><th style={th}>Label</th><th style={{ ...th, textAlign: 'right' }}>Value</th></tr></thead>
           <tbody>
@@ -45,7 +45,7 @@ function PivotTable({ pivotResult, formatValue = (v) => v.toLocaleString() }) {
   if (rowLabels.length === 0) return <p style={{ color: 'var(--color-muted)' }}>Not enough data yet.</p>
 
   return (
-    <div className="table-scroll">
+    <div className="table-wrap">
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
           <tr>

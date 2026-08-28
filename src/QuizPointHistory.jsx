@@ -49,7 +49,7 @@ function QuizPointHistory() {
       {!history.history.length ? (
         <p style={{ color: 'var(--color-muted)', fontSize: '0.9rem' }}>No finished quizzes yet.</p>
       ) : (
-        <div className="table-scroll">
+        <div className="table-wrap table-bleed">
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>

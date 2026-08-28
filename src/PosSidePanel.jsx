@@ -10,6 +10,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from './AuthContext'
 import { supabase } from './supabaseClient'
 import { useToast } from './Toast'
+import Modal from './components/Modal'
 import { getOrCreateShortLink } from './shortLinks'
 import ArrowLeftIcon from './ArrowLeftIcon'
 
@@ -26,34 +27,18 @@ function ShareLinkModal({ url, onClose }) {
   }
 
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 400, padding: '1rem'
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="card"
-        style={{ background: 'var(--color-surface)', padding: '1.2rem', width: '480px', maxWidth: '100%' }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-          <h3 style={{ margin: 0, fontSize: '1rem' }}>Share Link</h3>
-          <button type="button" className="secondary" onClick={onClose} style={{ padding: '0.25rem 0.6rem' }}>✕</button>
-        </div>
-        <p style={{ fontSize: '0.8rem', color: 'var(--color-muted)', margin: '0 0 0.7rem' }}>
-          Copied to your clipboard - opens straight to the order screen, just like customers see it.
-        </p>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <input
-            readOnly value={url} onFocus={(e) => e.target.select()}
-            style={{ flex: 1, minWidth: 0, padding: '0.5rem', fontSize: '0.85rem' }}
-          />
-          <button type="button" onClick={copyAgain} style={{ flexShrink: 0 }}>Copy</button>
-        </div>
+    <Modal size="md" onClose={onClose} title="Share Link" closeLabel="✕">
+      <p style={{ fontSize: '0.8rem', color: 'var(--color-muted)', margin: '0 0 0.7rem' }}>
+        Copied to your clipboard - opens straight to the order screen, just like customers see it.
+      </p>
+      <div style={{ display: 'flex', gap: '0.5rem' }}>
+        <input
+          readOnly value={url} onFocus={(e) => e.target.select()}
+          style={{ flex: 1, minWidth: 0, padding: '0.5rem', fontSize: '0.85rem' }}
+        />
+        <button type="button" onClick={copyAgain} style={{ flexShrink: 0 }}>Copy</button>
       </div>
-    </div>
+    </Modal>
   )
 }
 

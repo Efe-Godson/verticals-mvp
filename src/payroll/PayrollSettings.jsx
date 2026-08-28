@@ -95,7 +95,7 @@ export default function PayrollSettings() {
         <p style={{ color: 'var(--color-muted)', fontSize: '0.83rem', marginTop: 0 }}>
           Unchecked types are hidden from the Add Entry forms.
         </p>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.35rem 1rem' }}>
+        <div className="form-2col" style={{ rowGap: '0.35rem' }}>
           {ALL_TYPES.map(t => (
             <label key={t} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.88rem' }}>
               <input type="checkbox" checked={enabled.includes(t)} onChange={() => toggleType(t)} />

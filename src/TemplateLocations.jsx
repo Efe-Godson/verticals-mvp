@@ -9,6 +9,7 @@ import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
 import { useToast } from './Toast'
 import ConfirmDialog from './ConfirmDialog'
+import Modal from './components/Modal'
 import HomeRecycleBinDialog from './HomeRecycleBinDialog'
 import { useRecycleBinTrigger } from './RecycleBinContext'
 import { categoryColor, LocationIcon } from './templateVisuals'
@@ -462,30 +463,24 @@ function TemplateLocations() {
       )}
 
       {showAddModal && (
-        <div
-          onClick={() => setShowAddModal(false)}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '1rem' }}
-        >
-          <div onClick={(e) => e.stopPropagation()} style={{ background: 'var(--color-surface)', borderRadius: '8px', padding: '1.5rem', width: '380px', maxWidth: '100%' }}>
-            <h3 style={{ margin: '0 0 0.4rem' }}>{duplicateSourceId ? 'Name this duplicate' : 'Name this location'}</h3>
-            <p style={{ color: 'var(--color-muted)', fontSize: '0.85rem', margin: '0 0 1rem' }}>
-              {duplicateSourceId
-                ? 'A new, independent copy with the same menu and setup - no records or orders carry over.'
-                : `A new, independent "${template.name}" - its own menu and its own orders.`}
-            </p>
-            <form onSubmit={confirmAddLocation}>
-              <input
-                type="text" required autoFocus value={locationNameInput}
-                onChange={(e) => setLocationNameInput(e.target.value)}
-                style={{ width: '100%', padding: '0.5rem', marginBottom: '1rem' }}
-              />
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem' }}>
-                <button type="button" className="secondary" onClick={() => setShowAddModal(false)}>Cancel</button>
-                <button type="submit" disabled={creating}>{creating ? (duplicateSourceId ? 'Duplicating...' : 'Creating...') : (duplicateSourceId ? 'Duplicate' : 'Create')}</button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <Modal size="sm" onClose={() => setShowAddModal(false)} title={duplicateSourceId ? 'Name this duplicate' : 'Name this location'}>
+          <p style={{ color: 'var(--color-muted)', fontSize: '0.85rem', margin: '0 0 1rem' }}>
+            {duplicateSourceId
+              ? 'A new, independent copy with the same menu and setup - no records or orders carry over.'
+              : `A new, independent "${template.name}" - its own menu and its own orders.`}
+          </p>
+          <form onSubmit={confirmAddLocation}>
+            <input
+              type="text" required autoFocus value={locationNameInput}
+              onChange={(e) => setLocationNameInput(e.target.value)}
+              style={{ width: '100%', padding: '0.5rem', marginBottom: '1rem' }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem' }}>
+              <button type="button" className="secondary" onClick={() => setShowAddModal(false)}>Cancel</button>
+              <button type="submit" disabled={creating}>{creating ? (duplicateSourceId ? 'Duplicating...' : 'Creating...') : (duplicateSourceId ? 'Duplicate' : 'Create')}</button>
+            </div>
+          </form>
+        </Modal>
       )}
     </div>
   )

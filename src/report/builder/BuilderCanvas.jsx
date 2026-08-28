@@ -10,15 +10,20 @@ import VisualBlock from './VisualBlock'
 const Grid = WidthProvider(RGL)
 
 export default function BuilderCanvas({
-  visuals, results, form, selectedId,
+  visuals, results, form, selectedId, singleColumn = false,
   onSelect, onLayoutChange, onConfigure, onDuplicate, onRemove, onViewData, onPromote, onDemote, onClearDatapoint,
 }) {
-  const layout = useMemo(() => visuals.map(v => ({
+  // On a phone every visual spans the full 12 columns and stacks in order -
+  // a two-up grid crushes a chart at that width (brief §22).
+  const layout = useMemo(() => visuals.map((v, i) => ({
     i: v.id,
-    x: v.layout?.x ?? 0, y: v.layout?.y ?? 0,
-    w: v.layout?.w ?? 6, h: v.layout?.h ?? 5,
+    x: singleColumn ? 0 : (v.layout?.x ?? 0),
+    y: singleColumn ? i * (v.layout?.h ?? 5) : (v.layout?.y ?? 0),
+    w: singleColumn ? 12 : (v.layout?.w ?? 6),
+    h: v.layout?.h ?? 5,
     minW: 2, minH: 2,
-  })), [visuals])
+    static: singleColumn,
+  })), [visuals, singleColumn])
 
   return (
     <Grid
@@ -30,10 +35,10 @@ export default function BuilderCanvas({
       containerPadding={[16, 16]}
       compactType="vertical"
       preventCollision={false}
-      isDraggable
-      isResizable
+      isDraggable={!singleColumn}
+      isResizable={!singleColumn}
       draggableHandle=".rb-block-handle"
-      onLayoutChange={onLayoutChange}
+      onLayoutChange={singleColumn ? undefined : onLayoutChange}
       resizeHandles={['se']}
     >
       {visuals.map(v => (

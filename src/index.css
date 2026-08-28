@@ -322,6 +322,68 @@ input:focus, select:focus, textarea:focus {
   padding-right: 1.5rem;
 }
 
+/* .table-wrap = a horizontal-scroll container safe to use ANYWHERE
+   (page, card, modal, grid cell). Apply to every on-screen <table>.
+   Add `.table-bleed` alongside it ONLY for a table that sits directly
+   in a .page reading column and should go full-viewport-width on
+   phones - never inside a modal or a transformed grid item, where the
+   50vw margin trick resolves against the wrong box. */
+.table-wrap {
+  -webkit-overflow-scrolling: touch;
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 65vh;
+  margin-top: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background-color: var(--color-surface);
+}
+@media (max-width: 768px) {
+  .table-wrap.table-bleed {
+    width: 100vw;
+    margin-left: calc(50% - 50vw);
+    margin-right: calc(50% - 50vw);
+    box-sizing: border-box;
+    border-left: none;
+    border-right: none;
+    border-radius: 0;
+  }
+}
+
+/* Shared layout vocabulary - replaces repeated inline flex/grid patterns
+   so header rows, filter bars and two-column form sections collapse the
+   same way everywhere. */
+.cluster {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+.cluster-between {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  min-width: 0;
+}
+.grid-auto {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1rem;
+}
+.form-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 0.9rem;
+}
+@media (max-width: 520px) {
+  .form-2col {
+    grid-template-columns: 1fr;
+  }
+}
+
 .records-table tbody tr {
   cursor: pointer;
   transition: background 0.1s ease;
@@ -620,6 +682,17 @@ input:focus, select:focus, textarea:focus {
     bottom: calc(68px + env(safe-area-inset-bottom) + 0.8rem) !important;
   }
 
+  /* CreateForm/EditForm floating "Preview" button - stacked clear above the
+     dark-mode toggle so the two don't overlap on a phone. */
+  .preview-fab {
+    right: 1rem !important;
+    bottom: calc(68px + env(safe-area-inset-bottom) + 0.8rem + 56px) !important;
+  }
+  /* The "Undo" toast on the form builders - lift clear of the bottom bar. */
+  .builder-undo-toast {
+    bottom: calc(68px + env(safe-area-inset-bottom) + 0.8rem) !important;
+  }
+
   /* Shared convention for a page's own "Options" menu (Report.jsx's Print/
      Download/Report Builder, Records.jsx's Export/Save View/Recycle Bin):
      below 768px the trigger moves to the compact top bar's "⋯" button (see
@@ -753,13 +826,23 @@ input:focus, select:focus, textarea:focus {
 }
 
 @media (max-width: 480px) {
+  /* Match .app-content-under-navbar .page's specificity (0,0,2,0) so this
+     tighter padding actually wins inside the app shell - the bare `.page`
+     selector alone was being shadowed by the 768px nested rule. */
+  .page,
+  .app-content-under-navbar .page {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
   .page {
-    padding: 1rem 0.75rem;
+    padding-top: 1rem;
+    padding-bottom: 1rem;
   }
 
   button {
     padding: 0.5rem 0.85rem;
     font-size: 0.85rem;
+    min-height: 40px;
   }
 
   .card-grid {

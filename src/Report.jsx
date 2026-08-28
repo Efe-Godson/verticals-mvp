@@ -16,6 +16,7 @@ import HorizontalBarChart from './report/components/HorizontalBarChart'
 import PieChart from './report/components/PieChart'
 import PivotTable from './report/components/PivotTable'
 import PromotedVisuals from './report/PromotedVisuals'
+import Modal from './components/Modal'
 import { getGroupableFields, getMeasureOptions, computePivot, toChartData } from './report/helpers/pivotEngine'
 import { formatNaira, median } from './report/helpers/analysisUtils'
 import { DATE_RANGE_OPTIONS, getDateRangeBounds, getDateRangeLabel } from './report/helpers/dateRange'
@@ -758,22 +759,8 @@ function KPIGrid({ form, submissions, previousSubmissions = [], totalResponses, 
       </div>
 
       {moreMenuOpen && (
-        <div
-          onClick={() => setMoreMenuOpen(false)}
-          style={{
-            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: '1rem'
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="card"
-            style={{ background: 'var(--color-surface)', padding: '1.2rem', width: '320px', maxWidth: '100%' }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
-              <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Add Metric</span>
-              <button className="secondary" onClick={() => setMoreMenuOpen(false)} style={{ padding: '0.25rem 0.6rem' }}>Close</button>
-            </div>
+        <Modal size="sm" onClose={() => setMoreMenuOpen(false)} title="Add Metric">
+          <div>
             <input
               type="text"
               autoFocus
@@ -803,7 +790,7 @@ function KPIGrid({ form, submissions, previousSubmissions = [], totalResponses, 
               ))}
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </>
   )

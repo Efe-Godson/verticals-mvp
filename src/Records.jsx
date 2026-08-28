@@ -13,6 +13,7 @@ import { RecordDetail } from './records/RecordDetail'
 import { RecycleBinDialog } from './records/RecycleBinDialog'
 import { SavePresetDialog } from './records/SavePresetDialog'
 import ConfirmDialog from './ConfirmDialog'
+import Modal from './components/Modal'
 import { useToast } from './Toast'
 import { LoadingState } from './LoadingState'
 import { ErrorState } from './ErrorState'
@@ -1230,35 +1231,13 @@ function Records() {
       )}
 
       {editIframeUrl && (
-        <div
-          onClick={() => setEditIframeUrl(null)}
-          style={{
-            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: '1.5rem'
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: 'var(--color-surface)', borderRadius: '10px', width: '900px', maxWidth: '100%',
-              height: '85vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
-              boxShadow: '0 18px 45px rgba(0,0,0,0.25)'
-            }}
-          >
-            <div style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              padding: '0.7rem 1rem', borderBottom: '1px solid var(--color-border)'
-            }}>
-              <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Correct Order</span>
-              <button className="secondary" onClick={() => setEditIframeUrl(null)}>Close</button>
-            </div>
-            <iframe
-              src={editIframeUrl}
-              title="Correct Order"
-              style={{ flex: 1, border: 'none', width: '100%' }}
-            />
-          </div>
-        </div>
+        <Modal size="full" onClose={() => setEditIframeUrl(null)} title="Correct Order" bodyStyle={{ padding: 0, display: 'flex' }}>
+          <iframe
+            src={editIframeUrl}
+            title="Correct Order"
+            style={{ flex: 1, border: 'none', width: '100%', minHeight: '70vh' }}
+          />
+        </Modal>
       )}
 
       {showSaveDialog && (

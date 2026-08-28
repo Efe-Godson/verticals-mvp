@@ -155,7 +155,7 @@ export default function PayrollMonthly() {
             </div>
           )}
 
-          <div className="table-scroll">
+          <div className="table-wrap table-bleed">
             <table className="records-table" style={{ borderCollapse: 'collapse', width: '100%' }}>
               <thead>
                 <tr>

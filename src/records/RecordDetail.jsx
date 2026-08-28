@@ -8,6 +8,7 @@ import { formatCell } from './recordsUiKit'
 import { CartEditInput } from './CartEditInput'
 import { RecordEditInput } from './RecordEditInput'
 import { LoadingSpinner } from '../LoadingState'
+import Modal from '../components/Modal'
 
 export function RecordDetail({ form, record, fields, onClose, onUpdated, initialEditing = false, hideEdit = false }) {
   const { session } = useAuth()
@@ -124,21 +125,8 @@ export function RecordDetail({ form, record, fields, onClose, onUpdated, initial
   }
 
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-        background: 'rgba(0,0,0,0.4)', display: 'flex',
-        alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '1rem'
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: 'var(--color-surface)', borderRadius: '12px', padding: '1.4rem 1.5rem',
-          width: '520px', maxWidth: '100%', maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 18px 45px rgba(0,0,0,0.16)'
-        }}
-      >
+    <>
+      <Modal size="md" onClose={onClose} hideHeader>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
           <div>
             <h3 style={{ margin: 0 }}>{showHistory ? 'Edit History' : 'Record Detail'}</h3>
@@ -238,11 +226,11 @@ export function RecordDetail({ form, record, fields, onClose, onUpdated, initial
             </div>
           </>
         )}
-      </div>
+      </Modal>
 
       {isRetail && showInvoice && (
         <InvoiceModal form={form} submission={record} onClose={() => setShowInvoice(false)} allowDateEdit />
       )}
-    </div>
+    </>
   )
 }
