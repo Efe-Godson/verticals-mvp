@@ -97,6 +97,9 @@ function NavBar() {
   const match = location.pathname.match(/^\/form\/([^/]+)/)
   const id = match ? match[1] : null
   const isFormContext = !!id
+  // Payroll is a contained environment with its own section nav
+  // (PayrollSidePanel) - the app bar is stripped down to just Home here.
+  const isPayrollEnv = /^\/form\/[^/]+\/payroll(\/|$)/.test(location.pathname)
 
   // Every page reachable from the bottom bar's Records/Reports tabs - both
   // the picker (/records, /reports, no form in context yet) and the actual
@@ -166,14 +169,14 @@ function NavBar() {
 
           <div style={{ display: 'flex', gap: '1.2rem', fontSize: '0.9rem' }}>
             <Link to="/" style={{ color: location.pathname === '/' ? 'var(--color-primary)' : 'var(--color-muted)' }}>Home</Link>
-            <Link to="/reports" style={{ color: location.pathname === '/reports' ? 'var(--color-primary)' : 'var(--color-muted)' }}>Reports</Link>
-            <Link to="/templates" style={{ color: location.pathname === '/templates' ? 'var(--color-primary)' : 'var(--color-muted)' }}>Templates</Link>
-            {isAdmin && (
+            {!isPayrollEnv && <Link to="/reports" style={{ color: location.pathname === '/reports' ? 'var(--color-primary)' : 'var(--color-muted)' }}>Reports</Link>}
+            {!isPayrollEnv && <Link to="/templates" style={{ color: location.pathname === '/templates' ? 'var(--color-primary)' : 'var(--color-muted)' }}>Templates</Link>}
+            {!isPayrollEnv && isAdmin && (
               <Link to="/lab" style={{ color: location.pathname === '/lab' ? 'var(--color-primary)' : 'var(--color-muted)' }}>Lab</Link>
             )}
           </div>
 
-          {isFormContext && (
+          {isFormContext && !isPayrollEnv && (
             <div style={{ display: 'flex', gap: '1rem', fontSize: '0.9rem' }}>
               <Link to="/" style={{ color: 'var(--color-muted)' }}>Home</Link>
               <Link to={`/form/${id}/edit`} style={{ color: linkColor('/edit') }}>Builder</Link>
@@ -187,7 +190,7 @@ function NavBar() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-          {linkedForms.length > 0 && (
+          {linkedForms.length > 0 && !isPayrollEnv && (
             <div style={{ position: 'relative' }}>
               <button className="secondary" onClick={() => setLinkedMenuOpen(!linkedMenuOpen)}>
                 Linked Forms ▾
@@ -334,7 +337,7 @@ function NavBar() {
               <circle cx="19" cy="12" r="1.9" />
             </svg>
           </button>
-        ) : isRecordsOrReportsRoute ? null : (
+        ) : (isRecordsOrReportsRoute || isPayrollEnv) ? null : (
           <button
             type="button"
             onClick={() => setMenuOpen(true)}
@@ -354,8 +357,10 @@ function NavBar() {
 
       {/* Fixed bottom tab bar - Home/Records/Reports, see
           MobileBottomNav.jsx. Only ever shown alongside navbar-mobile-row
-          above (same breakpoint), see the matching CSS in index.css. */}
-      <MobileBottomNav />
+          above (same breakpoint), see the matching CSS in index.css.
+          Hidden in the contained Payroll environment - its own slide-out
+          is the section nav there. */}
+      {!isPayrollEnv && <MobileBottomNav />}
 
       {menuOpen && (
         <div
