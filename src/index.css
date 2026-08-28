@@ -855,6 +855,23 @@ input:focus, select:focus, textarea:focus {
   }
 }
 
+/* Payroll is a contained environment (App.jsx's isPayrollEnv hides the app
+   NavBar). PayrollSidePanel.jsx renders a fixed left panel; below 1024px it
+   is a hamburger-triggered drawer and the page just needs top room for the
+   floating buttons, at >= 1024px it is pinned open and the page shifts
+   right by its width (see PAYROLL_SIDEBAR_WIDTH). */
+.payroll-shell > .page {
+  padding-top: calc(3.5rem + env(safe-area-inset-top));
+}
+@media (min-width: 1024px) {
+  .payroll-shell {
+    padding-left: 210px;
+  }
+  .payroll-shell > .page {
+    padding-top: 2rem;
+  }
+}
+
 /* Retail invoice printing (InvoiceModal.jsx's Print button) - hides the
    whole app and prints only whichever element is marked as the print
    target (the true-size, unscaled invoice, never the shrunk-to-fit mobile

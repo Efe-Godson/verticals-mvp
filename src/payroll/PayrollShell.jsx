@@ -45,9 +45,9 @@ export default function PayrollShell() {
   }, [id])
 
   return (
-    <>
+    <div className="payroll-shell">
       <PayrollSidePanel formId={id} />
-      <div className="page" style={{ maxWidth: '1000px', paddingTop: 'calc(4rem + env(safe-area-inset-top))' }}>
+      <div className="page" style={{ maxWidth: '1000px' }}>
         {loading ? <LoadingState />
           : error ? <ErrorState message={error} />
           : (
@@ -57,6 +57,6 @@ export default function PayrollShell() {
             </>
           )}
       </div>
-    </>
+    </div>
   )
 }

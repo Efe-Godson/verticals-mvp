@@ -59,8 +59,6 @@ export default function EmployeePayrollModal({
   const [entries, setEntries] = useState(initialEntries || [])
   const [busy, setBusy] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
-  const [holdOpen, setHoldOpen] = useState(false)
-  const [holdReason, setHoldReason] = useState('')
   const [payOpen, setPayOpen] = useState(false)
   const [confirmRemove, setConfirmRemove] = useState(null) // the entry pending removal
   const showDates = settings?.showEntryDates !== false
@@ -107,14 +105,16 @@ export default function EmployeePayrollModal({
       const updated = await setRecordStatus(formId, record, status, meta)
       setRecord(updated)
       onChanged?.()
-      showToast(status === 'paid' ? `${employee.full_name} marked paid.` : `${employee.full_name} put on hold.`, 'success')
-      // In the guided review, acting on this employee advances to the next one.
-      if (reviewPosition && onNext) { setHoldOpen(false); setPayOpen(false); onNext() }
+      showToast(
+        status === 'paid' ? `${employee.full_name} marked paid.` : `${employee.full_name} moved back to pending.`,
+        'success',
+      )
+      // In the guided review, paying an employee advances to the next one.
+      if (status === 'paid' && reviewPosition && onNext) { setPayOpen(false); onNext() }
     } catch (err) {
       showToast(friendlyError(err, "That didn't go through. Nothing was changed."), 'error')
     } finally {
       setBusy(false)
-      setHoldOpen(false)
       setPayOpen(false)
     }
   }
@@ -131,12 +131,16 @@ export default function EmployeePayrollModal({
           {reviewPosition && (
             <button className="secondary" onClick={onPrev} disabled={busy || reviewPosition.index <= 1} style={{ marginRight: 'auto' }}>← Back</button>
           )}
-          {locked ? (
+          {record.status === 'paid' ? (
+            <>
+              <span style={{ fontSize: '0.82rem', color: 'var(--color-muted)' }}>Paid — record locked.</span>
+              <button className="secondary" onClick={() => move('draft')} disabled={busy}>Mark pending</button>
+            </>
+          ) : locked ? (
             <span style={{ fontSize: '0.82rem', color: 'var(--color-muted)' }}>This payroll is {record.status}.</span>
           ) : (
             <>
               <button className="secondary" onClick={() => setAddOpen(true)} disabled={busy}>+ Add Entry</button>
-              {record.status !== 'on_hold' && <button className="secondary" onClick={() => setHoldOpen(true)} disabled={busy}>Hold</button>}
               <button onClick={() => setPayOpen(true)} disabled={busy}>Pay</button>
             </>
           )}
@@ -167,7 +171,7 @@ export default function EmployeePayrollModal({
         </div>
       </div>
 
-      <Row label="Base Pay" amount={money(breakdown.baseSalary)} color="var(--status-good)" bold />
+      <Row label="Base Pay" amount={money(breakdown.baseSalary)} bold />
 
       <div style={{ marginTop: '0.9rem', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--status-critical)' }}>
         Deductions
@@ -194,14 +198,11 @@ export default function EmployeePayrollModal({
         borderTop: '2px solid var(--color-text)', marginTop: '1rem', paddingTop: '0.8rem',
       }}>
         <span style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--color-text)' }}>Final Pay</span>
-        <span style={{ fontWeight: 800, fontSize: '1.5rem', color: 'var(--status-good)', fontVariantNumeric: 'tabular-nums' }}>
+        <span style={{ fontWeight: 800, fontSize: '1.5rem', color: 'var(--color-text)', fontVariantNumeric: 'tabular-nums' }}>
           {money(breakdown.finalAmount)}
         </span>
       </div>
 
-      {record.status === 'on_hold' && record.hold_reason && (
-        <p style={{ fontSize: '0.82rem', color: 'var(--status-serious)', marginTop: '0.6rem' }}>On hold: {record.hold_reason}</p>
-      )}
       {record.status === 'paid' && (
         <p style={{ fontSize: '0.82rem', color: 'var(--color-muted)', marginTop: '0.6rem' }}>
           Paid {record.paid_at ? new Date(record.paid_at).toLocaleDateString('en-GB') : ''} · {PAY_METHODS.find(m => m.value === record.payment_method)?.label || record.payment_method || '—'}
@@ -229,21 +230,6 @@ export default function EmployeePayrollModal({
           onClose={() => setAddOpen(false)}
           onSaved={refresh}
         />
-      )}
-
-      {holdOpen && (
-        <PayrollModal
-          title="Hold Payment"
-          onClose={() => setHoldOpen(false)}
-          footer={<>
-            <button className="secondary" onClick={() => setHoldOpen(false)}>Cancel</button>
-            <button onClick={() => move('on_hold', { holdReason })} disabled={busy}>Hold Payment</button>
-          </>}
-        >
-          <Field label="Reason (optional)" hint="The employee stays in payroll but is excluded from bulk payment.">
-            <TextInput value={holdReason} onChange={(e) => setHoldReason(e.target.value)} placeholder="e.g. Awaiting management review" />
-          </Field>
-        </PayrollModal>
       )}
 
       {payOpen && (

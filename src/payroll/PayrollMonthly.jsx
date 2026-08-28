@@ -36,6 +36,8 @@ export default function PayrollMonthly() {
   const [selected, setSelected] = useState([])
   const [confirmPayAll, setConfirmPayAll] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [bulkMenuOpen, setBulkMenuOpen] = useState(false)
+  const [exportSelectedOnly, setExportSelectedOnly] = useState(false)
   // { title, message, confirmLabel, danger?, run } for one-off confirmations
   const [confirmAction, setConfirmAction] = useState(null)
   const ask = (cfg) => setConfirmAction(cfg)
@@ -78,7 +80,7 @@ export default function PayrollMonthly() {
     () => location ? allRecords.filter(r => empById[r.employee_id]?.primary_location_id === location) : allRecords,
     [allRecords, location, empById]
   )
-  const hasDraftRun = allRecords.length > 0
+  const hasRun = allRecords.length > 0
 
   // Live projection for the KPI cards - covers the selected location and
   // stays useful before Run Payroll has produced any records.
@@ -102,7 +104,7 @@ export default function PayrollMonthly() {
     }
   }, [employees, entries, records, month, settings, location])
 
-  const headcount = hasDraftRun ? records.length : kpi.staff
+  const headcount = hasRun ? records.length : kpi.staff
   const progressPct = kpi.net > 0 ? Math.round((kpi.paidAmount / kpi.net) * 100) : 0
 
   async function doRun() {
@@ -181,7 +183,7 @@ export default function PayrollMonthly() {
   async function doBulk(status, targets) {
     try {
       await bulkSetRecordStatus(formId, targets, status)
-      const verb = status === 'paid' ? 'marked paid' : 'put on hold'
+      const verb = status === 'paid' ? 'marked paid' : 'moved back to pending'
       showToast(`${targets.length} employee${targets.length > 1 ? 's' : ''} ${verb}.`, 'success')
       load()
     } catch (err) {
@@ -189,27 +191,28 @@ export default function PayrollMonthly() {
     }
   }
 
+  // status: 'paid' (pending -> paid) or 'draft' (paid -> pending).
   function bulk(status) {
-    const eligible = records.filter(r => selected.includes(r.id) && r.status !== 'paid' && r.status !== 'cancelled')
+    const want = status === 'paid' ? (r => r.status !== 'paid' && r.status !== 'cancelled') : (r => r.status === 'paid')
+    const eligible = records.filter(r => selected.includes(r.id) && want(r))
     const skipped = selected.length - eligible.length
     if (!eligible.length) {
-      showToast('None of the selected employees can be changed — they are already paid.', 'info')
+      showToast(status === 'paid' ? 'Every selected employee is already paid.' : 'None of the selected employees are paid.', 'info')
       return
     }
-    const label = status === 'paid' ? 'Mark paid' : 'Put on hold'
+    const label = status === 'paid' ? 'Mark paid' : 'Mark pending'
     ask({
-      title: `${label} ${eligible.length} employee${eligible.length > 1 ? 's' : ''}?`,
+      title: `${label} — ${eligible.length} employee${eligible.length > 1 ? 's' : ''}?`,
       message: status === 'paid'
-        ? `They'll be recorded as paid for ${monthLabel(month)}.${skipped ? ` ${skipped} already-paid selection${skipped > 1 ? 's' : ''} will be skipped.` : ''}`
-        : `They stay in payroll but are excluded from "Mark All Paid".${skipped ? ` ${skipped} paid selection${skipped > 1 ? 's' : ''} will be skipped.` : ''}`,
+        ? `They'll be recorded as paid for ${monthLabel(month)}.${skipped ? ` ${skipped} already-paid selection${skipped > 1 ? 's' : ''} skipped.` : ''}`
+        : `Their ${monthLabel(month)} payment is reversed and the records unlock for edits.${skipped ? ` ${skipped} not-yet-paid selection${skipped > 1 ? 's' : ''} skipped.` : ''}`,
       confirmLabel: label,
-      danger: status === 'on_hold',
       run: () => doBulk(status, eligible),
     })
   }
 
-  const payable = records.filter(r => r.status !== 'paid' && r.status !== 'cancelled' && r.status !== 'on_hold')
-  const excluded = records.filter(r => r.status === 'on_hold')
+  // Two payment states only: Paid, or Pending (everything not paid/cancelled).
+  const payable = records.filter(r => r.status !== 'paid' && r.status !== 'cancelled')
 
   async function doPayAll() {
     setConfirmPayAll(false)
@@ -245,12 +248,12 @@ export default function PayrollMonthly() {
   }
 
   const OPTIONS = [
-    { label: 'Export payroll', onClick: () => setExportOpen(true), disabled: !hasDraftRun },
-    { label: 'Download payslips', onClick: () => showToast('Payslip downloads are coming soon.', 'info'), disabled: !hasDraftRun },
-    { label: 'Print payroll', onClick: () => { if (hasDraftRun) window.print() }, disabled: !hasDraftRun },
+    { label: 'Export payroll', onClick: () => setExportOpen(true), disabled: !hasRun },
+    { label: 'Download payslips', onClick: () => showToast('Payslip downloads are coming soon.', 'info'), disabled: !hasRun },
+    { label: 'Print payroll', onClick: () => { if (hasRun) window.print() }, disabled: !hasRun },
     { divider: true },
     {
-      label: 'Recalculate payroll', disabled: !hasDraftRun,
+      label: 'Recalculate payroll', disabled: !hasRun,
       onClick: () => ask({
         title: `Recalculate ${monthLabel(month)} payroll?`,
         message: `Every unpaid record is updated to match the current staff salaries and payroll events. Paid records are left as they are.`,
@@ -259,7 +262,7 @@ export default function PayrollMonthly() {
     },
     { divider: true },
     {
-      label: 'Reset payroll', danger: true, disabled: !hasDraftRun,
+      label: 'Reset payroll', danger: true, disabled: !hasRun,
       onClick: () => ask({
         title: `Reset ${monthLabel(month)} payroll?`,
         message: `This clears the generated payroll and payment records for ${monthLabel(month)} so it can be started fresh. Staff, salaries and payroll events are NOT affected.`,
@@ -278,61 +281,57 @@ export default function PayrollMonthly() {
   const reviewEmp = reviewEmpId ? empById[reviewEmpId] : null
   const reviewRecord = reviewEmpId ? records.find(r => r.employee_id === reviewEmpId) : null
 
-  // Payroll lifecycle for the selected month/location view.
-  const remaining = records.filter(r => r.status !== 'paid' && r.status !== 'cancelled')
-  const remainingCount = remaining.length
+  // Pending = not yet paid, for the selected month/location view.
+  const pendingCount = payable.length
   const remainingAmount = Math.max(0, kpi.net - kpi.paidAmount)
-  const payrollStatus = !hasDraftRun ? 'not_started' : (remainingCount === 0 ? 'completed' : 'in_progress')
 
   return (
     <div>
       <style>{`
-        .pay-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 1rem; }
+        .pay-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 1.4rem; }
         .pay-toolbar-left, .pay-toolbar-right { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
-        .pay-complete { display: inline-flex; align-items: center; gap: 0.4rem; font-weight: 700; font-size: 0.88rem;
-          color: var(--status-good); padding: 0.45rem 0.85rem; border: 1px solid var(--color-primary);
-          border-radius: var(--radius); background: var(--color-primary-soft); }
-        .pay-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.7rem; margin-bottom: 1.1rem; }
-        .pay-kpi { border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); padding: 0.9rem 1rem; }
-        .pay-kpi .l { font-size: 0.72rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-muted); }
-        .pay-kpi .v { font-size: 1.3rem; font-weight: 800; font-variant-numeric: tabular-nums; margin-top: 0.2rem; }
+        /* Compact KPI strip: ~15% shorter than before, tighter label. */
+        .pay-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.7rem; margin-bottom: 1.4rem; }
+        .pay-kpi { border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); padding: 0.6rem 0.8rem; }
+        .pay-kpi .l { font-size: 0.66rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--color-muted); font-weight: 700; }
+        .pay-kpi .v { font-size: 1.2rem; font-weight: 800; font-variant-numeric: tabular-nums; margin-top: 0.1rem; color: var(--color-text); }
+        /* Net Payroll: subtle THEME tint (not semantic green) so it reads as
+           the headline figure, not an "addition". Amount stays dark. */
         .pay-kpi.net { border-color: var(--color-primary); background: var(--color-primary-soft); }
-        .pay-kpi.net .v { font-size: 1.5rem; }
+        .pay-kpi.net .v { font-size: 1.35rem; }
+        /* Table: grows with the page (no nested vertical scroll on desktop),
+           tinted sticky header, faint theme-tint hover. */
+        .pay-table-scroll { max-height: none; }
+        .pay-table thead th { position: sticky; top: 0; background: var(--color-bg); z-index: 1; }
+        .pay-table tbody tr:hover { background: var(--color-primary-soft); }
         @media (max-width: 760px) {
           .pay-kpis { grid-template-columns: 1fr 1fr; }
           .pay-kpi.k-total { order: 1 } .pay-kpi.net { order: 2 }
           .pay-kpi.k-ded { order: 3 } .pay-kpi.k-add { order: 4 }
-          .pay-kpi .v { font-size: 1.15rem }
-          .pay-kpi.net .v { font-size: 1.3rem }
+          .pay-kpi .v { font-size: 1.1rem }
+          .pay-kpi.net .v { font-size: 1.2rem }
         }
       `}</style>
 
-      {/* toolbar */}
+      {/* toolbar - left = filters, right = actions (§5). Review payroll is
+          the primary (theme) action once payroll exists; before that it's
+          Start Payroll. No status badge (§4). */}
       {isMobile ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginBottom: '1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
-            <MonthPicker value={month} onChange={setMonth} />
-          </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginBottom: '1.2rem' }}>
+          <MonthPicker value={month} onChange={setMonth} style={{ width: '100%' }} />
           <LocationFilter locations={locations} value={location} onChange={setLocation} style={{ width: '100%' }} />
-          {payrollStatus === 'not_started' && (
+          {!hasRun ? (
             <>
               <button onClick={handleRun} disabled={running} style={{ width: '100%', minHeight: 48, fontSize: '0.95rem' }}>{running ? 'Starting…' : 'Start Payroll'}</button>
               <OptionsMenu open={menuOpen} setOpen={setMenuOpen} items={OPTIONS} fullWidth />
             </>
-          )}
-          {payrollStatus === 'in_progress' && (
+          ) : (
             <>
-              <button onClick={() => startReview(['draft', 'pending_approval', 'on_hold'])} style={{ width: '100%', minHeight: 48, fontSize: '0.95rem' }}>Review payroll · {remainingCount}</button>
+              <button onClick={() => startReview()} style={{ width: '100%', minHeight: 48, fontSize: '0.95rem' }}>Review payroll · {pendingCount}</button>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
-                {payable.length > 0 && <button className="secondary" style={{ flex: 1, minHeight: 44 }} onClick={askPayAll}>Mark all paid</button>}
+                {pendingCount > 0 && <button className="secondary" style={{ flex: 1, minHeight: 44 }} onClick={askPayAll}>Mark all paid</button>}
                 <div style={{ flex: 1 }}><OptionsMenu open={menuOpen} setOpen={setMenuOpen} items={OPTIONS} fullWidth /></div>
               </div>
-            </>
-          )}
-          {payrollStatus === 'completed' && (
-            <>
-              <span className="pay-complete" style={{ width: '100%', justifyContent: 'center', minHeight: 48, boxSizing: 'border-box' }}>✓ Payroll complete</span>
-              <OptionsMenu open={menuOpen} setOpen={setMenuOpen} items={OPTIONS} fullWidth />
             </>
           )}
         </div>
@@ -343,16 +342,14 @@ export default function PayrollMonthly() {
             <LocationFilter locations={locations} value={location} onChange={setLocation} />
           </div>
           <div className="pay-toolbar-right">
-            {payrollStatus === 'not_started' && (
+            {!hasRun ? (
               <button onClick={handleRun} disabled={running}>{running ? 'Starting…' : 'Start Payroll'}</button>
-            )}
-            {payrollStatus === 'in_progress' && (
+            ) : (
               <>
-                <button onClick={() => startReview(['draft', 'pending_approval', 'on_hold'])}>Review payroll · {remainingCount}</button>
-                {payable.length > 0 && <button className="secondary" onClick={askPayAll}>Mark all paid</button>}
+                <button onClick={() => startReview()}>Review payroll · {pendingCount}</button>
+                {pendingCount > 0 && <button className="secondary" onClick={askPayAll}>Mark all paid</button>}
               </>
             )}
-            {payrollStatus === 'completed' && <span className="pay-complete">✓ Payroll complete</span>}
             <OptionsMenu open={menuOpen} setOpen={setMenuOpen} items={OPTIONS} />
           </div>
         </div>
@@ -397,7 +394,7 @@ export default function PayrollMonthly() {
         {monthLabel(month)} Payroll <span style={{ color: 'var(--color-muted)', fontWeight: 400 }}>· {headcount} employee{headcount === 1 ? '' : 's'}</span>
       </div>
 
-      {!hasDraftRun ? (
+      {!hasRun ? (
         <div className="card" style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-muted)' }}>
           Payroll has not been run for {monthLabel(month)}.<br />
           Add entries first, then press <strong>Start Payroll</strong> to generate each employee's record.
@@ -405,11 +402,20 @@ export default function PayrollMonthly() {
       ) : (
         <>
           {selected.length > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', padding: '0.6rem 1rem', background: 'var(--color-warning-soft)', borderRadius: 'var(--radius)', marginBottom: '0.8rem' }}>
-              <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>{selected.length} selected</span>
-              <button className="secondary" onClick={() => bulk('paid')}>Mark Paid</button>
-              <button className="secondary" onClick={() => bulk('on_hold')}>Hold Selected</button>
-              <button className="secondary" onClick={() => setSelected([])}>Clear</button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', padding: '0.6rem 1rem', background: 'var(--color-primary-soft)', border: '1px solid var(--color-primary)', borderRadius: 'var(--radius)', marginBottom: '0.8rem' }}>
+              <span style={{ fontWeight: 600, fontSize: '0.88rem', marginRight: 'auto' }}>{selected.length} selected</span>
+              <button onClick={() => bulk('paid')}>Mark paid</button>
+              <OptionsMenu
+                open={bulkMenuOpen}
+                setOpen={setBulkMenuOpen}
+                label="More ▾"
+                items={[
+                  { label: 'Mark pending', onClick: () => bulk('draft') },
+                  { label: 'Export selected', onClick: () => { setExportSelectedOnly(true); setExportOpen(true) } },
+                  { divider: true },
+                  { label: 'Clear selection', onClick: () => setSelected([]) },
+                ]}
+              />
             </div>
           )}
 
@@ -419,7 +425,7 @@ export default function PayrollMonthly() {
                 <EmployeePayCard
                   key={r.id}
                   record={r}
-                  name={empById[r.employee_id]?.full_name || '—'}
+                  name={empById[r.employee_id]?.full_name?.trim() || ''}
                   selected={selected.includes(r.id)}
                   onToggle={() => toggle(r.id)}
                   onOpen={() => openAt(r.employee_id)}
@@ -431,15 +437,15 @@ export default function PayrollMonthly() {
               </div>
             </div>
           ) : (
-            <div className="table-wrap table-bleed">
-              <table className="records-table" style={{ borderCollapse: 'collapse', width: '100%' }}>
+            <div className="table-wrap table-bleed pay-table-scroll">
+              <table className="records-table pay-table" style={{ borderCollapse: 'collapse', width: '100%' }}>
                 <thead>
                   <tr>
                     <th style={{ padding: '0.6rem 0.5rem', borderBottom: '2px solid var(--color-border)' }}>
                       <input type="checkbox" checked={selected.length === records.length && records.length > 0} onChange={toggleAll} />
                     </th>
                     {['Employee', 'Base', 'Adjustments', 'Net Pay', 'Status'].map(h => (
-                      <th key={h} style={{ textAlign: h === 'Employee' || h === 'Status' ? 'left' : 'right', padding: '0.6rem 0.7rem', borderBottom: '2px solid var(--color-border)', fontSize: '0.8rem', color: 'var(--color-muted)' }}>{h}</th>
+                      <th key={h} style={{ textAlign: h === 'Employee' || h === 'Status' ? 'left' : 'right', padding: '0.6rem 0.7rem', borderBottom: '2px solid var(--color-border)', fontSize: '0.75rem', letterSpacing: '0.03em', textTransform: 'uppercase', color: 'var(--color-muted)' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -448,13 +454,16 @@ export default function PayrollMonthly() {
                     const emp = empById[r.employee_id]
                     const add = Number(r.total_additions || 0)
                     const ded = Number(r.total_deductions || 0)
+                    const name = emp?.full_name?.trim()
                     return (
-                      <tr key={r.id} style={{ cursor: 'pointer', background: r.status === 'paid' ? 'var(--color-primary-soft)' : undefined }} onClick={() => openAt(r.employee_id)}>
+                      <tr key={r.id} style={{ cursor: 'pointer', background: selected.includes(r.id) ? 'var(--color-primary-soft)' : undefined }} onClick={() => openAt(r.employee_id)}>
                         <td style={{ padding: '0.55rem 0.5rem', borderBottom: '1px solid var(--color-border)' }} onClick={(e) => e.stopPropagation()}>
                           <input type="checkbox" checked={selected.includes(r.id)} onChange={() => toggle(r.id)} />
                         </td>
                         <td style={{ padding: '0.55rem 0.7rem', borderBottom: '1px solid var(--color-border)' }}>
-                          {emp?.full_name || '—'}
+                          {name
+                            ? <span style={{ fontWeight: 600 }}>{name}</span>
+                            : <span style={{ color: 'var(--status-serious)', fontWeight: 600 }}>⚠ Unnamed employee</span>}
                           {(emp?.department_id || emp?.primary_location_id) && (
                             <span style={{ color: 'var(--color-muted)', fontSize: '0.78rem' }}>
                               {' · '}{[deptName[emp.department_id], locName[emp.primary_location_id]].filter(Boolean).join(' — ')}
@@ -507,7 +516,7 @@ export default function PayrollMonthly() {
       {confirmPayAll && (
         <ConfirmDialog
           title="Mark all employees as paid?"
-          message={`This marks the ${payable.length} remaining employee${payable.length === 1 ? '' : 's'} in the ${monthLabel(month)} payroll as paid — ${money(remainingAmount)} across ${payable.length}.${excluded.length ? ` ${excluded.length} on-hold employee${excluded.length > 1 ? 's are' : ' is'} excluded.` : ''}`}
+          message={`${payable.length} employee${payable.length === 1 ? '' : 's'} will be marked as paid for ${monthLabel(month)}. Amount remaining: ${money(remainingAmount)}.`}
           confirmLabel="Mark all paid"
           onConfirm={doPayAll}
           onCancel={() => setConfirmPayAll(false)}
@@ -525,20 +534,26 @@ export default function PayrollMonthly() {
         />
       )}
 
-      {exportOpen && (
-        <PayrollModal
-          title={`Export — ${monthLabel(month)}`}
-          onClose={() => setExportOpen(false)}
-          footer={<button className="secondary" onClick={() => setExportOpen(false)}>Close</button>}
-        >
-          <p style={{ marginTop: 0, color: 'var(--color-muted)', fontSize: '0.88rem' }}>{records.length} employee records.</p>
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <button onClick={() => { exportPayrollToExcel(records, empById, month); setExportOpen(false) }}>Excel</button>
-            <button onClick={() => { exportPayrollToCSV(records, empById, month); setExportOpen(false) }}>CSV</button>
-            <button onClick={() => { exportPayrollToPDF(records, empById, month); setExportOpen(false) }}>PDF</button>
-          </div>
-        </PayrollModal>
-      )}
+      {exportOpen && (() => {
+        const rows = exportSelectedOnly ? records.filter(r => selected.includes(r.id)) : records
+        const closeExport = () => { setExportOpen(false); setExportSelectedOnly(false) }
+        return (
+          <PayrollModal
+            title={`Export — ${monthLabel(month)}`}
+            onClose={closeExport}
+            footer={<button className="secondary" onClick={closeExport}>Close</button>}
+          >
+            <p style={{ marginTop: 0, color: 'var(--color-muted)', fontSize: '0.88rem' }}>
+              {rows.length} {exportSelectedOnly ? 'selected ' : ''}employee record{rows.length === 1 ? '' : 's'}.
+            </p>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <button onClick={() => { exportPayrollToExcel(rows, empById, month); closeExport() }}>Excel</button>
+              <button onClick={() => { exportPayrollToCSV(rows, empById, month); closeExport() }}>CSV</button>
+              <button onClick={() => { exportPayrollToPDF(rows, empById, month); closeExport() }}>PDF</button>
+            </div>
+          </PayrollModal>
+        )
+      })()}
     </div>
   )
 }
@@ -553,11 +568,11 @@ function Kpi({ cls, label, value, short, amountColor }) {
 }
 
 // Secondary payroll actions. `items`: { label, onClick, disabled?, danger? } | { divider: true }
-function OptionsMenu({ open, setOpen, items, fullWidth }) {
+function OptionsMenu({ open, setOpen, items, fullWidth, label = 'Options ▾' }) {
   return (
     <div style={{ position: 'relative', ...(fullWidth ? { width: '100%' } : {}) }}>
       <button className="secondary" onClick={() => setOpen(o => !o)} style={fullWidth ? { width: '100%', minHeight: 44 } : undefined}>
-        Options ▾
+        {label}
       </button>
       {open && (
         <>
@@ -590,10 +605,12 @@ function EmployeePayCard({ record: r, name, selected, onToggle, onOpen }) {
   const add = Number(r.total_additions || 0)
   const ded = Number(r.total_deductions || 0)
   return (
-    <div className="card" style={{ padding: '0.9rem 1rem', background: r.status === 'paid' ? 'var(--color-primary-soft)' : undefined }}>
+    <div className="card" style={{ padding: '0.9rem 1rem', background: selected ? 'var(--color-primary-soft)' : undefined, borderColor: selected ? 'var(--color-primary)' : undefined }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem' }}>
         <input type="checkbox" checked={selected} onChange={onToggle} onClick={(e) => e.stopPropagation()} />
-        <span style={{ fontWeight: 700, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+        <span style={{ fontWeight: 700, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: name ? undefined : 'var(--status-serious)' }}>
+          {name || '⚠ Unnamed employee'}
+        </span>
         <RecordStatusBadge status={r.status} />
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem', fontWeight: 800, marginBottom: '0.3rem' }}>
@@ -611,7 +628,7 @@ function EmployeePayCard({ record: r, name, selected, onToggle, onOpen }) {
         </span>
       </div>
       <button className="secondary" onClick={onOpen} style={{ width: '100%', marginTop: '0.7rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span>View breakdown</span><span>›</span>
+        <span>View payroll</span><span>›</span>
       </button>
     </div>
   )

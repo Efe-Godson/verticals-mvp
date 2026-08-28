@@ -113,20 +113,13 @@ const inputStyle = { width: '100%', boxSizing: 'border-box' }
 export function TextInput(props) { return <input {...props} style={{ ...inputStyle, ...props.style }} /> }
 export function Select(props) { return <select {...props} style={{ ...inputStyle, ...props.style }} /> }
 
-// payroll_records.status -> form-state-badge variant + label
-const RECORD_BADGE = {
-  draft: ['draft', 'Draft'],
-  pending_approval: ['paused', 'Pending Approval'],
-  approved: ['live', 'Approved'],
-  on_hold: ['paused', 'On Hold'],
-  paid: ['live', 'Paid'],
-  failed: ['archived', 'Failed'],
-  cancelled: ['archived', 'Cancelled'],
-}
-
+// Generated payroll records only ever surface as two payment states:
+// Paid (green) or Pending (amber). Every other stored token - the historic
+// 'draft', plus 'cancelled'/'failed' edge cases - reads as Pending. These
+// are semantic colours and deliberately do NOT follow the app theme.
 export function RecordStatusBadge({ status }) {
-  const [variant, label] = RECORD_BADGE[status] || ['draft', status]
-  return <span className={`form-state-badge ${variant}`}>{label}</span>
+  const paid = status === 'paid'
+  return <span className={`form-state-badge ${paid ? 'live' : 'draft'}`}>{paid ? 'Paid' : 'Pending'}</span>
 }
 
 const EMP_BADGE = {

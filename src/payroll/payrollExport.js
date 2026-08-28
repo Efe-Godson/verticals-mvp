@@ -5,21 +5,20 @@ import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { monthLabel } from './ui'
 
-const STATUS_LABEL = {
-  draft: 'Draft', pending_approval: 'Pending Approval', approved: 'Approved',
-  on_hold: 'On Hold', paid: 'Paid', failed: 'Failed', cancelled: 'Cancelled',
-}
+// Payment records only surface as Paid or Pending (see ui.jsx's
+// RecordStatusBadge) - the historic status tokens all collapse to Pending.
+const statusLabel = (status) => (status === 'paid' ? 'Paid' : 'Pending')
 
 const COLUMNS = ['Employee', 'Base Salary', 'Additions', 'Deductions', 'Final Amount', 'Status']
 
 function toRows(records, employeesById) {
   return records.map(r => [
-    employeesById[r.employee_id]?.full_name || '—',
+    employeesById[r.employee_id]?.full_name?.trim() || 'Unnamed employee',
     Math.round(Number(r.base_salary) || 0),
     Math.round(Number(r.total_additions) || 0),
     Math.round(Number(r.total_deductions) || 0),
     Math.round(Number(r.final_amount) || 0),
-    STATUS_LABEL[r.status] || r.status,
+    statusLabel(r.status),
   ])
 }
 

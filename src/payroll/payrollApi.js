@@ -353,10 +353,13 @@ export async function runPayroll(payrollFormId, month, form) {
     listEntries(payrollFormId, { month }),
     loadRecordsForMonth(payrollFormId, month),
   ])
+  // Paid / cancelled records are locked (doc section 36); everything else is
+  // regenerated as a fresh Pending record. (The status column's stored token
+  // stays 'draft' - the DB check constraint predates the Pending/Paid model -
+  // but it renders as "Pending" everywhere, see ui.jsx's RecordStatusBadge.)
   const locked = new Set(
     existing.filter(r => r.status === 'paid' || r.status === 'cancelled').map(r => r.employee_id)
   )
-  const existingByEmp = Object.fromEntries(existing.map(r => [r.employee_id, r]))
 
   const rows = employees
     .filter(e => e.employment_status !== 'terminated' && !locked.has(e.id))
@@ -366,9 +369,7 @@ export async function runPayroll(payrollFormId, month, form) {
       const row = breakdownToRecordRow(breakdown, {
         payrollFormId, payrollMonth: month, payrollPeriodId: period.id,
       })
-      // Preserve an in-progress status/approval; fresh rows start as draft.
-      const prev = existingByEmp[employee.id]
-      row.status = prev && ['approved', 'on_hold', 'pending_approval'].includes(prev.status) ? prev.status : 'draft'
+      row.status = 'draft' // = "Pending"
       return row
     })
 
@@ -412,6 +413,18 @@ export async function setRecordStatus(payrollFormId, record, status, meta = {}) 
     patch.paid_at = now
     patch.payment_method = meta.paymentMethod || null
     patch.payment_reference = meta.paymentReference || null
+  }
+  // Back to Pending ('draft' token): wipe the payment/approval trail so the
+  // record reads as genuinely unpaid again.
+  if (status === 'draft' || status === 'pending') {
+    patch.status = 'draft'
+    patch.paid_at = null
+    patch.payment_method = null
+    patch.payment_reference = null
+    patch.approved_by = null
+    patch.approved_at = null
+    patch.approved_amount = null
+    patch.hold_reason = null
   }
   const { data, error } = await supabase.from('payroll_records')
     .update(patch).eq('id', record.id).select().single()

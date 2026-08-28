@@ -1,13 +1,24 @@
 // Place at: src/payroll/PayrollSidePanel.jsx
 // Payroll runs as its own contained environment - the app NavBar is hidden
 // on /form/:id/payroll* (see App.jsx's isPayrollEnv). This is the whole
-// nav for it: a fixed hamburger + left slide-out drawer and a fixed back
-// arrow, exactly like the restaurant/retail POS flow (src/PosSidePanel.jsx).
+// nav for it.
+//
+//   >= 1024px : the drawer is pinned open permanently; PayrollShell offsets
+//               its content by the drawer width (.payroll-shell in
+//               index.css). No hamburger, no backdrop.
+//   < 1024px  : a fixed hamburger + left slide-out drawer + a fixed back
+//               arrow, exactly like the restaurant/retail POS flow
+//               (src/PosSidePanel.jsx).
+//
 // The drawer holds the three payroll sections up top, then the same
 // "jump to the rest of this form" options the POS panel carries.
 import { useState } from 'react'
 import { NavLink, Link } from 'react-router-dom'
+import useIsMobile from '../hooks/useIsMobile'
 import ArrowLeftIcon from '../ArrowLeftIcon'
+
+// Keep in sync with .payroll-shell's padding-left in index.css.
+const SIDEBAR_WIDTH = 210
 
 const SECTIONS = [
   { to: '', label: 'Payments', end: true },
@@ -16,8 +27,10 @@ const SECTIONS = [
 ]
 
 export default function PayrollSidePanel({ formId }) {
+  const pinned = !useIsMobile(1024) // persistent sidebar at >= 1024px
   const [open, setOpen] = useState(false)
   const close = () => setOpen(false)
+  const showDrawer = pinned || open
 
   const sectionTo = (s) => (s.to ? `/form/${formId}/payroll/${s.to}` : `/form/${formId}/payroll`)
 
@@ -32,54 +45,63 @@ export default function PayrollSidePanel({ formId }) {
 
   return (
     <>
-      <button
-        type="button"
-        className="pos-menu-button"
-        onClick={() => setOpen(true)}
-        aria-label="Open payroll menu"
-        style={{
-          position: 'fixed', top: 'calc(1rem + env(safe-area-inset-top))', left: '1rem', zIndex: 150,
-          width: 44, height: 44, padding: 0, borderRadius: 8,
-          background: 'var(--color-primary)', color: 'white', border: 'none', cursor: 'pointer',
-          display: open ? 'none' : 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4,
-        }}
-      >
-        <span style={{ width: 20, height: 2, background: 'white', borderRadius: 1 }} />
-        <span style={{ width: 20, height: 2, background: 'white', borderRadius: 1 }} />
-        <span style={{ width: 20, height: 2, background: 'white', borderRadius: 1 }} />
-      </button>
+      {!pinned && (
+        <>
+          <button
+            type="button"
+            className="pos-menu-button"
+            onClick={() => setOpen(true)}
+            aria-label="Open payroll menu"
+            style={{
+              position: 'fixed', top: 'calc(1rem + env(safe-area-inset-top))', left: '1rem', zIndex: 150,
+              width: 44, height: 44, padding: 0, borderRadius: 8,
+              background: 'var(--color-primary)', color: 'white', border: 'none', cursor: 'pointer',
+              display: open ? 'none' : 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4,
+            }}
+          >
+            <span style={{ width: 20, height: 2, background: 'white', borderRadius: 1 }} />
+            <span style={{ width: 20, height: 2, background: 'white', borderRadius: 1 }} />
+            <span style={{ width: 20, height: 2, background: 'white', borderRadius: 1 }} />
+          </button>
 
-      <Link
-        to="/"
-        className="pos-back-button"
-        aria-label="Back to all businesses"
-        title="All businesses"
-        style={{
-          position: 'fixed', top: 'calc(1rem + env(safe-area-inset-top))', right: '1rem', zIndex: 150,
-          width: 44, height: 44, background: 'transparent', border: 'none', color: 'var(--color-primary)',
-          display: open ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center',
-        }}
-      >
-        <ArrowLeftIcon size={26} />
-      </Link>
+          <Link
+            to="/"
+            className="pos-back-button"
+            aria-label="Back to all businesses"
+            title="All businesses"
+            style={{
+              position: 'fixed', top: 'calc(1rem + env(safe-area-inset-top))', right: '1rem', zIndex: 150,
+              width: 44, height: 44, background: 'transparent', border: 'none', color: 'var(--color-primary)',
+              display: open ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <ArrowLeftIcon size={26} />
+          </Link>
 
-      {open && (
-        <div onClick={close} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 150 }} />
+          {open && (
+            <div onClick={close} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 150 }} />
+          )}
+        </>
       )}
 
       <div style={{
-        position: 'fixed', top: 0, left: 0, bottom: 0, width: 210,
+        position: 'fixed', top: 0, left: 0, bottom: 0, width: SIDEBAR_WIDTH,
         background: 'var(--color-primary)', color: 'white', zIndex: 151,
-        transform: open ? 'translateX(0)' : 'translateX(-100%)', transition: 'transform 0.2s ease',
+        transform: showDrawer ? 'translateX(0)' : 'translateX(-100%)',
+        transition: pinned ? 'none' : 'transform 0.2s ease',
         padding: 'calc(1rem + env(safe-area-inset-top)) 1rem calc(1rem + env(safe-area-inset-bottom))',
-        boxShadow: '2px 0 12px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', overflowY: 'auto',
+        boxShadow: pinned ? 'none' : '2px 0 12px rgba(0,0,0,0.2)',
+        borderRight: pinned ? '1px solid rgba(0,0,0,0.12)' : 'none',
+        display: 'flex', flexDirection: 'column', overflowY: 'auto',
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.4rem' }}>
           <span style={{ fontWeight: 700 }}>Payroll</span>
-          <button type="button" onClick={close} aria-label="Close menu"
-            style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '1.3rem', lineHeight: 1, cursor: 'pointer', padding: 0 }}>
-            ✕
-          </button>
+          {!pinned && (
+            <button type="button" onClick={close} aria-label="Close menu"
+              style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '1.3rem', lineHeight: 1, cursor: 'pointer', padding: 0 }}>
+              ✕
+            </button>
+          )}
         </div>
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
