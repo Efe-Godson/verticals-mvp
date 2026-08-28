@@ -46,12 +46,7 @@ export default function PayrollShell() {
 
   return (
     <div className="page" style={{ maxWidth: '1000px' }}>
-      <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-        {form.name}
-      </div>
-      <h1 style={{ margin: '0.2rem 0 0', fontSize: '1.55rem' }}>Staff Payments</h1>
-
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', marginTop: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--color-border)' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--color-border)' }}>
         {TABS.map(tab => (
           <NavLink
             key={tab.to || 'overview'}
