@@ -3,7 +3,7 @@
 // payment forward. Adding an entry here recalculates in place - no refresh.
 import { useMemo, useState } from 'react'
 import { useToast } from '../Toast'
-import { PayrollModal, Field, TextInput, Select, money, monthLabel, RecordStatusBadge } from './ui'
+import { PayrollModal, Field, TextInput, Select, money, monthLabel } from './ui'
 import { calculateEmployeePayroll } from './calculatePayroll'
 import { recalcEmployeeRecord, setRecordStatus, deleteEntry } from './payrollApi'
 import AddEntryModal from './AddEntryModal'
@@ -15,26 +15,28 @@ const PAY_METHODS = [
   { value: 'other', label: 'Other' },
 ]
 
-// A ledger row: label in column 1, an optional line-item amount in column 2,
-// and an optional running-total in column 3 (Base Pay / subtotals / Net Pay
-// stack down that outer column so the arithmetic reads top to bottom).
-function LRow({ label, sub, amount, total, amountColor, totalColor, strong, grand, indent, muted, top, onRemove, disabled }) {
-  const bold = strong || grand
+// One line on the payslip: description on the left, amount on the right,
+// sharing a single amount axis. `sep` draws the short rule above a subtotal.
+function Row({ label, amount, amountColor, strong, muted, sep, onRemove, disabled }) {
+  const cls = sep ? ' sep' : ''
   return (
     <>
-      <div className={`pr-lbl${indent ? ' i' : ''}${top ? ' t' : ''}${grand ? ' g' : ''}`}
-        style={{ color: muted ? 'var(--color-muted)' : undefined, fontWeight: bold ? 700 : undefined, fontSize: grand ? '1.05rem' : undefined }}>
+      <div className={`pr-l${cls}`} style={{ color: muted ? 'var(--color-muted)' : undefined, fontWeight: strong ? 700 : undefined }}>
         {label}
         {onRemove && <button className="secondary" onClick={onRemove} disabled={disabled} style={{ marginLeft: '0.4rem', padding: '0 0.35rem', fontSize: '0.7rem' }}>×</button>}
-        {sub && <span style={{ display: 'block', fontSize: '0.74rem', color: 'var(--color-muted)', fontWeight: 400 }}>{sub}</span>}
       </div>
-      <div className={`pr-amt${top ? ' t' : ''}`} style={{ color: amountColor }}>{amount || ''}</div>
-      <div className={`pr-amt${top ? ' t' : ''}${grand ? ' g' : ''}`}
-        style={{ color: totalColor, fontWeight: bold ? 800 : undefined, fontSize: grand ? '1.2rem' : undefined }}>
-        {total || ''}
-      </div>
+      <div className={`pr-a${cls}`} style={{ color: amountColor, fontWeight: strong ? 700 : undefined }}>{amount}</div>
     </>
   )
+}
+
+// "Late Arrival · Aug 12" / "Missed Day · Aug 6" - reason if there is one,
+// else the entry-type label, plus the event date.
+function eventLabel(item) {
+  const desc = (item.reason && item.reason.trim()) || item.label
+  if (!item.date) return desc
+  const d = new Date(item.date)
+  return isNaN(d) ? desc : `${desc} · ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
 }
 
 export default function EmployeePayrollModal({
@@ -145,59 +147,49 @@ export default function EmployeePayrollModal({
       )}
 
       <style>{`
-        .pr-ledger { display: grid; grid-template-columns: 1fr minmax(84px, auto) minmax(96px, auto);
-          column-gap: 0.9rem; row-gap: 0.1rem; align-items: baseline; margin-top: 0.4rem; }
-        .pr-ledger .pr-lbl { padding: 0.32rem 0; }
-        .pr-ledger .pr-lbl.i { padding-left: 0.9rem; }
-        .pr-ledger .pr-amt { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; padding: 0.32rem 0; }
-        .pr-ledger .pr-sec { grid-column: 1 / -1; margin-top: 0.75rem; font-size: 0.72rem; font-weight: 700;
-          letter-spacing: 0.05em; text-transform: uppercase; color: var(--color-muted); }
-        .pr-ledger .t { border-bottom: 1px dotted var(--color-border); }
-        .pr-ledger .g { border-top: 2px solid var(--color-border); margin-top: 0.35rem; padding-top: 0.55rem; }
+        .pr-grid { display: grid; grid-template-columns: 1fr auto; column-gap: 1rem; row-gap: 0.05rem;
+          align-items: baseline; margin-top: 0.2rem; }
+        .pr-grid .pr-l { padding: 0.3rem 0; }
+        .pr-grid .pr-a { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; padding: 0.3rem 0; }
+        .pr-grid .pr-head { grid-column: 1 / -1; margin-top: 1rem; font-size: 0.72rem; font-weight: 800;
+          letter-spacing: 0.07em; text-transform: uppercase; padding-bottom: 0.3rem; border-bottom: 1px solid currentColor; }
+        .pr-grid .sep { border-top: 1px solid var(--color-border); margin-top: 0.1rem; padding-top: 0.4rem; }
+        .pr-grid .pr-fl, .pr-grid .pr-fa { border-top: 2px solid var(--color-text); margin-top: 1rem; padding-top: 0.7rem; }
+        .pr-grid .pr-fa { text-align: right; font-size: 1.5rem; font-weight: 800; font-variant-numeric: tabular-nums; align-self: center; }
       `}</style>
 
-      {/* centred name, with the daily rate small above it */}
-      <div style={{ textAlign: 'center', marginBottom: '0.4rem' }}>
-        <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)', fontVariantNumeric: 'tabular-nums' }}>
-          {money(breakdown.dailyRate, 2)} / day · {breakdown.daysInPeriod} days
-        </div>
-        <div style={{ fontSize: '1.55rem', fontWeight: 800, lineHeight: 1.15, margin: '0.1rem 0 0.35rem' }}>
-          {employee.full_name}
-        </div>
-        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap', fontSize: '0.82rem', color: 'var(--color-muted)' }}>
-          <span>{[employee.job_title, employee.department_name, employee.location_name].filter(Boolean).join(' · ')}</span>
-          <RecordStatusBadge status={record.status} />
+      {/* centred name, daily rate small underneath */}
+      <div style={{ textAlign: 'center', marginBottom: '0.6rem' }}>
+        <div style={{ fontSize: '1.55rem', fontWeight: 800, lineHeight: 1.15 }}>{employee.full_name}</div>
+        <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)', fontVariantNumeric: 'tabular-nums', marginTop: '0.15rem' }}>
+          {money(breakdown.dailyRate, 2)} / day
         </div>
       </div>
 
-      <div className="pr-ledger">
-        <LRow top label="Base Pay" total={money(breakdown.baseSalary)} />
+      <div className="pr-grid">
+        <Row label="Base Pay" amount={money(breakdown.baseSalary)} strong />
 
-        <div className="pr-sec">Deductions</div>
-        {deductions.length === 0
-          ? <LRow indent muted label="No deductions" />
-          : deductions.map(item => (
-            <LRow key={item.id} indent
-              label={item.label} sub={item.reason}
-              amount={`− ${money(item.amount, 2)}`} amountColor="var(--status-critical)"
-              onRemove={!locked ? () => removeEntry(item.id) : undefined} disabled={busy}
-            />
-          ))}
-        <LRow top label="Total Deductions" total={`− ${money(breakdown.totalDeductions)}`} totalColor="var(--status-critical)" strong />
+        <div className="pr-head" style={{ color: 'var(--status-critical)' }}>Deductions</div>
+        {deductions.map(item => (
+          <Row key={item.id} label={eventLabel(item)} amount={money(item.amount)} amountColor="var(--status-critical)"
+            onRemove={!locked ? () => removeEntry(item.id) : undefined} disabled={busy} />
+        ))}
+        <Row label="Total Deductions" amount={`- ${money(breakdown.totalDeductions)}`} amountColor="var(--status-critical)" strong sep={deductions.length > 0} />
 
-        <div className="pr-sec">Additions</div>
-        {additions.length === 0
-          ? <LRow indent muted label="No additions" />
-          : additions.map(item => (
-            <LRow key={item.id} indent
-              label={item.label} sub={item.reason}
-              amount={`+ ${money(item.amount, 2)}`} amountColor="var(--status-good)"
-              onRemove={!locked ? () => removeEntry(item.id) : undefined} disabled={busy}
-            />
-          ))}
-        <LRow top label="Total Additions" total={`+ ${money(breakdown.totalAdditions)}`} totalColor="var(--status-good)" strong />
+        <div className="pr-head" style={{ color: 'var(--status-good)' }}>Additions</div>
+        {additions.map(item => (
+          <Row key={item.id} label={eventLabel(item)} amount={money(item.amount)} amountColor="var(--status-good)"
+            onRemove={!locked ? () => removeEntry(item.id) : undefined} disabled={busy} />
+        ))}
+        <Row label="Total Additions" amount={`+ ${money(breakdown.totalAdditions)}`} amountColor="var(--status-good)" strong sep={additions.length > 0} />
 
-        <LRow grand label="Net Pay" total={money(breakdown.finalAmount)} />
+        <div className="pr-fl">
+          <div style={{ fontWeight: 800, fontSize: '0.95rem', letterSpacing: '0.04em' }}>FINAL PAY</div>
+          <div style={{ fontSize: '0.76rem', color: 'var(--color-muted)', fontVariantNumeric: 'tabular-nums' }}>
+            {money(breakdown.baseSalary)} − {money(breakdown.totalDeductions)} + {money(breakdown.totalAdditions)}
+          </div>
+        </div>
+        <div className="pr-fa">{money(breakdown.finalAmount)}</div>
       </div>
 
       {record.status === 'on_hold' && record.hold_reason && (

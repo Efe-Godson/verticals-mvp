@@ -77,6 +77,7 @@ export function calculateEmployeePayroll({ employee, entries = [], payrollMonth,
       category: entry.entry_category,
       quantity: entry.quantity != null ? Number(entry.quantity) : null,
       reason: entry.reason || '',
+      date: entry.entry_date || null,
       amount,
       signedAmount: entry.entry_category === 'deduction' ? -amount : amount,
     }
