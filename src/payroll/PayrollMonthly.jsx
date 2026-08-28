@@ -8,7 +8,7 @@ import { LoadingState } from '../LoadingState'
 import { ErrorState } from '../ErrorState'
 import ConfirmDialog from '../ConfirmDialog'
 import useIsMobile from '../hooks/useIsMobile'
-import { MonthPicker, LocationFilter, PayrollModal, money, moneyShort, monthLabel, currentMonth, RecordStatusBadge } from './ui'
+import { MonthPicker, LocationFilter, PayrollModal, money, moneyShort, monthLabel, currentMonth, RecordStatusBadge, friendlyError } from './ui'
 import { calculateEmployeePayroll } from './calculatePayroll'
 import {
   payrollSettings, listEmployees, listDepartments, listLocations, listEntries, loadRecordsForMonth,
@@ -35,6 +35,9 @@ export default function PayrollMonthly() {
   const [running, setRunning] = useState(false)
   const [selected, setSelected] = useState([])
   const [confirmPayAll, setConfirmPayAll] = useState(false)
+  // { title, message, confirmLabel, danger?, run } for one-off confirmations
+  const [confirmAction, setConfirmAction] = useState(null)
+  const ask = (cfg) => setConfirmAction(cfg)
   const [exportOpen, setExportOpen] = useState(false)
   // Guided review after Run Payroll: walk each employee's breakdown one modal
   // at a time and approve / pay / hold before moving on.
@@ -100,7 +103,7 @@ export default function PayrollMonthly() {
   const headcount = hasDraftRun ? records.length : kpi.staff
   const progressPct = kpi.net > 0 ? Math.round((kpi.paidAmount / kpi.net) * 100) : 0
 
-  async function handleRun() {
+  async function doRun() {
     setRunning(true)
     try {
       const recs = await runPayroll(formId, month, form)
@@ -113,10 +116,23 @@ export default function PayrollMonthly() {
         .map(r => r.employee_id)
       if (ordered.length) { setReviewQueue(ordered); setReviewIdx(0) }
     } catch (err) {
-      showToast('Start Payroll failed: ' + err.message, 'error')
+      showToast(friendlyError(err, "Couldn't start payroll. Please try again."), 'error')
     } finally {
       setRunning(false)
     }
+  }
+
+  function handleRun() {
+    if (running) return
+    const paid = records.filter(r => r.status === 'paid').length
+    ask({
+      title: hasDraftRun ? 'Re-generate payroll?' : `Start payroll for ${monthLabel(month)}?`,
+      message: hasDraftRun
+        ? `Every unpaid record for ${monthLabel(month)} will be recalculated from the current entries.${paid ? ` ${paid} already-paid record${paid > 1 ? 's are' : ' is'} left untouched.` : ''}`
+        : `This creates a payroll record for every active employee, then walks you through each one to review and pay.`,
+      confirmLabel: hasDraftRun ? 'Re-generate' : 'Start Payroll',
+      run: doRun,
+    })
   }
 
   function startReview(fromStatuses) {
@@ -163,16 +179,34 @@ export default function PayrollMonthly() {
     setSelected(cur => cur.length === records.length ? [] : records.map(r => r.id))
   }
 
-  async function bulk(status) {
-    const targets = records.filter(r => selected.includes(r.id) && r.status !== 'paid' && r.status !== 'cancelled')
-    if (!targets.length) { showToast('Nothing eligible selected.', 'error'); return }
+  async function doBulk(status, targets) {
     try {
       await bulkSetRecordStatus(formId, targets, status)
-      showToast(`${targets.length} marked ${status.replace('_', ' ')}.`, 'success')
+      const verb = status === 'paid' ? 'marked paid' : 'put on hold'
+      showToast(`${targets.length} employee${targets.length > 1 ? 's' : ''} ${verb}.`, 'success')
       load()
     } catch (err) {
-      showToast('Bulk action failed: ' + err.message, 'error')
+      showToast(friendlyError(err, "Couldn't update those records."), 'error')
     }
+  }
+
+  function bulk(status) {
+    const eligible = records.filter(r => selected.includes(r.id) && r.status !== 'paid' && r.status !== 'cancelled')
+    const skipped = selected.length - eligible.length
+    if (!eligible.length) {
+      showToast('None of the selected employees can be changed — they are already paid.', 'info')
+      return
+    }
+    const label = status === 'paid' ? 'Mark paid' : 'Put on hold'
+    ask({
+      title: `${label} ${eligible.length} employee${eligible.length > 1 ? 's' : ''}?`,
+      message: status === 'paid'
+        ? `They'll be recorded as paid for ${monthLabel(month)}.${skipped ? ` ${skipped} already-paid selection${skipped > 1 ? 's' : ''} will be skipped.` : ''}`
+        : `They stay in payroll but are excluded from "Mark All Paid".${skipped ? ` ${skipped} paid selection${skipped > 1 ? 's' : ''} will be skipped.` : ''}`,
+      confirmLabel: label,
+      danger: status === 'on_hold',
+      run: () => doBulk(status, eligible),
+    })
   }
 
   const payable = records.filter(r => r.status !== 'paid' && r.status !== 'cancelled' && r.status !== 'on_hold')
@@ -184,10 +218,10 @@ export default function PayrollMonthly() {
     try {
       await bulkSetRecordStatus(formId, payable, 'paid')
       await createPaymentBatch(formId, month, payable)
-      showToast(`${payable.length} employees marked paid; payment batch created.`, 'success')
+      showToast(`${payable.length} employee${payable.length > 1 ? 's' : ''} marked paid. Payment batch recorded.`, 'success')
       load()
     } catch (err) {
-      showToast('Mark All Paid failed: ' + err.message, 'error')
+      showToast(friendlyError(err, "Couldn't mark everyone paid. Some may have gone through — reload to check."), 'error')
     }
   }
 
@@ -395,6 +429,17 @@ export default function PayrollMonthly() {
           confirmLabel="Mark Paid"
           onConfirm={doPayAll}
           onCancel={() => setConfirmPayAll(false)}
+        />
+      )}
+
+      {confirmAction && (
+        <ConfirmDialog
+          title={confirmAction.title}
+          message={confirmAction.message}
+          confirmLabel={confirmAction.confirmLabel}
+          danger={confirmAction.danger}
+          onConfirm={() => { const fn = confirmAction.run; setConfirmAction(null); fn?.() }}
+          onCancel={() => setConfirmAction(null)}
         />
       )}
 

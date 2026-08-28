@@ -4,7 +4,7 @@
 import { useMemo, useState } from 'react'
 import { useToast } from '../Toast'
 import ConfirmDialog from '../ConfirmDialog'
-import { PayrollModal, Field, TextInput, Select, money, monthLabel } from './ui'
+import { PayrollModal, Field, TextInput, Select, money, monthLabel, friendlyError } from './ui'
 import { calculateEmployeePayroll } from './calculatePayroll'
 import { recalcEmployeeRecord, setRecordStatus, deleteEntry } from './payrollApi'
 import AddEntryModal from './AddEntryModal'
@@ -84,7 +84,7 @@ export default function EmployeePayrollModal({
       setEntries(e)
       onChanged?.()
     } catch (err) {
-      showToast('Could not refresh: ' + err.message, 'error')
+      showToast(friendlyError(err, "Couldn't refresh the breakdown."), 'error')
     }
   }
 
@@ -95,7 +95,7 @@ export default function EmployeePayrollModal({
       await refresh()
       showToast('Entry removed.', 'success')
     } catch (err) {
-      showToast('Could not remove: ' + err.message, 'error')
+      showToast(friendlyError(err, "Couldn't remove that entry."), 'error')
     } finally {
       setBusy(false)
     }
@@ -107,11 +107,11 @@ export default function EmployeePayrollModal({
       const updated = await setRecordStatus(formId, record, status, meta)
       setRecord(updated)
       onChanged?.()
-      showToast(`Marked ${status.replace('_', ' ')}.`, 'success')
+      showToast(status === 'paid' ? `${employee.full_name} marked paid.` : `${employee.full_name} put on hold.`, 'success')
       // In the guided review, acting on this employee advances to the next one.
       if (reviewPosition && onNext) { setHoldOpen(false); setPayOpen(false); onNext() }
     } catch (err) {
-      showToast('Could not update: ' + err.message, 'error')
+      showToast(friendlyError(err, "That didn't go through. Nothing was changed."), 'error')
     } finally {
       setBusy(false)
       setHoldOpen(false)
@@ -269,6 +269,14 @@ export default function EmployeePayrollModal({
           <Field label="Reference (optional)">
             <TextInput value={payRef} onChange={(e) => setPayRef(e.target.value)} placeholder="Transfer / receipt reference" />
           </Field>
+          {breakdown.finalAmount <= 0 && (
+            <p style={{ fontSize: '0.82rem', color: 'var(--status-serious)', margin: '0.2rem 0 0' }}>
+              Net pay is {money(breakdown.finalAmount)} — double-check the deductions before marking this paid.
+            </p>
+          )}
+          <p style={{ fontSize: '0.78rem', color: 'var(--color-muted)', margin: '0.6rem 0 0' }}>
+            Once paid, this month's record is locked. Corrections go through an adjustment in a later month.
+          </p>
         </PayrollModal>
       )}
     </PayrollModal>

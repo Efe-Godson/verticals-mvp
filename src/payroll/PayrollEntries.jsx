@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { usePayroll } from './PayrollShell'
 import { useToast } from '../Toast'
+import ConfirmDialog from '../ConfirmDialog'
 import { LoadingState } from '../LoadingState'
 import { ErrorState } from '../ErrorState'
-import { money, monthLabel, currentMonth, LocationFilter } from './ui'
+import { money, monthLabel, currentMonth, LocationFilter, friendlyError } from './ui'
 import { ENTRY_TYPE_LABELS, DEDUCTION_TYPES, ADDITION_TYPES } from './calculatePayroll'
 import { payrollSettings, listEmployees, listLocations, listEntries, deleteEntry } from './payrollApi'
 import AddEntryModal from './AddEntryModal'
@@ -25,6 +26,7 @@ export default function PayrollEntries() {
   const [addOpen, setAddOpen] = useState(false)
   const [bulkOpen, setBulkOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
+  const [pendingDelete, setPendingDelete] = useState(null) // entry row awaiting confirm
 
   const [fMonth, setFMonth] = useState(currentMonth())
   const [fLocation, setFLocation] = useState('')
@@ -77,12 +79,13 @@ export default function PayrollEntries() {
   )
 
   async function remove(id) {
+    setPendingDelete(null)
     try {
       await deleteEntry(formId, id)
       showToast('Entry removed.', 'success')
       load()
     } catch (err) {
-      showToast('Could not remove: ' + err.message, 'error')
+      showToast(friendlyError(err, "Couldn't remove that entry."), 'error')
     }
   }
 
@@ -146,7 +149,7 @@ export default function PayrollEntries() {
                   </td>
                   <td style={{ padding: '0.55rem 0.7rem', borderBottom: '1px solid var(--color-border)', whiteSpace: 'nowrap', color: 'var(--color-muted)', fontSize: '0.82rem' }}>{monthLabel(e.payroll_month)}</td>
                   <td style={{ padding: '0.55rem 0.7rem', borderBottom: '1px solid var(--color-border)' }}>
-                    <button className="secondary" onClick={() => remove(e.id)} style={{ padding: '0.2rem 0.5rem', fontSize: '0.78rem' }}>Delete</button>
+                    <button className="secondary" onClick={() => setPendingDelete(e)} style={{ padding: '0.2rem 0.5rem', fontSize: '0.78rem' }}>Delete</button>
                   </td>
                 </tr>
               )
@@ -163,6 +166,16 @@ export default function PayrollEntries() {
       )}
       {importOpen && (
         <ImportModal mode="entries" formId={formId} settings={settings} employees={employees} onClose={() => setImportOpen(false)} onSaved={load} />
+      )}
+      {pendingDelete && (
+        <ConfirmDialog
+          title="Delete this entry?"
+          message={`${ENTRY_TYPE_LABELS[pendingDelete.entry_type] || pendingDelete.entry_type}${pendingDelete.reason ? ` — ${pendingDelete.reason}` : ''} (${money(pendingDelete.amount)}) for ${empById[pendingDelete.employee_id]?.full_name || 'this employee'} will be removed. If payroll has already run for ${monthLabel(pendingDelete.payroll_month)}, re-run it to apply the change.`}
+          confirmLabel="Delete"
+          danger
+          onConfirm={() => remove(pendingDelete.id)}
+          onCancel={() => setPendingDelete(null)}
+        />
       )}
     </div>
   )

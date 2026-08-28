@@ -13,6 +13,19 @@ export function money(value, decimals = 0) {
   return formatNaira(value, decimals).replace('₦', '₦ ')
 }
 
+// Turn a raw thrown error / Supabase error into one plain sentence for a
+// toast. Keeps short human messages, replaces jargon, hides long dumps.
+export function friendlyError(err, fallback = 'Something went wrong. Please try again.') {
+  const raw = (err && (err.message || err.error_description || err.msg || err.details)) || String(err || '')
+  if (!raw) return fallback
+  if (/failed to fetch|networkerror|timeout|net::/i.test(raw)) return 'Network problem — check your connection and try again.'
+  if (/duplicate key|already exists|unique constraint/i.test(raw)) return 'That already exists.'
+  if (/permission|not authorized|rls|row-level security|jwt/i.test(raw)) return "You don't have permission to do that. Try signing in again."
+  if (/violates .*constraint|check constraint/i.test(raw)) return "That change isn't allowed here."
+  if (/not found|no rows/i.test(raw)) return 'That record could no longer be found — it may have changed. Reload and try again.'
+  return raw.length > 160 ? fallback : raw
+}
+
 // Abbreviated currency for tight spaces (mobile KPI cards): ₦3.27M, ₦42.5K.
 // Pair with title={money(value)} so the exact figure is a tap/hover away.
 function trimZeros(s) {
