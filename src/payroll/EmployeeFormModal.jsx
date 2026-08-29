@@ -10,6 +10,7 @@
 import { useMemo, useState } from 'react'
 import { useToast } from '../Toast'
 import { PayrollModal, Field, TextInput, Select, roleList, deptIds, locationIds, dedupeByName } from './ui'
+import LoadingButton from '../components/LoadingButton'
 import { createEmployee, updateEmployee, createDepartment, createLocation } from './payrollApi'
 
 const norm = (s) => String(s || '').trim().toLowerCase()
@@ -199,7 +200,7 @@ export default function EmployeeFormModal({ formId, settings, employee, departme
       wide
       footer={<>
         <button className="secondary" onClick={onClose} disabled={saving}>Cancel</button>
-        <button onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save Employee'}</button>
+        <LoadingButton loading={saving} loadingLabel="Saving…" onClick={save}>{editing ? 'Save Employee' : 'Add Employee'}</LoadingButton>
       </>}
     >
       <div className="form-2col">

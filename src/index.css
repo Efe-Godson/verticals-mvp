@@ -124,6 +124,32 @@
   100% { background-position: 0 50%; }
 }
 
+/* --- Skeleton loading primitives (src/components/Skeleton.jsx) ---------
+   A quiet neutral placeholder that pulses ~1.5s. Match the shape of the
+   real content with width/height/border-radius; never flash. */
+@keyframes verticals-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+.vskel {
+  display: block;
+  background: var(--color-border);
+  border-radius: 6px;
+  animation: verticals-pulse 1.5s ease-in-out infinite;
+}
+.vskel--text { height: 0.72em; margin: 0.2em 0; border-radius: 4px; }
+.vskel--circle { border-radius: 50%; }
+/* A row of skeletons should read as one block, not N staggered pulses. */
+.vskel-group .vskel { animation-delay: 0s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .vskel,
+  svg[style*="verticals-spin"] {
+    animation: none !important;
+  }
+  .vskel { opacity: 0.7; }
+}
+
 html, body {
   /* Safety net against any element that overflows its container width
      (long unwrapped text forcing a grid track wider than 1fr, a stray fixed

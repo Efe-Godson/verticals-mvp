@@ -4,8 +4,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { usePayroll } from './PayrollShell'
 import { useToast } from '../Toast'
-import { LoadingState } from '../LoadingState'
 import { ErrorState } from '../ErrorState'
+import { SkeletonKpis, SkeletonTableRows, Skeleton } from '../components/Skeleton'
+import { RefreshingIndicator } from '../components/InlineLoader'
+import { useDeferredLoading } from '../components/loadingHooks'
 import ConfirmDialog from '../ConfirmDialog'
 import useIsMobile from '../hooks/useIsMobile'
 import { MonthPicker, LocationFilter, PayrollModal, money, moneyShort, monthLabel, currentMonth, RecordStatusBadge, friendlyError, locationIds, deptIds, namesFor, dedupeByName } from './ui'
@@ -33,6 +35,7 @@ export default function PayrollMonthly() {
   const [entries, setEntries] = useState([])
   const [allRecords, setRecords] = useState([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
   const [running, setRunning] = useState(false)
   const [selected, setSelected] = useState([])
@@ -50,8 +53,12 @@ export default function PayrollMonthly() {
   const [reviewQueue, setReviewQueue] = useState([]) // employee ids
   const [reviewIdx, setReviewIdx] = useState(null)   // null = not reviewing
 
+  // quiet = background refresh after a mutation: keep the current UI on
+  // screen, just flag "Updating…" (brief §3C) instead of dropping to a
+  // skeleton.
   async function load({ quiet = false } = {}) {
     if (!quiet) setLoading(true)
+    setRefreshing(true)
     setError('')
     try {
       const [emps, depts, locs, ents, recs] = await Promise.all([
@@ -68,6 +75,7 @@ export default function PayrollMonthly() {
       setError(err.message || 'Could not load payroll.')
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
   }
 
@@ -283,7 +291,8 @@ export default function PayrollMonthly() {
     },
   ]
 
-  if (loading) return <LoadingState />
+  const showSkeleton = useDeferredLoading(loading)
+  if (loading) return showSkeleton ? <PaymentsSkeleton isMobile={isMobile} /> : null
   if (error) return <ErrorState message={error} onRetry={load} />
 
   const totalFinal = records.reduce((s, r) => s + Number(r.final_amount || 0), 0)
@@ -402,8 +411,9 @@ export default function PayrollMonthly() {
           : <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>{progressPct}%</div>}
       </div>
 
-      <div style={{ fontSize: '0.92rem', fontWeight: 700, marginBottom: '0.7rem' }}>
-        {monthLabel(month)} Payroll <span style={{ color: 'var(--color-muted)', fontWeight: 400 }}>· {headcount} employee{headcount === 1 ? '' : 's'}</span>
+      <div style={{ fontSize: '0.92rem', fontWeight: 700, marginBottom: '0.7rem', display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+        <span>{monthLabel(month)} Payroll <span style={{ color: 'var(--color-muted)', fontWeight: 400 }}>· {headcount} employee{headcount === 1 ? '' : 's'}</span></span>
+        <RefreshingIndicator show={refreshing} />
       </div>
 
       {!hasRun ? (
@@ -641,6 +651,36 @@ function EmployeePayCard({ record: r, name, selected, onToggle, onOpen }) {
       <button className="secondary" onClick={onOpen} style={{ width: '100%', marginTop: '0.7rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span>View payroll</span><span>›</span>
       </button>
+    </div>
+  )
+}
+
+// Initial-load placeholder: same shapes as the real page (filter row, 4
+// KPI cards, progress card, table) so nothing jumps when data arrives.
+function PaymentsSkeleton({ isMobile }) {
+  return (
+    <div aria-hidden="true">
+      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.4rem' }}>
+        <Skeleton w={isMobile ? '100%' : '160px'} h="38px" />
+        <Skeleton w={isMobile ? '100%' : '150px'} h="38px" />
+        <Skeleton w={isMobile ? '100%' : '130px'} h="38px" style={{ marginLeft: isMobile ? 0 : 'auto' }} />
+      </div>
+      <SkeletonKpis count={4} />
+      <div className="card" style={{ padding: '0.9rem 1.1rem', marginBottom: '1.3rem' }}>
+        <Skeleton w="35%" h="0.9rem" style={{ marginBottom: '0.7rem' }} />
+        <Skeleton w="100%" h="8px" radius="999px" />
+      </div>
+      <Skeleton w="40%" h="0.9rem" style={{ marginBottom: '0.8rem' }} />
+      <div className="table-wrap table-bleed pay-table-scroll">
+        <table className="records-table pay-table" style={{ borderCollapse: 'collapse', width: '100%' }}>
+          <thead>
+            <tr>{['Employee', 'Base', 'Adjustments', 'Net Pay', 'Status'].map(h => (
+              <th key={h} style={{ padding: '0.6rem 0.7rem', borderBottom: '2px solid var(--color-border)', textAlign: 'left', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--color-muted)' }}>{h}</th>
+            ))}</tr>
+          </thead>
+          <SkeletonTableRows rows={7} cols={['45%', '60%', '55%', '60%', '58px']} />
+        </table>
+      </div>
     </div>
   )
 }

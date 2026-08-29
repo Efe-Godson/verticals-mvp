@@ -3,8 +3,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { usePayroll } from './PayrollShell'
-import { LoadingState } from '../LoadingState'
 import { ErrorState } from '../ErrorState'
+import EmptyState from '../components/EmptyState'
+import { SkeletonTableRows } from '../components/Skeleton'
+import { RefreshingIndicator } from '../components/InlineLoader'
+import { useDeferredLoading } from '../components/loadingHooks'
 import { money, EmployeeStatusBadge, LocationFilter, roleList, deptIds, locationIds, namesFor, dedupeByName } from './ui'
 import { payrollSettings, listEmployees, listDepartments, listLocations } from './payrollApi'
 import EmployeeFormModal from './EmployeeFormModal'
@@ -22,6 +25,7 @@ export default function PayrollEmployees() {
   const [departments, setDepartments] = useState([])
   const [locations, setLocations] = useState([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
   const [deptFilter, setDeptFilter] = useState('')
@@ -31,8 +35,9 @@ export default function PayrollEmployees() {
   const [importOpen, setImportOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
 
-  async function load() {
-    setLoading(true)
+  async function load({ quiet = false } = {}) {
+    if (!quiet) setLoading(true)
+    setRefreshing(true)
     setError('')
     try {
       const [emps, depts, locs] = await Promise.all([
@@ -45,6 +50,7 @@ export default function PayrollEmployees() {
       setError(err.message || 'Could not load employees.')
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
   }
 
@@ -75,8 +81,12 @@ export default function PayrollEmployees() {
     })
   }, [employees, search, deptFilter, locFilter, statusFilter, deptName, locName])
 
-  if (loading) return <LoadingState />
+  const showSkeleton = useDeferredLoading(loading)
+  if (loading && !showSkeleton) return null
   if (error) return <ErrorState message={error} onRetry={load} />
+
+  const noneAtAll = !loading && employees.length === 0
+  const noneMatch = !loading && employees.length > 0 && filtered.length === 0
 
   return (
     <div>
@@ -93,13 +103,23 @@ export default function PayrollEmployees() {
             {['active', 'on_leave', 'suspended', 'inactive', 'terminated'].map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
           </select>
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <RefreshingIndicator show={refreshing && !loading} style={{ marginRight: '0.2rem' }} />
           <button className="secondary" onClick={() => setSettingsOpen(true)} title="Payroll settings, departments &amp; locations">⚙ Settings</button>
           <button className="secondary" onClick={() => setImportOpen(true)}>Import</button>
           <button onClick={() => setAddOpen(true)}>+ Add Employee</button>
         </div>
       </div>
 
+      {noneAtAll ? (
+        <EmptyState
+          title="No employees yet"
+          message="Add your staff here, or import them from a spreadsheet, to start running payroll."
+          action={<button onClick={() => setAddOpen(true)}>+ Add Employee</button>}
+        />
+      ) : noneMatch ? (
+        <EmptyState title="No matches" message="No employees match the current search or filters." />
+      ) : (
       <div className="table-wrap table-bleed">
         <table className="records-table" style={{ borderCollapse: 'collapse', width: '100%' }}>
           <thead>
@@ -107,10 +127,10 @@ export default function PayrollEmployees() {
               <th key={h} style={{ textAlign: h === 'Monthly Salary' ? 'right' : 'left', padding: '0.6rem 0.7rem', borderBottom: '2px solid var(--color-border)', fontSize: '0.8rem', color: 'var(--color-muted)' }}>{h}</th>
             ))}</tr>
           </thead>
+          {loading ? (
+            <SkeletonTableRows rows={8} cols={['40%', '55%', '50%', '48%', '35%', '58px']} />
+          ) : (
           <tbody>
-            {filtered.length === 0 && (
-              <tr><td colSpan={6} style={{ padding: '1.4rem', color: 'var(--color-muted)' }}>No employees{employees.length ? ' match the filters' : ' yet'}.</td></tr>
-            )}
             {filtered.map(e => (
               <tr key={e.id} onClick={() => navigate(e.id)} style={{ cursor: 'pointer' }}>
                 <td style={{ padding: '0.6rem 0.7rem', borderBottom: '1px solid var(--color-border)' }}>
@@ -125,8 +145,10 @@ export default function PayrollEmployees() {
               </tr>
             ))}
           </tbody>
+          )}
         </table>
       </div>
+      )}
 
       {addOpen && (
         <EmployeeFormModal
@@ -136,7 +158,7 @@ export default function PayrollEmployees() {
           locations={locations}
           roleSuggestions={roleSuggestions}
           onClose={() => setAddOpen(false)}
-          onSaved={load}
+          onSaved={() => load({ quiet: true })}
         />
       )}
       {importOpen && (
@@ -147,7 +169,7 @@ export default function PayrollEmployees() {
           departments={departments}
           locations={locations}
           onClose={() => setImportOpen(false)}
-          onSaved={load}
+          onSaved={() => load({ quiet: true })}
         />
       )}
 
@@ -156,7 +178,7 @@ export default function PayrollEmployees() {
           form={form}
           formId={formId}
           reloadForm={reloadForm}
-          onClose={() => { setSettingsOpen(false); load() }}
+          onClose={() => { setSettingsOpen(false); load({ quiet: true }) }}
         />
       )}
     </div>
