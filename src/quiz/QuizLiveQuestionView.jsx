@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react'
 import { invokeQuiz } from '../quizApi'
 import QuestionTimer from './QuestionTimer'
 import McqOptionGrid from './McqOptionGrid'
-import { LoadingState } from '../LoadingState'
+import PageSkeleton from '../components/PageSkeleton'
 
 function QuizLiveQuestionView({ roomId, room, credential }) {
   const [question, setQuestion] = useState(null)
@@ -56,7 +56,7 @@ function QuizLiveQuestionView({ roomId, room, credential }) {
     invokeQuiz('advance-quiz-room', { room_id: roomId, action: 'reveal' }).catch(() => {})
   }
 
-  if (!question) return <LoadingState label="Loading question..." />
+  if (!question) return <PageSkeleton variant="detail" />
 
   return (
     <div className="page">

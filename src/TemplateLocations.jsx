@@ -14,7 +14,8 @@ import HomeRecycleBinDialog from './HomeRecycleBinDialog'
 import { useRecycleBinTrigger } from './RecycleBinContext'
 import { categoryColor, LocationIcon } from './templateVisuals'
 import { createLocationForm, duplicateLocationForm, locationDestination } from './locations'
-import { LoadingState } from './LoadingState'
+import PageSkeleton from './components/PageSkeleton'
+import { useDeferredLoading } from './components/loadingHooks'
 import { ErrorState } from './ErrorState'
 import { usePageTitle, usePageBack } from './PageTitleContext'
 
@@ -385,7 +386,8 @@ function TemplateLocations() {
     }
   }
 
-  if (loading) return <LoadingState />
+  const showSkel = useDeferredLoading(loading)
+  if (loading) return showSkel ? <PageSkeleton variant="cards" /> : null
   if (error) return <ErrorState message={error} />
 
   const color = categoryColor(template.category)

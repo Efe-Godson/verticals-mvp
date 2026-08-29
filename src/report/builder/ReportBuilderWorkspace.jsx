@@ -7,7 +7,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useToast } from '../../Toast'
-import { LoadingState } from '../../LoadingState'
+import PageSkeleton from '../../components/PageSkeleton'
 import { ErrorState } from '../../ErrorState'
 import useIsMobile from '../../hooks/useIsMobile'
 import { runQuery } from '../engine'
@@ -53,7 +53,7 @@ export default function ReportBuilderWorkspace() {
     return out
   }, [rb.visuals, rb.form, rb.scopedSubmissions, rb.previousSubmissions])
 
-  if (rb.loading) return <LoadingState label="Loading Report Builder..." />
+  if (rb.loading) return <PageSkeleton variant="report" />
   if (rb.error && !rb.form) return <ErrorState message={rb.error} />
 
   const selected = rb.visuals.find(v => v.id === selectedId) || null

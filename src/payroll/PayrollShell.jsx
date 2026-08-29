@@ -6,8 +6,8 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useLocation, Outlet, useOutletContext } from 'react-router-dom'
 import { loadPayrollForm } from './payrollApi'
-import { LoadingState } from '../LoadingState'
 import { ErrorState } from '../ErrorState'
+import { Skeleton, SkeletonKpis, SkeletonTableRows } from '../components/Skeleton'
 import PayrollSidePanel from './PayrollSidePanel'
 
 export function usePayroll() {
@@ -48,14 +48,25 @@ export default function PayrollShell() {
     <div className="payroll-shell">
       <PayrollSidePanel formId={id} />
       <div className="page" style={{ maxWidth: '1000px' }}>
-        {loading ? <LoadingState />
-          : error ? <ErrorState message={error} />
-          : (
-            <>
-              <h1 style={{ fontSize: '1.5rem', margin: '0 0 1.3rem' }}>{sectionLabel(pathname)}</h1>
-              <Outlet context={{ form, formId: id, reloadForm }} />
-            </>
-          )}
+        {/* The section heading is known from the URL immediately, so show it
+            even while the anchor form loads - only the body below is a
+            skeleton (brief §2/§4). */}
+        <h1 style={{ fontSize: '1.5rem', margin: '0 0 1.3rem' }}>{sectionLabel(pathname)}</h1>
+        {loading ? (
+          <div aria-busy="true">
+            <SkeletonKpis count={4} />
+            <div style={{ height: '1.2rem' }} />
+            <div className="table-wrap">
+              <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+                <thead><tr>{Array.from({ length: 5 }).map((_, i) => (
+                  <th key={i} style={{ padding: '0.6rem 0.7rem', borderBottom: '2px solid var(--color-border)', textAlign: 'left' }}><Skeleton w="55%" h="0.7rem" /></th>
+                ))}</tr></thead>
+                <SkeletonTableRows rows={6} cols={5} />
+              </table>
+            </div>
+          </div>
+        ) : error ? <ErrorState message={error} />
+          : <Outlet context={{ form, formId: id, reloadForm }} />}
       </div>
     </div>
   )

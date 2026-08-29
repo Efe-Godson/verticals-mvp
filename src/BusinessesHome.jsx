@@ -14,6 +14,7 @@ import HomeRecycleBinDialog from './HomeRecycleBinDialog'
 import { useRecycleBinTrigger } from './RecycleBinContext'
 import { categoryColor, CategoryIcon } from './templateVisuals'
 import { usePageTitle } from './PageTitleContext'
+import { SkeletonCard } from './components/Skeleton'
 
 // Retail/Restaurant are the only categories where "how many locations" is
 // itself the meaningful fact about the business - every other template is
@@ -320,8 +321,8 @@ function BusinessesHome() {
       )}
 
       {loading ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.8rem' }}>
-          {[0, 1, 2].map(i => <div key={i} className="card" style={{ minHeight: '160px' }} />)}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.8rem' }} aria-busy="true">
+          {[0, 1, 2, 3].map(i => <SkeletonCard key={i} lines={2} style={{ minHeight: '160px' }} />)}
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.8rem' }}>

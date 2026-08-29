@@ -12,7 +12,7 @@ import { useToast } from './Toast'
 import { invokeQuiz } from './quizApi'
 import RoomCodeBadge from './quiz/RoomCodeBadge'
 import HorizontalBarChart from './report/components/HorizontalBarChart'
-import { LoadingState } from './LoadingState'
+import PageSkeleton from './components/PageSkeleton'
 import { ErrorState } from './ErrorState'
 
 const POLL_MS = 2000
@@ -53,7 +53,7 @@ function QuizAdminDashboard() {
   }
 
   if (error) return <ErrorState message={error} />
-  if (!state) return <LoadingState />
+  if (!state) return <PageSkeleton variant="detail" />
 
   const { room, player_count, players, leader, current_question, option_counts } = state
 

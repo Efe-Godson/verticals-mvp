@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { usePayroll } from './PayrollShell'
 import { useToast } from '../Toast'
-import { LoadingState } from '../LoadingState'
+import PageSkeleton from '../components/PageSkeleton'
+import { useDeferredLoading } from '../components/loadingHooks'
 import { ErrorState } from '../ErrorState'
 import { money, monthLabel, EmployeeStatusBadge, RecordStatusBadge, roleList, deptIds, locationIds, namesFor } from './ui'
 import { getDailyRate, ENTRY_TYPE_LABELS } from './calculatePayroll'
@@ -71,7 +72,8 @@ export default function PayrollEmployeeProfile() {
 
   useEffect(() => { load() }, [empId, formId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (loading) return <LoadingState />
+  const showSkel = useDeferredLoading(loading)
+  if (loading) return showSkel ? <PageSkeleton variant="detail" /> : null
   if (error) return <ErrorState message={error} onRetry={load} />
 
   const deptNameById = Object.fromEntries(departments.map(d => [d.id, d.name]))

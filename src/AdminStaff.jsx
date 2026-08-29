@@ -11,7 +11,8 @@ import { useToast } from './Toast'
 import PosSidePanel from './PosSidePanel'
 import Modal from './components/Modal'
 import ConfirmDialog from './ConfirmDialog'
-import { LoadingState } from './LoadingState'
+import PageSkeleton from './components/PageSkeleton'
+import { useDeferredLoading } from './components/loadingHooks'
 import { ErrorState } from './ErrorState'
 
 // supabase-js only populates `data` when the function returns 2xx - on a
@@ -222,7 +223,8 @@ function AdminStaff() {
     loadStaff()
   }
 
-  if (loading) return <LoadingState label="Loading admin..." />
+  const showSkel = useDeferredLoading(loading)
+  if (loading) return showSkel ? <PageSkeleton variant="table" /> : null
   if (error) return <ErrorState message={error} />
 
   return (

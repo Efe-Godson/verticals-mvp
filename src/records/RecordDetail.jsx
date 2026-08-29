@@ -7,7 +7,7 @@ import { isRetailTemplate } from '../lib/templateFlags'
 import { formatCell } from './recordsUiKit'
 import { CartEditInput } from './CartEditInput'
 import { RecordEditInput } from './RecordEditInput'
-import { LoadingSpinner } from '../LoadingState'
+import { InlineLoader } from '../components/InlineLoader'
 import Modal from '../components/Modal'
 
 export function RecordDetail({ form, record, fields, onClose, onUpdated, initialEditing = false, hideEdit = false }) {
@@ -169,7 +169,7 @@ export function RecordDetail({ form, record, fields, onClose, onUpdated, initial
 
         {showHistory ? (
           loadingLogs ? (
-            <p style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--color-muted)' }}><LoadingSpinner size={15} color="var(--color-muted)" /> Loading history...</p>
+            <InlineLoader label="Loading history…" />
           ) : logs.length === 0 ? (
             <p style={{ color: 'var(--color-muted)' }}>No edits have been made to this record yet.</p>
           ) : (

@@ -20,7 +20,8 @@ import Modal from './components/Modal'
 import { getGroupableFields, getMeasureOptions, computePivot, toChartData } from './report/helpers/pivotEngine'
 import { formatNaira, median } from './report/helpers/analysisUtils'
 import { DATE_RANGE_OPTIONS, getDateRangeBounds, getDateRangeLabel } from './report/helpers/dateRange'
-import { LoadingState } from './LoadingState'
+import PageSkeleton from './components/PageSkeleton'
+import { useDeferredLoading } from './components/loadingHooks'
 import { ErrorState } from './ErrorState'
 import { usePageOptions } from './PageTitleContext'
 
@@ -142,7 +143,8 @@ function Report() {
   // which render early below instead of the filter bar this menu lives in.
   usePageOptions(!loading && !error && submissions.length > 0, () => setOptionsMenuOpen(v => !v))
 
-  if (loading) return <LoadingState label="Loading report..." />
+  const showSkel = useDeferredLoading(loading)
+  if (loading) return showSkel ? <PageSkeleton variant="report" /> : null
   if (error) return <ErrorState message={error} />
 
   if (submissions.length === 0) {

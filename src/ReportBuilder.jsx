@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { useToast } from './Toast'
-import { LoadingState } from './LoadingState'
+import PageSkeleton from './components/PageSkeleton'
 import { ErrorState } from './ErrorState'
 import HorizontalBarChart from './report/components/HorizontalBarChart'
 import PieChart from './report/components/PieChart'
@@ -72,7 +72,7 @@ function ReportBuilder() {
     return { error: null }
   }
 
-  if (loading) return <LoadingState label="Loading report builder..." />
+  if (loading) return <PageSkeleton variant="report" />
   if (error) return <ErrorState message={error} />
 
   const groupableFields = getGroupableFields(form)

@@ -9,12 +9,13 @@ import TemplateEditorDialog from './TemplateEditorDialog'
 import { categoryColor, CategoryIcon } from './templateVisuals'
 import { createLocationForm, locationDestination } from './locations'
 import { usePageTitle } from './PageTitleContext'
+import { Skeleton } from './components/Skeleton'
 
 function TemplatesSkeleton() {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.8rem' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.8rem' }} aria-busy="true">
       {[0, 1, 2, 3, 4, 5].map(i => (
-        <div key={i} className="card" style={{ aspectRatio: '1' }} />
+        <Skeleton key={i} h="auto" style={{ aspectRatio: '1', borderRadius: '12px' }} />
       ))}
     </div>
   )

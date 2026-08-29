@@ -7,7 +7,7 @@ import { useToast } from './Toast'
 import HomeRecycleBinDialog from './HomeRecycleBinDialog'
 import { useRecycleBinTrigger } from './RecycleBinContext'
 import LabSidePanel from './LabSidePanel'
-import { LoadingSpinner } from './LoadingState'
+import { InlineLoader } from './components/InlineLoader'
 
 const PAGE_SIZE = 8
 
@@ -446,7 +446,7 @@ function Home() {
         </div>
       )}
 
-      {loading && <p style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--color-muted)' }}><LoadingSpinner size={15} color="var(--color-muted)" /> Loading...</p>}
+      {loading && <InlineLoader />}
       {error && <p style={{ color: 'var(--status-critical)' }}>{error}</p>}
 
       {!loading && forms.length === 0 && (

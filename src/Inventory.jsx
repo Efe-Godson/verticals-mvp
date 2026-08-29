@@ -16,7 +16,8 @@ import PosSidePanel from './PosSidePanel'
 import { supabase } from './supabaseClient'
 import { useToast } from './Toast'
 import Modal from './components/Modal'
-import { LoadingState } from './LoadingState'
+import PageSkeleton from './components/PageSkeleton'
+import { useDeferredLoading } from './components/loadingHooks'
 import { ErrorState } from './ErrorState'
 
 const LOW_STOCK_THRESHOLD = 5
@@ -94,7 +95,8 @@ function Inventory() {
     loadForm()
   }, [id])
 
-  if (loading) return <LoadingState label="Loading inventory..." />
+  const showSkel = useDeferredLoading(loading)
+  if (loading) return showSkel ? <PageSkeleton variant="table" /> : null
   if (error) return <ErrorState message={error} />
 
   const cartField = form.fields.find(f => f.type === 'cart')

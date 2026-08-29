@@ -15,7 +15,8 @@ import { SavePresetDialog } from './records/SavePresetDialog'
 import ConfirmDialog from './ConfirmDialog'
 import Modal from './components/Modal'
 import { useToast } from './Toast'
-import { LoadingState } from './LoadingState'
+import PageSkeleton from './components/PageSkeleton'
+import { useDeferredLoading } from './components/loadingHooks'
 import { ErrorState } from './ErrorState'
 import { usePageOptions } from './PageTitleContext'
 
@@ -214,7 +215,8 @@ function Records() {
   // render before this page's own Options menu ever exists.
   usePageOptions(!loading && !error, () => setActiveMenu(current => current === 'options' ? null : 'options'))
 
-  if (loading) return <LoadingState label="Loading records..." />
+  const showSkel = useDeferredLoading(loading)
+  if (loading) return showSkel ? <PageSkeleton variant="table" /> : null
   if (error) return <ErrorState message={error} />
 
   const { start: rangeStart, end: rangeEnd } = getDateRangeBounds(dateRange, customStart, customEnd)

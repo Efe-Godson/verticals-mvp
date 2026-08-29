@@ -11,7 +11,8 @@ import ProductManager from './ProductManager'
 import MoreDetailsManager from './MoreDetailsManager'
 import { COUNTRIES } from './lib/locationData'
 import { isRestaurantTemplate } from './lib/templateFlags'
-import { LoadingState } from './LoadingState'
+import PageSkeleton from './components/PageSkeleton'
+import { useDeferredLoading } from './components/loadingHooks'
 import { ErrorState } from './ErrorState'
 
 const FIELD_TYPES = [
@@ -334,7 +335,8 @@ function EditForm() {
     }
   }
 
-  if (loading) return <LoadingState label="Loading form..." />
+  const showSkel = useDeferredLoading(loading)
+  if (loading) return showSkel ? <PageSkeleton variant="form" /> : null
   if (error) return <ErrorState message={error} />
 
   const hasCartField = fields.some(f => f.type === 'cart')

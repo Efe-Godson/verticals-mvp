@@ -1,4 +1,5 @@
 import Modal from '../components/Modal'
+import { SkeletonText } from '../components/Skeleton'
 
 export function RecycleBinDialog({ form, submissions, loading, onRestore, onPermanentDelete, onEmptyBin, onClose }) {
   return (
@@ -8,7 +9,9 @@ export function RecycleBinDialog({ form, submissions, loading, onRestore, onPerm
       </p>
 
       {loading ? (
-        <p style={{ color: 'var(--color-muted)' }}>Loading…</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }} aria-busy="true">
+          {[0, 1, 2].map(i => <div key={i} className="card" style={{ padding: '0.8rem 1rem' }}><SkeletonText lines={2} /></div>)}
+        </div>
       ) : submissions.length === 0 ? (
         <p style={{ color: 'var(--color-muted)' }}>The bin is empty.</p>
       ) : (

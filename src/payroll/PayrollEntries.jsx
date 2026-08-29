@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { usePayroll } from './PayrollShell'
 import { useToast } from '../Toast'
 import ConfirmDialog from '../ConfirmDialog'
-import { LoadingState } from '../LoadingState'
+import PageSkeleton from '../components/PageSkeleton'
+import { useDeferredLoading } from '../components/loadingHooks'
 import { ErrorState } from '../ErrorState'
 import { money, monthLabel, currentMonth, LocationFilter, friendlyError } from './ui'
 import { ENTRY_TYPE_LABELS, DEDUCTION_TYPES, ADDITION_TYPES } from './calculatePayroll'
@@ -89,7 +90,8 @@ export default function PayrollEntries() {
     }
   }
 
-  if (loading) return <LoadingState />
+  const showSkel = useDeferredLoading(loading)
+  if (loading) return showSkel ? <PageSkeleton variant="table" /> : null
   if (error) return <ErrorState message={error} onRetry={load} />
 
   return (

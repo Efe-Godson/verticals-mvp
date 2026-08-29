@@ -6,7 +6,8 @@ import { supabase } from './supabaseClient'
 import { fetchAIAnalysis, askAIQuestion, describeAIError } from './lib/aiClient'
 import { DATE_RANGE_OPTIONS, getDateRangeBounds, getDateRangeLabel } from './report/helpers/dateRange'
 import StatTile from './report/components/StatTile'
-import { LoadingState } from './LoadingState'
+import PageSkeleton from './components/PageSkeleton'
+import { useDeferredLoading } from './components/loadingHooks'
 import { ErrorState } from './ErrorState'
 
 const EXAMPLE_QUESTIONS = [
@@ -173,7 +174,8 @@ function AIAnalystPage() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [qaHistory, asking])
 
-  if (loading) return <LoadingState />
+  const showSkel = useDeferredLoading(loading)
+  if (loading) return showSkel ? <PageSkeleton variant="detail" /> : null
   if (!form) return <ErrorState message="Form not found." />
 
   const { start, end } = getDateRangeBounds(dateRange, customStart, customEnd)

@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import PosSidePanel from './PosSidePanel'
-import { LoadingState } from './LoadingState'
+import PageSkeleton from './components/PageSkeleton'
+import { useDeferredLoading } from './components/loadingHooks'
 import { ErrorState } from './ErrorState'
 import { isRetailTemplate } from './lib/templateFlags'
 import { LOGO_ICONS, LogoIcon } from './invoiceLogos'
@@ -236,7 +237,8 @@ function FormSettings() {
     clearSignatureCanvas()
   }
 
-  if (loading) return <LoadingState label="Loading settings..." />
+  const showSkel = useDeferredLoading(loading)
+  if (loading) return showSkel ? <PageSkeleton variant="form" /> : null
   if (error) return <ErrorState message={error} />
 
   const hasCartField = form.fields?.some(f => f.type === 'cart')

@@ -7,7 +7,9 @@ import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
 import { useToast } from './Toast'
 import SparkleIcon from './SparkleIcon'
-import { LoadingState, ExtractingOverlay } from './LoadingState'
+import { ExtractingOverlay } from './LoadingState'
+import PageSkeleton from './components/PageSkeleton'
+import { useDeferredLoading } from './components/loadingHooks'
 import { ErrorState } from './ErrorState'
 import { InvoiceModal } from './InvoiceModal'
 import { printReceipt } from './receiptPrint'
@@ -1944,7 +1946,8 @@ function PublicForm() {
     )
   }
 
-  if (loading) return <LoadingState label="Loading form..." />
+  const showFormSkeleton = useDeferredLoading(loading)
+  if (loading) return showFormSkeleton ? <PageSkeleton variant="form" /> : null
 
   if (!form) return <ErrorState message={message} />
 

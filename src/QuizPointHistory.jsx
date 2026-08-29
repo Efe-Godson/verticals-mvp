@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { getQuizIdentityToken } from './quizIdentity'
 import { invokeQuiz } from './quizApi'
-import { LoadingState } from './LoadingState'
+import PageSkeleton from './components/PageSkeleton'
 
 function formatDate(dateString) {
   return new Date(dateString).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -19,7 +19,7 @@ function QuizPointHistory() {
     return () => { cancelled = true }
   }, [])
 
-  if (!history) return <LoadingState />
+  if (!history) return <PageSkeleton variant="detail" />
 
   return (
     <div className="page">
