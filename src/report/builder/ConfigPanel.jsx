@@ -19,7 +19,7 @@ function Sel({ label, value, onChange, children }) {
   )
 }
 
-export default function ConfigPanel({ visual, form, onQuery, onVisual, onViewData, onPromote, onDemote }) {
+export default function ConfigPanel({ visual, form, datasets = [], onDataset, onQuery, onVisual, onViewData, onPromote, onDemote }) {
   if (!visual) {
     return <div style={{ padding: '1rem', color: 'var(--color-muted)', fontSize: '0.83rem' }}>Select a visual on the canvas to configure it.</div>
   }
@@ -54,6 +54,19 @@ export default function ConfigPanel({ visual, form, onQuery, onVisual, onViewDat
         <span style={lbl}>Title</span>
         <input style={inp} type="text" value={visual.title} onChange={e => onVisual({ title: e.target.value })} />
       </label>
+
+      {datasets.length > 1 && onDataset && (
+        <label>
+          <span style={lbl}>Dataset</span>
+          <select
+            style={inp}
+            value={visual.datasetId || 'orders'}
+            onChange={e => onDataset(e.target.value)}
+          >
+            {datasets.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}
+          </select>
+        </label>
+      )}
 
       {isScatter ? (
         <>

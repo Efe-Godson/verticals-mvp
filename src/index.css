@@ -326,6 +326,26 @@ input:focus, select:focus, textarea:focus {
   padding: 2rem 1.5rem;
 }
 
+/* Focus-mode form pages (Records / Reports / Settings / Add Products / ...)
+   render under PosSidePanel's fixed hamburger (top-left) and back button
+   (top-right). Give the content column room on desktop so nothing tucks
+   under them, and stop full-bleed tables from sliding beneath the panel
+   when it's pinned. On mobile those buttons sit at the bottom, so no inset
+   is needed there. */
+@media (min-width: 769px) {
+  .pos-flow .page {
+    padding-left: 4.5rem;
+    padding-right: 4.5rem;
+  }
+}
+.pos-flow .table-breakout {
+  width: 100%;
+  margin-left: 0;
+  margin-right: 0;
+  padding-left: 0;
+  padding-right: 0;
+}
+
 /* ---------- Responsive foundation ---------- */
 
 /* Any horizontally-scrollable table wrapper should feel native on touch,

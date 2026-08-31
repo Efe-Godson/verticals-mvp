@@ -20,6 +20,15 @@ import { ErrorState } from './ErrorState'
 import { usePageOptions } from './PageTitleContext'
 
 const PAGE_SIZE = 10
+
+// A field value counts as "present" for column-visibility purposes.
+function hasValue(v) {
+  if (v === null || v === undefined || v === '') return false
+  if (Array.isArray(v)) return v.length > 0
+  if (typeof v === 'object') return Object.values(v).some(x => x !== null && x !== undefined && x !== '')
+  return String(v).trim() !== ''
+}
+
 const META_COLUMNS = [
   { id: '__orderId', label: 'Order ID' },
   { id: '__lastUpdate', label: 'Last Update Date' },
@@ -252,7 +261,29 @@ function Records() {
   const startIndex = (safePage - 1) * PAGE_SIZE
   const pageRows = visible.slice(startIndex, startIndex + PAGE_SIZE)
 
-  const visibleFields = form.fields.filter(f => f.type !== 'section' && !hiddenFieldIds.includes(f.id))
+  // Columns that are completely empty across every record don't show at all
+  // (common on template forms - restaurant orders rarely fill every optional
+  // field). Reappears automatically once any record has a value there. Cart
+  // is always kept. Skipped while there are no records yet.
+  const populatedFieldIds = (() => {
+    if (submissions.length === 0) return null // null = "keep everything"
+    const seen = new Set()
+    for (const sub of submissions) {
+      for (const f of form.fields) {
+        if (f.type === 'section' || f.type === 'cart' || seen.has(f.id)) continue
+        if (hasValue(sub.data?.[f.id])) seen.add(f.id)
+      }
+    }
+    return seen
+  })()
+
+  const isColumnPopulated = (fieldId) => !populatedFieldIds || populatedFieldIds.has(fieldId)
+
+  const visibleFields = form.fields.filter(f =>
+    f.type !== 'section' &&
+    !hiddenFieldIds.includes(f.id) &&
+    (f.type === 'cart' || isColumnPopulated(f.id)),
+  )
   // POS/restaurant order forms keep the table lean - Last Update, IP, and
   // Submission ID are debugging-grade columns nobody's checking out orders needs.
   const cartField = form.fields.find(f => f.type === 'cart')
@@ -653,7 +684,7 @@ function Records() {
       </div>
       {columnsExpanded && (
         <>
-          {form.fields.filter(f => f.type !== 'section').map(field => (
+          {form.fields.filter(f => f.type !== 'section' && (f.type === 'cart' || isColumnPopulated(f.id))).map(field => (
             <label key={field.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.3rem 0', fontSize: '0.85rem', cursor: 'pointer' }}>
               <input
                 type="checkbox"

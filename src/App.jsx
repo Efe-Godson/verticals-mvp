@@ -137,7 +137,7 @@ function AppShell() {
           .app-content-under-navbar rule in index.css) - a focus-mode/public
           form page has no such bar and would just get pointless empty
           space at the bottom otherwise. */}
-      <div className={showNavBar ? 'app-content-under-navbar' : undefined}>
+      <div className={[showNavBar && 'app-content-under-navbar', posPanelFormId && 'pos-flow'].filter(Boolean).join(' ') || undefined}>
       <ErrorBoundary key={location.pathname}>
       <Routes>
         <Route path="/s/:code" element={<ShortLinkRedirect />} />

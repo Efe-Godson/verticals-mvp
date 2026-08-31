@@ -1,8 +1,8 @@
 // Place at: src/report/builder/DatasetTableModal.jsx
-// The whole dataset behind the builder as a plain table: every submission
-// as a row, every analysable field as a column, with each column's type
-// shown in the header. Opened from the workspace top bar ("Data ▤") - not
-// tied to any one visual (ViewDataModal is the per-visual version).
+// Every dataset the builder can query (Orders, Sale line items, Products &
+// Inventory, Customers) as a plain table - one row per record, one column
+// per field, each column's type in the header. Opened from the workspace
+// top bar ("Data ▤"). Per-visual "View Data" (ViewDataModal) is separate.
 import { useMemo, useState } from 'react'
 import Modal from '../../components/Modal'
 import { formatCell } from '../../records/recordsUiKit'
@@ -25,35 +25,48 @@ const th = {
 }
 const td = { padding: '0.4rem 0.7rem', borderBottom: '1px solid var(--color-border)', fontSize: '0.8rem', whiteSpace: 'nowrap', maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis' }
 
-export default function DatasetTableModal({ form, submissions, onClose }) {
+const cellText = (v, f) => {
+  if (v === null || v === undefined || v === '') return '—'
+  if (f.type === 'date') { const d = new Date(v); return isNaN(d) ? String(v) : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) }
+  return formatCell(v, f)
+}
+
+export default function DatasetTableModal({ datasets = [], onClose }) {
+  const list = datasets.length ? datasets : [{ id: 'orders', label: 'Orders', form: { fields: [] }, submissions: [] }]
+  const [activeId, setActiveId] = useState(list[0].id)
   const [q, setQ] = useState('')
 
-  // Every field the report engine can actually work with - same list the
-  // Data rail and the config panel use.
-  const fields = useMemo(() => listFields(form || { fields: [] }), [form])
+  const ds = list.find(d => d.id === activeId) || list[0]
+  const fields = useMemo(() => listFields(ds.form || { fields: [] }), [ds])
+  const rowsAll = ds.submissions || []
 
   const rows = useMemo(() => {
-    const all = submissions || []
-    if (!q.trim()) return all
+    if (!q.trim()) return rowsAll
     const needle = q.trim().toLowerCase()
-    return all.filter(s =>
-      fields.some(f => String(formatCell(s.data[f.id], f) ?? '').toLowerCase().includes(needle)),
-    )
-  }, [submissions, fields, q])
+    return rowsAll.filter(s => fields.some(f => String(cellText(s.data?.[f.id], f)).toLowerCase().includes(needle)))
+  }, [rowsAll, fields, q])
 
   const shown = rows.slice(0, ROW_CAP)
 
   return (
-    <Modal
-      size="full"
-      onClose={onClose}
-      title="Dataset"
-      bodyStyle={{ padding: '0.8rem 1.1rem 1.1rem' }}
-    >
+    <Modal size="full" onClose={onClose} title="Data" bodyStyle={{ padding: '0.8rem 1.1rem 1.1rem' }}>
+      {/* dataset tabs */}
+      <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginBottom: '0.7rem' }}>
+        {list.map(d => (
+          <button
+            key={d.id}
+            className={d.id === activeId ? '' : 'secondary'}
+            style={{ fontSize: '0.8rem', padding: '0.3rem 0.7rem' }}
+            onClick={() => { setActiveId(d.id); setQ('') }}
+          >
+            {d.label} <span style={{ opacity: 0.7 }}>· {(d.submissions || []).length}</span>
+          </button>
+        ))}
+      </div>
+
       <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.9rem', flexWrap: 'wrap', marginBottom: '0.6rem' }}>
-        <div style={{ fontWeight: 700 }}>{form?.name || 'Dataset'}</div>
         <div style={{ fontSize: '0.82rem', color: 'var(--color-muted)' }}>
-          {(submissions || []).length.toLocaleString()} record{(submissions || []).length === 1 ? '' : 's'} · {fields.length} field{fields.length === 1 ? '' : 's'}
+          {rowsAll.length.toLocaleString()} row{rowsAll.length === 1 ? '' : 's'} · {fields.length} field{fields.length === 1 ? '' : 's'}
         </div>
         <input
           value={q}
@@ -64,15 +77,14 @@ export default function DatasetTableModal({ form, submissions, onClose }) {
       </div>
 
       {fields.length === 0 ? (
-        <p style={{ color: 'var(--color-muted)', fontSize: '0.85rem' }}>This form has no analysable fields yet.</p>
+        <p style={{ color: 'var(--color-muted)', fontSize: '0.85rem' }}>No fields in this dataset.</p>
       ) : (
         <>
-          <div className="table-wrap" style={{ marginTop: 0, maxHeight: '68vh' }}>
+          <div className="table-wrap" style={{ marginTop: 0, maxHeight: '66vh' }}>
             <table style={{ borderCollapse: 'collapse', width: '100%' }}>
               <thead>
                 <tr>
                   <th style={{ ...th, textAlign: 'right' }}>#</th>
-                  <th style={th}>Submitted</th>
                   {fields.map(f => {
                     const t = fieldTypeLabel(f)
                     const c = TYPE_BADGE[t] || TYPE_BADGE.text
@@ -92,18 +104,17 @@ export default function DatasetTableModal({ form, submissions, onClose }) {
               </thead>
               <tbody>
                 {shown.map((s, i) => (
-                  <tr key={s.id}>
+                  <tr key={s.id ?? i}>
                     <td style={{ ...td, textAlign: 'right', color: 'var(--color-muted)' }}>{i + 1}</td>
-                    <td style={td}>{new Date(s.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
                     {fields.map(f => (
-                      <td key={f.id} style={td} title={String(formatCell(s.data[f.id], f) ?? '')}>
-                        {formatCell(s.data[f.id], f)}
+                      <td key={f.id} style={td} title={String(cellText(s.data?.[f.id], f))}>
+                        {cellText(s.data?.[f.id], f)}
                       </td>
                     ))}
                   </tr>
                 ))}
                 {shown.length === 0 && (
-                  <tr><td style={td} colSpan={fields.length + 2}>No matching rows.</td></tr>
+                  <tr><td style={td} colSpan={fields.length + 1}>No matching rows.</td></tr>
                 )}
               </tbody>
             </table>

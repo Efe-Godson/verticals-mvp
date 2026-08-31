@@ -202,6 +202,7 @@ async function createFormGoogleSheet(form, records, accessToken) {
     throw new Error(updateBody.error?.message || 'Could not populate the Google Sheet.')
   }
 
+  await applyHeaderFormat(spreadsheetId, [body.sheets?.[0]?.properties?.sheetId ?? 0], accessToken)
   return { spreadsheetId, url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}`, created: true }
 }
 
@@ -237,7 +238,62 @@ async function resyncFormGoogleSheet(spreadsheetId, form, records, accessToken) 
     throw new Error(updateBody.error?.message || 'Could not populate the Google Sheet.')
   }
 
+  const idMap = await getSheetIdsByTitle(spreadsheetId, accessToken)
+  await applyHeaderFormat(spreadsheetId, [idMap.Records ?? 0], accessToken)
   return { spreadsheetId, url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}`, created: false }
+}
+
+// --- header styling (blue fill, white bold, frozen) ------------------
+
+// #0070f3 normalised to 0-1 for the Sheets API.
+const HEADER_FILL = { red: 0, green: 0.4392, blue: 0.9529 }
+
+function headerFormatRequests(sheetId) {
+  return [
+    {
+      repeatCell: {
+        range: { sheetId, startRowIndex: 0, endRowIndex: 1 },
+        cell: {
+          userEnteredFormat: {
+            backgroundColor: HEADER_FILL,
+            textFormat: { foregroundColor: { red: 1, green: 1, blue: 1 }, bold: true },
+          },
+        },
+        fields: 'userEnteredFormat(backgroundColor,textFormat)',
+      },
+    },
+    {
+      updateSheetProperties: {
+        properties: { sheetId, gridProperties: { frozenRowCount: 1 } },
+        fields: 'gridProperties.frozenRowCount',
+      },
+    },
+  ]
+}
+
+// Best-effort - a formatting failure never fails the data sync.
+async function applyHeaderFormat(spreadsheetId, sheetIds, accessToken) {
+  const requests = (sheetIds || []).filter(v => v != null).flatMap(headerFormatRequests)
+  if (requests.length === 0) return
+  try {
+    await fetchSheetsJson(
+      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`,
+      accessToken,
+      { method: 'POST', body: JSON.stringify({ requests }) },
+    )
+  } catch { /* ignore */ }
+}
+
+async function getSheetIdsByTitle(spreadsheetId, accessToken) {
+  const { res, body } = await fetchSheetsJson(
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?fields=sheets.properties(sheetId,title)`,
+    accessToken,
+    { method: 'GET' },
+  )
+  if (!res.ok) return {}
+  const map = {}
+  for (const s of body.sheets || []) map[s.properties.title] = s.properties.sheetId
+  return map
 }
 
 // Requests Sheets/Drive access incrementally, via a fresh Supabase Google
@@ -275,6 +331,114 @@ export async function syncFormGoogleSheet(form, records) {
     }
   }
 
+  window.open(result.url, '_blank', 'noopener,noreferrer')
+  return result
+}
+
+// --- Report Builder datasets -> one spreadsheet, a tab per dataset -------
+
+function sanitizeTabTitle(s) {
+  return String(s).replace(/[[\]*?:/\\]/g, ' ').trim().slice(0, 90) || 'Sheet'
+}
+
+function datasetSheetValues(ds) {
+  const fields = ds.form?.fields || []
+  const headers = fields.map(f => f.label || f.id)
+  const rows = (ds.submissions || []).map(r => fields.map(f => cellToText(r.data?.[f.id], f)))
+  return [headers, ...rows]
+}
+
+async function createDatasetsSheet(form, datasets, accessToken) {
+  const tabs = datasets.map(d => sanitizeTabTitle(d.label))
+  const { res, body } = await fetchSheetsJson('https://sheets.googleapis.com/v4/spreadsheets', accessToken, {
+    method: 'POST',
+    body: JSON.stringify({
+      properties: { title: `${form.name} data` },
+      sheets: tabs.map(t => ({ properties: { title: t } })),
+    }),
+  })
+  if (!res.ok) {
+    if (isScopeError(res.status, body)) return { needsConsent: true }
+    if (res.status === 401) throw new Error('Your Google Sheets connection has expired. Please try again to reconnect.')
+    throw new Error(body.error?.message || 'Could not create a Google Sheet.')
+  }
+  const spreadsheetId = body.spreadsheetId
+  const idByTitle = {}
+  for (const s of body.sheets || []) idByTitle[s.properties.title] = s.properties.sheetId
+
+  for (let i = 0; i < datasets.length; i++) {
+    const { res: uRes, body: uBody } = await fetchSheetsJson(
+      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(tabs[i])}!A1?valueInputOption=RAW`,
+      accessToken, { method: 'PUT', body: JSON.stringify({ values: datasetSheetValues(datasets[i]) }) },
+    )
+    if (!uRes.ok) {
+      if (isScopeError(uRes.status, uBody)) return { needsConsent: true }
+      throw new Error(uBody.error?.message || 'Could not populate the Google Sheet.')
+    }
+  }
+  await applyHeaderFormat(spreadsheetId, Object.values(idByTitle), accessToken)
+  return { spreadsheetId, url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}`, created: true }
+}
+
+async function resyncDatasetsSheet(spreadsheetId, datasets, accessToken) {
+  const existing = await getSheetIdsByTitle(spreadsheetId, accessToken)
+  if (Object.keys(existing).length === 0) return { staleLink: true }
+
+  const missing = datasets.map(d => sanitizeTabTitle(d.label)).filter(t => !(t in existing))
+  if (missing.length) {
+    const { res, body } = await fetchSheetsJson(
+      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`, accessToken,
+      { method: 'POST', body: JSON.stringify({ requests: missing.map(t => ({ addSheet: { properties: { title: t } } })) }) },
+    )
+    if (!res.ok) {
+      if (isScopeError(res.status, body)) return { needsConsent: true }
+      if (res.status === 404 || res.status === 403) return { staleLink: true }
+      throw new Error(body.error?.message || 'Could not sync the Google Sheet.')
+    }
+    for (const r of body.replies || []) {
+      if (r.addSheet) existing[r.addSheet.properties.title] = r.addSheet.properties.sheetId
+    }
+  }
+
+  for (const d of datasets) {
+    const title = sanitizeTabTitle(d.label)
+    await fetchSheetsJson(
+      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(title)}!A:ZZ:clear`,
+      accessToken, { method: 'POST', body: JSON.stringify({}) },
+    )
+    const { res: uRes, body: uBody } = await fetchSheetsJson(
+      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(title)}!A1?valueInputOption=RAW`,
+      accessToken, { method: 'PUT', body: JSON.stringify({ values: datasetSheetValues(d) }) },
+    )
+    if (!uRes.ok) {
+      if (isScopeError(uRes.status, uBody)) return { needsConsent: true }
+      if (uRes.status === 404 || uRes.status === 403) return { staleLink: true }
+      throw new Error(uBody.error?.message || 'Could not populate the Google Sheet.')
+    }
+  }
+  await applyHeaderFormat(spreadsheetId, datasets.map(d => existing[sanitizeTabTitle(d.label)]), accessToken)
+  return { spreadsheetId, url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}`, created: false }
+}
+
+// Links / re-syncs every Report Builder dataset (Orders, Sale line items,
+// Products & Inventory, Customers) into one spreadsheet - a tab each,
+// blue/white frozen header row. form.settings.datasetsSheetId keeps every
+// sync pointed at the same spreadsheet; the caller persists it on first run.
+export async function syncDatasetsGoogleSheet(form, datasets) {
+  if (!datasets || datasets.length === 0) return null
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.provider_token) { await requestGoogleSheetsAccess(); return null }
+
+  const existingId = form.settings?.datasetsSheetId
+  let result = existingId
+    ? await resyncDatasetsSheet(existingId, datasets, session.provider_token)
+    : await createDatasetsSheet(form, datasets, session.provider_token)
+
+  if (result.needsConsent) { await requestGoogleSheetsAccess(); return null }
+  if (result.staleLink) {
+    result = await createDatasetsSheet(form, datasets, session.provider_token)
+    if (result.needsConsent) { await requestGoogleSheetsAccess(); return null }
+  }
   window.open(result.url, '_blank', 'noopener,noreferrer')
   return result
 }

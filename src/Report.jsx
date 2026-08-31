@@ -465,11 +465,9 @@ function Report() {
       className="page"
       style={{
         maxWidth: 'min(1600px, 100%)',
-        // In focus mode keep the column clear of the fixed menu / back
-        // buttons (each ~44px, 1rem from the edge). On mobile those buttons
-        // sit at the bottom instead, so no side inset is needed there.
+        // Focus mode reserves the top for PosSidePanel's fixed hamburger;
+        // the side inset that clears it is .pos-flow .page in index.css.
         ...(isFocusMode ? { paddingTop: '4rem' } : {}),
-        ...(isFocusMode && isDesktop ? { paddingLeft: '4.25rem', paddingRight: '4.25rem' } : {}),
       }}
       ref={reportContentRef}
     >

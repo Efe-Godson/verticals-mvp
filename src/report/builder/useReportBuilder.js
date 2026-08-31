@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../../supabaseClient'
 import { getDateRangeBounds } from '../helpers/dateRange'
+import { buildDatasets } from '../engine'
 import { makeVisual } from './catalogue'
 
 const EMPTY_STATE = { visuals: [], builderFilters: { dateRange: 'all', customStart: '', customEnd: '', dimensionFilters: [] } }
@@ -63,6 +64,18 @@ export function useReportBuilder(formId) {
     setForm(updatedForm)
     setDirty(false)
     return { error: null }
+  }, [])
+
+  // Write a shallow patch onto form.settings (outside the reportBuilder bag)
+  // - used for e.g. datasetsSheetId once a Google Sheet is linked.
+  const saveFormSetting = useCallback(async (patch) => {
+    const current = formRef.current
+    if (!current) return
+    const updatedSettings = { ...(current.settings || {}), ...patch }
+    await supabase.from('forms').update({ settings: updatedSettings }).eq('id', current.id)
+    const updatedForm = { ...current, settings: updatedSettings }
+    formRef.current = updatedForm
+    setForm(updatedForm)
   }, [])
 
   const stateRef = useRef(state)
@@ -210,12 +223,17 @@ export function useReportBuilder(formId) {
     })
   }, [submissions, state.builderFilters])
 
+  // Orders + Sale line items + Products & Inventory + Customers, each in the
+  // { form, submissions } shape the engine understands. Built off the
+  // date-scoped rows so the builder's date range applies everywhere.
+  const datasets = useMemo(() => buildDatasets(form, scopedSubmissions), [form, scopedSubmissions])
+
   return {
     form, loading, error, saving, dirty,
     visuals: state.visuals,
     builderFilters: state.builderFilters,
-    submissions, scopedSubmissions, previousSubmissions,
+    submissions, scopedSubmissions, previousSubmissions, datasets,
     addVisual, updateVisual, updateVisualQuery, duplicateVisual, removeVisual,
-    setCanvasLayout, promote, demote, setBuilderFilters, save,
+    setCanvasLayout, promote, demote, setBuilderFilters, save, saveFormSetting,
   }
 }

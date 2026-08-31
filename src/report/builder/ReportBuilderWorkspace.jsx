@@ -11,6 +11,7 @@ import PageSkeleton from '../../components/PageSkeleton'
 import { ErrorState } from '../../ErrorState'
 import useIsMobile from '../../hooks/useIsMobile'
 import { runQuery } from '../engine'
+import { syncDatasetsGoogleSheet } from '../../recordsExport'
 import { useReportBuilder } from './useReportBuilder'
 import DataPanel from './DataPanel'
 import VisualCatalog from './VisualCatalog'
@@ -30,6 +31,7 @@ export default function ReportBuilderWorkspace() {
   const [selectedId, setSelectedId] = useState(null)
   const [viewDataId, setViewDataId] = useState(null)
   const [showDataset, setShowDataset] = useState(false)
+  const [syncing, setSyncing] = useState(false)
   const [mobilePane, setMobilePane] = useState(null) // 'data' | 'catalog' | 'config' | null
   const [preview, setPreview] = useState(false)
 
@@ -39,13 +41,24 @@ export default function ReportBuilderWorkspace() {
 
   useEffect(() => { if (!isMobile) setMobilePane(null) }, [isMobile])
 
+  const dsById = useMemo(
+    () => Object.fromEntries((rb.datasets || []).map(d => [d.id, d])),
+    [rb.datasets],
+  )
+  const datasetFor = (v) => dsById[v?.datasetId || 'orders'] || (rb.datasets || [])[0] || { form: rb.form, submissions: rb.scopedSubmissions }
+
   const results = useMemo(() => {
     const out = {}
     for (const v of rb.visuals) {
+      const ds = dsById[v.datasetId || 'orders'] || rb.datasets?.[0]
       try {
         out[v.id] = runQuery(
           { ...v.query, filters: v.filters },
-          { form: rb.form, submissions: rb.scopedSubmissions, previousSubmissions: rb.previousSubmissions },
+          {
+            form: ds?.form || rb.form,
+            submissions: ds?.submissions || rb.scopedSubmissions,
+            previousSubmissions: (!v.datasetId || v.datasetId === 'orders') ? rb.previousSubmissions : [],
+          },
         )
       } catch (err) {
         out[v.id] = null
@@ -53,12 +66,13 @@ export default function ReportBuilderWorkspace() {
       }
     }
     return out
-  }, [rb.visuals, rb.form, rb.scopedSubmissions, rb.previousSubmissions])
+  }, [rb.visuals, rb.form, rb.datasets, dsById, rb.scopedSubmissions, rb.previousSubmissions])
 
   if (rb.loading) return <PageSkeleton variant="report" />
   if (rb.error && !rb.form) return <ErrorState message={rb.error} />
 
   const selected = rb.visuals.find(v => v.id === selectedId) || null
+  const selectedDataset = datasetFor(selected)
 
   function handleSelect(vid, dp) {
     setSelectedId(vid)
@@ -82,10 +96,38 @@ export default function ReportBuilderWorkspace() {
     showToast('Removed from Reports.', 'info')
   }
 
+  async function handleSyncSheet() {
+    if (syncing || !rb.datasets?.length) return
+    setSyncing(true)
+    try {
+      const result = await syncDatasetsGoogleSheet(rb.form, rb.datasets)
+      if (result === null) return // redirected to Google consent
+      if (result?.spreadsheetId && rb.form?.settings?.datasetsSheetId !== result.spreadsheetId) {
+        await rb.saveFormSetting({ datasetsSheetId: result.spreadsheetId })
+      }
+      showToast(result?.created ? 'Google Sheet created and opened.' : 'Google Sheet updated.', 'success')
+    } catch (err) {
+      showToast(err.message || 'Could not sync to Google Sheets.', 'error')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  function handleDatasetChange(datasetId) {
+    // Field ids belong to the old dataset - clear every binding.
+    rb.updateVisual(selectedId, { datasetId })
+    rb.updateVisualQuery(selectedId, {
+      metric: null, dimension: null, secondaryDimension: null,
+      rows: [], cols: [], scatterX: null, scatterY: null,
+    })
+  }
+
   const configPanel = (
     <ConfigPanel
       visual={selected}
-      form={rb.form}
+      form={selectedDataset.form}
+      datasets={rb.datasets}
+      onDataset={handleDatasetChange}
       onQuery={patch => rb.updateVisualQuery(selectedId, patch)}
       onVisual={patch => rb.updateVisual(selectedId, patch)}
       onViewData={() => setViewDataId(selectedId)}
@@ -132,6 +174,9 @@ export default function ReportBuilderWorkspace() {
         <span style={{ fontSize: '0.82rem', color: 'var(--color-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{rb.form?.name}</span>
         <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
           <button className="secondary" onClick={() => setShowDataset(true)} style={{ fontSize: '0.8rem' }}>Data ▤</button>
+          <button className="secondary" onClick={handleSyncSheet} disabled={syncing} style={{ fontSize: '0.8rem' }}>
+            {syncing ? 'Syncing…' : rb.form?.settings?.datasetsSheetId ? 'Sync Sheet ↻' : 'Link Google Sheet'}
+          </button>
           <button className="secondary" onClick={() => setPreview(p => !p)} style={{ fontSize: '0.8rem' }}>{preview ? 'Edit' : 'Preview'}</button>
           <button onClick={handleSave} disabled={rb.saving} style={{ fontSize: '0.8rem' }}>
             {rb.saving ? 'Saving…' : rb.dirty ? 'Save*' : 'Save'}
@@ -142,7 +187,7 @@ export default function ReportBuilderWorkspace() {
       <BuilderFilterBar form={rb.form} filters={rb.builderFilters} onChange={rb.setBuilderFilters} />
 
       <div className="rb-cols">
-        {!preview && <div className="rb-side" style={{ borderRight: '1px solid var(--color-border)' }}><DataPanel form={rb.form} /></div>}
+        {!preview && <div className="rb-side" style={{ borderRight: '1px solid var(--color-border)' }}><DataPanel form={selectedDataset.form} datasetLabel={selectedDataset.label} datasets={rb.datasets} onPickDataset={selected ? handleDatasetChange : undefined} /></div>}
 
         <div style={{ overflow: 'auto', position: 'relative' }}>
           {rb.visuals.length === 0 ? (
@@ -183,7 +228,7 @@ export default function ReportBuilderWorkspace() {
         <>
           <div className="rb-drawer-backdrop" onClick={() => setMobilePane(null)} />
           {mobilePane === 'data' ? (
-            <div className="rb-drawer-left"><DataPanel form={rb.form} /></div>
+            <div className="rb-drawer-left"><DataPanel form={selectedDataset.form} datasetLabel={selectedDataset.label} datasets={rb.datasets} onPickDataset={selected ? handleDatasetChange : undefined} /></div>
           ) : (
             <div className="rb-sheet">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.6rem 0.9rem', borderBottom: '1px solid var(--color-border)' }}>
@@ -198,20 +243,23 @@ export default function ReportBuilderWorkspace() {
         </>
       )}
 
-      {viewDataId && (
-        <ViewDataModal
-          visual={rb.visuals.find(v => v.id === viewDataId)}
-          result={results[viewDataId]}
-          form={rb.form}
-          submissions={rb.submissions}
-          onClose={() => setViewDataId(null)}
-        />
-      )}
+      {viewDataId && (() => {
+        const v = rb.visuals.find(x => x.id === viewDataId)
+        const ds = datasetFor(v)
+        return (
+          <ViewDataModal
+            visual={v}
+            result={results[viewDataId]}
+            form={ds.form}
+            submissions={ds.submissions}
+            onClose={() => setViewDataId(null)}
+          />
+        )
+      })()}
 
       {showDataset && (
         <DatasetTableModal
-          form={rb.form}
-          submissions={rb.submissions}
+          datasets={rb.datasets}
           onClose={() => setShowDataset(false)}
         />
       )}

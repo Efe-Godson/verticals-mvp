@@ -2,6 +2,7 @@
 // Barrel for the Report Builder analytics engine. Renderers and the builder
 // shell import from here, never from the individual files.
 export * from './fieldMeta'
+export * from './datasets'
 export * from './dateBuckets'
 export * from './aggregate'
 export * from './populationStats'
