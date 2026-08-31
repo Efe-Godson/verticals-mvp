@@ -334,6 +334,10 @@ input:focus, select:focus, textarea:focus {
    is needed there. */
 @media (min-width: 769px) {
   .pos-flow .page {
+    /* Focus-mode pages fill the screen (they have no app nav eating width),
+       with just enough side room to clear the fixed hamburger / back
+       button. */
+    max-width: min(1600px, 100%);
     padding-left: 4.5rem;
     padding-right: 4.5rem;
   }

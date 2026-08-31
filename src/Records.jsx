@@ -116,6 +116,7 @@ function Records() {
         return
       }
       setSubmissions(subsData)
+      scheduleAutoSync()
 
       // Auto-hide columns that are ~90%+ empty across every record - a
       // one-time suggested default, not something recomputed on every load
@@ -169,6 +170,46 @@ function Records() {
 
   const formRef = useRef(form)
   useEffect(() => { formRef.current = form }, [form])
+  const submissionsRef = useRef(submissions)
+  useEffect(() => { submissionsRef.current = submissions }, [submissions])
+
+  // Once a Google Sheet is linked, keep it current automatically: any change
+  // to this form's records (a new order, an edit, a delete - from here or a
+  // customer placing an order elsewhere) schedules a debounced silent
+  // re-push of the FULL record set. Never prompts / opens a tab.
+  const autoSyncTimer = useRef(null)
+  function scheduleAutoSync() {
+    if (!formRef.current?.settings?.googleSheetId) return
+    clearTimeout(autoSyncTimer.current)
+    autoSyncTimer.current = setTimeout(async () => {
+      try {
+        const all = [...submissionsRef.current].sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+        await syncFormGoogleSheet(formRef.current, all, { silent: true })
+      } catch { /* auto-sync is best-effort */ }
+    }, 12000)
+  }
+  useEffect(() => () => clearTimeout(autoSyncTimer.current), [])
+
+  // Live: pick up records inserted/updated/deleted for this form (e.g. a
+  // customer order) without a manual refresh, and feed the auto-sync.
+  // Realtime + a refresh whenever the tab is refocused, so a shop owner
+  // watching orders come in gets both the table and the linked sheet kept
+  // current on their own.
+  useEffect(() => {
+    const refresh = () => reloadSubmissions().then(scheduleAutoSync)
+    const ch = supabase
+      .channel(`records-live-${id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'submissions', filter: `form_id=eq.${id}` }, refresh)
+      .subscribe()
+    const onFocus = () => { if (document.visibilityState === 'visible') refresh() }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onFocus)
+    return () => {
+      supabase.removeChannel(ch)
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onFocus)
+    }
+  }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Shared read-modify-write for the settings JSONB bag, used by every
   // action on this page that persists a preference there (hidden columns,
@@ -192,6 +233,7 @@ function Records() {
   function handleRecordUpdated(updatedRecord) {
     setSubmissions(submissions.map(s => s.id === updatedRecord.id ? updatedRecord : s))
     setSelectedRecord(updatedRecord)
+    scheduleAutoSync()
   }
 
   async function reloadSubmissions() {
@@ -212,6 +254,7 @@ function Records() {
       if (e.data === 'verticals-order-saved') {
         setEditIframeUrl(null)
         reloadSubmissions()
+        scheduleAutoSync()
       }
     }
     window.addEventListener('message', handleMessage)
@@ -421,6 +464,7 @@ function Records() {
       }
 
       setSubmissions(current => [...(data || []), ...current])
+      scheduleAutoSync()
       const warningNote = warnings.length > 0 ? ` (${warnings.length} cell${warnings.length !== 1 ? 's' : ''} skipped: check values against field options)` : ''
       showToast(`Imported ${data.length} record${data.length !== 1 ? 's' : ''}.${warningNote}`, warnings.length > 0 ? 'error' : 'success')
     } catch (err) {
@@ -430,7 +474,11 @@ function Records() {
 
   async function handleSyncGoogleSheet() {
     try {
-      const result = await syncFormGoogleSheet(form, visible)
+      // Always the full record set for this form - never the current
+      // date-range / search / column filter view. Sorted oldest-first so
+      // the sheet reads like an append-only log.
+      const allRecords = [...submissions].sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+      const result = await syncFormGoogleSheet(form, allRecords)
       // null means syncFormGoogleSheet just kicked off a Google consent
       // redirect (no scope yet, or the linked sheet needed re-auth), so the
       // browser is navigating away, so there's nothing to persist yet.
@@ -519,6 +567,7 @@ function Records() {
     }
 
     setSubmissions(submissions.filter(s => !deletedIds.includes(s.id)))
+    scheduleAutoSync()
     setSelectedIds(selectedIds.filter(sid => !deletedIds.includes(sid)))
     setBinCount(binCount + deletedIds.length)
   }
@@ -549,6 +598,7 @@ function Records() {
     }
     setTrashedSubmissions(trashedSubmissions.filter(s => s.id !== subId))
     setSubmissions([data, ...submissions].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)))
+    scheduleAutoSync()
     setBinCount(Math.max(0, binCount - 1))
     showToast('Record restored.', 'success')
   }
@@ -665,7 +715,7 @@ function Records() {
             </DropdownItem>
           )}
           <DropdownItem onClick={() => { handleSyncGoogleSheet(); setActiveMenu(null) }}>
-            {form.settings?.googleSheetId ? 'Sync to Google Sheet' : 'Connect Google Sheets'}
+            {form.settings?.googleSheetId ? 'Sync to Google Sheet' : 'Connect to Google Sheets'}
           </DropdownItem>
           <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.7rem 0 0.5rem' }} />
         </>

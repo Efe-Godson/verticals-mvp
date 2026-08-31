@@ -305,25 +305,43 @@ async function getSheetIdsByTitle(spreadsheetId, accessToken) {
 // the same spreadsheet (and the same shareable link) instead of creating a
 // new one each time. The caller is responsible for persisting the returned
 // spreadsheetId onto the form the first time one is created.
-export async function syncFormGoogleSheet(form, records) {
+// `silent` (used by the Records page's auto-sync): never redirect to Google
+// consent and never open the sheet in a new tab - just quietly push the
+// data if we already have a token + a linked sheet, otherwise no-op.
+export async function syncFormGoogleSheet(form, records, { silent = false } = {}) {
   const { data: { session } } = await supabase.auth.getSession()
 
+  // Right after Google consent the session carries a long-lived
+  // provider_refresh_token (access_type=offline). Stash it server-side so
+  // the sheet-sync edge function can keep this form's sheet current even
+  // when nobody has the app open. Best-effort - a failure here never blocks
+  // the sync itself.
+  if (session?.provider_refresh_token && form?.id) {
+    supabase.rpc('store_sheet_refresh_token', { p_form_id: form.id, p_token: session.provider_refresh_token })
+      .then(({ error }) => { if (error && import.meta.env.DEV) console.warn('store refresh token:', error.message) })
+  }
+
   if (!session?.provider_token) {
+    if (silent) return { skipped: 'no-token' }
     await requestGoogleSheetsAccess()
     return null
   }
 
   const existingId = form.settings?.googleSheetId
+  if (silent && !existingId) return { skipped: 'not-linked' }
+
   let result = existingId
     ? await resyncFormGoogleSheet(existingId, form, records, session.provider_token)
     : await createFormGoogleSheet(form, records, session.provider_token)
 
   if (result.needsConsent) {
+    if (silent) return { skipped: 'needs-consent' }
     await requestGoogleSheetsAccess()
     return null
   }
 
   if (result.staleLink) {
+    if (silent) return { skipped: 'stale-link' }
     result = await createFormGoogleSheet(form, records, session.provider_token)
     if (result.needsConsent) {
       await requestGoogleSheetsAccess()
@@ -331,7 +349,7 @@ export async function syncFormGoogleSheet(form, records) {
     }
   }
 
-  window.open(result.url, '_blank', 'noopener,noreferrer')
+  if (!silent) window.open(result.url, '_blank', 'noopener,noreferrer')
   return result
 }
 

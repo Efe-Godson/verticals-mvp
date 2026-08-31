@@ -110,3 +110,9 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/get-player-quiz-history/deno.json"
 entrypoint = "./functions/get-player-quiz-history/index.ts"
+
+[functions.sheet-sync]
+enabled = true
+verify_jwt = false
+import_map = "./functions/sheet-sync/deno.json"
+entrypoint = "./functions/sheet-sync/index.ts"
