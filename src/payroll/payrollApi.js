@@ -164,7 +164,7 @@ const SALARY_TYPES = ['monthly', 'daily', 'hourly', 'shift']
 // that also carry compensation-only fields like salary_type - drop anything
 // that isn't a column so the insert doesn't fail against the schema cache.
 const EMPLOYEE_COLUMNS = [
-  'employee_number', 'full_name', 'phone', 'email',
+  'employee_number', 'full_name', 'phone', 'email', 'gender',
   'job_title', 'job_titles', 'department_id', 'department_ids',
   'primary_location_id', 'location_ids', 'employment_status', 'start_date', 'end_date',
   'monthly_salary', 'bank_name', 'account_number', 'account_name', 'payment_provider',

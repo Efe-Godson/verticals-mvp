@@ -40,6 +40,7 @@ import ResetPassword from './ResetPassword'
 import Templates from './Templates'
 import AccountPage from './AccountPage'
 import NavBar from './NavBar'
+import PosSidePanel from './PosSidePanel'
 import DarkModeToggle from './DarkModeToggle'
 import { LoadingState } from './LoadingState'
 import OfflineBanner from './OfflineBanner'
@@ -107,16 +108,30 @@ function AppShell() {
   // The Report Builder is a contained full-screen workspace with its own
   // chrome (see report/builder/ReportBuilderWorkspace.jsx) - no app NavBar.
   const isReportBuilder = /^\/form\/[^/]+\/report\/builder\/?$/.test(location.pathname)
+  // A read-only report shared to an outside email (see FormSettings.jsx's
+  // "Share the report") - no app nav, no side panel, just the report.
+  const isSharedReport = /^\/form\/[^/]+\/report\/?$/.test(location.pathname) &&
+    new URLSearchParams(location.search).get('shared') === '1'
   // Payroll is a contained environment with its own slide-out nav + back
   // button (see payroll/PayrollSidePanel.jsx), like the POS focus flow.
   const isPayrollEnv = /^\/form\/[^/]+\/payroll(\/|$)/.test(location.pathname)
-  const showNavBar = !isPublicForm && !isShortLink && !isQuizPlayer && !isLogin && !isSignUp && !isConfirmEmail && !isResetPassword && !isFocusMode && !isReportBuilder && !isPayrollEnv
+  const showNavBar = !isPublicForm && !isShortLink && !isQuizPlayer && !isLogin && !isSignUp && !isConfirmEmail && !isResetPassword && !isFocusMode && !isReportBuilder && !isPayrollEnv && !isSharedReport
+
+  // The POS side panel is mounted here (not inside each focus-mode page) so
+  // it stays put across navigation between Records / Reports / Settings /
+  // etc. instead of unmounting and re-fetching every time. The public order
+  // screen (PublicForm) keeps its own instance - it needs bottomBarPresent.
+  const focusFormMatch = location.pathname.match(/^\/form\/([^/]+)/)
+  const posPanelFormId = isFocusMode && !isReportBuilder && !isPayrollEnv && focusFormMatch
+    ? focusFormMatch[1]
+    : null
 
   return (
     <>
       <OfflineBanner />
       {showNavBar && <NavBar />}
       {showNavBar && <DarkModeToggle />}
+      {posPanelFormId && <PosSidePanel formId={posPanelFormId} />}
       {/* Only pages with NavBar get its fixed navbar-bottom-bar on mobile,
           so only they need the matching bottom padding reserved (see the
           .app-content-under-navbar rule in index.css) - a focus-mode/public

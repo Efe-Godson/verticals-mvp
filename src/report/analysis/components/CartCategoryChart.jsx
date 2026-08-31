@@ -1,10 +1,12 @@
 // Place at: src/report/analysis/components/CartCategoryChart.jsx
-// Chart version of "cart revenue grouped by a categorical field", replaces
-// the old table-based CartCrossTab for this use case (no tables).
+// "Cart revenue grouped by a categorical field" - two charts: revenue by
+// value, and order count by value. On the Reports page these are handed
+// out as separate tiles (cartCategoryTiles); the default component still
+// renders both stacked for anywhere that wants the combined view.
 import HorizontalBarChart from '../../components/HorizontalBarChart'
 import { getFieldValues, formatNaira } from '../../helpers/analysisUtils'
 
-function CartCategoryChart({ categoryField, cartField, submissions }) {
+function aggregate({ categoryField, cartField, submissions }) {
   const revenueGroups = {}
   const orderGroups = {}
   let totalRevenue = 0
@@ -16,7 +18,6 @@ function CartCategoryChart({ categoryField, cartField, submissions }) {
     const grandTotal = cartVal.total + (cartVal.deliveryFee || 0)
     totalRevenue += grandTotal
     totalOrders += 1
-
     getFieldValues(sub, categoryField).forEach(val => {
       revenueGroups[val] = (revenueGroups[val] || 0) + grandTotal
       orderGroups[val] = (orderGroups[val] || 0) + 1
@@ -27,29 +28,47 @@ function CartCategoryChart({ categoryField, cartField, submissions }) {
     .map(([label, revenue]) => ({
       label,
       count: revenue,
-      percent: totalRevenue > 0 ? Math.round((revenue / totalRevenue) * 100) : 0
+      percent: totalRevenue > 0 ? Math.round((revenue / totalRevenue) * 100) : 0,
     }))
     .sort((a, b) => b.count - a.count)
-
-  if (data.length === 0) return <p style={{ color: '#999' }}>Not enough order data yet.</p>
 
   const orderData = Object.entries(orderGroups)
     .map(([label, orders]) => ({
       label,
       count: orders,
-      percent: totalOrders > 0 ? Math.round((orders / totalOrders) * 100) : 0
+      percent: totalOrders > 0 ? Math.round((orders / totalOrders) * 100) : 0,
     }))
     .sort((a, b) => b.count - a.count)
 
-  const top = data[0]
+  return { data, orderData }
+}
+
+// Two separate tile descriptors for the Reports page.
+export function cartCategoryTiles({ categoryField, cartField, submissions }) {
+  const { data, orderData } = aggregate({ categoryField, cartField, submissions })
+  if (data.length === 0) return []
+  const base = `cat-${categoryField.id}-${cartField.id}`
+  return [
+    {
+      id: `${base}-rev`,
+      title: `Sales by ${categoryField.label}`,
+      node: <HorizontalBarChart data={data} formatValue={(v) => formatNaira(v)} bare />,
+    },
+    {
+      id: `${base}-ord`,
+      title: `Orders by ${categoryField.label}`,
+      node: <HorizontalBarChart data={orderData} bare />,
+    },
+  ]
+}
+
+function CartCategoryChart({ categoryField, cartField, submissions }) {
+  const { data, orderData } = aggregate({ categoryField, cartField, submissions })
+  if (data.length === 0) return <p style={{ color: '#999' }}>Not enough order data yet.</p>
 
   return (
     <div>
       <HorizontalBarChart data={data} formatValue={(v) => formatNaira(v)} />
-      <p style={{ fontSize: '0.85rem', color: 'var(--color-muted)', marginTop: '0.8rem' }}>
-        {top.label} leads with {formatNaira(top.count)} in sales ({top.percent}% of revenue).
-      </p>
-
       <div style={{ marginTop: '1.5rem' }}>
         <HorizontalBarChart title="Orders" data={orderData} bare />
       </div>

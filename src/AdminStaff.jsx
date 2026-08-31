@@ -8,7 +8,6 @@ import { useState, useEffect } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { useToast } from './Toast'
-import PosSidePanel from './PosSidePanel'
 import Modal from './components/Modal'
 import ConfirmDialog from './ConfirmDialog'
 import PageSkeleton from './components/PageSkeleton'
@@ -229,9 +228,8 @@ function AdminStaff() {
 
   return (
     <div className="page" style={isFocusMode ? { paddingTop: '4rem' } : undefined}>
-      {/* Reserves room for PosSidePanel's fixed top-left hamburger - see the
-          same fix in PublicForm.jsx/Records.jsx. */}
-      {isFocusMode && <PosSidePanel formId={form.id} hasCartField={form.fields?.some(f => f.type === 'cart')} />}
+      {/* paddingTop above reserves room for PosSidePanel's fixed top-left
+          hamburger (the panel is mounted once in App.jsx's AppShell). */}
       <h1>Create New Location Login</h1>
       <p style={{ color: 'var(--color-muted)', marginTop: '-0.5rem' }}>
         Create staff logins for "{form.name}". Staff can only reach Order Screen, Add Products, and Records - nothing else in the app.

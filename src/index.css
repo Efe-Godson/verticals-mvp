@@ -172,6 +172,34 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
+  transition: padding-left 0.2s ease;
+}
+
+/* PosSidePanel.jsx docked (desktop, pinned or open): the panel is a fixed
+   210px rail on the left and the page content is pushed clear of it rather
+   than being covered by an overlay. */
+body.pos-panel-docked {
+  padding-left: 210px;
+}
+
+/* Active nav item in the POS side panel: a smooth "pebble" - soft green
+   gradient with a top sheen and a slight lift off the panel. */
+.pos-nav-active {
+  color: #1f3a25;
+  background: linear-gradient(150deg, #f0f8f1 0%, #d9eddb 52%, #c2dcc5 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65), 0 1px 4px rgba(0, 0, 0, 0.22);
+}
+:root[data-theme="dark"] .pos-nav-active {
+  color: #dfeee2;
+  background: linear-gradient(150deg, #33513a 0%, #294632 55%, #203a28 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), 0 1px 4px rgba(0, 0, 0, 0.45);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .pos-nav-active {
+    color: #dfeee2;
+    background: linear-gradient(150deg, #33513a 0%, #294632 55%, #203a28 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), 0 1px 4px rgba(0, 0, 0, 0.45);
+  }
 }
 
 a {
@@ -879,6 +907,77 @@ input:focus, select:focus, textarea:focus {
     padding-left: 0.75rem;
     padding-right: 0.75rem;
   }
+}
+
+/* Report page chart tiles (src/Report.jsx ChartTileGrid). One column on
+   phones/tablets; two per row once there's room, so a wide screen isn't
+   mostly empty margin. A joined pair (report-tile-wide) always spans the
+   full width since it's already two charts. */
+.report-tile-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.2rem;
+  align-items: start;
+}
+@media (min-width: 1200px) {
+  .report-tile-list {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.report-tile-list > .report-tile-wide {
+  grid-column: 1 / -1;
+}
+
+/* The two charts inside one joined pair. */
+.report-chart-pair {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.2rem;
+}
+@media (min-width: 1024px) {
+  .report-chart-pair {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+}
+
+/* Compact KPI strip on the payroll Staff / Events pages
+   (src/payroll/StatCards.jsx). auto-fit so 4 cards wrap to 2 then 1 with
+   no media query; matches the Payments page's .pay-kpi look. */
+.pay-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.7rem;
+  margin-bottom: 1.4rem;
+}
+.pay-stat {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  padding: 0.6rem 0.8rem;
+}
+.pay-stat.accent {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+.pay-stat .l {
+  font-size: 0.66rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  font-weight: 700;
+}
+.pay-stat .v {
+  font-size: 1.2rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  margin-top: 0.1rem;
+  color: var(--color-text);
+}
+.pay-stat .s {
+  font-size: 0.72rem;
+  color: var(--color-muted);
+  margin-top: 0.15rem;
 }
 
 /* Payroll is a contained environment (App.jsx's isPayrollEnv hides the app

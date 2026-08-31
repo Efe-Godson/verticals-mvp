@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, Fragment } from 'react'
 import { createPortal } from 'react-dom'
 import { useParams, useSearchParams } from 'react-router-dom'
-import PosSidePanel from './PosSidePanel'
 import { supabase } from './supabaseClient'
 import { exportRecordsToExcel, exportRecordsToCSV, exportRecordsToPDF, printRecordsTable, syncFormGoogleSheet } from './recordsExport'
 import { downloadRecordsTemplate, parseRecordsFile, readWorkbookRows } from './recordsImport'
@@ -798,8 +797,6 @@ function Records() {
           instead - worse than the momentary letter overlap it fixed, so
           just the top reserve stays. Only rendered/needed in focus mode,
           the same condition PosSidePanel itself renders under below. */}
-      {isFocusMode && <PosSidePanel formId={form.id} hasCartField={hasCartField} />}
-
       {hasCartField && (
         <div style={{ position: 'relative', margin: '1rem 0' }}>
           {showRevealHint && (

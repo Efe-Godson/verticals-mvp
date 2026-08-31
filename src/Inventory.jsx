@@ -12,7 +12,6 @@
 // migration and submit-form/index.ts.
 import { useEffect, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import PosSidePanel from './PosSidePanel'
 import { supabase } from './supabaseClient'
 import { useToast } from './Toast'
 import Modal from './components/Modal'
@@ -102,9 +101,7 @@ function Inventory() {
   const cartField = form.fields.find(f => f.type === 'cart')
   if (!cartField) {
     return (
-      <div className="page">
-        {isFocusMode && <PosSidePanel formId={form.id} hasCartField={false} />}
-        <h1>Inventory</h1>
+      <div className="page">        <h1>Inventory</h1>
         <p style={{ color: 'var(--color-muted)' }}>This form doesn't have a product catalogue to track stock for.</p>
       </div>
     )
@@ -154,9 +151,7 @@ function Inventory() {
   }
 
   return (
-    <div className="page" style={isFocusMode ? { paddingTop: '4rem' } : undefined}>
-      {isFocusMode && <PosSidePanel formId={form.id} hasCartField={true} />}
-      <h1 style={{ margin: 0 }}>Inventory</h1>
+    <div className="page" style={isFocusMode ? { paddingTop: '4rem' } : undefined}>      <h1 style={{ margin: 0 }}>Inventory</h1>
       <p style={{ color: 'var(--color-muted)', margin: '0.3rem 0 1.2rem' }}>{form.name}</p>
 
       {products.length === 0 ? (

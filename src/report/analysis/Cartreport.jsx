@@ -36,9 +36,6 @@ function CartReport({ field, answered, showStats = true }) {
     .map(([name, revenue]) => ({ label: name, count: revenue }))
     .sort((a, b) => b.count - a.count)
 
-  const bestSeller = topByQty[0]
-  const topEarner = topByRevenue[0]
-
   // Only worth its own section once there's an actual split to show - a
   // single category (or every item uncategorized) just re-states the
   // product breakdown above with one bar.
@@ -51,9 +48,6 @@ function CartReport({ field, answered, showStats = true }) {
   const categoryByQty = Object.entries(categoryQty)
     .map(([name, qty]) => ({ label: name, count: qty }))
     .sort((a, b) => b.count - a.count)
-
-  const topCategoryByRevenue = categoryByRevenue[0]
-  const topCategoryByQty = categoryByQty[0]
 
   return (
     <div style={{ marginTop: showStats ? '0.8rem' : 0 }}>
@@ -72,11 +66,6 @@ function CartReport({ field, answered, showStats = true }) {
               Revenue by Product{topByRevenue.length > 10 ? ' (top 10)' : ''}
             </div>
             <HorizontalBarChart data={topByRevenue.slice(0, 10)} formatValue={(v) => formatNaira(v)} bare />
-            {topEarner && (
-              <p style={{ fontSize: '0.85rem', color: 'var(--color-muted)', marginTop: '0.8rem' }}>
-                {topEarner.label} generates the most revenue, at {formatNaira(topEarner.count)}.
-              </p>
-            )}
           </div>
         )}
 
@@ -86,11 +75,6 @@ function CartReport({ field, answered, showStats = true }) {
               Units Sold by Product{topByQty.length > 10 ? ' (top 10)' : ''}
             </div>
             <HorizontalBarChart data={topByQty.slice(0, 10)} bare />
-            {bestSeller && (
-              <p style={{ fontSize: '0.85rem', color: 'var(--color-muted)', marginTop: '0.8rem' }}>
-                {bestSeller.label} is the best seller, with {bestSeller.count.toLocaleString()} units sold.
-              </p>
-            )}
           </div>
         )}
 
@@ -100,11 +84,6 @@ function CartReport({ field, answered, showStats = true }) {
               Revenue by Category
             </div>
             <HorizontalBarChart data={categoryByRevenue} formatValue={(v) => formatNaira(v)} bare />
-            {topCategoryByRevenue && (
-              <p style={{ fontSize: '0.85rem', color: 'var(--color-muted)', marginTop: '0.8rem' }}>
-                {topCategoryByRevenue.label} generates the most revenue, at {formatNaira(topCategoryByRevenue.count)}.
-              </p>
-            )}
           </div>
         )}
 
@@ -114,11 +93,6 @@ function CartReport({ field, answered, showStats = true }) {
               Units Sold by Category
             </div>
             <HorizontalBarChart data={categoryByQty} bare />
-            {topCategoryByQty && (
-              <p style={{ fontSize: '0.85rem', color: 'var(--color-muted)', marginTop: '0.8rem' }}>
-                {topCategoryByQty.label} sells the most units, with {topCategoryByQty.count.toLocaleString()} sold.
-              </p>
-            )}
           </div>
         )}
       </div>
@@ -127,3 +101,65 @@ function CartReport({ field, answered, showStats = true }) {
 }
 
 export default CartReport
+
+// The same four cart charts (Revenue / Units, by Product / by Category) but
+// as separate tile descriptors, so the Reports page can give each its own
+// card instead of bundling them into one. StatTiles are omitted - the page
+// carries its own KPI row.
+export function cartReportTiles({ field, answered }) {
+  if (!answered || answered.length === 0) return []
+
+  const itemQty = {}
+  const itemRevenue = {}
+  const categoryQty = {}
+  const categoryRevenue = {}
+
+  answered.forEach(s => {
+    ;(s.data[field.id]?.items || []).forEach(item => {
+      itemQty[item.name] = (itemQty[item.name] || 0) + item.quantity
+      itemRevenue[item.name] = (itemRevenue[item.name] || 0) + item.price * item.quantity
+      const category = item.category?.trim() || 'Uncategorized'
+      categoryQty[category] = (categoryQty[category] || 0) + item.quantity
+      categoryRevenue[category] = (categoryRevenue[category] || 0) + item.price * item.quantity
+    })
+  })
+
+  const toSorted = (obj) => Object.entries(obj)
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count)
+
+  const byRev = toSorted(itemRevenue)
+  const byQty = toSorted(itemQty)
+  const catRev = toSorted(categoryRevenue)
+  const catQty = toSorted(categoryQty)
+  const hasCategoryBreakdown = Object.keys(categoryRevenue).length > 1
+
+  const tiles = []
+  if (byRev.length > 0) {
+    tiles.push({
+      id: `cart-${field.id}-rev`,
+      title: `Revenue by Product${byRev.length > 10 ? ' (top 10)' : ''}`,
+      node: <HorizontalBarChart data={byRev.slice(0, 10)} formatValue={(v) => formatNaira(v)} bare />,
+    })
+  }
+  if (byQty.length > 0) {
+    tiles.push({
+      id: `cart-${field.id}-qty`,
+      title: `Units Sold by Product${byQty.length > 10 ? ' (top 10)' : ''}`,
+      node: <HorizontalBarChart data={byQty.slice(0, 10)} bare />,
+    })
+  }
+  if (hasCategoryBreakdown) {
+    tiles.push({
+      id: `cart-${field.id}-catrev`,
+      title: 'Revenue by Category',
+      node: <HorizontalBarChart data={catRev} formatValue={(v) => formatNaira(v)} bare />,
+    })
+    tiles.push({
+      id: `cart-${field.id}-catqty`,
+      title: 'Units Sold by Category',
+      node: <HorizontalBarChart data={catQty} bare />,
+    })
+  }
+  return tiles
+}

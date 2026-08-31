@@ -43,13 +43,12 @@ function HorizontalBarChart({
 
     const isMobile = useIsMobile(768)
 
-    // A fixed px label width either wastes space or truncates too hard
-    // depending on how much room the row actually has (e.g. a focus-mode
-    // page vs a normal one), and that available width isn't knowable here -
-    // a percentage of the row claims more room wherever there's more to
-    // give instead of needing hand-tuning per context.
-    const labelWidth = isMobile ? "44%" : 110
-    const valueWidth = isMobile ? 58 : 80
+    // Responsive label column: a share of the row (so it scales with the
+    // container - focus mode, a paired half-tile, a phone) rather than a
+    // fixed px width that truncated product names hard. Labels also wrap to
+    // two lines instead of ellipsising at one.
+    const labelWidth = isMobile ? "46%" : "clamp(120px, 32%, 300px)"
+    const valueWidth = isMobile ? 58 : 84
     const barHeight = isMobile ? 24 : 20
     const gap = isMobile ? ".45rem" : ".7rem"
     const labelFont = isMobile ? ".78rem" : ".82rem"
@@ -199,9 +198,12 @@ function HorizontalBarChart({
                                 fontSize: labelFont,
                                 color: "var(--color-text)",
                                 textAlign: "center",
+                                lineHeight: 1.25,
                                 overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
+                                display: "-webkit-box",
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: "vertical",
+                                wordBreak: "break-word",
                                 width: "100%",
                             }}
                         >
@@ -259,9 +261,12 @@ function HorizontalBarChart({
                                 color: "var(--color-text)",
                                 fontWeight: hovered === d.label ? 600 : 400,
                                 textAlign: "right",
+                                lineHeight: 1.25,
                                 overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
+                                display: "-webkit-box",
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: "vertical",
+                                wordBreak: "break-word",
                             }}
                         >
                             {d.label}

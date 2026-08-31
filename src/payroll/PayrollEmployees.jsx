@@ -6,6 +6,7 @@ import { usePayroll } from './PayrollShell'
 import { ErrorState } from '../ErrorState'
 import EmptyState from '../components/EmptyState'
 import { SkeletonTableRows } from '../components/Skeleton'
+import StatCards from './StatCards'
 import { RefreshingIndicator } from '../components/InlineLoader'
 import { useDeferredLoading } from '../components/loadingHooks'
 import { money, EmployeeStatusBadge, LocationFilter, roleList, deptIds, locationIds, namesFor, dedupeByName } from './ui'
@@ -68,6 +69,27 @@ export default function PayrollEmployees() {
     [employees],
   )
 
+  // Overview KPIs - always the whole roster, not the search-filtered view.
+  const stats = useMemo(() => {
+    const total = employees.length
+    const active = employees.filter(e => e.employment_status === 'active').length
+    const g = { male: 0, female: 0, other: 0, unspecified: 0 }
+    for (const e of employees) g[e.gender] = (g[e.gender] || 0) + 1
+    const known = g.male + g.female + g.other
+    const pct = (n) => (known ? Math.round((n / known) * 100) : 0)
+    return {
+      total,
+      active,
+      activePct: total ? Math.round((active / total) * 100) : 0,
+      genderValue: known ? `${pct(g.male)}% M · ${pct(g.female)}% F` : '—',
+      genderSub: known
+        ? `${g.male} M · ${g.female} F${g.other ? ` · ${g.other} other` : ''}${g.unspecified ? ` · ${g.unspecified} unset` : ''}`
+        : 'No gender recorded yet',
+      depts: deptOptions.length,
+      locs: locOptions.length,
+    }
+  }, [employees, deptOptions, locOptions])
+
   const filtered = useMemo(() => {
     const deptFilterName = deptFilter ? norm(deptName[deptFilter]) : ''
     const locFilterName = locFilter ? norm(locName[locFilter]) : ''
@@ -90,6 +112,15 @@ export default function PayrollEmployees() {
 
   return (
     <div>
+      {!loading && employees.length > 0 && (
+        <StatCards items={[
+          { label: 'Total Staff', value: stats.total },
+          { label: 'Active', value: stats.active, sub: `${stats.activePct}% of roster` },
+          { label: 'Gender', value: stats.genderValue, sub: stats.genderSub },
+          { label: 'Departments', value: stats.depts, sub: `${stats.locs} location${stats.locs === 1 ? '' : 's'}` },
+        ]} />
+      )}
+
       <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.6rem', marginBottom: '1rem' }}>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           <input placeholder="Search employees…" value={search} onChange={(e) => setSearch(e.target.value)} style={{ minWidth: '170px' }} />

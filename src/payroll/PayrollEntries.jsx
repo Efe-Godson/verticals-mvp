@@ -13,6 +13,7 @@ import { payrollSettings, listEmployees, listLocations, listEntries, deleteEntry
 import AddEntryModal from './AddEntryModal'
 import BulkEntryModal from './BulkEntryModal'
 import ImportModal from './ImportModal'
+import StatCards from './StatCards'
 
 export default function PayrollEntries() {
   const { form, formId } = usePayroll()
@@ -79,6 +80,23 @@ export default function PayrollEntries() {
     [entries, fLocation, empById]
   )
 
+  // Top entry types as a share of all events in view (max 4 cards).
+  const typeBreakdown = useMemo(() => {
+    const total = visibleEntries.length
+    if (!total) return []
+    const counts = {}
+    for (const e of visibleEntries) counts[e.entry_type] = (counts[e.entry_type] || 0) + 1
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4)
+      .map(([type, count]) => ({
+        label: ENTRY_TYPE_LABELS[type] || type,
+        value: `${Math.round((count / total) * 100)}%`,
+        sub: `${count} of ${total}`,
+        color: DEDUCTION_TYPES.includes(type) ? 'var(--status-critical)' : 'var(--status-good)',
+      }))
+  }, [visibleEntries])
+
   async function remove(id) {
     setPendingDelete(null)
     try {
@@ -96,6 +114,8 @@ export default function PayrollEntries() {
 
   return (
     <div>
+      {typeBreakdown.length > 0 && <StatCards items={typeBreakdown} />}
+
       <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.6rem', marginBottom: '1rem' }}>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           <input type="month" value={fMonth} onChange={(e) => setFMonth(e.target.value)} />

@@ -17,6 +17,12 @@ const norm = (s) => String(s || '').trim().toLowerCase()
 
 const STATUSES = ['active', 'on_leave', 'suspended', 'inactive', 'terminated']
 const STATUS_LABEL = { active: 'Active', on_leave: 'On Leave', suspended: 'Suspended', inactive: 'Inactive', terminated: 'Terminated' }
+const GENDERS = [
+  { value: 'unspecified', label: 'Prefer not to say' },
+  { value: 'male', label: 'Male' },
+  { value: 'female', label: 'Female' },
+  { value: 'other', label: 'Other' },
+]
 
 const chipStyle = {
   display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
@@ -110,6 +116,7 @@ export default function EmployeeFormModal({ formId, settings, employee, departme
     employee_number: employee?.employee_number || '',
     phone: employee?.phone || '',
     email: employee?.email || '',
+    gender: employee?.gender || 'unspecified',
     job_titles: roleList(employee),
     department_ids: deptIds(employee),
     location_ids: locationIds(employee),
@@ -170,6 +177,7 @@ export default function EmployeeFormModal({ formId, settings, employee, departme
         employee_number: v.employee_number.trim() || null,
         phone: v.phone.trim() || null,
         email: v.email.trim() || null,
+        gender: v.gender,
         job_titles: v.job_titles,
         department_ids: v.department_ids,
         location_ids: v.location_ids,
@@ -208,6 +216,11 @@ export default function EmployeeFormModal({ formId, settings, employee, departme
         <Field label="Staff ID" hint="Optional — e.g. RCH-001"><TextInput value={v.employee_number} onChange={set('employee_number')} /></Field>
         <Field label="Phone"><TextInput value={v.phone} onChange={set('phone')} /></Field>
         <Field label="Email"><TextInput type="email" value={v.email} onChange={set('email')} /></Field>
+        <Field label="Gender">
+          <Select value={v.gender} onChange={set('gender')}>
+            {GENDERS.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
+          </Select>
+        </Field>
       </div>
 
       <Field label="Roles" hint="One person can hold several — type a role and press Enter.">

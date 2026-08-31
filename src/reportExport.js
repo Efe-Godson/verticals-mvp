@@ -232,40 +232,59 @@ export function printReport(form, submissions, filterSummary) {
 // produce, since it can't render arbitrary HTML/CSS or draw the bar charts).
 // ---------------------------------------------------------------------------
 
-export async function exportReportToPDF(element, fileName) {
+// One visual per page: every [data-report-block] (a chart tile, a joined
+// pair, the KPI strip, ...) gets its own PDF page, scaled to fit. `variant`
+// 'mobile' uses a narrow page so it reads large on a phone. `onProgress(done,
+// total, label)` fires before each block so the caller can show progress.
+export async function exportReportToPDF(element, fileName, { variant = 'standard', onProgress } = {}) {
   if (!element) {
     alert('Could not find the report content to export. Please try again.')
     return
   }
 
-  const canvas = await html2canvas(element, {
-    scale: 2,
-    backgroundColor: '#ffffff',
-    useCORS: true
-  })
+  // Report.jsx tags each layout piece with data-report-block, in visual
+  // order. Prefer those; fall back to top-level children.
+  const marked = element.querySelectorAll('[data-report-block]')
+  let blocks = (marked.length
+    ? [...marked]
+    : [...element.children].filter(el => !el.hasAttribute('data-html2canvas-ignore'))
+  ).filter(el => el.offsetHeight > 4)
+  if (blocks.length === 0) blocks = [element]
 
-  const imgData = canvas.toDataURL('image/png')
-  const pdf = new jsPDF('p', 'mm', 'a4')
+  const mobile = variant === 'mobile'
+  const format = mobile ? [124, 200] : [210, 297] // mm, portrait
+  const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format })
+  const pageW = pdf.internal.pageSize.getWidth()
+  const pageH = pdf.internal.pageSize.getHeight()
+  const margin = mobile ? 6 : 10
+  const availW = pageW - margin * 2
+  const availH = pageH - margin * 2
 
-  const pageWidth = pdf.internal.pageSize.getWidth()
-  const pageHeight = pdf.internal.pageSize.getHeight()
-  const imgWidth = pageWidth
-  const imgHeight = (canvas.height * imgWidth) / canvas.width
+  for (let i = 0; i < blocks.length; i++) {
+    const label = blocks[i].querySelector('h1, h2, h3, strong, .l')?.textContent?.trim() || `Section ${i + 1}`
+    onProgress?.(i, blocks.length, label)
+    // Let the caller's progress UI paint between heavy captures.
+    await new Promise(r => setTimeout(r, 0))
 
-  let heightLeft = imgHeight
-  let position = 0
+    const canvas = await html2canvas(blocks[i], {
+      scale: mobile ? 3 : 2,
+      backgroundColor: '#ffffff',
+      useCORS: true,
+    })
+    if (i > 0) pdf.addPage(format, 'p')
 
-  pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
-  heightLeft -= pageHeight
-
-  while (heightLeft > 0) {
-    position = heightLeft - imgHeight
-    pdf.addPage()
-    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
-    heightLeft -= pageHeight
+    // Contain within the page (never slice - one visual per slide).
+    let w = availW
+    let h = (canvas.height * w) / canvas.width
+    if (h > availH) { h = availH; w = (canvas.width * h) / canvas.height }
+    pdf.addImage(
+      canvas.toDataURL('image/png'), 'PNG',
+      margin + (availW - w) / 2, margin + (availH - h) / 2, w, h,
+    )
   }
 
-  pdf.save(`${fileName}.pdf`)
+  onProgress?.(blocks.length, blocks.length, 'Saving…')
+  pdf.save(`${fileName}${mobile ? '-mobile' : ''}.pdf`)
 }
 
 // ---------------------------------------------------------------------------

@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { supabase } from './supabaseClient'
-import PosSidePanel from './PosSidePanel'
 import PageSkeleton from './components/PageSkeleton'
 import { useDeferredLoading } from './components/loadingHooks'
 import { ErrorState } from './ErrorState'
@@ -27,6 +26,8 @@ function FormSettings() {
   const [companyEmail, setCompanyEmail] = useState('')
   const [receiptPaperWidth, setReceiptPaperWidth] = useState(80)
   const [staffReportRange, setStaffReportRange] = useState('today')
+  const [reportDateField, setReportDateField] = useState('')
+  const [reportShareEmails, setReportShareEmails] = useState('') // textarea, one per line
   const [aiFillRules, setAiFillRules] = useState('')
   const [logoUrl, setLogoUrl] = useState('')
   const [logoIconKey, setLogoIconKey] = useState('')
@@ -64,6 +65,8 @@ function FormSettings() {
         setCompanyEmail(data.settings?.companyEmail ?? '')
         setReceiptPaperWidth(data.settings?.receiptPaperWidth ?? 80)
         setStaffReportRange(data.settings?.staffReportRange ?? 'today')
+        setReportDateField(data.settings?.reportDateField ?? '')
+        setReportShareEmails((data.settings?.reportSharedEmails ?? []).join('\n'))
         setAiFillRules(data.settings?.aiFillRules ?? '')
         setLogoUrl(data.settings?.logoUrl ?? '')
         setLogoIconKey(data.settings?.logoIconKey ?? '')
@@ -92,10 +95,14 @@ function FormSettings() {
     // payrollRole from Templates.jsx, hiddenColumns/recordPresets from
     // Records.jsx, payroll from the Payroll module...). Replacing it outright
     // used to silently delete all of those the moment this page saved.
+    const reportSharedEmails = Array.from(new Set(
+      reportShareEmails.split(/[\n,;]+/).map(e => e.trim().toLowerCase()).filter(e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)),
+    ))
+
     const newSettings = {
       ...form.settings,
       allowMultipleResponses, collectEmail, companyName, companyPhone, companyAddress, companyEmail, receiptPaperWidth,
-      staffReportRange, aiFillRules, logoUrl, logoIconKey,
+      staffReportRange, reportDateField, reportSharedEmails, aiFillRules, logoUrl, logoIconKey,
       showVerticalsBranding, defaultInvoiceView, paymentBankName, paymentAccountNumber, paymentAccountName, invoiceNotes,
       invoiceAuthorizedBy, invoiceAuthorizedDesignation, signatureUrl,
     }
@@ -249,9 +256,7 @@ function FormSettings() {
   return (
     <div className="page" style={isFocusMode ? { paddingTop: '4rem' } : undefined}>
       {/* Reserves room for PosSidePanel's fixed top-left hamburger - see the
-          same fix in PublicForm.jsx/Records.jsx. */}
-      {isFocusMode && <PosSidePanel formId={form.id} hasCartField={hasCartField} />}
-      <h1>{form.name}: Settings</h1>
+          same fix in PublicForm.jsx/Records.jsx. */}      <h1>{form.name}: Settings</h1>
 
       {/* "Submit another response" and email collection are about a public
           respondent filling this form out themselves - meaningless for a
@@ -677,6 +682,51 @@ function FormSettings() {
           />
         </div>
       )}
+
+      <div className="card" style={{ padding: '1.5rem', marginTop: '1.5rem' }}>
+        <h3 style={{ marginTop: 0 }}>Reports</h3>
+        <p style={{ fontSize: '0.85rem', color: 'var(--color-muted)', marginTop: '-0.5rem', marginBottom: '1rem' }}>
+          By default reports date each record by when it was submitted. Pick a date field here to use that instead - so backdated / backlog entries land on the date you actually set, not the day you keyed them in. Records with that field left blank fall back to the submission date.
+        </p>
+        <label style={{ fontSize: '0.85rem', color: 'var(--color-muted)' }}>Report date field</label>
+        <select
+          value={reportDateField}
+          onChange={(e) => setReportDateField(e.target.value)}
+          style={{ padding: '0.5rem', width: '100%', marginTop: '0.3rem' }}
+        >
+          <option value="">Submission date (default)</option>
+          {(form?.fields || []).filter(f => f.type === 'date').map(f => (
+            <option key={f.id} value={f.id}>{f.label || 'Untitled date field'}</option>
+          ))}
+        </select>
+
+        <div style={{ borderTop: '1px solid var(--color-border)', margin: '1.2rem 0 1rem' }} />
+
+        <label style={{ fontSize: '0.85rem', color: 'var(--color-muted)' }}>Share the report (read-only)</label>
+        <p style={{ fontSize: '0.8rem', color: 'var(--color-muted)', margin: '0.3rem 0 0.4rem' }}>
+          One email per line. Anyone who signs in to Verticals with one of these addresses can open the report link below and see <strong>only</strong> this report - no records, settings, or other pages.
+        </p>
+        <textarea
+          value={reportShareEmails}
+          onChange={(e) => setReportShareEmails(e.target.value)}
+          rows={3}
+          placeholder={'partner@example.com\ninvestor@example.com'}
+          style={{ padding: '0.5rem', width: '100%', fontSize: '0.85rem', boxSizing: 'border-box' }}
+        />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+          <code style={{ fontSize: '0.8rem', background: 'var(--color-bg)', padding: '0.3rem 0.5rem', borderRadius: '6px', wordBreak: 'break-all' }}>
+            {typeof window !== 'undefined' ? `${window.location.origin}/form/${id}/report?shared=1` : ''}
+          </code>
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => navigator.clipboard?.writeText(`${window.location.origin}/form/${id}/report?shared=1`)}
+            style={{ fontSize: '0.8rem', padding: '0.3rem 0.6rem' }}
+          >
+            Copy link
+          </button>
+        </div>
+      </div>
 
       <div className="card" style={{ padding: '1.5rem', marginTop: '1.5rem' }}>
         <h3 style={{ marginTop: 0 }}>Staff Access</h3>

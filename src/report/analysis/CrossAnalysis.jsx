@@ -213,9 +213,8 @@ function CrossAnalysis({ fields, cartFields = [], submissions }) {
         </div>
       )}
 
-      {!fieldA || !fieldB ? (
-        <p style={{ color: '#999' }}>Pick two data points above to compare them.</p>
-      ) : sameField ? (
+      {!fieldA || !fieldB ? null
+      : sameField ? (
         <p style={{ color: '#999' }}>Choose two different data points to compare.</p>
       ) : !validCombo ? (
         <p style={{ color: '#999' }}>{fieldA.label} and {fieldB.label} are both numbers - pick one number and one category (like Order Type or a dropdown answer) to compare them.</p>

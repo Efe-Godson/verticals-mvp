@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, Fragment } from 'react'
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
-import PosSidePanel from './PosSidePanel'
 import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
 import FieldValidationControls from './FieldValidationControls'
@@ -476,9 +475,7 @@ function EditForm() {
   return (
     <div className="page" style={isFocusMode ? { paddingTop: '4rem' } : undefined}>
       {/* Reserves room for PosSidePanel's fixed top-left hamburger - see the
-          same fix in PublicForm.jsx/Records.jsx. */}
-      {isFocusMode && <PosSidePanel formId={id} hasCartField={hasCartField} />}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem', flexWrap: 'wrap', gap: '0.6rem' }}>
+          same fix in PublicForm.jsx/Records.jsx. */}      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem', flexWrap: 'wrap', gap: '0.6rem' }}>
         <h1 style={{ margin: 0 }}>{hasCartField ? 'Add Product' : 'Edit Form'}</h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
           {!hasCartField && (

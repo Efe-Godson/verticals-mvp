@@ -19,6 +19,7 @@ import BuilderCanvas from './BuilderCanvas'
 import BuilderFilterBar from './BuilderFilterBar'
 import EmptyState from './EmptyState'
 import ViewDataModal from './ViewDataModal'
+import DatasetTableModal from './DatasetTableModal'
 
 export default function ReportBuilderWorkspace() {
   const { id } = useParams()
@@ -28,6 +29,7 @@ export default function ReportBuilderWorkspace() {
   const isMobile = useIsMobile(900)
   const [selectedId, setSelectedId] = useState(null)
   const [viewDataId, setViewDataId] = useState(null)
+  const [showDataset, setShowDataset] = useState(false)
   const [mobilePane, setMobilePane] = useState(null) // 'data' | 'catalog' | 'config' | null
   const [preview, setPreview] = useState(false)
 
@@ -129,6 +131,7 @@ export default function ReportBuilderWorkspace() {
         {!isMobile && <strong style={{ letterSpacing: '0.06em', fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--color-muted)' }}>Report Builder</strong>}
         <span style={{ fontSize: '0.82rem', color: 'var(--color-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{rb.form?.name}</span>
         <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
+          <button className="secondary" onClick={() => setShowDataset(true)} style={{ fontSize: '0.8rem' }}>Data ▤</button>
           <button className="secondary" onClick={() => setPreview(p => !p)} style={{ fontSize: '0.8rem' }}>{preview ? 'Edit' : 'Preview'}</button>
           <button onClick={handleSave} disabled={rb.saving} style={{ fontSize: '0.8rem' }}>
             {rb.saving ? 'Saving…' : rb.dirty ? 'Save*' : 'Save'}
@@ -202,6 +205,14 @@ export default function ReportBuilderWorkspace() {
           form={rb.form}
           submissions={rb.submissions}
           onClose={() => setViewDataId(null)}
+        />
+      )}
+
+      {showDataset && (
+        <DatasetTableModal
+          form={rb.form}
+          submissions={rb.submissions}
+          onClose={() => setShowDataset(false)}
         />
       )}
     </div>
