@@ -155,8 +155,8 @@ function ResultScreen({ answers }) {
   )
 }
 
-export default function OnboardingScreens({ onComplete, onAnswersChange, footerNote }) {
-  const { answers, resolved, progress, setAnswer, toggleAnswer } = useFlow(onboardingFlow)
+export default function OnboardingScreens({ onComplete, onAnswersChange, footerNote, initialAnswers }) {
+  const { answers, resolved, progress, setAnswer, toggleAnswer } = useFlow(onboardingFlow, { initialAnswers })
   const [pageIndex, setPageIndex] = useState(0)
 
   useEffect(() => { onAnswersChange?.(answers) }, [answers, onAnswersChange])

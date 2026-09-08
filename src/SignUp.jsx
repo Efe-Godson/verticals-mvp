@@ -66,9 +66,21 @@ function SignUp() {
     }
   }
 
+  let fromOnboarding = false
+  try { fromOnboarding = !!sessionStorage.getItem('verticals_onboarding') } catch { /* private mode */ }
+
   return (
     <div className="page" style={{ maxWidth: '380px' }}>
       <h1>Create account</h1>
+
+      {fromOnboarding && (
+        <p style={{
+          margin: '0.4rem 0 0', padding: '0.6rem 0.8rem', borderRadius: 8,
+          background: 'var(--color-primary-soft)', color: 'var(--color-text)', fontSize: '0.85rem',
+        }}>
+          Your setup is ready. Create an account to save it and get started.
+        </p>
+      )}
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', marginTop: '1rem' }}>
         <div>

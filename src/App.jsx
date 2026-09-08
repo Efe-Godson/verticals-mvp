@@ -32,6 +32,7 @@ import AlertsPage from './AlertsPage'
 import EmailMonitorPage from './EmailMonitorPage'
 import OnboardingPrototype from './lab/onboarding/OnboardingPrototype'
 import DemoShell, { DemoHome, DemoRecords, DemoReport } from './lab/demo/DemoExperience'
+import OnboardingPage from './onboarding/OnboardingPage'
 import PayrollShell from './payroll/PayrollShell'
 import PayrollEmployees from './payroll/PayrollEmployees'
 import PayrollEmployeeProfile from './payroll/PayrollEmployeeProfile'
@@ -54,7 +55,9 @@ import OfflineBanner from './OfflineBanner'
 function PrivateRoute({ children }) {
   const { session, loading } = useAuth()
   if (loading) return <LoadingState />
-  if (!session) return <Navigate to={isFirstVisit() ? '/signup' : '/login'} replace />
+  // First time here -> the onboarding flow (it hands off to Sign Up at the
+  // end). Been here before -> straight to Login.
+  if (!session) return <Navigate to={isFirstVisit() ? '/onboarding' : '/login'} replace />
   return children
 }
 
@@ -105,6 +108,7 @@ function AppShell() {
   const isQuizPlayer = /^\/lab\/quiz\/(join|room\/[^/]+\/play)/.test(location.pathname)
   const isLogin = location.pathname === '/login'
   const isSignUp = location.pathname === '/signup'
+  const isOnboarding = location.pathname === '/onboarding'
   const isConfirmEmail = location.pathname === '/confirm-email'
   const isResetPassword = location.pathname === '/reset-password'
   // Links opened from the POS side panel (Records/Settings/Add Products)
@@ -127,7 +131,7 @@ function AppShell() {
   // /lab/demo is a contained environment with its own top bar + Home/Records/
   // Report tabs (see src/lab/demo/DemoExperience.jsx) - no app NavBar.
   const isDemoEnv = location.pathname.startsWith('/lab/demo')
-  const showNavBar = !isPublicForm && !isShortLink && !isQuizPlayer && !isLogin && !isSignUp && !isConfirmEmail && !isResetPassword && !isFocusMode && !isReportBuilder && !isPayrollEnv && !isExpenseEnv && !isSharedReport && !isDemoEnv
+  const showNavBar = !isPublicForm && !isShortLink && !isQuizPlayer && !isLogin && !isSignUp && !isOnboarding && !isConfirmEmail && !isResetPassword && !isFocusMode && !isReportBuilder && !isPayrollEnv && !isExpenseEnv && !isSharedReport && !isDemoEnv
 
   // The POS side panel is mounted here (not inside each focus-mode page) so
   // it stays put across navigation between Records / Reports / Settings /
@@ -153,6 +157,7 @@ function AppShell() {
       <ErrorBoundary key={location.pathname}>
       <Routes>
         <Route path="/s/:code" element={<ShortLinkRedirect />} />
+        <Route path="/onboarding" element={<PublicOnlyRoute><OnboardingPage /></PublicOnlyRoute>} />
         <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
         <Route path="/signup" element={<PublicOnlyRoute><SignUp /></PublicOnlyRoute>} />
         <Route path="/confirm-email" element={<PublicOnlyRoute><ConfirmEmail /></PublicOnlyRoute>} />

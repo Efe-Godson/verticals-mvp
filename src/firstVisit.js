@@ -14,3 +14,11 @@ export function isFirstVisit() {
   if (!visited) localStorage.setItem(FLAG_KEY, 'true')
   return cachedFirstVisit
 }
+
+// Call once the visitor has been through onboarding (or otherwise seen the
+// entry flow), so landing straight on /onboarding from a marketing link
+// still counts as "been here" afterwards.
+export function markVisited() {
+  cachedFirstVisit = false
+  try { localStorage.setItem(FLAG_KEY, 'true') } catch { /* private mode */ }
+}
