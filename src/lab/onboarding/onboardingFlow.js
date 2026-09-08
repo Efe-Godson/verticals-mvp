@@ -30,6 +30,8 @@ export const onboardingFlow = {
         {
           id: 'interests',
           type: 'multiselect',
+          label: "What would you like to understand better about your business?",
+          help: "Choose everything you'd like more visibility into.",
           required: true,
           options: [
             { value: 'sales', label: 'Sales', help: "Know what's selling and how sales are moving." },

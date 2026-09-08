@@ -19,8 +19,19 @@ const STYLES = `
   color: var(--color-text); box-shadow: var(--shadow);
   transition: transform 150ms ease, border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
 }
-.ob-card:hover:not(:disabled) { transform: translateY(-2px); border-color: var(--color-primary); box-shadow: 0 6px 18px rgba(0,0,0,0.08); }
 .ob-card:disabled { opacity: 0.45; cursor: not-allowed; }
+.ob-opt-label { font-weight: 600; font-size: 0.96rem; }
+.ob-opt-help { font-size: 0.9rem; color: var(--color-muted); line-height: 1.4; }
+/* Hover: a bold solid fill in the theme colour, all text white. */
+.ob-card:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.14);
+}
+.ob-card:hover:not(:disabled) .ob-opt-label,
+.ob-card:hover:not(:disabled) .ob-opt-help { color: #fff; }
 /* Selected: a bold ring + a light, theme-safe tint (10% of the theme colour
    over the surface) so the muted supporting text stays readable whatever
    the business's theme colour is. */
@@ -38,7 +49,7 @@ const STYLES = `
 
 function Tick({ on, round }) {
   return (
-    <span aria-hidden="true" style={{
+    <span className="ob-tick" aria-hidden="true" style={{
       width: 18, height: 18, flexShrink: 0, borderRadius: round ? '50%' : 5, marginTop: 1,
       border: `1px solid ${on ? 'var(--color-primary)' : 'var(--color-border)'}`,
       background: on ? 'var(--color-primary)' : 'transparent',
@@ -86,9 +97,9 @@ function Field({ field, value, onSet, onToggle, hideLabel = false }) {
                   onClick={() => (isMulti ? onToggle(opt.value) : onSet(selected ? '' : opt.value))}
                 >
                   <Tick on={selected} round={!isMulti} />
-                  <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-                    <span style={{ fontWeight: 600, fontSize: '0.94rem' }}>{opt.label}</span>
-                    {opt.help && <span style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>{opt.help}</span>}
+                  <span style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
+                    <span className="ob-opt-label">{opt.label}</span>
+                    {opt.help && <span className="ob-opt-help">{opt.help}</span>}
                   </span>
                 </button>
               )
@@ -241,11 +252,23 @@ export default function OnboardingScreens({ onComplete, onAnswersChange, footerN
       ) : (
         <div key={field.id} className="ob-field">
           <h2 style={{ margin: '0.3rem 0 0.35rem', fontSize: 'clamp(1.3rem, 3vw, 1.7rem)', lineHeight: 1.25 }}>
-            {field.label}
+            {field.label || step.title}
             {field.required && <span style={{ color: 'var(--status-critical)', marginLeft: 4 }}>*</span>}
           </h2>
-          {field.help && <p style={{ margin: '0 0 1.4rem', color: 'var(--color-muted)', fontSize: '0.92rem' }}>{field.help}</p>}
-          {!field.help && <div style={{ height: '1.1rem' }} />}
+          {field.help && (
+            <p style={{ margin: idx === 0 && step.note ? '0 0 0.7rem' : '0 0 1.4rem', color: 'var(--color-muted)', fontSize: '0.92rem' }}>
+              {field.help}
+            </p>
+          )}
+          {idx === 0 && step.note && (
+            <p style={{
+              display: 'inline-block', margin: '0 0 1.4rem', padding: '0.3rem 0.75rem', borderRadius: 999,
+              background: 'var(--color-primary-soft)', color: 'var(--color-primary)', fontWeight: 700, fontSize: '0.8rem',
+            }}>
+              {step.note}
+            </p>
+          )}
+          {!field.help && !(idx === 0 && step.note) && <div style={{ height: '1.1rem' }} />}
           <Field
             field={field}
             value={answers[field.id]}

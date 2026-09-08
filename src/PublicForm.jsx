@@ -1993,12 +1993,16 @@ function PublicForm() {
     // date/time pickers draw their own placeholder text that a floating
     // label would collide with.
     if (field.type === 'date' || field.type === 'time') {
+      // Click anywhere in the field (not just the tiny calendar/clock icon)
+      // to open the native picker.
+      const openPicker = (e) => { try { e.currentTarget.showPicker?.() } catch { /* not supported / already open */ } }
       return (
         <input
           type={inputType}
           value={answers[field.id] || ''}
           onChange={(e) => updateAnswer(field.id, e.target.value)}
-          style={{ padding: '0.5rem', width: '100%' }}
+          onClick={openPicker}
+          style={{ padding: '0.5rem', width: '100%', cursor: 'pointer' }}
         />
       )
     }
