@@ -2190,6 +2190,26 @@ function PublicForm() {
         </div>
       )}
 
+      {form.settings?.formBanner && (
+        <div className="no-print" style={(() => {
+          const t = form.settings.formBannerTone || 'info'
+          const map = {
+            info: ['var(--color-primary-soft)', 'var(--color-primary)'],
+            warning: ['var(--color-warning-soft)', 'var(--status-warning)'],
+            success: ['color-mix(in srgb, var(--status-good) 12%, var(--color-surface))', 'var(--status-good)'],
+            neutral: ['var(--color-bg)', 'var(--color-border)'],
+          }
+          const [bg, accent] = map[t] || map.info
+          return {
+            background: bg, borderLeft: `3px solid ${accent}`, borderRadius: 'var(--radius)',
+            padding: '0.7rem 0.95rem', marginBottom: '1rem', fontSize: '0.9rem',
+            color: 'var(--color-text)', whiteSpace: 'pre-wrap',
+          }
+        })()}>
+          {form.settings.formBanner}
+        </div>
+      )}
+
       <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.6rem', flexWrap: 'wrap' }}>
         <div>
           {/* Retail-only: the form name is redundant chrome on a phone

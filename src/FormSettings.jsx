@@ -26,6 +26,8 @@ function FormSettings() {
   const [allowMultipleResponses, setAllowMultipleResponses] = useState(true)
   const [collectEmail, setCollectEmail] = useState(false)
   const [formStyle, setFormStyle] = useState('standard') // 'standard' | 'stepped'
+  const [formBanner, setFormBanner] = useState('')
+  const [formBannerTone, setFormBannerTone] = useState('info') // info | warning | success | neutral
   const [isDemo, setIsDemo] = useState(false) // the /lab/demo sample business (admin only)
   const [companyName, setCompanyName] = useState('')
   const [companyPhone, setCompanyPhone] = useState('')
@@ -68,6 +70,8 @@ function FormSettings() {
         setAllowMultipleResponses(data.settings?.allowMultipleResponses ?? true)
         setCollectEmail(data.settings?.collectEmail ?? false)
         setFormStyle(data.settings?.formStyle ?? 'standard')
+        setFormBanner(data.settings?.formBanner ?? '')
+        setFormBannerTone(data.settings?.formBannerTone ?? 'info')
         setIsDemo(data.is_demo ?? false)
         setCompanyName(data.settings?.companyName ?? '')
         setCompanyPhone(data.settings?.companyPhone ?? '')
@@ -112,7 +116,9 @@ function FormSettings() {
 
     const newSettings = {
       ...form.settings,
-      allowMultipleResponses, collectEmail, formStyle, companyName, companyPhone, companyAddress, companyEmail, receiptPaperWidth,
+      allowMultipleResponses, collectEmail, formStyle,
+      formBanner: formBanner.trim(), formBannerTone,
+      companyName, companyPhone, companyAddress, companyEmail, receiptPaperWidth,
       staffReportRange, expenseMode, reportDateField, reportSharedEmails, aiFillRules, logoUrl, logoIconKey,
       showVerticalsBranding, defaultInvoiceView, paymentBankName, paymentAccountNumber, paymentAccountName, invoiceNotes,
       invoiceAuthorizedBy, invoiceAuthorizedDesignation, signatureUrl,
@@ -291,6 +297,40 @@ function FormSettings() {
           </label>
         </div>
       )}
+
+      <div className="card" style={{ padding: '1.5rem', marginTop: '1.5rem' }}>
+        <h3 style={{ marginTop: 0 }}>Form banner</h3>
+        <p style={{ fontSize: '0.85rem', color: 'var(--color-muted)', marginTop: '-0.5rem', marginBottom: '0.8rem' }}>
+          A short message shown at the top of the form for everyone filling it in. Leave blank for none.
+        </p>
+        <textarea
+          value={formBanner}
+          onChange={(e) => setFormBanner(e.target.value)}
+          rows={2}
+          maxLength={280}
+          placeholder="e.g. Orders placed after 6pm are delivered the next day."
+          style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical' }}
+        />
+        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.7rem' }}>
+          {[
+            { value: 'info', label: 'Info' },
+            { value: 'warning', label: 'Warning' },
+            { value: 'success', label: 'Success' },
+            { value: 'neutral', label: 'Neutral' },
+          ].map(o => (
+            <button
+              key={o.value}
+              type="button"
+              onClick={() => setFormBannerTone(o.value)}
+              className={formBannerTone === o.value ? '' : 'secondary'}
+              disabled={!formBanner.trim()}
+              style={{ padding: '0.4rem 0.9rem', fontSize: '0.85rem' }}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {form.settings?.templateSlug === 'expenses' && (
         <div className="card" style={{ padding: '1.5rem', marginTop: '1.5rem' }}>
