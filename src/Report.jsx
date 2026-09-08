@@ -143,8 +143,9 @@ function locationCountTile({ locationField, submissions }) {
   return [{ id: `loc-${locationField.id}-count`, title: `Responses by ${locationField.label}`, node: <HorizontalBarChart data={rows} bare /> }]
 }
 
-function Report() {
-  const { id } = useParams()
+function Report({ formId: formIdProp } = {}) {
+  const params = useParams()
+  const id = formIdProp || params.id
   const [searchParams] = useSearchParams()
   const isFocusMode = searchParams.get('focus') === '1'
   const { staffFormId, session } = useAuth()

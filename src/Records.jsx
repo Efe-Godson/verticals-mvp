@@ -41,8 +41,9 @@ const META_COLUMNS = [
   { id: '__submissionId', label: 'Submission ID' },
 ]
 
-function Records() {
-  const { id } = useParams()
+function Records({ formId: formIdProp } = {}) {
+  const params = useParams()
+  const id = formIdProp || params.id
   const [searchParams] = useSearchParams()
   const isFocusMode = searchParams.get('focus') === '1'
   const { showToast } = useToast()

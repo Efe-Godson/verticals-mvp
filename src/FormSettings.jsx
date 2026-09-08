@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { supabase } from './supabaseClient'
+import { useAuth } from './AuthContext'
+import { TEMPLATE_ADMIN_USER_ID } from './adminAccount'
 import PageSkeleton from './components/PageSkeleton'
 import { useDeferredLoading } from './components/loadingHooks'
 import { ErrorState } from './ErrorState'
@@ -18,9 +20,13 @@ function FormSettings() {
   const [saved, setSaved] = useState(false)
   const [saveError, setSaveError] = useState('')
 
+  const { session } = useAuth()
+  const isAdmin = session?.user?.id === TEMPLATE_ADMIN_USER_ID
+
   const [allowMultipleResponses, setAllowMultipleResponses] = useState(true)
   const [collectEmail, setCollectEmail] = useState(false)
   const [formStyle, setFormStyle] = useState('standard') // 'standard' | 'stepped'
+  const [isDemo, setIsDemo] = useState(false) // the /lab/demo sample business (admin only)
   const [companyName, setCompanyName] = useState('')
   const [companyPhone, setCompanyPhone] = useState('')
   const [companyAddress, setCompanyAddress] = useState('')
@@ -62,6 +68,7 @@ function FormSettings() {
         setAllowMultipleResponses(data.settings?.allowMultipleResponses ?? true)
         setCollectEmail(data.settings?.collectEmail ?? false)
         setFormStyle(data.settings?.formStyle ?? 'standard')
+        setIsDemo(data.is_demo ?? false)
         setCompanyName(data.settings?.companyName ?? '')
         setCompanyPhone(data.settings?.companyPhone ?? '')
         setCompanyAddress(data.settings?.companyAddress ?? '')
@@ -111,9 +118,17 @@ function FormSettings() {
       invoiceAuthorizedBy, invoiceAuthorizedDesignation, signatureUrl,
     }
 
+    const update = { settings: newSettings }
+    // Admin only: the /lab/demo sample business. Exactly one form can be the
+    // demo, so turning it on here clears it everywhere else first.
+    if (isAdmin && isDemo !== (form.is_demo ?? false)) {
+      if (isDemo) await supabase.from('forms').update({ is_demo: false }).eq('is_demo', true).neq('id', id)
+      update.is_demo = isDemo
+    }
+
     const { error } = await supabase
       .from('forms')
-      .update({ settings: newSettings })
+      .update(update)
       .eq('id', id)
 
     setSaving(false)
@@ -121,7 +136,7 @@ function FormSettings() {
       setSaveError('Could not save: ' + error.message)
       return
     }
-    setForm(current => ({ ...current, settings: newSettings }))
+    setForm(current => ({ ...current, settings: newSettings, ...('is_demo' in update ? { is_demo: update.is_demo } : {}) }))
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
@@ -261,6 +276,21 @@ function FormSettings() {
     <div className="page" style={isFocusMode ? { paddingTop: '4rem' } : undefined}>
       {/* Reserves room for PosSidePanel's fixed top-left hamburger - see the
           same fix in PublicForm.jsx/Records.jsx. */}      <h1>{form.name}: Settings</h1>
+
+      {isAdmin && (
+        <div className="card" style={{ padding: '1.25rem 1.5rem', marginTop: '1.5rem', borderColor: 'var(--color-primary)' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer' }}>
+            <input type="checkbox" checked={isDemo} onChange={(e) => setIsDemo(e.target.checked)} />
+            <span>
+              Use as the demo business
+              <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>
+                Powers <code>/lab/demo</code> (Home / Records / Report). Only one form can be the demo - turning
+                this on clears it from any other form. Save to apply.
+              </div>
+            </span>
+          </label>
+        </div>
+      )}
 
       {form.settings?.templateSlug === 'expenses' && (
         <div className="card" style={{ padding: '1.5rem', marginTop: '1.5rem' }}>
