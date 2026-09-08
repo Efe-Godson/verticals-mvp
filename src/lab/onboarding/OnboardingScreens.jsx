@@ -48,20 +48,20 @@ function Tick({ on, round }) {
   )
 }
 
-function Field({ field, value, onSet, onToggle }) {
+function Field({ field, value, onSet, onToggle, hideLabel = false }) {
   const isMulti = field.type === 'multiselect'
   const arr = Array.isArray(value) ? value : []
   const atMax = field.maxSelect && arr.length >= field.maxSelect
 
   return (
     <div className="ob-field" style={{ marginBottom: '1.6rem' }}>
-      {field.label && (
+      {!hideLabel && field.label && (
         <label style={{ display: 'block', fontWeight: 600, fontSize: '1.02rem', marginBottom: field.help ? 2 : '0.6rem' }}>
           {field.label}
           {field.required && <span style={{ color: 'var(--status-critical)', marginLeft: 4 }}>*</span>}
         </label>
       )}
-      {field.help && <p style={{ margin: '0 0 0.7rem', fontSize: '0.86rem', color: 'var(--color-muted)' }}>{field.help}</p>}
+      {!hideLabel && field.help && <p style={{ margin: '0 0 0.7rem', fontSize: '0.86rem', color: 'var(--color-muted)' }}>{field.help}</p>}
 
       {field.type === 'text' ? (
         <input
@@ -155,9 +155,14 @@ function ResultScreen({ answers }) {
   )
 }
 
+const isAnswered = (field, answers) => {
+  const v = answers[field.id]
+  return Array.isArray(v) ? v.length > 0 : v !== undefined && v !== ''
+}
+
 export default function OnboardingScreens({ onComplete, onAnswersChange, footerNote, initialAnswers }) {
-  const { answers, resolved, progress, setAnswer, toggleAnswer } = useFlow(onboardingFlow, { initialAnswers })
-  const [pageIndex, setPageIndex] = useState(0)
+  const { answers, resolved, setAnswer, toggleAnswer } = useFlow(onboardingFlow, { initialAnswers })
+  const [qIndex, setQIndex] = useState(0)
 
   useEffect(() => { onAnswersChange?.(answers) }, [answers, onAnswersChange])
 
@@ -170,83 +175,93 @@ export default function OnboardingScreens({ onComplete, onAnswersChange, footerN
     }
   }, [picksCustomWorkflow]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const steps = resolved.steps
-  const idx = Math.min(pageIndex, steps.length - 1)
-  const step = steps[idx]
-  const isLast = idx === steps.length - 1
-  const stepDone = (step.fields || []).filter((f) => f.required).every((f) => {
-    const v = answers[f.id]
-    return Array.isArray(v) ? v.length > 0 : v !== undefined && v !== ''
-  })
+  // One question per screen: flatten every visible field across the steps
+  // into an ordered list, then the result step (no fields) as the final
+  // screen. The list re-derives as answers change, so conditional questions
+  // slot in / drop out in place.
+  const screens = useMemo(() => {
+    const list = []
+    for (const step of resolved.steps) {
+      if (step.fields.length === 0) list.push({ step, field: null })
+      else for (const field of step.fields) list.push({ step, field })
+    }
+    return list
+  }, [resolved])
+
+  const idx = Math.min(qIndex, screens.length - 1)
+  const { step, field } = screens[idx]
+  const isLast = idx === screens.length - 1
+  const isResult = !field
+
+  // Question number within the whole flow (skip the result screen).
+  const totalQuestions = screens.filter((s) => s.field).length
+  const questionNo = screens.slice(0, idx + 1).filter((s) => s.field).length
+
+  const canAdvance = isResult || !field.required || isAnswered(field, answers)
 
   // exclusiveValue + maxSelect handling for multi-select fields.
-  function handleToggle(field, optValue) {
-    const cur = Array.isArray(answers[field.id]) ? answers[field.id] : []
-    const ex = field.exclusiveValue
+  function handleToggle(f, optValue) {
+    const cur = Array.isArray(answers[f.id]) ? answers[f.id] : []
+    const ex = f.exclusiveValue
     if (ex) {
-      if (optValue === ex) {
-        setAnswer(field.id, cur.includes(ex) ? [] : [ex])
-        return
-      }
+      if (optValue === ex) { setAnswer(f.id, cur.includes(ex) ? [] : [ex]); return }
       const withoutEx = cur.filter((v) => v !== ex)
-      setAnswer(field.id, cur.includes(optValue) ? withoutEx.filter((v) => v !== optValue) : [...withoutEx, optValue])
+      setAnswer(f.id, cur.includes(optValue) ? withoutEx.filter((v) => v !== optValue) : [...withoutEx, optValue])
       return
     }
-    if (field.maxSelect && !cur.includes(optValue) && cur.length >= field.maxSelect) return
-    toggleAnswer(field.id, optValue)
+    if (f.maxSelect && !cur.includes(optValue) && cur.length >= f.maxSelect) return
+    toggleAnswer(f.id, optValue)
   }
 
   const navBtn = { minHeight: 44, padding: '0 1.2rem' }
+  const go = (n) => setQIndex(Math.max(0, Math.min(n, screens.length - 1)))
 
   return (
-    <div style={{ maxWidth: 620, margin: '0 auto' }}>
+    <div style={{ maxWidth: 600, margin: '0 auto' }}>
       <style>{STYLES}</style>
 
-      {/* progress */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: '1.8rem' }}>
-        {steps.map((s, i) => (
-          <button
-            key={s.id} type="button" title={s.title} aria-label={`Go to ${s.title}`}
-            onClick={() => setPageIndex(i)}
-            style={{
-              flex: 1, height: 6, borderRadius: 999, border: 'none', padding: 0, cursor: 'pointer',
-              background: i <= idx || progress.done > i ? 'var(--color-primary)' : 'var(--color-border)',
-              opacity: i === idx ? 1 : 0.6,
-            }}
-          />
-        ))}
+      {/* progress: one continuous bar across every question */}
+      <div style={{ height: 6, borderRadius: 999, background: 'var(--color-border)', overflow: 'hidden', marginBottom: '1.6rem' }}>
+        <div style={{
+          height: '100%', borderRadius: 999, background: 'var(--color-primary)',
+          width: `${((idx + 1) / screens.length) * 100}%`, transition: 'width 200ms ease',
+        }} />
       </div>
 
       <div style={{ fontSize: '0.74rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-primary)' }}>
-        {step.eyebrow}
+        {isResult ? step.eyebrow : `Question ${questionNo} of ${totalQuestions}`}
       </div>
-      <h2 style={{ margin: '0.3rem 0 0.4rem', fontSize: 'clamp(1.35rem, 3vw, 1.8rem)', lineHeight: 1.2 }}>{step.title}</h2>
-      {step.description && (
-        <p style={{ margin: step.note ? '0 0 0.35rem' : '0 0 1.8rem', color: 'var(--color-muted)', fontSize: '0.95rem' }}>{step.description}</p>
+
+      {isResult ? (
+        <>
+          <h2 style={{ margin: '0.3rem 0 0.4rem', fontSize: 'clamp(1.35rem, 3vw, 1.8rem)', lineHeight: 1.2 }}>{step.title}</h2>
+          {step.description && <p style={{ margin: '0 0 1.6rem', color: 'var(--color-muted)', fontSize: '0.95rem' }}>{step.description}</p>}
+          <ResultScreen answers={answers} />
+        </>
+      ) : (
+        <div key={field.id} className="ob-field">
+          <h2 style={{ margin: '0.3rem 0 0.35rem', fontSize: 'clamp(1.3rem, 3vw, 1.7rem)', lineHeight: 1.25 }}>
+            {field.label}
+            {field.required && <span style={{ color: 'var(--status-critical)', marginLeft: 4 }}>*</span>}
+          </h2>
+          {field.help && <p style={{ margin: '0 0 1.4rem', color: 'var(--color-muted)', fontSize: '0.92rem' }}>{field.help}</p>}
+          {!field.help && <div style={{ height: '1.1rem' }} />}
+          <Field
+            field={field}
+            value={answers[field.id]}
+            onSet={(v) => setAnswer(field.id, v)}
+            onToggle={(v) => handleToggle(field, v)}
+            hideLabel
+          />
+        </div>
       )}
-      {step.note && <p style={{ margin: '0 0 1.7rem', color: 'var(--color-muted)', fontSize: '0.82rem' }}>{step.note}</p>}
-      {!step.description && !step.note && <div style={{ height: '1.4rem' }} />}
-
-      {step.id === 'result' && <ResultScreen answers={answers} />}
-
-      {step.fields.map((field) => (
-        <Field
-          key={field.id}
-          field={field}
-          value={answers[field.id]}
-          onSet={(v) => setAnswer(field.id, v)}
-          onToggle={(v) => handleToggle(field, v)}
-        />
-      ))}
 
       <div style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.7rem',
-        marginTop: '2rem', paddingTop: '1.1rem', borderTop: '1px solid var(--color-border)',
+        marginTop: '1.5rem', paddingTop: '1.1rem', borderTop: '1px solid var(--color-border)',
       }}>
         {idx > 0 ? (
-          <button type="button" className="secondary" style={navBtn} onClick={() => setPageIndex(idx - 1)}>
-            ← Back
-          </button>
+          <button type="button" className="secondary" style={navBtn} onClick={() => go(idx - 1)}>← Back</button>
         ) : (
           <span aria-hidden="true" />
         )}
@@ -255,16 +270,11 @@ export default function OnboardingScreens({ onComplete, onAnswersChange, footerN
             {step.ctaLabel || 'Create my Verticals account →'}
           </button>
         ) : (
-          <button type="button" style={navBtn} onClick={() => setPageIndex(idx + 1)}>
-            {step.ctaLabel || 'Continue →'}
+          <button type="button" style={navBtn} disabled={!canAdvance} onClick={() => go(idx + 1)}>
+            {idx === screens.length - 2 ? (step.ctaLabel || 'Continue →') : 'Continue →'}
           </button>
         )}
       </div>
-      {!isLast && !stepDone && step.fields.length > 0 && (
-        <p style={{ fontSize: '0.8rem', color: 'var(--color-muted)', margin: '0.6rem 0 0', textAlign: 'right' }}>
-          You can revisit this later.
-        </p>
-      )}
 
       {isLast && (
         <p style={{ fontSize: '0.82rem', color: 'var(--color-muted)', marginTop: '0.7rem' }}>
