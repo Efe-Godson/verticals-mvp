@@ -25,7 +25,7 @@ import useIsMobile from './hooks/useIsMobile'
 import {
   ShoppingCart, CirclePlus, Package, ClipboardList,
   ChartNoAxesColumnIncreasing, Settings, ShieldCheck, Share2, ChevronLeft,
-  LayoutDashboard,
+  LayoutDashboard, FileText, SquarePen,
 } from 'lucide-react'
 
 // One shared spec so every nav icon matches (see the design brief).
@@ -179,16 +179,23 @@ function PosSidePanel({ formId, hasCartField: hasCartFieldProp, bottomBarPresent
     { label: 'Reports', to: `/form/${formId}/report?focus=1`, icon: ChartNoAxesColumnIncreasing },
     ...(isStaff ? [] : [{ label: 'Settings', to: `/form/${formId}/settings?focus=1`, icon: Settings }]),
   ] : [
-    { label: hasCartField ? 'Order Screen' : 'View Form', to: `/form/${formId}`, icon: ShoppingCart },
-    ...(hasCartField ? [{ label: 'Add Products', to: `/form/${formId}/edit?focus=1`, icon: CirclePlus }] : []),
-    ...(hasCartField ? [{ label: 'Inventory', to: `/form/${formId}/inventory?focus=1`, icon: Package }] : []),
+    hasCartField
+      ? { label: 'Order Screen', to: `/form/${formId}`, icon: ShoppingCart }
+      : { label: 'View Form', to: `/form/${formId}`, icon: FileText },
+    ...(hasCartField
+      ? [
+          { label: 'Add Products', to: `/form/${formId}/edit?focus=1`, icon: CirclePlus },
+          { label: 'Inventory', to: `/form/${formId}/inventory?focus=1`, icon: Package },
+        ]
+      : isStaff ? [] : [{ label: 'Edit Form', to: `/form/${formId}/edit?focus=1`, icon: SquarePen }]),
     { label: 'Records', to: `/form/${formId}/records?focus=1`, icon: ClipboardList },
     { label: 'Reports', to: `/form/${formId}/report?focus=1`, icon: ChartNoAxesColumnIncreasing },
     ...(isStaff ? [] : [
       { label: 'Settings', to: `/form/${formId}/settings?focus=1`, icon: Settings },
       { label: 'Admin', to: `/form/${formId}/admin?focus=1`, icon: ShieldCheck },
     ]),
-    ...(hasCartField ? [{ label: 'Share Link', onClick: openShareLink, icon: Share2 }] : []),
+    // Share the public link - useful for any form, not just cart ones.
+    ...(isStaff ? [] : [{ label: 'Share Link', onClick: openShareLink, icon: Share2 }]),
   ]
 
   const exitLink = isStaff ? null : backTo
