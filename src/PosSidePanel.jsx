@@ -20,27 +20,24 @@ import { useToast } from './Toast'
 import Modal from './components/Modal'
 import { getOrCreateShortLink } from './shortLinks'
 import ArrowLeftIcon from './ArrowLeftIcon'
+import CompactTopBar from './components/CompactTopBar'
 import useIsMobile from './hooks/useIsMobile'
+import {
+  ShoppingCart, CirclePlus, Package, ClipboardList,
+  ChartNoAxesColumnIncreasing, Settings, ShieldCheck, Share2, ChevronLeft,
+  LayoutDashboard,
+} from 'lucide-react'
+
+// One shared spec so every nav icon matches (see the design brief).
+const NAV_ICON = { size: 18, strokeWidth: 1.8 }
 
 const PANEL_WIDTH = 210
 const PIN_KEY = 'pos-panel-pinned'
 
+// Docked open is the default on desktop; only an explicit collapse (stored
+// as '0') keeps it shut.
 function readPinned() {
-  try { return localStorage.getItem(PIN_KEY) === '1' } catch { return false }
-}
-
-// Flat line thumbtack, matching ArrowLeftIcon / SparkleIcon. Tilts 45deg
-// when the panel is pinned.
-function PinIcon({ size = 16, pinned = false }) {
-  return (
-    <svg
-      width={size} height={size} viewBox="0 0 24 24" fill="none"
-      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-      style={{ transform: pinned ? 'rotate(45deg)' : 'none', transition: 'transform 0.15s ease', flexShrink: 0 }}
-    >
-      <path d="M8 4h8M10 4l-1 8-3 2v1h12v-1l-3-2-1-8M12 18v3" />
-    </svg>
-  )
+  try { return localStorage.getItem(PIN_KEY) !== '0' } catch { return true }
 }
 
 // A single-row "here's your link" strip: the link's already on the
@@ -74,7 +71,10 @@ function ShareLinkModal({ url, onClose }) {
 // Generic nav for any template's form, not just cart/POS ones - Templates'
 // "Manage" opens whichever page fits the template with ?panel=1, which
 // starts this open instead of collapsed.
-function PosSidePanel({ formId, hasCartField: hasCartFieldProp, bottomBarPresent = false }) {
+// bottomBarPresent: kept for callers (PublicForm.jsx's deferCheckout order
+// screen) - no longer changes anything here now that the top bar treatment
+// (see `topBar` below) is universal on mobile rather than conditional on it.
+function PosSidePanel({ formId, hasCartField: hasCartFieldProp, bottomBarPresent: _bottomBarPresent = false }) {
   const [searchParams] = useSearchParams()
   const { pathname } = useLocation()
   const isMobile = useIsMobile(768)
@@ -86,6 +86,8 @@ function PosSidePanel({ formId, hasCartField: hasCartFieldProp, bottomBarPresent
   const [pinned, setPinned] = useState(readPinned)
   const [open, setOpen] = useState(() => searchParams.get('panel') === '1' || (readPinned() && !isMobile))
   const [shareLinkUrl, setShareLinkUrl] = useState(null)
+  const [formName, setFormName] = useState('')
+  const [templateSlug, setTemplateSlug] = useState(null)
   const { staffFormId } = useAuth()
   const isStaff = !!staffFormId
 
@@ -93,6 +95,10 @@ function PosSidePanel({ formId, hasCartField: hasCartFieldProp, bottomBarPresent
   // overlay so it never eats the (already tight) content width.
   const docked = pinned && !isMobile
   const visible = open || docked
+  // The compact top bar is a desktop thing - it stays put whether the panel
+  // is docked (bar starts after it) or collapsed (bar spans full width, with
+  // a hamburger to bring the panel back).
+  const showTopBar = !isMobile
 
   // Push the page across on desktop while the panel is showing. body padding
   // doesn't move position:fixed children, so the panel itself stays put at
@@ -103,6 +109,14 @@ function PosSidePanel({ formId, hasCartField: hasCartFieldProp, bottomBarPresent
     return () => document.body.classList.remove('pos-panel-docked')
   }, [visible, isMobile])
 
+  // Reserve room for the compact top bar (position:fixed, so body padding
+  // moves the content under it without moving the bar - same trick as
+  // .pos-panel-docked).
+  useEffect(() => {
+    document.body.classList.toggle('compact-topbar', showTopBar)
+    return () => document.body.classList.remove('compact-topbar')
+  }, [showTopBar])
+
   // Where "back" goes: a template's own Locations page if this form is one
   // of its locations, straight to All Businesses otherwise.
   const [backTo, setBackTo] = useState(null) // { label, to } | null
@@ -110,9 +124,11 @@ function PosSidePanel({ formId, hasCartField: hasCartFieldProp, bottomBarPresent
   useEffect(() => {
     let cancelled = false
     async function resolveBackLink() {
-      const { data: form } = await supabase.from('forms').select('settings, fields').eq('id', formId).single()
-      if (!cancelled && Array.isArray(form?.fields)) {
-        setFetchedHasCart(form.fields.some(f => f.type === 'cart'))
+      const { data: form } = await supabase.from('forms').select('name, settings, fields').eq('id', formId).single()
+      if (!cancelled) {
+        setFormName(form?.name || '')
+        setTemplateSlug(form?.settings?.templateSlug || null)
+        if (Array.isArray(form?.fields)) setFetchedHasCart(form.fields.some(f => f.type === 'cart'))
       }
       const slug = form?.settings?.templateSlug
       if (!slug) { if (!cancelled) setBackTo({ label: 'All Businesses', to: '/' }); return }
@@ -144,7 +160,7 @@ function PosSidePanel({ formId, hasCartField: hasCartFieldProp, bottomBarPresent
     setPinned(prev => {
       const next = !prev
       try { localStorage.setItem(PIN_KEY, next ? '1' : '0') } catch { /* private mode */ }
-      if (next) setOpen(true)
+      setOpen(next) // collapsing also closes; expanding re-opens
       return next
     })
   }
@@ -154,72 +170,116 @@ function PosSidePanel({ formId, hasCartField: hasCartFieldProp, bottomBarPresent
     if (!docked) setOpen(false)
   }
 
-  const links = [
-    { label: hasCartField ? 'Order Screen' : 'View Form', to: `/form/${formId}` },
-    ...(hasCartField ? [{ label: 'Add Products', to: `/form/${formId}/edit?focus=1` }] : []),
-    ...(hasCartField ? [{ label: 'Inventory', to: `/form/${formId}/inventory?focus=1` }] : []),
-    { label: 'Records', to: `/form/${formId}/records?focus=1` },
-    { label: 'Reports', to: `/form/${formId}/report?focus=1` },
+  const isExpense = templateSlug === 'expenses'
+
+  const links = isExpense ? [
+    { label: 'Overview', to: `/form/${formId}/expenses`, icon: LayoutDashboard },
+    { label: 'Add Expense', to: `/form/${formId}/expenses?add=1`, icon: CirclePlus },
+    { label: 'Records', to: `/form/${formId}/records?focus=1`, icon: ClipboardList },
+    { label: 'Reports', to: `/form/${formId}/report?focus=1`, icon: ChartNoAxesColumnIncreasing },
+    ...(isStaff ? [] : [{ label: 'Settings', to: `/form/${formId}/settings?focus=1`, icon: Settings }]),
+  ] : [
+    { label: hasCartField ? 'Order Screen' : 'View Form', to: `/form/${formId}`, icon: ShoppingCart },
+    ...(hasCartField ? [{ label: 'Add Products', to: `/form/${formId}/edit?focus=1`, icon: CirclePlus }] : []),
+    ...(hasCartField ? [{ label: 'Inventory', to: `/form/${formId}/inventory?focus=1`, icon: Package }] : []),
+    { label: 'Records', to: `/form/${formId}/records?focus=1`, icon: ClipboardList },
+    { label: 'Reports', to: `/form/${formId}/report?focus=1`, icon: ChartNoAxesColumnIncreasing },
     ...(isStaff ? [] : [
-      { label: 'Settings', to: `/form/${formId}/settings?focus=1` },
-      { label: 'Admin', to: `/form/${formId}/admin?focus=1` },
+      { label: 'Settings', to: `/form/${formId}/settings?focus=1`, icon: Settings },
+      { label: 'Admin', to: `/form/${formId}/admin?focus=1`, icon: ShieldCheck },
     ]),
-    ...(hasCartField ? [{ label: 'Share Link', onClick: openShareLink }] : []),
+    ...(hasCartField ? [{ label: 'Share Link', onClick: openShareLink, icon: Share2 }] : []),
   ]
 
   const exitLink = isStaff ? null : backTo
 
-  const navItemBase = {
-    display: 'block', textDecoration: 'none', padding: '0.65rem 0.75rem',
-    borderRadius: '6px', fontSize: '0.9rem', border: 'none', background: 'transparent',
-    textAlign: 'left', cursor: 'pointer', width: '100%',
-  }
-  // A smooth "pebble" - soft green gradient with a subtle sheen and lift.
-  // Colours + dark-mode variant live in .pos-nav-active (index.css).
-  const activeNavItem = {
-    ...navItemBase,
-    fontWeight: 600,
-    borderRadius: '10px',
-    paddingTop: '0.7rem',
-    paddingBottom: '0.7rem',
-  }
+  // Mobile: one full-width top bar (menu left, back right, a hairline
+  // border underneath) - the same toolbar language NavBar.jsx's own compact
+  // mobile bar uses, standard across every template now. Two separate
+  // floating circles read as clutter by comparison. Desktop keeps the
+  // floating circular buttons (bottomBarPresent no longer changes this).
+  const topBar = isMobile
 
   return (
     <>
+      {topBar && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 149,
+          height: 'calc(52px + env(safe-area-inset-top))',
+          background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)',
+        }} />
+      )}
+
+      {showTopBar && (
+        <CompactTopBar
+          title={formName}
+          onMenu={docked ? undefined : togglePin}
+          exitLink={exitLink}
+          leftOffset={docked ? PANEL_WIDTH : 0}
+          {...(hasCartFieldProp !== undefined
+            // PublicForm's order screen: a plain .page (max-width 800, 1.5rem
+            // side padding). Focus-mode pages (AppShell) use .pos-flow .page.
+            ? { contentMax: '800px', padX: 'clamp(0.9rem, 4vw, 1.5rem)' }
+            : { contentMax: 'min(1600px, 100%)', padX: 'clamp(1rem, 4vw, 4.5rem)' })}
+        />
+      )}
+
+      {isMobile && (
       <button
         type="button"
-        className={bottomBarPresent ? undefined : 'pos-menu-button'}
-        onClick={() => setOpen(true)}
+        className={topBar ? undefined : 'pos-menu-button'}
+        onClick={() => { if (isMobile) setOpen(true); else if (!pinned) togglePin() }}
         aria-label="Open menu"
-        style={{
+        style={topBar ? {
+          position: 'fixed', top: 'env(safe-area-inset-top)', left: '0.4rem', zIndex: 150,
+          width: '44px', height: '52px', padding: 0, border: 'none',
+          background: 'transparent', color: 'var(--color-primary)',
+          display: visible ? 'none' : 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', gap: '4px', cursor: 'pointer',
+        } : {
           position: 'fixed', top: 'calc(1rem + env(safe-area-inset-top))', left: '1rem', zIndex: 150,
           width: '44px', height: '44px', padding: 0, borderRadius: '8px',
           background: 'var(--color-primary)', color: 'white', border: 'none',
+          // A flat colour square pasted at the very corner read as glued-on;
+          // the same lift DarkModeToggle's FAB uses gives it some depth off
+          // the page instead.
+          boxShadow: 'var(--shadow)',
           display: visible ? 'none' : 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center', gap: '4px', cursor: 'pointer',
         }}
       >
-        <span style={{ width: '20px', height: '2px', background: 'white', borderRadius: '1px' }} />
-        <span style={{ width: '20px', height: '2px', background: 'white', borderRadius: '1px' }} />
-        <span style={{ width: '20px', height: '2px', background: 'white', borderRadius: '1px' }} />
+        <span style={{ width: '20px', height: '2px', background: topBar ? 'var(--color-primary)' : 'white', borderRadius: '1px' }} />
+        <span style={{ width: '20px', height: '2px', background: topBar ? 'var(--color-primary)' : 'white', borderRadius: '1px' }} />
+        <span style={{ width: '20px', height: '2px', background: topBar ? 'var(--color-primary)' : 'white', borderRadius: '1px' }} />
       </button>
+      )}
 
-      {exitLink && (
+      {exitLink && isMobile && (
         <Link
           to={exitLink.to}
-          className={bottomBarPresent ? undefined : 'pos-back-button'}
+          className={topBar ? undefined : 'pos-back-button'}
           aria-label={`Back to ${exitLink.label}`}
           title={exitLink.label}
-          style={{
+          style={topBar ? {
+            position: 'fixed', top: 'env(safe-area-inset-top)', right: '0.4rem', zIndex: 160,
+            width: '44px', height: '52px', background: 'transparent', border: 'none',
+            color: 'var(--color-primary)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          } : {
             // Always on screen - above the drawer/backdrop so it stays
             // reachable even while the menu is open or pinned.
             position: 'fixed', top: 'calc(1rem + env(safe-area-inset-top))', right: '1rem', zIndex: 160,
-            width: '44px', height: '44px', background: 'transparent', border: 'none',
-            color: 'var(--color-primary)',
+            width: '44px', height: '44px', borderRadius: '50%',
+            // Was a bare icon with nothing behind it - a proper surface +
+            // border + shadow (same FAB treatment as the hamburger/
+            // DarkModeToggle) so it reads as a button, not decoration
+            // floating flat over whatever's underneath it.
+            background: 'var(--color-surface)', border: '1px solid var(--color-border)',
+            boxShadow: 'var(--shadow)', color: 'var(--color-primary)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
         >
-          <ArrowLeftIcon size={26} />
+          <ArrowLeftIcon size={22} />
         </Link>
       )}
 
@@ -254,19 +314,18 @@ function PosSidePanel({ formId, hasCartField: hasCartFieldProp, bottomBarPresent
               <button
                 type="button"
                 onClick={togglePin}
-                aria-label={pinned ? 'Unpin menu' : 'Pin menu open'}
-                title={pinned ? 'Unpin menu' : 'Pin menu open'}
+                aria-label="Collapse menu"
+                title="Collapse menu"
                 style={{
-                  background: pinned ? 'rgba(255,255,255,0.22)' : 'transparent',
-                  border: 'none', color: 'white', cursor: 'pointer',
-                  lineHeight: 1, padding: '0.3rem', borderRadius: '6px',
+                  background: 'transparent', border: 'none', color: 'white', cursor: 'pointer',
+                  lineHeight: 0, padding: '0.3rem', borderRadius: '6px',
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                 }}
               >
-                <PinIcon pinned={pinned} />
+                <ChevronLeft size={20} strokeWidth={2.25} />
               </button>
             )}
-            {!docked && (
+            {isMobile && (
               <button
                 type="button"
                 onClick={() => setOpen(false)}
@@ -279,12 +338,14 @@ function PosSidePanel({ formId, hasCartField: hasCartFieldProp, bottomBarPresent
           </div>
         </div>
 
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+        <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
           {links.map(link => {
+            const Icon = link.icon
             if (link.onClick) {
               return (
-                <button key={link.label} type="button" onClick={link.onClick} style={{ ...navItemBase, color: 'white' }}>
-                  {link.label}
+                <button key={link.label} type="button" onClick={link.onClick} className="pos-nav-item">
+                  <Icon {...NAV_ICON} aria-hidden="true" />
+                  <span>{link.label}</span>
                 </button>
               )
             }
@@ -296,10 +357,10 @@ function PosSidePanel({ formId, hasCartField: hasCartFieldProp, bottomBarPresent
                 to={link.to}
                 onClick={handleNavClick}
                 aria-current={isActive ? 'page' : undefined}
-                className={isActive ? 'pos-nav-active' : undefined}
-                style={isActive ? activeNavItem : { ...navItemBase, color: 'white' }}
+                className={isActive ? 'pos-nav-item is-active' : 'pos-nav-item'}
               >
-                {link.label}
+                <Icon {...NAV_ICON} aria-hidden="true" />
+                <span>{link.label}</span>
               </Link>
             )
           })}

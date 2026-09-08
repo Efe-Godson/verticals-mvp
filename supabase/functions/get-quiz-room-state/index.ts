@@ -8,6 +8,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { jsonResponse, corsHeaders, requireQuizAdmin } from '../_shared/quiz.ts'
+import { callerId, enforceRateLimit } from '../_shared/rateLimit.ts'
 
 Deno.serve(async req => {
   try {
@@ -21,6 +22,17 @@ Deno.serve(async req => {
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
+
+    // Admin-only, but polled every ~2s by the dashboard while it's open -
+    // a plain 2s poll is ~30/min on its own, so this needs real headroom
+    // above the usual 60/min default.
+    const uid = await callerId(req, supabase)
+    const limited = await enforceRateLimit(
+      supabase, `get-quiz-room-state:${uid ?? 'anon'}`,
+      { max: 120, windowSeconds: 60 },
+      { function: 'get-quiz-room-state', user_id: uid, room_id },
+    )
+    if (limited) return limited
 
     const admin = await requireQuizAdmin(req, supabase, room_id)
     if (admin.error) return jsonResponse({ error: admin.error }, admin.status)

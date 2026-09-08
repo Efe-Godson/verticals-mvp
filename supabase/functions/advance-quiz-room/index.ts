@@ -11,6 +11,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { jsonResponse, corsHeaders, requireQuizAdmin, broadcastPlayers } from '../_shared/quiz.ts'
+import { clientIp, callerId, enforceRateLimit } from '../_shared/rateLimit.ts'
 
 async function questionEndsAt(room: any, index: number, supabase: any) {
   const { data: question, error } = await supabase
@@ -71,6 +72,19 @@ Deno.serve(async req => {
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
+
+    // Mostly admin-only, but 'reveal' can come from any player's client (see
+    // below) - key on whichever identity is actually available per caller,
+    // not room_id alone, so one spamming client can't exhaust a shared budget
+    // for the whole room.
+    const uid = await callerId(req, supabase)
+    const ip = clientIp(req)
+    const limited = await enforceRateLimit(
+      supabase, `advance-quiz-room:${uid ?? ip ?? 'unknown'}:${room_id}`,
+      { max: 30, windowSeconds: 60 },
+      { function: 'advance-quiz-room', user_id: uid, ip, room_id, action },
+    )
+    if (limited) return limited
 
     // 'reveal' is the one action anyone can trigger once the deadline has
     // passed (see module comment) - every other action always requires the

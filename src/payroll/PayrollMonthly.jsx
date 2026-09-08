@@ -4,9 +4,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { usePayroll } from './PayrollShell'
 import { useToast } from '../Toast'
-import { ErrorState } from '../ErrorState'
+import { ErrorState, InlineError } from '../ErrorState'
 import { SkeletonKpis, SkeletonTableRows, Skeleton } from '../components/Skeleton'
-import { RefreshingIndicator } from '../components/InlineLoader'
+import { RefreshingIndicator, InlineLoader } from '../components/InlineLoader'
+import EmptyState from '../components/EmptyState'
 import { useDeferredLoading } from '../components/loadingHooks'
 import ConfirmDialog from '../ConfirmDialog'
 import useIsMobile from '../hooks/useIsMobile'
@@ -14,15 +15,19 @@ import { MonthPicker, LocationFilter, PayrollModal, money, moneyShort, monthLabe
 import { calculateEmployeePayroll } from './calculatePayroll'
 import {
   payrollSettings, listEmployees, listDepartments, listLocations, listEntries, loadRecordsForMonth,
-  runPayroll, bulkSetRecordStatus, createPaymentBatch, resetPayrollMonth,
+  runPayroll, bulkSetRecordStatus, createPaymentBatch, resetPayrollMonth, listPayrollHistory,
 } from './payrollApi'
 import { exportPayrollToCSV, exportPayrollToExcel, exportPayrollToPDF } from './payrollExport'
 import EmployeePayrollModal from './EmployeePayrollModal'
+import PayrollSettingsModal from './PayrollSettingsModal'
+import { DataCard } from '../components/DataCards'
+import SearchIcon from '../SearchIcon'
+import { getPageCache, setPageCache } from '../hooks/pageCache'
 
 const norm = (s) => String(s || '').trim().toLowerCase()
 
 export default function PayrollMonthly() {
-  const { form, formId } = usePayroll()
+  const { form, formId, reloadForm } = usePayroll()
   const { showToast } = useToast()
   const isMobile = useIsMobile(760)
   const settings = useMemo(() => payrollSettings(form), [form])
@@ -41,6 +46,10 @@ export default function PayrollMonthly() {
   const [selected, setSelected] = useState([])
   const [confirmPayAll, setConfirmPayAll] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [empSearch, setEmpSearch] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
   const [bulkMenuOpen, setBulkMenuOpen] = useState(false)
   const [exportSelectedOnly, setExportSelectedOnly] = useState(false)
   // { title, message, confirmLabel, danger?, run } for one-off confirmations
@@ -56,6 +65,11 @@ export default function PayrollMonthly() {
   // quiet = background refresh after a mutation: keep the current UI on
   // screen, just flag "Updating…" (brief §3C) instead of dropping to a
   // skeleton.
+  // Revisiting a month you've already loaded this session paints from the
+  // cached data instantly and refreshes silently behind it, instead of
+  // reshowing the skeleton every time (see src/hooks/pageCache.js).
+  const cacheKey = `payroll-monthly:${formId}:${month}`
+
   async function load({ quiet = false } = {}) {
     if (!quiet) setLoading(true)
     setRefreshing(true)
@@ -71,6 +85,7 @@ export default function PayrollMonthly() {
       setEntries(ents)
       setRecords(recs)
       setSelected([])
+      setPageCache(cacheKey, { employees: emps, departments: depts, locations: locs, entries: ents, allRecords: recs })
     } catch (err) {
       setError(err.message || 'Could not load payroll.')
     } finally {
@@ -79,7 +94,20 @@ export default function PayrollMonthly() {
     }
   }
 
-  useEffect(() => { load() }, [formId, month]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const cached = getPageCache(cacheKey)
+    if (cached) {
+      setEmployees(cached.employees)
+      setDepartments(cached.departments)
+      setLocations(cached.locations)
+      setEntries(cached.entries)
+      setRecords(cached.allRecords)
+      setLoading(false)
+      load({ quiet: true })
+    } else {
+      load()
+    }
+  }, [formId, month]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const empById = useMemo(() => Object.fromEntries(employees.map(e => [e.id, e])), [employees])
   const deptName = useMemo(() => Object.fromEntries(departments.map(d => [d.id, d.name])), [departments])
@@ -101,6 +129,14 @@ export default function PayrollMonthly() {
     [allRecords, selLocName, atLoc, empById]
   )
   const hasRun = allRecords.length > 0
+
+  // Free-text find over the produced records, by employee name. A view over
+  // `records` only - selection / Run / totals still work off the full set.
+  const visibleRecords = useMemo(() => {
+    const q = empSearch.trim().toLowerCase()
+    if (!q) return records
+    return records.filter(r => (empById[r.employee_id]?.full_name || '').toLowerCase().includes(q))
+  }, [records, empSearch, empById])
 
   // Live projection for the KPI cards - covers the selected location and
   // stays useful before Run Payroll has produced any records.
@@ -125,7 +161,6 @@ export default function PayrollMonthly() {
   }, [employees, entries, records, month, settings, atLoc])
 
   const headcount = hasRun ? records.length : kpi.staff
-  const progressPct = kpi.net > 0 ? Math.round((kpi.paidAmount / kpi.net) * 100) : 0
 
   async function doRun() {
     setRunning(true)
@@ -222,7 +257,7 @@ export default function PayrollMonthly() {
     }
     const label = status === 'paid' ? 'Mark paid' : 'Mark pending'
     ask({
-      title: `${label} — ${eligible.length} employee${eligible.length > 1 ? 's' : ''}?`,
+      title: `${label} - ${eligible.length} employee${eligible.length > 1 ? 's' : ''}?`,
       message: status === 'paid'
         ? `They'll be recorded as paid for ${monthLabel(month)}.${skipped ? ` ${skipped} already-paid selection${skipped > 1 ? 's' : ''} skipped.` : ''}`
         : `Their ${monthLabel(month)} payment is reversed and the records unlock for edits.${skipped ? ` ${skipped} not-yet-paid selection${skipped > 1 ? 's' : ''} skipped.` : ''}`,
@@ -242,7 +277,7 @@ export default function PayrollMonthly() {
       showToast(`${payable.length} employee${payable.length > 1 ? 's' : ''} marked paid. Payment batch recorded.`, 'success')
       load()
     } catch (err) {
-      showToast(friendlyError(err, "Couldn't mark everyone paid. Some may have gone through — reload to check."), 'error')
+      showToast(friendlyError(err, "Couldn't mark everyone paid. Some may have gone through - reload to check."), 'error')
     }
   }
 
@@ -268,9 +303,12 @@ export default function PayrollMonthly() {
   }
 
   const OPTIONS = [
+    { label: 'Payroll settings', onClick: () => setSettingsOpen(true) },
+    { divider: true },
     { label: 'Export payroll', onClick: () => setExportOpen(true), disabled: !hasRun },
     { label: 'Download payslips', onClick: () => showToast('Payslip downloads are coming soon.', 'info'), disabled: !hasRun },
     { label: 'Print payroll', onClick: () => { if (hasRun) window.print() }, disabled: !hasRun },
+    { label: 'Payroll history', onClick: () => setHistoryOpen(true) },
     { divider: true },
     {
       label: 'Recalculate payroll', disabled: !hasRun,
@@ -295,7 +333,7 @@ export default function PayrollMonthly() {
   if (loading) return showSkeleton ? <PaymentsSkeleton isMobile={isMobile} /> : null
   if (error) return <ErrorState message={error} onRetry={load} />
 
-  const totalFinal = records.reduce((s, r) => s + Number(r.final_amount || 0), 0)
+  const totalFinal = visibleRecords.reduce((s, r) => s + Number(r.final_amount || 0), 0)
 
   // Guided-review current employee
   const reviewEmpId = reviewIdx != null ? reviewQueue[reviewIdx] : null
@@ -325,37 +363,71 @@ export default function PayrollMonthly() {
         .pay-table-scroll { max-height: none; }
         .pay-table thead th { position: sticky; top: 0; background: var(--color-bg); z-index: 1; }
         .pay-table tbody tr:hover { background: var(--color-primary-soft); }
-        @media (max-width: 760px) {
-          .pay-kpis { grid-template-columns: 1fr 1fr; }
-          .pay-kpi.k-total { order: 1 } .pay-kpi.net { order: 2 }
-          .pay-kpi.k-ded { order: 3 } .pay-kpi.k-add { order: 4 }
-          .pay-kpi .v { font-size: 1.1rem }
-          .pay-kpi.net .v { font-size: 1.2rem }
-        }
       `}</style>
 
-      {/* toolbar - left = filters, right = actions (§5). Review payroll is
-          the primary (theme) action once payroll exists; before that it's
-          Start Payroll. No status badge (§4). */}
+      {/* Mobile: a completely different, action-focused reading of this page
+          (design brief - "how much / for how many / how complete / what do I
+          do / who's being paid", everything else moved into Options).
+          Desktop keeps the fuller dashboard (toolbar, 4 KPI cards, the
+          bordered progress card, unchanged below) - only the <640px layout
+          here. */}
       {isMobile ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginBottom: '1.2rem' }}>
-          <MonthPicker value={month} onChange={setMonth} style={{ width: '100%' }} />
-          <LocationFilter locations={locOptions} value={location} onChange={setLocation} style={{ width: '100%' }} />
-          {!hasRun ? (
-            <>
-              <button onClick={handleRun} disabled={running} style={{ width: '100%', minHeight: 48, fontSize: '0.95rem' }}>{running ? 'Starting…' : 'Start Payroll'}</button>
-              <OptionsMenu open={menuOpen} setOpen={setMenuOpen} items={OPTIONS} fullWidth />
-            </>
-          ) : (
-            <>
-              <button onClick={() => startReview()} style={{ width: '100%', minHeight: 48, fontSize: '0.95rem' }}>Review payroll · {pendingCount}</button>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                {pendingCount > 0 && <button className="secondary" style={{ flex: 1, minHeight: 44 }} onClick={askPayAll}>Mark all paid</button>}
-                <div style={{ flex: 1 }}><OptionsMenu open={menuOpen} setOpen={setMenuOpen} items={OPTIONS} fullWidth /></div>
-              </div>
-            </>
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+            <MonthPicker value={month} onChange={setMonth} style={{ flex: 1, minWidth: 0 }} />
+            <button
+              type="button" className="secondary" onClick={() => setMenuOpen(true)}
+              aria-label="Payroll details and more options"
+              style={{ flexShrink: 0, minHeight: 40, minWidth: 40, padding: '0 0.7rem', fontSize: '1rem', letterSpacing: '0.12em' }}
+            >
+              •••
+            </button>
+          </div>
+          {locOptions.length > 0 && (
+            <LocationFilter
+              locations={locOptions} value={location} onChange={setLocation}
+              style={{
+                width: '100%', marginBottom: '1.6rem',
+                border: '1px solid var(--color-border)', borderRadius: 'var(--radius)', background: 'var(--color-surface)',
+                color: 'var(--color-text)', fontSize: '0.88rem', fontWeight: 600, padding: '0.5rem 0.7rem',
+              }}
+            />
           )}
-        </div>
+
+          {/* 1. How much? / 2. For how many? - in its own tile, tinted with
+              the theme color (same role as desktop's .pay-kpi.net) so it
+              reads as the headline figure rather than a plain white card. */}
+          <div className="card" style={{
+            padding: '1rem 1.1rem', marginBottom: '1.6rem',
+            borderColor: 'var(--color-primary)', background: 'var(--color-primary-soft)',
+          }}>
+            <div style={{ fontSize: '2.1rem', fontWeight: 800, letterSpacing: '-0.01em', fontVariantNumeric: 'tabular-nums' }}>
+              {money(kpi.net)}
+            </div>
+            <div style={{ color: 'var(--color-muted)', fontSize: '0.92rem', marginTop: '0.15rem' }}>
+              Net Payroll · {headcount} employee{headcount === 1 ? '' : 's'}
+            </div>
+          </div>
+
+          {/* 4. What should I do? - one strong CTA; once payroll exists this
+              becomes the next real action instead of sticking around
+              alongside it. */}
+          <div style={{ marginBottom: '2rem' }}>
+            {!hasRun ? (
+              <button onClick={handleRun} disabled={running} style={{ width: '100%', minHeight: 50, fontSize: '1rem' }}>
+                {running ? 'Starting…' : 'Start Payroll'}
+              </button>
+            ) : pendingCount > 0 ? (
+              <button onClick={() => startReview()} style={{ width: '100%', minHeight: 50, fontSize: '1rem' }}>
+                Review payroll · {pendingCount}
+              </button>
+            ) : (
+              <div style={{ textAlign: 'center', color: 'var(--color-muted)', fontSize: '0.9rem', padding: '0.4rem 0' }}>
+                ✓ All employees paid
+              </div>
+            )}
+          </div>
+        </>
       ) : (
         <div className="pay-toolbar">
           <div className="pay-toolbar-left">
@@ -376,51 +448,81 @@ export default function PayrollMonthly() {
         </div>
       )}
 
-      {/* 4 KPI cards */}
-      <div className="pay-kpis">
-        <Kpi cls="k-total" label="Total Payroll" value={kpi.total} short={isMobile} />
-        <Kpi cls="k-ded" label="Deductions" value={kpi.deductions} short={isMobile} amountColor="var(--status-critical)" />
-        <Kpi cls="k-add" label="Additions" value={kpi.additions} short={isMobile} amountColor="var(--status-good)" />
-        <Kpi cls="net" label="Net Payroll" value={kpi.net} short={isMobile} />
-      </div>
-
-      {/* payment progress */}
-      <div className="card" style={{ padding: '0.9rem 1.1rem', marginBottom: '1.3rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: '0.4rem' }}>
-          <strong style={{ fontSize: '0.9rem' }}>Payment progress</strong>
-          {isMobile
-            ? <strong style={{ fontSize: '0.9rem', color: 'var(--color-text)' }}>{progressPct}%</strong>
-            : <span style={{ fontSize: '0.85rem', color: 'var(--color-muted)' }}>
-                {money(kpi.paidAmount)} paid · {money(remainingAmount)} remaining
-                <span style={{ marginLeft: '0.8rem' }}>{kpi.paidCount} of {headcount} employees paid</span>
-              </span>}
+      {/* 4 KPI cards - desktop only; mobile leads with the hero Net Payroll
+          figure above instead. The old "Payment progress" card is gone on
+          both - the paid/remaining split lives in the Options sheet (mobile)
+          and the Status column of the table itself carries the rest. */}
+      {!isMobile && (
+        <div className="pay-kpis">
+          <Kpi cls="k-total" label="Total Payroll" value={kpi.total} />
+          <Kpi cls="k-ded" label="Deductions" value={kpi.deductions} amountColor="var(--status-critical)" />
+          <Kpi cls="k-add" label="Additions" value={kpi.additions} amountColor="var(--status-good)" />
+          <Kpi cls="net" label="Net Payroll" value={kpi.net} />
         </div>
-        {isMobile && (
-          <div style={{ fontSize: '0.82rem', color: 'var(--color-muted)', margin: '0.15rem 0 0' }}>
-            {kpi.paidCount} of {headcount} employees paid
+      )}
+
+      {/* Mobile + payroll not started yet: the CTA button above already
+          covers it - an "Employees" heading with nothing under it but an
+          empty-state sentence is redundant, so skip the whole section. */}
+      {!(isMobile && !hasRun) && (
+        <>
+          <div style={{ fontSize: isMobile ? '1.05rem' : '0.92rem', fontWeight: 700, marginBottom: '0.7rem', display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+            {/* Mobile: just "Employees" - the month and headcount are already
+                established above, no need to repeat them. */}
+            {isMobile
+              ? <span>Employees</span>
+              : <span>{monthLabel(month)} Payroll <span style={{ color: 'var(--color-muted)', fontWeight: 400 }}>· {headcount} employee{headcount === 1 ? '' : 's'}</span></span>}
+            <RefreshingIndicator show={refreshing} />
+            {/* Desktop has room for the full search field inline; mobile keeps
+                it collapsed behind an icon so the heading row stays short. */}
+            {hasRun && records.length > 4 && !isMobile && (
+              <input
+                type="text"
+                placeholder="Search employees by name…"
+                value={empSearch}
+                onChange={(e) => setEmpSearch(e.target.value)}
+                style={{ marginLeft: 'auto', width: '280px', maxWidth: '100%' }}
+              />
+            )}
+            {hasRun && records.length > 4 && isMobile && (
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => setSearchOpen(o => { if (o) setEmpSearch(''); return !o })}
+                aria-label={searchOpen ? 'Close employee search' : 'Search employees'}
+                aria-pressed={searchOpen}
+                style={{
+                  marginLeft: 'auto', padding: '0.35rem 0.5rem', lineHeight: 0,
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  background: searchOpen ? 'var(--color-primary-soft)' : undefined,
+                  borderColor: searchOpen ? 'var(--color-primary)' : undefined,
+                  color: searchOpen ? 'var(--color-primary)' : undefined,
+                }}
+              >
+                <SearchIcon size={16} />
+              </button>
+            )}
           </div>
-        )}
-        <div style={{ height: 8, borderRadius: 999, background: 'var(--color-primary-soft)', overflow: 'hidden', margin: '0.55rem 0 0.35rem' }}>
-          <div style={{ width: `${progressPct}%`, height: '100%', background: 'var(--color-primary)' }} />
-        </div>
-        {isMobile
-          ? <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
-              <span>{money(kpi.paidAmount)} paid</span>
-              <span style={{ color: 'var(--color-muted)' }}>{money(remainingAmount)} remaining</span>
-            </div>
-          : <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>{progressPct}%</div>}
-      </div>
-
-      <div style={{ fontSize: '0.92rem', fontWeight: 700, marginBottom: '0.7rem', display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
-        <span>{monthLabel(month)} Payroll <span style={{ color: 'var(--color-muted)', fontWeight: 400 }}>· {headcount} employee{headcount === 1 ? '' : 's'}</span></span>
-        <RefreshingIndicator show={refreshing} />
-      </div>
+          {hasRun && searchOpen && isMobile && (
+            <input
+              autoFocus
+              type="text"
+              placeholder="Search employees by name…"
+              value={empSearch}
+              onChange={(e) => setEmpSearch(e.target.value)}
+              style={{ width: '100%', boxSizing: 'border-box', marginBottom: '0.9rem' }}
+            />
+          )}
+        </>
+      )}
 
       {!hasRun ? (
-        <div className="card" style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-muted)' }}>
-          Payroll has not been run for {monthLabel(month)}.<br />
-          Add entries first, then press <strong>Start Payroll</strong> to generate each employee's record.
-        </div>
+        isMobile ? null : (
+          <div className="card" style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-muted)' }}>
+            Payroll has not been run for {monthLabel(month)}.<br />
+            Add entries first, then press <strong>Start Payroll</strong> to generate each employee's record.
+          </div>
+        )
       ) : (
         <>
           {selected.length > 0 && (
@@ -443,7 +545,9 @@ export default function PayrollMonthly() {
 
           {isMobile ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
-              {records.map(r => (
+              {visibleRecords.length === 0 ? (
+                <p style={{ color: 'var(--color-muted)', padding: '0.6rem 0.2rem' }}>No employees match “{empSearch}”.</p>
+              ) : visibleRecords.map(r => (
                 <EmployeePayCard
                   key={r.id}
                   record={r}
@@ -454,7 +558,7 @@ export default function PayrollMonthly() {
                 />
               ))}
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0.2rem', fontWeight: 700 }}>
-                <span style={{ color: 'var(--color-muted)' }}>Total payable</span>
+                <span style={{ color: 'var(--color-muted)' }}>Total payable{empSearch.trim() ? ' (matches)' : ''}</span>
                 <span>{money(totalFinal)}</span>
               </div>
             </div>
@@ -472,7 +576,10 @@ export default function PayrollMonthly() {
                   </tr>
                 </thead>
                 <tbody>
-                  {records.map(r => {
+                  {visibleRecords.length === 0 && (
+                    <tr><td colSpan={6} style={{ padding: '1.2rem 0.7rem', color: 'var(--color-muted)' }}>No employees match “{empSearch}”.</td></tr>
+                  )}
+                  {visibleRecords.map(r => {
                     const emp = empById[r.employee_id]
                     const add = Number(r.total_additions || 0)
                     const ded = Number(r.total_deductions || 0)
@@ -487,7 +594,7 @@ export default function PayrollMonthly() {
                             ? <span style={{ fontWeight: 600 }}>{name}</span>
                             : <span style={{ color: 'var(--status-serious)', fontWeight: 600 }}>⚠ Unnamed employee</span>}
                           {(() => {
-                            const meta = [namesFor(deptIds(emp), deptName), namesFor(locationIds(emp), locName)].filter(Boolean).join(' — ')
+                            const meta = [namesFor(deptIds(emp), deptName), namesFor(locationIds(emp), locName)].filter(Boolean).join(' - ')
                             return meta && <span style={{ color: 'var(--color-muted)', fontSize: '0.78rem' }}>{' · '}{meta}</span>
                           })()}
                         </td>
@@ -503,7 +610,7 @@ export default function PayrollMonthly() {
                     )
                   })}
                   <tr>
-                    <td colSpan={4} style={{ padding: '0.6rem 0.7rem', textAlign: 'right', fontWeight: 600, color: 'var(--color-muted)' }}>Total payable</td>
+                    <td colSpan={4} style={{ padding: '0.6rem 0.7rem', textAlign: 'right', fontWeight: 600, color: 'var(--color-muted)' }}>Total payable{empSearch.trim() ? ' (matches)' : ''}</td>
                     <td style={{ padding: '0.6rem 0.7rem', textAlign: 'right', fontWeight: 800 }}>{money(totalFinal)}</td>
                     <td />
                   </tr>
@@ -512,6 +619,38 @@ export default function PayrollMonthly() {
             </div>
           )}
         </>
+      )}
+
+      {/* Mobile "•••": everything the 4 KPI cards + bordered progress card
+          used to show permanently, plus the same secondary actions the
+          desktop OptionsMenu offers, in one bottom sheet instead of
+          occupying screen space all the time (design brief §3). */}
+      {isMobile && menuOpen && (
+        <MobileOptionsSheet
+          onClose={() => setMenuOpen(false)}
+          kpi={kpi}
+          remainingAmount={remainingAmount}
+          items={OPTIONS}
+        />
+      )}
+
+      {/* Payroll settings / history - reachable from both the mobile sheet
+          and the desktop OptionsMenu above (same OPTIONS array either way). */}
+      {settingsOpen && (
+        <PayrollSettingsModal
+          form={form}
+          formId={formId}
+          reloadForm={reloadForm}
+          onClose={() => { setSettingsOpen(false); load({ quiet: true }) }}
+        />
+      )}
+      {historyOpen && (
+        <PayrollHistoryModal
+          formId={formId}
+          currentMonth={month}
+          onSelectMonth={(m) => { setMonth(m); setHistoryOpen(false); setMenuOpen(false) }}
+          onClose={() => setHistoryOpen(false)}
+        />
       )}
 
       {/* the navigable per-employee modal - opened by Start Payroll, the
@@ -560,7 +699,7 @@ export default function PayrollMonthly() {
         const closeExport = () => { setExportOpen(false); setExportSelectedOnly(false) }
         return (
           <PayrollModal
-            title={`Export — ${monthLabel(month)}`}
+            title={`Export - ${monthLabel(month)}`}
             onClose={closeExport}
             footer={<button className="secondary" onClick={closeExport}>Close</button>}
           >
@@ -589,10 +728,18 @@ function Kpi({ cls, label, value, short, amountColor }) {
 }
 
 // Secondary payroll actions. `items`: { label, onClick, disabled?, danger? } | { divider: true }
-function OptionsMenu({ open, setOpen, items, fullWidth, label = 'Options ▾' }) {
+function OptionsMenu({ open, setOpen, items, fullWidth, minHeight, label = 'Options ▾' }) {
   return (
-    <div style={{ position: 'relative', ...(fullWidth ? { width: '100%' } : {}) }}>
-      <button className="secondary" onClick={() => setOpen(o => !o)} style={fullWidth ? { width: '100%', minHeight: 44 } : undefined}>
+    <div style={{ position: 'relative', flexShrink: 0, ...(fullWidth ? { width: '100%' } : {}) }}>
+      <button
+        className="secondary"
+        onClick={() => setOpen(o => !o)}
+        aria-label={label === '⋯' ? 'More options' : undefined}
+        style={{
+          ...(fullWidth ? { width: '100%' } : {}),
+          ...(minHeight ? { minHeight, padding: '0 0.9rem' } : {}),
+        }}
+      >
         {label}
       </button>
       {open && (
@@ -620,38 +767,143 @@ function OptionsMenu({ open, setOpen, items, fullWidth, label = 'Options ▾' })
   )
 }
 
+// Mobile's "•••": the numbers the 4 KPI cards + bordered progress card show
+// on desktop (Total/Deductions/Additions/Paid/Remaining), plus the same
+// secondary actions as the desktop OptionsMenu (`items`) - one bottom sheet
+// instead of permanent screen space (design brief §3). Reuses PayrollModal,
+// which is already a sheet on a phone (see src/components/Modal.jsx).
+function MobileOptionsSheet({ onClose, kpi, remainingAmount, items }) {
+  const row = { display: 'flex', justifyContent: 'space-between', fontSize: '0.92rem', padding: '0.35rem 0' }
+  return (
+    <PayrollModal title="Payroll Details" onClose={onClose}>
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <div style={row}><span style={{ color: 'var(--color-muted)' }}>Total Payroll</span><span style={{ fontWeight: 700 }}>{money(kpi.total)}</span></div>
+        <div style={row}><span style={{ color: 'var(--color-muted)' }}>Deductions</span><span style={{ fontWeight: 700, color: 'var(--status-critical)' }}>{money(kpi.deductions)}</span></div>
+        <div style={row}><span style={{ color: 'var(--color-muted)' }}>Additions</span><span style={{ fontWeight: 700, color: 'var(--status-good)' }}>{money(kpi.additions)}</span></div>
+        <div style={{ height: 1, background: 'var(--color-border)', margin: '0.5rem 0' }} />
+        <div style={row}><span style={{ color: 'var(--color-muted)' }}>Paid</span><span style={{ fontWeight: 700 }}>{money(kpi.paidAmount)}</span></div>
+        <div style={row}><span style={{ color: 'var(--color-muted)' }}>Remaining</span><span style={{ fontWeight: 700 }}>{money(remainingAmount)}</span></div>
+      </div>
+
+      <div style={{ height: 1, background: 'var(--color-border)', margin: '0.9rem 0 0.4rem' }} />
+
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        {items.map((it, i) => it.divider
+          ? <div key={i} style={{ height: 1, background: 'var(--color-border)', margin: '0.4rem 0' }} />
+          : (
+            <button
+              key={i} className="secondary" disabled={it.disabled}
+              onClick={() => { onClose(); it.onClick() }}
+              style={{
+                border: 'none', background: 'transparent', textAlign: 'left', justifyContent: 'flex-start',
+                padding: '0.7rem 0.2rem', fontSize: '0.95rem', minHeight: 44,
+                color: it.danger ? 'var(--status-critical)' : 'var(--color-text)',
+              }}
+            >
+              {it.label}
+            </button>
+          ))}
+      </div>
+    </PayrollModal>
+  )
+}
+
+// Every past month that's ever had payroll run, newest first - reached from
+// Options ("Payroll history") on both mobile and desktop. There's no
+// separate history view/report here: tapping a month just re-points this
+// same page at it (setMonth), reusing everything else on the page (KPIs,
+// progress, the table/cards, Options) rather than building a second,
+// read-only version of the same information.
+function PayrollHistoryModal({ formId, currentMonth, onSelectMonth, onClose }) {
+  const [rows, setRows] = useState(null) // null = loading
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    listPayrollHistory(formId)
+      .then(data => { if (!cancelled) setRows(data) })
+      .catch(err => { if (!cancelled) setError(friendlyError(err, 'Could not load payroll history.')) })
+    return () => { cancelled = true }
+  }, [formId])
+
+  return (
+    <PayrollModal title="Payroll History" onClose={onClose}>
+      {error ? (
+        <InlineError message={error} style={{ fontSize: '0.88rem' }} />
+      ) : rows === null ? (
+        <InlineLoader />
+      ) : rows.length === 0 ? (
+        <EmptyState title="No payroll history" message="No payroll has been run yet." style={{ padding: '1.5rem 1rem' }} />
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+          {rows.map(r => {
+            const fullyPaid = r.headcount > 0 && r.paidCount === r.headcount
+            const isCurrent = r.month === currentMonth
+            return (
+              <button
+                key={r.month}
+                type="button"
+                className="secondary"
+                onClick={() => onSelectMonth(r.month)}
+                style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem',
+                  textAlign: 'left', padding: '0.65rem 0.8rem', minHeight: 48,
+                  border: `1px solid ${isCurrent ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                  background: isCurrent ? 'var(--color-primary-soft)' : 'transparent',
+                }}
+              >
+                <span>
+                  <div style={{ fontWeight: 600 }}>{monthLabel(r.month)}</div>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--color-muted)' }}>
+                    {r.headcount} employee{r.headcount === 1 ? '' : 's'}
+                  </div>
+                </span>
+                <span style={{ textAlign: 'right' }}>
+                  <div style={{ fontWeight: 700 }}>{money(r.total)}</div>
+                  <div style={{ fontSize: '0.78rem', color: fullyPaid ? 'var(--status-good)' : 'var(--color-muted)' }}>
+                    {fullyPaid ? 'Fully paid' : `${r.paidCount} of ${r.headcount} paid`}
+                  </div>
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </PayrollModal>
+  )
+}
+
 // Mobile row -> compact payment card (doc: don't squeeze the 6-col table
-// onto a phone).
+// onto a phone). Uses the shared DataCard primitive; tap the card to open the
+// per-employee payroll modal.
 function EmployeePayCard({ record: r, name, selected, onToggle, onOpen }) {
   const add = Number(r.total_additions || 0)
   const ded = Number(r.total_deductions || 0)
   return (
-    <div className="card" style={{ padding: '0.9rem 1rem', background: selected ? 'var(--color-primary-soft)' : undefined, borderColor: selected ? 'var(--color-primary)' : undefined }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem' }}>
-        <input type="checkbox" checked={selected} onChange={onToggle} onClick={(e) => e.stopPropagation()} />
-        <span style={{ fontWeight: 700, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: name ? undefined : 'var(--status-serious)' }}>
-          {name || '⚠ Unnamed employee'}
-        </span>
-        <RecordStatusBadge status={r.status} />
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem', fontWeight: 800, marginBottom: '0.3rem' }}>
-        <span>Net Pay</span><span>{money(r.final_amount)}</span>
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.83rem', color: 'var(--color-muted)' }}>
-        <span>Base</span><span>{money(r.base_salary)}</span>
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.83rem', color: 'var(--color-muted)' }}>
-        <span>Adjustments</span>
-        <span style={{ display: 'flex', gap: '0.6rem' }}>
-          {add === 0 && ded === 0 && money(0)}
-          {add > 0 && <span style={{ color: 'var(--status-good)' }}>+{money(add)}</span>}
-          {ded > 0 && <span style={{ color: 'var(--status-critical)' }}>−{money(ded)}</span>}
-        </span>
-      </div>
-      <button className="secondary" onClick={onOpen} style={{ width: '100%', marginTop: '0.7rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span>View payroll</span><span>›</span>
-      </button>
-    </div>
+    <DataCard
+      title={name
+        ? name
+        : <span style={{ color: 'var(--status-serious)' }}>⚠ Unnamed employee</span>}
+      status={<RecordStatusBadge status={r.status} />}
+      selected={selected}
+      onToggle={onToggle}
+      onOpen={onOpen}
+    >
+      <DataCard.Row label="Net Pay" value={money(r.final_amount)} strong />
+      <DataCard.Row label="Base" value={money(r.base_salary)} muted />
+      <DataCard.Row
+        label="Adjustments"
+        muted
+        value={
+          add === 0 && ded === 0 ? money(0) : (
+            <span style={{ display: 'inline-flex', gap: '0.6rem', justifyContent: 'flex-end' }}>
+              {add > 0 && <span style={{ color: 'var(--status-good)' }}>+{money(add)}</span>}
+              {ded > 0 && <span style={{ color: 'var(--status-critical)' }}>−{money(ded)}</span>}
+            </span>
+          )
+        }
+      />
+    </DataCard>
   )
 }
 

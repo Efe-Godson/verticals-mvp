@@ -28,7 +28,7 @@ export default class ErrorBoundary extends Component {
         <div className="card" style={{ padding: '1.5rem' }}>
           <h2 style={{ marginTop: 0 }}>Something went wrong on this page</h2>
           <p style={{ color: 'var(--color-muted)' }}>
-            The rest of the app is fine — try reloading, or go back home.
+            The rest of the app is fine - try reloading, or go back home.
           </p>
           <pre style={{
             whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: '0.8rem',

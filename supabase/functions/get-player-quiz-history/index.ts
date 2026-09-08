@@ -11,6 +11,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { jsonResponse, corsHeaders } from '../_shared/quiz.ts'
+import { clientIp, enforceRateLimit } from '../_shared/rateLimit.ts'
 
 Deno.serve(async req => {
   try {
@@ -24,6 +25,13 @@ Deno.serve(async req => {
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
+
+    const limited = await enforceRateLimit(
+      supabase, `get-player-quiz-history:${identity_token}`,
+      { max: 60, windowSeconds: 60 },
+      { function: 'get-player-quiz-history', ip: clientIp(req), identity_token },
+    )
+    if (limited) return limited
 
     const { data: rows, error } = await supabase
       .from('quiz_players')

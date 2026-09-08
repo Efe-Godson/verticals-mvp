@@ -9,6 +9,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { jsonResponse, corsHeaders } from '../_shared/stats.ts'
+import { clientIp, enforceRateLimit } from '../_shared/rateLimit.ts'
 
 Deno.serve(async req => {
   try {
@@ -24,6 +25,17 @@ Deno.serve(async req => {
     const body = await req.json()
     const { action, edit_token } = body
     if (!edit_token) return jsonResponse({ error: 'edit_token is required' }, 400)
+
+    // Public + unauthenticated - edit_token is itself the access control (see
+    // file header), so this keys on IP: the real risk here is one source
+    // trying many tokens, not a legitimate respondent editing their own once.
+    const ip = clientIp(req)
+    const limited = await enforceRateLimit(
+      supabase, `manage-submission:${ip ?? 'unknown'}`,
+      { max: 60, windowSeconds: 60 },
+      { function: 'manage-submission', ip, action },
+    )
+    if (limited) return limited
 
     if (action === 'get') {
       const { data: submission, error } = await supabase

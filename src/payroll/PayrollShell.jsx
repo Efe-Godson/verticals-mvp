@@ -10,6 +10,8 @@ import { ErrorState } from '../ErrorState'
 import { Skeleton, SkeletonKpis, SkeletonTableRows } from '../components/Skeleton'
 import PayrollSidePanel from './PayrollSidePanel'
 
+const SR_ONLY = { position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap', border: 0 }
+
 export function usePayroll() {
   return useOutletContext()
 }
@@ -48,10 +50,10 @@ export default function PayrollShell() {
     <div className="payroll-shell">
       <PayrollSidePanel formId={id} />
       <div className="page" style={{ maxWidth: '1000px' }}>
-        {/* The section heading is known from the URL immediately, so show it
-            even while the anchor form loads - only the body below is a
-            skeleton (brief §2/§4). */}
-        <h1 style={{ fontSize: '1.5rem', margin: '0 0 1.3rem' }}>{sectionLabel(pathname)}</h1>
+        {/* The section name is shown by the side panel (its compact top bar
+            on desktop, the mobile bar / pill below that), so here it's just
+            an off-screen heading for document structure. */}
+        <h1 style={SR_ONLY}>{sectionLabel(pathname)}</h1>
         {loading ? (
           <div aria-busy="true">
             <SkeletonKpis count={4} />

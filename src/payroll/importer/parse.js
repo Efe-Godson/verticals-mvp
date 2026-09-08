@@ -93,7 +93,7 @@ export function parseEmployees(rows, { departments = [], locations = [] } = {}) 
 
     const monthly_salary = coerceAmount(salaryRaw)
     if (monthly_salary == null || monthly_salary <= 0) problems.push('Monthly Salary must be a number greater than 0')
-    else if (/[^0-9.\s]/.test(str(salaryRaw))) notes.push('Salary had extra characters — read as ' + monthly_salary)
+    else if (/[^0-9.\s]/.test(str(salaryRaw))) notes.push('Salary had extra characters - read as ' + monthly_salary)
 
     let needsDept = false
     let department = null
@@ -112,7 +112,7 @@ export function parseEmployees(rows, { departments = [], locations = [] } = {}) 
     }
 
     const employment_status = EMP_STATUSES.includes(statusRaw) ? statusRaw : 'active'
-    if (statusRaw && !EMP_STATUSES.includes(statusRaw)) notes.push(`Status "${statusRaw}" not recognised — set to Active`)
+    if (statusRaw && !EMP_STATUSES.includes(statusRaw)) notes.push(`Status "${statusRaw}" not recognised - set to Active`)
     const salary_type = SALARY_TYPES.includes(salaryTypeRaw) ? salaryTypeRaw : 'monthly'
 
     return {
@@ -187,7 +187,7 @@ export function parseEntries(rows, { employees = [] } = {}) {
       }
     } else if (nameRaw) {
       const hit = byName.get(nameRaw.toLowerCase())
-      if (hit === null) problems.push(`More than one employee named "${nameRaw}" — add a Staff ID`)
+      if (hit === null) problems.push(`More than one employee named "${nameRaw}" - add a Staff ID`)
       else if (!hit) problems.push(`Employee "${nameRaw}" not found`)
       else employee = hit
     } else {

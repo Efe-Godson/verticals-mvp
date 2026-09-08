@@ -20,12 +20,14 @@ function FormSettings() {
 
   const [allowMultipleResponses, setAllowMultipleResponses] = useState(true)
   const [collectEmail, setCollectEmail] = useState(false)
+  const [formStyle, setFormStyle] = useState('standard') // 'standard' | 'stepped'
   const [companyName, setCompanyName] = useState('')
   const [companyPhone, setCompanyPhone] = useState('')
   const [companyAddress, setCompanyAddress] = useState('')
   const [companyEmail, setCompanyEmail] = useState('')
   const [receiptPaperWidth, setReceiptPaperWidth] = useState(80)
   const [staffReportRange, setStaffReportRange] = useState('today')
+  const [expenseMode, setExpenseMode] = useState('business') // Expenses books only
   const [reportDateField, setReportDateField] = useState('')
   const [reportShareEmails, setReportShareEmails] = useState('') // textarea, one per line
   const [aiFillRules, setAiFillRules] = useState('')
@@ -59,12 +61,14 @@ function FormSettings() {
         setForm(data)
         setAllowMultipleResponses(data.settings?.allowMultipleResponses ?? true)
         setCollectEmail(data.settings?.collectEmail ?? false)
+        setFormStyle(data.settings?.formStyle ?? 'standard')
         setCompanyName(data.settings?.companyName ?? '')
         setCompanyPhone(data.settings?.companyPhone ?? '')
         setCompanyAddress(data.settings?.companyAddress ?? '')
         setCompanyEmail(data.settings?.companyEmail ?? '')
         setReceiptPaperWidth(data.settings?.receiptPaperWidth ?? 80)
         setStaffReportRange(data.settings?.staffReportRange ?? 'today')
+        setExpenseMode(data.settings?.expenseMode ?? 'business')
         setReportDateField(data.settings?.reportDateField ?? '')
         setReportShareEmails((data.settings?.reportSharedEmails ?? []).join('\n'))
         setAiFillRules(data.settings?.aiFillRules ?? '')
@@ -101,8 +105,8 @@ function FormSettings() {
 
     const newSettings = {
       ...form.settings,
-      allowMultipleResponses, collectEmail, companyName, companyPhone, companyAddress, companyEmail, receiptPaperWidth,
-      staffReportRange, reportDateField, reportSharedEmails, aiFillRules, logoUrl, logoIconKey,
+      allowMultipleResponses, collectEmail, formStyle, companyName, companyPhone, companyAddress, companyEmail, receiptPaperWidth,
+      staffReportRange, expenseMode, reportDateField, reportSharedEmails, aiFillRules, logoUrl, logoIconKey,
       showVerticalsBranding, defaultInvoiceView, paymentBankName, paymentAccountNumber, paymentAccountName, invoiceNotes,
       invoiceAuthorizedBy, invoiceAuthorizedDesignation, signatureUrl,
     }
@@ -258,6 +262,38 @@ function FormSettings() {
       {/* Reserves room for PosSidePanel's fixed top-left hamburger - see the
           same fix in PublicForm.jsx/Records.jsx. */}      <h1>{form.name}: Settings</h1>
 
+      {form.settings?.templateSlug === 'expenses' && (
+        <div className="card" style={{ padding: '1.5rem', marginTop: '1.5rem' }}>
+          <h3 style={{ marginTop: 0 }}>Expenses</h3>
+          <label style={{ fontSize: '0.85rem', color: 'var(--color-muted)', display: 'block', marginBottom: '0.5rem' }}>
+            What are you tracking?
+          </label>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            {[
+              { value: 'business', label: 'Business', hint: 'Includes Vendor, Location and "Paid from".' },
+              { value: 'personal', label: 'Personal', hint: 'Just Amount, Category, Description, Payment method, Date.' },
+              { value: 'both', label: 'Both', hint: 'All fields available.' },
+            ].map(o => (
+              <button
+                key={o.value}
+                type="button"
+                onClick={() => setExpenseMode(o.value)}
+                className={expenseMode === o.value ? '' : 'secondary'}
+                title={o.hint}
+                style={{ padding: '0.45rem 0.9rem' }}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+          <p style={{ fontSize: '0.8rem', color: 'var(--color-muted)', margin: '0.7rem 0 0' }}>
+            {expenseMode === 'personal'
+              ? 'Vendor, Location and "Paid from" are hidden from Quick Add and the full form.'
+              : 'All expense fields are available under "Add details".'}
+          </p>
+        </div>
+      )}
+
       {/* "Submit another response" and email collection are about a public
           respondent filling this form out themselves - meaningless for a
           POS/restaurant-style form, where orders are entered by staff via
@@ -293,6 +329,33 @@ function FormSettings() {
               </div>
             </span>
           </label>
+
+          <div style={{ marginTop: '1.4rem' }}>
+            <label style={{ fontSize: '0.85rem', color: 'var(--color-muted)', display: 'block', marginBottom: '0.5rem' }}>
+              Display style
+            </label>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              {[
+                { value: 'standard', label: 'Standard', hint: 'Classic form layout.' },
+                { value: 'stepped', label: 'Stepped', hint: 'One screen per section, big card options.' },
+              ].map(o => (
+                <button
+                  key={o.value}
+                  type="button"
+                  onClick={() => setFormStyle(o.value)}
+                  className={formStyle === o.value ? '' : 'secondary'}
+                  style={{ flex: '1 1 180px', textAlign: 'left', padding: '0.7rem 0.9rem' }}
+                >
+                  <div style={{ fontWeight: 600 }}>{o.label}</div>
+                  <div style={{ fontSize: '0.78rem', opacity: 0.8, fontWeight: 400 }}>{o.hint}</div>
+                </button>
+              ))}
+            </div>
+            <p style={{ fontSize: '0.78rem', color: 'var(--color-muted)', margin: '0.5rem 0 0' }}>
+              Stepped works best when the form is split into sections. Choice questions (dropdown, multiple
+              choice, checkboxes) become large tappable cards.
+            </p>
+          </div>
         </div>
       )}
 

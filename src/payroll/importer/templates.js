@@ -22,7 +22,7 @@ export function downloadEmployeeTemplate(departments = [], locations = []) {
   dataSheet['!cols'] = headers.map(() => ({ wch: 20 }))
 
   const instructions = instructionSheet([
-    'VERTICALS — EMPLOYEE IMPORT',
+    'VERTICALS - EMPLOYEE IMPORT',
     '',
     'Required columns (every row):',
     '  • Employee Name',
@@ -31,7 +31,7 @@ export function downloadEmployeeTemplate(departments = [], locations = []) {
     '  • Location',
     '  • Monthly Salary',
     '',
-    'Monthly Salary: numbers only. Enter 90000 — not ₦90,000.',
+    'Monthly Salary: numbers only. Enter 90000 - not ₦90,000.',
     'Verticals adds the currency formatting after import.',
     '',
     'Status (one of):  Active | On Leave | Suspended | Inactive | Terminated',
@@ -39,10 +39,10 @@ export function downloadEmployeeTemplate(departments = [], locations = []) {
     'Start Date format:  YYYY-MM-DD  (e.g. 2026-07-01)',
     '',
     'Departments that already exist:',
-    ...(departments.length ? departments.map(d => '  • ' + d.name) : ['  (none yet — new names will be offered for creation on import)']),
+    ...(departments.length ? departments.map(d => '  • ' + d.name) : ['  (none yet - new names will be offered for creation on import)']),
     '',
     'Locations that already exist:',
-    ...(locations.length ? locations.map(l => '  • ' + l.name) : ['  (none yet — new names will be offered for creation on import)']),
+    ...(locations.length ? locations.map(l => '  • ' + l.name) : ['  (none yet - new names will be offered for creation on import)']),
     '',
     'Do not rename the column headers on the Employees sheet.',
   ])
@@ -69,7 +69,7 @@ export function downloadEntryTemplate(employees = []) {
 
   const amountTypes = [...DEDUCTION_TYPES, ...ADDITION_TYPES].filter(t => t !== 'missed_day' && t !== 'extra_day')
   const instructions = instructionSheet([
-    'VERTICALS — PAYROLL ENTRY IMPORT',
+    'VERTICALS - PAYROLL ENTRY IMPORT',
     '',
     'Match employees by Staff ID first, then by Employee Name.',
     'If a row has both and they disagree, that row is flagged in the preview.',

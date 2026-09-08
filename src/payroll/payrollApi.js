@@ -387,6 +387,29 @@ export async function loadRecordsForMonth(payrollFormId, month) {
   return data || []
 }
 
+// One row per month that's ever had payroll run, aggregated from
+// payroll_records (no separate history table - every record already carries
+// its own month/amount/status). Newest first. Used by the Payments page's
+// "Payroll history" - tapping a month there just re-points the page at it,
+// so this only needs to be enough to pick a month from, not a full report.
+export async function listPayrollHistory(payrollFormId) {
+  const { data, error } = await supabase.from('payroll_records')
+    .select('payroll_month, final_amount, status')
+    .eq('payroll_form_id', payrollFormId)
+  if (error) throw error
+
+  const byMonth = {}
+  ;(data || []).forEach(r => {
+    const m = byMonth[r.payroll_month] || (byMonth[r.payroll_month] = {
+      month: r.payroll_month, headcount: 0, total: 0, paid: 0, paidCount: 0,
+    })
+    m.headcount += 1
+    m.total += Number(r.final_amount || 0)
+    if (r.status === 'paid') { m.paid += Number(r.final_amount || 0); m.paidCount += 1 }
+  })
+  return Object.values(byMonth).sort((a, b) => b.month.localeCompare(a.month))
+}
+
 // Compute every active employee's breakdown for `month` and upsert into
 // payroll_records. Rows already paid / cancelled are left untouched (doc
 // section 36 - paid payroll is locked).

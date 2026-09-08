@@ -34,7 +34,7 @@ export function SummaryTableViz({ result }) {
               <td style={{ ...td, textAlign: 'right', color: (r.diffFromMean || 0) >= 0 ? 'var(--status-good)' : 'var(--status-critical)' }}>
                 {(r.diffFromMean || 0) >= 0 ? '+' : ''}{formatPercent(r.pctDiffFromMean || 0)}
               </td>
-              <td style={{ ...td, textAlign: 'right' }}>{r.rank ?? '—'}</td>
+              <td style={{ ...td, textAlign: 'right' }}>{r.rank ?? '-'}</td>
             </tr>
           ))}
         </tbody>

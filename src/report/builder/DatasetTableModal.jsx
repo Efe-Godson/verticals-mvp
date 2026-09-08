@@ -26,7 +26,7 @@ const th = {
 const td = { padding: '0.4rem 0.7rem', borderBottom: '1px solid var(--color-border)', fontSize: '0.8rem', whiteSpace: 'nowrap', maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis' }
 
 const cellText = (v, f) => {
-  if (v === null || v === undefined || v === '') return '—'
+  if (v === null || v === undefined || v === '') return '-'
   if (f.type === 'date') { const d = new Date(v); return isNaN(d) ? String(v) : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) }
   return formatCell(v, f)
 }

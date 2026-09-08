@@ -25,7 +25,7 @@ function QuizFinalResultsView({ room, players, ownPlayerId }) {
               <div>Accuracy<br /><strong>{accuracy}%</strong></div>
               <div>Points<br /><strong>{ownPlayer.total_points}</strong></div>
               <div>Final Rank<br /><strong>#{ownPlayer.rank}</strong></div>
-              <div>Fastest Answer<br /><strong>{ownPlayer.fastest_answer_ms != null ? `${(ownPlayer.fastest_answer_ms / 1000).toFixed(1)}s` : '—'}</strong></div>
+              <div>Fastest Answer<br /><strong>{ownPlayer.fastest_answer_ms != null ? `${(ownPlayer.fastest_answer_ms / 1000).toFixed(1)}s` : '-'}</strong></div>
             </div>
           </div>
         </>

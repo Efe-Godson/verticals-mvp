@@ -15,6 +15,9 @@ import { useRecycleBinTrigger } from './RecycleBinContext'
 import { categoryColor, CategoryIcon } from './templateVisuals'
 import { usePageTitle } from './PageTitleContext'
 import { SkeletonCard } from './components/Skeleton'
+import { RefreshingIndicator } from './components/InlineLoader'
+import { getPageCache, setPageCache } from './hooks/pageCache'
+import { ErrorState } from './ErrorState'
 
 // Retail/Restaurant are the only categories where "how many locations" is
 // itself the meaningful fact about the business - every other template is
@@ -133,6 +136,8 @@ function BusinessesHome() {
 
   const [usedTemplates, setUsedTemplates] = useState([]) // [{ template, locationCount, singleFormId, secondaryLabel }]
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [error, setError] = useState('')
 
   const [pendingDeleteSlug, setPendingDeleteSlug] = useState(null)
   const [pendingBinConfirm, setPendingBinConfirm] = useState(null) // { type: 'permanentDelete', formId } | { type: 'emptyBin' }
@@ -141,55 +146,71 @@ function BusinessesHome() {
   const [trashedForms, setTrashedForms] = useState([])
   const [loadingBin, setLoadingBin] = useState(false)
 
-  async function loadTemplates() {
-    setLoading(true)
-    const { data: forms } = await supabase
-      .from('forms').select('id, settings')
-      .eq('user_id', session.user.id)
-      .is('deleted_at', null)
-      .not('settings->>templateSlug', 'is', null)
-      .is('settings->>primaryFormId', null)
+  const cacheKey = session ? `businesses-home:${session.user.id}` : null
 
-    const bySlug = {} // slug -> { count, firstFormId, formIds }
-    ;(forms || []).forEach(f => {
-      const slug = f.settings?.templateSlug
-      if (!slug) return
-      if (!bySlug[slug]) bySlug[slug] = { count: 0, firstFormId: f.id, formIds: [] }
-      bySlug[slug].count += 1
-      bySlug[slug].formIds.push(f.id)
-    })
+  async function loadTemplates({ quiet = false } = {}) {
+    if (!quiet) setLoading(true)
+    setRefreshing(true)
+    setError('')
+    try {
+      const { data: forms, error: formsError } = await supabase
+        .from('forms').select('id, settings')
+        .eq('user_id', session.user.id)
+        .is('deleted_at', null)
+        .not('settings->>templateSlug', 'is', null)
+        .is('settings->>primaryFormId', null)
+      if (formsError) throw formsError
 
-    const slugs = Object.keys(bySlug)
-    if (slugs.length === 0) {
-      setUsedTemplates([])
-      setLoading(false)
-      return
-    }
+      const bySlug = {} // slug -> { count, firstFormId, formIds }
+      ;(forms || []).forEach(f => {
+        const slug = f.settings?.templateSlug
+        if (!slug) return
+        if (!bySlug[slug]) bySlug[slug] = { count: 0, firstFormId: f.id, formIds: [] }
+        bySlug[slug].count += 1
+        bySlug[slug].formIds.push(f.id)
+      })
 
-    const { data: templates } = await supabase.from('templates').select('*').in('slug', slugs)
-
-    // Each tile's secondary line is whichever count is actually meaningful
-    // for that kind of template - staff for the payroll bundle, locations
-    // for Retail/Restaurant, otherwise how many responses it's collected.
-    const list = await Promise.all((templates || []).map(async template => {
-      const entry = bySlug[template.slug]
-      const isBundle = template.bundle?.length > 0
-      let secondaryLabel
-      if (isBundle) {
-        const { count } = await supabase.from('submissions').select('id', { count: 'exact', head: true })
-          .eq('form_id', entry.firstFormId).is('deleted_at', null)
-        secondaryLabel = `${count || 0} staff`
-      } else if (usesLocationCount(template.category)) {
-        secondaryLabel = `${entry.count} location${entry.count !== 1 ? 's' : ''}`
-      } else {
-        const { count } = await supabase.from('submissions').select('id', { count: 'exact', head: true })
-          .in('form_id', entry.formIds).is('deleted_at', null)
-        secondaryLabel = `${count || 0} response${count === 1 ? '' : 's'}`
+      const slugs = Object.keys(bySlug)
+      if (slugs.length === 0) {
+        setUsedTemplates([])
+        setPageCache(cacheKey, [])
+        return
       }
-      return { template, locationCount: entry.count, singleFormId: entry.firstFormId, formIds: entry.formIds, secondaryLabel }
-    }))
-    setUsedTemplates(list)
-    setLoading(false)
+
+      const { data: templates, error: templatesError } = await supabase.from('templates').select('*').in('slug', slugs)
+      if (templatesError) throw templatesError
+
+      // Each tile's secondary line is whichever count is actually meaningful
+      // for that kind of template - staff for the payroll bundle, locations
+      // for Retail/Restaurant, otherwise how many responses it's collected.
+      const list = await Promise.all((templates || []).map(async template => {
+        const entry = bySlug[template.slug]
+        const isBundle = template.bundle?.length > 0
+        let secondaryLabel
+        if (isBundle) {
+          const { count } = await supabase.from('submissions').select('id', { count: 'exact', head: true })
+            .eq('form_id', entry.firstFormId).is('deleted_at', null)
+          secondaryLabel = `${count || 0} staff`
+        } else if (usesLocationCount(template.category)) {
+          secondaryLabel = `${entry.count} location${entry.count !== 1 ? 's' : ''}`
+        } else {
+          const { count } = await supabase.from('submissions').select('id', { count: 'exact', head: true })
+            .in('form_id', entry.formIds).is('deleted_at', null)
+          secondaryLabel = `${count || 0} response${count === 1 ? '' : 's'}`
+        }
+        return { template, locationCount: entry.count, singleFormId: entry.firstFormId, formIds: entry.formIds, secondaryLabel }
+      }))
+      setUsedTemplates(list)
+      setPageCache(cacheKey, list)
+    } catch (err) {
+      // A cached view (if any) stays on screen - see the effect below,
+      // which only shows this ErrorState when there was nothing to fall
+      // back to.
+      setError(err.message || 'Could not load your businesses.')
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+    }
   }
 
   async function loadBinCount() {
@@ -201,9 +222,17 @@ function BusinessesHome() {
   }
 
   useEffect(() => {
-    loadTemplates()
+    if (!session) return
+    const cached = getPageCache(cacheKey)
+    if (cached) {
+      setUsedTemplates(cached)
+      setLoading(false)
+      loadTemplates({ quiet: true })
+    } else {
+      loadTemplates()
+    }
     loadBinCount()
-  }, [session])
+  }, [session]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Publishes the bin's open handler + count to NavBar, same pattern as
   // Home.jsx/TemplateLocations.jsx - whichever of these is mounted owns it.
@@ -310,9 +339,12 @@ function BusinessesHome() {
       `}</style>
 
       {!loading && usedTemplates.length > 0 && (
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '1rem' }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-muted)' }}>
-            Your Workflows
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '1rem', gap: '0.7rem', flexWrap: 'wrap' }}>
+          <span style={{ display: 'flex', alignItems: 'baseline', gap: '0.6rem' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-muted)' }}>
+              Your Workflows
+            </span>
+            <RefreshingIndicator show={refreshing} />
           </span>
           <span style={{ fontSize: '0.78rem', color: 'var(--color-muted)' }}>
             {workflowCount} workflow{workflowCount !== 1 ? 's' : ''} · {locationTotal} location{locationTotal !== 1 ? 's' : ''}
@@ -324,6 +356,8 @@ function BusinessesHome() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.8rem' }} aria-busy="true">
           {[0, 1, 2, 3].map(i => <SkeletonCard key={i} lines={2} style={{ minHeight: '160px' }} />)}
         </div>
+      ) : error && usedTemplates.length === 0 ? (
+        <ErrorState message={error} onRetry={() => loadTemplates()} />
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.8rem' }}>
           {usedTemplates.map(({ template, secondaryLabel, singleFormId }) => (

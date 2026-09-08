@@ -15,6 +15,8 @@ import ConfirmDialog from './ConfirmDialog'
 import SparkleIcon from './SparkleIcon'
 import { extractProductsFromText, describeAIError } from './lib/aiClient'
 import { ExtractingOverlay } from './LoadingState'
+import useIsMobile from './hooks/useIsMobile'
+import { DataCard, DataCardList } from './components/DataCards'
 
 function newProductId() {
   return 'p' + Date.now() + Math.random().toString(36).slice(2, 7)
@@ -284,6 +286,7 @@ function AiImportModal({ onClose, onImport }) {
 }
 
 function ProductManager({ products, onChange, onClose, inline = false, hideAiImport = false }) {
+  const isMobile = useIsMobile()
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState('All')
   const [editingProduct, setEditingProduct] = useState(null) // null closed, 'new', or a product object
@@ -500,6 +503,36 @@ function ProductManager({ products, onChange, onClose, inline = false, hideAiImp
 
         {filtered.length === 0 ? (
           <p style={{ color: 'var(--color-muted)' }}>No products yet. Click "+ Add Product" to start building the menu.</p>
+        ) : isMobile ? (
+          <DataCardList>
+            {filtered.map(p => (
+              <DataCard
+                key={p.id}
+                title={<>
+                  {p.name}
+                  {p.isPackage && (
+                    <span style={{
+                      marginLeft: '0.5rem', fontSize: '0.62rem', fontWeight: 700, color: 'var(--color-primary)',
+                      border: '1px solid var(--color-primary)', borderRadius: '999px', padding: '0.05rem 0.4rem',
+                    }}>
+                      PACKAGE
+                    </span>
+                  )}
+                </>}
+                subtitle={p.category || undefined}
+                footer={
+                  <>
+                    <button type="button" className="secondary" style={{ fontSize: '0.8rem', padding: '0.3rem 0.7rem' }} onClick={() => setEditingProduct(p)}>Edit</button>
+                    <button type="button" className="secondary" style={{ fontSize: '0.8rem', padding: '0.3rem 0.7rem' }} onClick={() => duplicateProduct(p)}>Duplicate</button>
+                    <button type="button" className="secondary" style={{ fontSize: '0.8rem', padding: '0.3rem 0.7rem', color: '#c0392b' }} onClick={() => setPendingDeleteId(p.id)}>Delete</button>
+                  </>
+                }
+              >
+                <DataCard.Row label="Price" value={`₦${Number(p.price).toLocaleString()}`} strong />
+                {p.unit && <DataCard.Row label="Unit" value={p.unit} muted />}
+              </DataCard>
+            ))}
+          </DataCardList>
         ) : (
           // A 5-column table doesn't shrink to fit a phone screen the way
           // flex/grid layouts do - table-scroll (same class Records.jsx

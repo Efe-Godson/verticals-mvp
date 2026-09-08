@@ -57,7 +57,7 @@ describe('aggregateValues', () => {
   })
 })
 
-describe('runQuery — series', () => {
+describe('runQuery - series', () => {
   it('sum of cart revenue by staff, with population stats + rank + %', () => {
     const r = runQuery(
       { metric: 'order', cartMode: 'revenue', aggregation: 'sum', dimension: 'staff', sort: 'metric-desc' },
@@ -107,7 +107,7 @@ describe('runQuery — series', () => {
   })
 })
 
-describe('runQuery — matrix', () => {
+describe('runQuery - matrix', () => {
   it('staff x category revenue with row/col/grand totals', () => {
     const r = runQuery(
       { kind: 'pivot', rows: ['staff'], cols: ['cat'], metric: 'order', cartMode: 'revenue', aggregation: 'sum' },
@@ -141,7 +141,7 @@ describe('runQuery — matrix', () => {
   })
 })
 
-describe('runQuery — scalar & scatter', () => {
+describe('runQuery - scalar & scatter', () => {
   it('scalar KPI with previous-period comparison', () => {
     const r = runQuery(
       { metric: 'order', cartMode: 'revenue', aggregation: 'sum' },

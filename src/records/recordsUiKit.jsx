@@ -1,6 +1,12 @@
+// Shown in any cell the respondent left empty, so blanks are easy to spot
+// (and to filter on via the column menu's "(Blanks)" option).
+export const BlankMark = () => (
+  <span style={{ color: 'var(--color-muted)', fontStyle: 'italic', opacity: 0.7 }}>(blank)</span>
+)
+
 export function formatCell(value, field) {
   if (value === undefined || value === null || value === '') {
-    return <span style={{ color: '#ccc' }}>-</span>
+    return <BlankMark />
   }
   if (field.type === 'date') {
     const d = new Date(value)
@@ -14,15 +20,15 @@ export function formatCell(value, field) {
     return isNaN(num) ? value : num.toLocaleString()
   }
   if (field.type === 'linked_record') {
-    return value.label ? value.label.toString() : <span style={{ color: '#ccc' }}>-</span>
+    return value.label ? value.label.toString() : <BlankMark />
   }
   if (field.type === 'location') {
     const parts = [value.city, value.state, value.country].filter(Boolean)
-    return parts.length > 0 ? parts.join(', ') : <span style={{ color: '#ccc' }}>-</span>
+    return parts.length > 0 ? parts.join(', ') : <BlankMark />
   }
   if (field.type === 'cart') {
     if (!value || !value.items || value.items.length === 0) {
-      return <span style={{ color: '#ccc' }}>-</span>
+      return <BlankMark />
     }
     return `${value.items.length} item${value.items.length !== 1 ? 's' : ''}: ₦${value.total.toLocaleString()}`
   }

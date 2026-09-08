@@ -8,7 +8,7 @@ import { DATE_RANGE_OPTIONS, getDateRangeBounds, getDateRangeLabel } from './rep
 import StatTile from './report/components/StatTile'
 import PageSkeleton from './components/PageSkeleton'
 import { useDeferredLoading } from './components/loadingHooks'
-import { ErrorState } from './ErrorState'
+import { ErrorState, InlineError } from './ErrorState'
 
 const EXAMPLE_QUESTIONS = [
   'Which product should I restock first?',
@@ -318,7 +318,7 @@ function AIAnalystPage() {
         <p style={{ color: '#999', marginTop: '1.5rem' }}>No responses in this date range.</p>
       )}
 
-      {error && <p style={{ color: 'red', marginTop: '1rem' }}>{error}</p>}
+      {error && <InlineError message={error} style={{ marginTop: '1rem' }} />}
 
       {!analysis && !analyzing && filtered.length > 0 && (
         <p style={{ color: 'var(--color-muted)', marginTop: '2rem' }}>
@@ -485,7 +485,7 @@ function AIAnalystPage() {
               </div>
             )}
 
-            {askError && <p style={{ color: 'red', fontSize: '0.85rem', margin: '0.4rem 0 0' }}>{askError}</p>}
+            {askError && <InlineError message={askError} style={{ fontSize: '0.85rem', margin: '0.4rem 0 0' }} />}
 
             <div ref={chatEndRef} />
           </div>

@@ -153,10 +153,28 @@
 html, body {
   /* Safety net against any element that overflows its container width
      (long unwrapped text forcing a grid track wider than 1fr, a stray fixed
-     pixel width, etc.) turning into page-wide horizontal scroll on a phone -
-     elements that scroll on purpose (.category-scroll, .table-scroll) use
-     their own local overflow-x and are unaffected by this. */
+     pixel width, a 100vw full-bleed table wider than the content area by the
+     scrollbar width, etc.) turning into page-wide horizontal scroll -
+     elements that scroll on purpose (.category-scroll, .table-scroll,
+     .table-wrap) use their own local overflow-x and are unaffected.
+
+     `clip` rather than `hidden`: it clips without turning the element into a
+     scroll container, so sticky table headers / sticky filter bars inside
+     still stick. `hidden` is kept first as a fallback for engines without
+     `clip`. */
   overflow-x: hidden;
+  overflow-x: clip;
+  max-width: 100%;
+}
+
+/* The app mount point and the shell wrapper App.jsx renders inside it get the
+   same clip, so a wide flex/grid row deep inside a page can't push the shell
+   wider than the viewport even if some ancestor between it and <body> ever
+   becomes a scroll container and defeats the clip above. */
+#root,
+#root > .app-content-under-navbar {
+  overflow-x: clip;
+  max-width: 100%;
 }
 
 body {
@@ -182,24 +200,146 @@ body.pos-panel-docked {
   padding-left: 210px;
 }
 
-/* Active nav item in the POS side panel: a smooth "pebble" - soft green
-   gradient with a top sheen and a slight lift off the panel. */
-.pos-nav-active {
-  color: #1f3a25;
-  background: linear-gradient(150deg, #f0f8f1 0%, #d9eddb 52%, #c2dcc5 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65), 0 1px 4px rgba(0, 0, 0, 0.22);
+/* Desktop side-panel flows: a compact top bar (CompactTopBar.jsx) stands in
+   for the floating hamburger/back. Its height is content-driven and
+   published as --compact-topbar-h; reserve exactly that on the body (the bar
+   is position:fixed, so this moves only the content). The .page !important
+   trims the old top reserve pages kept for the floating hamburger - incl.
+   PublicForm.jsx's inline paddingTop on the order screen - to a small
+   responsive gap. */
+body.compact-topbar {
+  padding-top: var(--compact-topbar-h, 52px);
 }
-:root[data-theme="dark"] .pos-nav-active {
-  color: #dfeee2;
-  background: linear-gradient(150deg, #33513a 0%, #294632 55%, #203a28 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), 0 1px 4px rgba(0, 0, 0, 0.45);
+body.compact-topbar .page {
+  padding-top: clamp(0.5rem, 1.5vw, 1rem) !important;
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .pos-nav-active {
-    color: #dfeee2;
-    background: linear-gradient(150deg, #33513a 0%, #294632 55%, #203a28 100%);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), 0 1px 4px rgba(0, 0, 0, 0.45);
-  }
+/* The order screen's own <h1> is redundant once the bar shows the name. */
+body.compact-topbar .pf-order-title {
+  display: none;
+}
+
+/* Lab demo conversion ribbon (src/lab/demo/DemoRibbon.jsx) - reserve room at
+   the bottom so it never covers the last row of a page. */
+body.demo-ribbon-on {
+  padding-bottom: calc(52px + env(safe-area-inset-bottom));
+}
+
+/* Card-grid selector (src/components/CardChoice.jsx) - the "stepped" form
+   display style and the Lab onboarding flow. Translucent-free, theme-driven,
+   readable in light and dark. */
+.cardchoice {
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+}
+.cardchoice-opt {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.9rem 1rem;
+  border-radius: 14px;
+  text-align: left;
+  cursor: pointer;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow);
+  transition: transform 150ms ease, border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
+}
+.cardchoice-opt:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: var(--color-primary);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+}
+.cardchoice-opt:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.cardchoice-opt[aria-pressed="true"] {
+  border-color: var(--color-primary);
+  box-shadow: inset 0 0 0 1px var(--color-primary);
+  /* Light, theme-safe tint so muted helper text stays readable on any theme. */
+  background: var(--color-primary-soft);
+  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface));
+}
+.cardchoice-tick {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  margin-top: 1px;
+  border-radius: 5px;
+  border: 1px solid var(--color-border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 11px;
+  line-height: 1;
+}
+.cardchoice-tick.round { border-radius: 50%; }
+.cardchoice-opt[aria-pressed="true"] .cardchoice-tick {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+.cardchoice-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cardchoice-label { font-weight: 600; font-size: 0.94rem; }
+.cardchoice-help { font-size: 0.8rem; color: var(--color-muted); }
+.cardchoice-count {
+  grid-column: 1 / -1;
+  margin: 0.1rem 0 0;
+  font-size: 0.78rem;
+  color: var(--color-muted);
+}
+
+/* Stepped-style PublicForm chrome. */
+.page.stepped-form { max-width: 640px; }
+.stepped-form .stepped-eyebrow {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+  margin-bottom: 0.3rem;
+}
+.stepped-form .stepped-field { animation: ob-reveal 260ms ease both; }
+@keyframes ob-reveal { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .stepped-form .stepped-field { animation: none; } }
+
+/* Side-panel nav items (PosSidePanel.jsx / PayrollSidePanel.jsx). The panel
+   background is the user's chosen theme colour, so active + hover are
+   translucent-white overlays that read correctly on green, blue, purple, or
+   anything else - never a hardcoded brand colour. */
+.pos-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.78);
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+}
+.pos-nav-item svg {
+  flex-shrink: 0;
+}
+.pos-nav-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+.pos-nav-item.is-active {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-weight: 600;
+  /* 3px "you are here" indicator on the far left - no border box. */
+  box-shadow: inset 3px 0 0 #fff;
 }
 
 a {
@@ -260,6 +400,94 @@ input, select, textarea {
 input:focus, select:focus, textarea:focus {
   outline: none;
   border-color: var(--color-primary);
+}
+
+/* iOS Safari zooms the whole page in when a focused form control's text is
+   under 16px - jarring, and it leaves the layout shifted. Bump every control
+   to 16px at phone widths (only there; the 0.9rem desktop size is fine with a
+   mouse). max() so a control that's deliberately larger keeps its size. */
+@media (max-width: 768px) {
+  input, select, textarea {
+    font-size: max(16px, 0.9rem);
+  }
+}
+
+/* Floating-caption fields (PublicForm.jsx's order screen: Customer Name,
+   Phone, dropdowns, Location's per-part selects, ...).
+   <select> always has visible content on its own second line (even an
+   unpicked one shows "Select an option"), so its caption sits permanently
+   at the top-left, same spot a filled text field's caption ends up in.
+   <input>/<textarea> have no second line until something's typed, so an
+   always-top caption there just left a bare gap underneath it (looked like
+   an oversized, half-empty input) - empty, their caption instead rests
+   centered like a normal placeholder, then snaps up to the same top-left
+   spot once you focus or type, matching the select's fixed position.
+   The centered/snap-up split is the standard `:placeholder-shown` trick -
+   it needs an actual (blank) placeholder=" " attribute on the control, even
+   though nothing is ever visibly shown there; the label carries the real
+   prompt text instead. Only apply to markup that puts the label immediately
+   after its control (the `+` combinator requires that exact order) - see
+   PublicForm.jsx's renderInput. */
+.field-floating {
+  position: relative;
+}
+.field-floating input,
+.field-floating select,
+.field-floating textarea {
+  width: 100%;
+  padding: 1.3rem 0.8rem 0.4rem;
+}
+.field-floating textarea {
+  padding-top: 1.5rem;
+  min-height: 90px;
+  resize: vertical;
+}
+.field-floating > label {
+  position: absolute;
+  left: 0.85rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: inherit;
+  color: var(--color-muted);
+  pointer-events: none;
+  transition: top 0.15s ease, transform 0.15s ease, color 0.15s ease;
+  transform-origin: top left;
+  max-width: calc(100% - 1.7rem);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.field-floating textarea + label {
+  /* A multi-line box is taller than one line - rest the caption near its
+     top instead of dead-center across the whole box. */
+  top: 1.35rem;
+  transform: none;
+}
+.field-floating select + label,
+.field-floating input:focus + label,
+.field-floating input:not(:placeholder-shown) + label,
+.field-floating textarea:focus + label,
+.field-floating textarea:not(:placeholder-shown) + label {
+  top: 0.62rem;
+  transform: translateY(0) scale(0.78);
+}
+.field-floating input:focus + label,
+.field-floating textarea:focus + label,
+.field-floating select:focus + label {
+  color: var(--color-primary);
+}
+/* The quiet-until-clicked ring: a plain border at rest, a soft theme-color
+   ring once actually focused - stronger than the app-wide focus style
+   (index.css's `input:focus` above) since these fields are meant to read as
+   the most polished input on the page. */
+.field-floating input:focus,
+.field-floating select:focus,
+.field-floating textarea:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
+}
+.field-required-mark {
+  color: #c0392b;
 }
 
 .card {
@@ -804,16 +1032,9 @@ input:focus, select:focus, textarea:focus {
 
 @media (max-width: 768px) {
 
-  /* PosSidePanel's menu/back buttons: same top-corner floating buttons as
-     desktop, just re-anchored to the bottom corners here - a top corner is
-     an awkward one-handed reach on a phone, the bottom is where a thumb
-     actually rests. Only the vertical anchor changes; size/color/side stay
-     exactly as PosSidePanel.jsx sets them. */
-  .pos-menu-button,
-  .pos-back-button {
-    top: auto !important;
-    bottom: calc(1rem + env(safe-area-inset-bottom)) !important;
-  }
+  /* PosSidePanel.jsx / PayrollSidePanel.jsx render their own full-width top
+     bar below this width (menu left, back right, a border-bottom hairline)
+     instead of floating circular buttons - see each component's `topBar`. */
 
   .list-actions-desktop {
     display: none !important;
@@ -939,13 +1160,17 @@ input:focus, select:focus, textarea:focus {
    full width since it's already two charts. */
 .report-tile-list {
   display: grid;
-  grid-template-columns: 1fr;
+  /* minmax(0, 1fr) not 1fr: a plain 1fr track is min-content-floored, so a
+     chart card whose contents report a wide min-content (a recharts
+     container, a long unbroken label) would push the track - and the page -
+     wider than the viewport. minmax(0, ...) lets the track shrink. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 1.2rem;
   align-items: start;
 }
 @media (min-width: 1200px) {
   .report-tile-list {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
 }
 .report-tile-list > .report-tile-wide {
@@ -955,12 +1180,12 @@ input:focus, select:focus, textarea:focus {
 /* The two charts inside one joined pair. */
 .report-chart-pair {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 1.2rem;
 }
 @media (min-width: 1024px) {
   .report-chart-pair {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     align-items: start;
   }
 }
@@ -973,6 +1198,16 @@ input:focus, select:focus, textarea:focus {
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 0.7rem;
   margin-bottom: 1.4rem;
+}
+/* Below ~340px of content width, two 150px tracks no longer fit (2*150 +
+   gap > the space left after page padding), so auto-fit drops straight to
+   one column per card - four stacked full-width rows instead of a compact
+   2x2 tile grid. Force 2-up on phones instead; each card's own text wraps
+   to fit rather than the grid giving up a whole column. */
+@media (max-width: 480px) {
+  .pay-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 .pay-stat {
   border: 1px solid var(--color-border);
@@ -1006,19 +1241,18 @@ input:focus, select:focus, textarea:focus {
 
 /* Payroll is a contained environment (App.jsx's isPayrollEnv hides the app
    NavBar). PayrollSidePanel.jsx renders a fixed left panel; below 1024px it
-   is a hamburger-triggered drawer and the page just needs top room for the
-   floating buttons, at >= 1024px it is pinned open and the page shifts
-   right by its width (see PAYROLL_SIDEBAR_WIDTH). */
+   is a hamburger-triggered drawer, and on desktop it is docked open by
+   default but can be collapsed. `body.payroll-panel-docked` is toggled by
+   the panel while it's docked - the page shifts right by its width and
+   loses the top gutter it needs for the floating expand button otherwise. */
 .payroll-shell > .page {
   padding-top: calc(3.5rem + env(safe-area-inset-top));
 }
-@media (min-width: 1024px) {
-  .payroll-shell {
-    padding-left: 210px;
-  }
-  .payroll-shell > .page {
-    padding-top: 2rem;
-  }
+body.payroll-panel-docked .payroll-shell {
+  padding-left: 210px;
+}
+body.payroll-panel-docked .payroll-shell > .page {
+  padding-top: 2rem;
 }
 
 /* Retail invoice printing (InvoiceModal.jsx's Print button) - hides the

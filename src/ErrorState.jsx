@@ -5,7 +5,7 @@
 // message, in a card instead of bare text. onRetry is optional - only pass
 // it for an error worth re-attempting (a failed fetch), not a permanent one
 // ("this form doesn't exist").
-function AlertIcon({ size = 22 }) {
+export function AlertIcon({ size = 22 }) {
   return (
     <svg
       width={size} height={size} viewBox="0 0 24 24" fill="none"
@@ -16,6 +16,25 @@ function AlertIcon({ size = 22 }) {
       <line x1="12" y1="7.5" x2="12" y2="13" />
       <line x1="12" y1="16.2" x2="12" y2="16.21" />
     </svg>
+  )
+}
+
+// Compact version for a banner inside an otherwise-usable page/panel
+// (Home.jsx's list, an AI panel's own error) - same flat icon + message,
+// no full-page card wrapper.
+export function InlineError({ message, onRetry, style, className }) {
+  return (
+    <div className={className} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', color: 'var(--status-critical)', fontSize: '0.88rem', ...style }}>
+      <AlertIcon size={16} />
+      <span style={{ color: 'var(--color-text)' }}>
+        {message}
+        {onRetry && (
+          <button type="button" className="secondary" onClick={onRetry} style={{ marginLeft: '0.6rem', fontSize: '0.8rem', padding: '0.15rem 0.5rem' }}>
+            Try again
+          </button>
+        )}
+      </span>
+    </div>
   )
 }
 

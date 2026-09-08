@@ -139,7 +139,7 @@ export default function ImportModal({ mode, formId, settings, departments = [], 
           <ol style={{ color: 'var(--color-muted)', fontSize: '0.86rem', paddingLeft: '1.1rem', lineHeight: 1.7 }}>
             <li>Download the template</li>
             <li>Fill in your {isEmployees ? 'employee information' : 'entries'}</li>
-            <li>Upload the completed file — you'll see a preview before anything is saved</li>
+            <li>Upload the completed file - you'll see a preview before anything is saved</li>
           </ol>
 
           <button className="secondary" onClick={downloadTemplate} style={{ margin: '0.4rem 0 1.1rem' }}>↓ Download Excel Template</button>
@@ -205,17 +205,17 @@ export default function ImportModal({ mode, formId, settings, departments = [], 
                       <td style={td}>{row.rowNum}</td>
                       {isEmployees ? (
                         <>
-                          <td style={td}>{row.values.full_name || '—'}</td>
-                          <td style={td}>{row.deptName || '—'}</td>
-                          <td style={td}>{row.locName || '—'}</td>
-                          <td style={td}>{row.values.monthly_salary ? row.values.monthly_salary.toLocaleString() : '—'}</td>
+                          <td style={td}>{row.values.full_name || '-'}</td>
+                          <td style={td}>{row.deptName || '-'}</td>
+                          <td style={td}>{row.locName || '-'}</td>
+                          <td style={td}>{row.values.monthly_salary ? row.values.monthly_salary.toLocaleString() : '-'}</td>
                         </>
                       ) : (
                         <>
-                          <td style={td}>{row.employeeName || '—'}</td>
-                          <td style={td}>{row.typeLabel || '—'}</td>
-                          <td style={td}>{row.values.reason || '—'}</td>
-                          <td style={td}>{row.values.quantity != null ? `${row.values.quantity} d` : (row.values.amount ? row.values.amount.toLocaleString() : '—')}</td>
+                          <td style={td}>{row.employeeName || '-'}</td>
+                          <td style={td}>{row.typeLabel || '-'}</td>
+                          <td style={td}>{row.values.reason || '-'}</td>
+                          <td style={td}>{row.values.quantity != null ? `${row.values.quantity} d` : (row.values.amount ? row.values.amount.toLocaleString() : '-')}</td>
                         </>
                       )}
                       <td style={td}><StatusCell ready={ready} text={row.problems[0] || (isEmployees ? 'unresolved name' : 'skipped')} /></td>
@@ -243,7 +243,7 @@ function Resolver({ kind, name, options, value = { action: 'create', mapTo: '' }
       </label>
       {value.action === 'map' && (
         <Select value={value.mapTo || ''} onChange={(e) => onChange({ ...value, mapTo: e.target.value })} style={{ width: 'auto' }}>
-          <option value="">— pick —</option>
+          <option value="">Pick one…</option>
           {options.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
         </Select>
       )}

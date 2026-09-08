@@ -213,7 +213,7 @@ export default function EmployeeFormModal({ formId, settings, employee, departme
     >
       <div className="form-2col">
         <Field label="Employee Name"><TextInput value={v.full_name} onChange={set('full_name')} /></Field>
-        <Field label="Staff ID" hint="Optional — e.g. RCH-001"><TextInput value={v.employee_number} onChange={set('employee_number')} /></Field>
+        <Field label="Staff ID" hint="Optional - e.g. RCH-001"><TextInput value={v.employee_number} onChange={set('employee_number')} /></Field>
         <Field label="Phone"><TextInput value={v.phone} onChange={set('phone')} /></Field>
         <Field label="Email"><TextInput type="email" value={v.email} onChange={set('email')} /></Field>
         <Field label="Gender">
@@ -223,7 +223,7 @@ export default function EmployeeFormModal({ formId, settings, employee, departme
         </Field>
       </div>
 
-      <Field label="Roles" hint="One person can hold several — type a role and press Enter.">
+      <Field label="Roles" hint="One person can hold several - type a role and press Enter.">
         <TagInput
           values={v.job_titles}
           onChange={setField('job_titles')}

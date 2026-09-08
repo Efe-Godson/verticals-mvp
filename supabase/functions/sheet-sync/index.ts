@@ -15,6 +15,7 @@
 //   GOOGLE_OAUTH_CLIENT_SECRET   Auth Google provider) client id / secret
 
 import { createClient } from '@supabase/supabase-js'
+import { enforceRateLimit } from '../_shared/rateLimit.ts'
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' }
 
@@ -113,6 +114,17 @@ Deno.serve(async (req) => {
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   )
+
+  // Invoked by a DB trigger on every submissions change (see file header) -
+  // there's no user identity here, just the triggering form. Generous budget
+  // so a busy form's normal traffic never gets throttled, just a runaway
+  // trigger loop.
+  const limited = await enforceRateLimit(
+    supabase, `sheet-sync:${formId}`,
+    { max: 30, windowSeconds: 300 },
+    { function: 'sheet-sync', form_id: formId },
+  )
+  if (limited) return limited
 
   const { data: form } = await supabase.from('forms').select('id, name, fields, settings').eq('id', formId).single()
   const spreadsheetId = form?.settings?.googleSheetId

@@ -10,7 +10,7 @@ import { bucketDate } from './dateBuckets'
 import { aggregateValues } from './aggregate'
 import { computePopulationStats, enrichRows } from './populationStats'
 
-const NULL_LABEL = '—'
+const NULL_LABEL = '-'
 
 // ---- metric --------------------------------------------------------------
 

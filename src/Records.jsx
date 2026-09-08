@@ -4,10 +4,10 @@ import { useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { exportRecordsToExcel, exportRecordsToCSV, exportRecordsToPDF, printRecordsTable, syncFormGoogleSheet } from './recordsExport'
 import { downloadRecordsTemplate, parseRecordsFile, readWorkbookRows } from './recordsImport'
-import { DATE_RANGE_OPTIONS, getDateRangeBounds, passesFilter } from './records/recordsUtils'
+import { DATE_RANGE_OPTIONS, getDateRangeBounds, passesFilter, makeSortComparator, valueDisplayString, isBlankValue } from './records/recordsUtils'
 import { formatCell, FilterIcon, CubeIcon, overlayStyle, dropdownStyle, DropdownItem } from './records/recordsUiKit'
 import { CartCell } from './records/CartCell'
-import { FilterPopover } from './records/FilterPopover'
+import { ColumnHeaderMenu } from './records/ColumnHeaderMenu'
 import { RecordDetail } from './records/RecordDetail'
 import { RecycleBinDialog } from './records/RecycleBinDialog'
 import { SavePresetDialog } from './records/SavePresetDialog'
@@ -18,6 +18,11 @@ import PageSkeleton from './components/PageSkeleton'
 import { useDeferredLoading } from './components/loadingHooks'
 import { ErrorState } from './ErrorState'
 import { usePageOptions } from './PageTitleContext'
+import { getPageCache, setPageCache } from './hooks/pageCache'
+import { RefreshingIndicator } from './components/InlineLoader'
+import EmptyState, { SearchOffIcon } from './components/EmptyState'
+import useIsMobile from './hooks/useIsMobile'
+import { DataCard, DataCardList } from './components/DataCards'
 
 const PAGE_SIZE = 10
 
@@ -41,6 +46,7 @@ function Records() {
   const [searchParams] = useSearchParams()
   const isFocusMode = searchParams.get('focus') === '1'
   const { showToast } = useToast()
+  const isMobile = useIsMobile()
   const [pendingConfirm, setPendingConfirm] = useState(null) // { type: 'deleteSelected' } | { type: 'permanentlyDelete', subId } | { type: 'emptyBin' }
   const [form, setForm] = useState(null)
   const [submissions, setSubmissions] = useState([])
@@ -52,6 +58,7 @@ function Records() {
   const [customStart, setCustomStart] = useState('')
   const [customEnd, setCustomEnd] = useState('')
   const [filters, setFilters] = useState({})
+  const [sortConfig, setSortConfig] = useState(null) // { fieldId, dir: 'asc' | 'desc' }
   const [openFilterId, setOpenFilterId] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedRecord, setSelectedRecord] = useState(null)
@@ -80,16 +87,21 @@ function Records() {
   const [trashedSubmissions, setTrashedSubmissions] = useState([])
   const [loadingBin, setLoadingBin] = useState(false)
   const [hoveredHeaderId, setHoveredHeaderId] = useState(null)
+  // Revisiting a form you've already opened this session paints from the
+  // last known data instantly instead of blanking to a skeleton, while a
+  // fresh copy loads silently behind it (see src/hooks/pageCache.js).
+  const [refreshing, setRefreshing] = useState(false)
+  const cacheKey = `records:${id}`
 
   useEffect(() => {
-    async function loadData() {
-      setLoading(true)
+    async function loadData(silent) {
+      if (!silent) setLoading(true)
       const { data: formData, error: formError } = await supabase
         .from('forms').select('*').eq('id', id).single()
 
       if (formError) {
-        setError('This form could not be found.')
-        setLoading(false)
+        if (!silent) { setError('This form could not be found.'); setLoading(false) }
+        setRefreshing(false)
         return
       }
       setForm(formData)
@@ -99,7 +111,8 @@ function Records() {
       const isCartForm = formData.fields.some(f => f.type === 'cart')
       const defaultHidden = isCartForm ? ['__orderId', '__lastUpdate', '__ip', '__submissionId'] : []
       const hasCustomizedColumns = formData.settings?.hiddenColumns != null
-      setHiddenFieldIds(hasCustomizedColumns ? formData.settings.hiddenColumns : defaultHidden)
+      let effectiveHidden = hasCustomizedColumns ? formData.settings.hiddenColumns : defaultHidden
+      setHiddenFieldIds(effectiveHidden)
       // A POS/order form (Restaurant, Retail, ...) is almost always opened
       // to check today's sales, not the full history - other form types
       // (surveys, registrations, ...) keep the "All time" default.
@@ -111,8 +124,8 @@ function Records() {
         .order('created_at', { ascending: false })
 
       if (subsError) {
-        setError('Could not load records: ' + subsError.message)
-        setLoading(false)
+        if (!silent) { setError('Could not load records: ' + subsError.message); setLoading(false) }
+        setRefreshing(false)
         return
       }
       setSubmissions(subsData)
@@ -142,6 +155,7 @@ function Records() {
 
         if (sparseFieldIds.length > 0) {
           const mergedHidden = [...new Set([...defaultHidden, ...sparseFieldIds])]
+          effectiveHidden = mergedHidden
           setHiddenFieldIds(mergedHidden)
           const updatedSettings = { ...(formData.settings || {}), hiddenColumns: mergedHidden }
           // Persisted so this becomes the account's actual saved preference
@@ -163,10 +177,24 @@ function Records() {
         .not('deleted_at', 'is', null)
       setBinCount(count || 0)
 
-      setLoading(false)
+      setPageCache(cacheKey, { form: formData, submissions: subsData, binCount: count || 0, hiddenFieldIds: effectiveHidden })
+      if (!silent) setLoading(false)
+      setRefreshing(false)
     }
-    loadData()
-  }, [id])
+
+    const cached = getPageCache(cacheKey)
+    if (cached) {
+      setForm(cached.form)
+      setSubmissions(cached.submissions)
+      setBinCount(cached.binCount)
+      if (cached.hiddenFieldIds) setHiddenFieldIds(cached.hiddenFieldIds)
+      setLoading(false)
+      setRefreshing(true)
+      loadData(true)
+    } else {
+      loadData(false)
+    }
+  }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const formRef = useRef(form)
   useEffect(() => { formRef.current = form }, [form])
@@ -290,6 +318,11 @@ function Records() {
     })
   })
 
+  // The date-range + keyword view, before any per-column filter. The column
+  // menu's value list is built from this, so unticking a value in one column
+  // never makes the other values vanish from its own list (Excel behaviour).
+  const searchScoped = visible
+
   visible = visible.filter(sub => {
     return Object.keys(filters).every(fieldId => {
       const field = form.fields.find(f => f.id === fieldId)
@@ -298,6 +331,34 @@ function Records() {
       return passesFilter(sub, field, filter)
     })
   })
+
+  if (sortConfig) {
+    const sortField = form.fields.find(f => f.id === sortConfig.fieldId)
+    if (sortField) visible = [...visible].sort(makeSortComparator(sortField, sortConfig.dir))
+  }
+
+  // Distinct values (+ blank tally) for one column's menu, from searchScoped.
+  const columnValueSummary = (fieldId) => {
+    const field = form.fields.find(f => f.id === fieldId)
+    if (!field) return { values: [], hasBlanks: false, blankCount: 0 }
+    const counts = new Map()
+    let blankCount = 0
+    for (const sub of searchScoped) {
+      const raw = sub.data?.[fieldId]
+      if (isBlankValue(raw)) { blankCount++; continue }
+      const disp = valueDisplayString(raw, field)
+      counts.set(disp, (counts.get(disp) || 0) + 1)
+    }
+    let values = [...counts.entries()].map(([v, count]) => ({ v, count }))
+    if (field.type === 'number') {
+      values.sort((a, b) => Number(String(a.v).replace(/,/g, '')) - Number(String(b.v).replace(/,/g, '')))
+    } else if (field.type === 'date') {
+      values.sort((a, b) => new Date(a.v) - new Date(b.v))
+    } else {
+      values.sort((a, b) => a.v.localeCompare(b.v))
+    }
+    return { values, hasBlanks: blankCount > 0, blankCount }
+  }
 
   const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE))
   const safePage = Math.min(currentPage, totalPages)
@@ -331,6 +392,44 @@ function Records() {
   // Submission ID are debugging-grade columns nobody's checking out orders needs.
   const cartField = form.fields.find(f => f.type === 'cart')
   const hasCartField = !!cartField
+
+  // Phone card view (see the isMobile branch in the render): a wide row of
+  // columns becomes a short stack showing only what's worth a glance, tap for
+  // the rest via RecordDetail. cardFields = the non-cart fields eligible to
+  // appear on a card, in form order.
+  const cardFields = form.fields.filter(f =>
+    f.type !== 'section' && f.type !== 'cart' &&
+    !hiddenFieldIds.includes(f.id) && isColumnPopulated(f.id),
+  )
+  function recordCardTitle(sub) {
+    if (sub.order_number) return `Order #${sub.order_number}`
+    const first = cardFields.find(f => hasValue(sub.data[f.id]))
+    if (first) return formatCell(sub.data[first.id], first)
+    return `Record ${sub.id.slice(0, 8)}`
+  }
+  function recordCardRows(sub) {
+    if (hasCartField) {
+      const c = sub.data[cartField.id] || {}
+      const grand = Number(c.total || 0) + Number(c.deliveryFee || 0)
+      const items = Array.isArray(c.items) ? c.items.length : 0
+      return (
+        <>
+          <DataCard.Row label="Total" value={`₦${grand.toLocaleString()}`} strong />
+          <DataCard.Row label="Items" value={`${items} item${items === 1 ? '' : 's'}`} muted />
+          {Number(c.deliveryFee || 0) > 0 && (
+            <DataCard.Row label="Delivery" value={`₦${Number(c.deliveryFee).toLocaleString()}`} muted />
+          )}
+        </>
+      )
+    }
+    const titleField = sub.order_number ? null : cardFields.find(f => hasValue(sub.data[f.id]))
+    const rows = cardFields
+      .filter(f => f.id !== titleField?.id && hasValue(sub.data[f.id]))
+      .slice(0, 3)
+    return rows.map(f => (
+      <DataCard.Row key={f.id} label={f.label} value={formatCell(sub.data[f.id], f)} align="left" />
+    ))
+  }
 
   // Order stats reflect whatever's currently filtered/searched (e.g. "Today"),
   // not the whole history, so the tiles stay meaningful as filters change.
@@ -534,6 +633,7 @@ function Records() {
     setCustomStart('')
     setCustomEnd('')
     setFilters({})
+    setSortConfig(null)
     setOpenFilterId(null)
     setCurrentPage(1)
   }
@@ -929,6 +1029,7 @@ function Records() {
           as a unit when space is tight, and Options jumping up onto that
           same line (ahead of a wrapped date input) read as misaligned. */}
       <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem', marginTop: '0.8rem' }}>
+        <RefreshingIndicator show={refreshing} />
         {/* Always visible now, no click-to-reveal icon step - same "🔍
             Search..." placeholder-as-icon convention ProductManager.jsx's
             catalogue search already uses, one less tap to get to it. */}
@@ -1021,8 +1122,8 @@ function Records() {
           <div className="dropdown-panel" style={{
             position: 'fixed', top: '4.2rem', right: '0.8rem',
             background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 150, minWidth: '220px', padding: '0.6rem',
-            overflow: 'hidden'
+            boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 150,
+            width: 'min(240px, calc(100vw - 1.6rem))', maxHeight: 'calc(100vh - 6rem)', overflowY: 'auto', padding: '0.6rem',
           }}>
             {optionsMenuItems}
           </div>
@@ -1042,20 +1143,59 @@ function Records() {
       )}
 
       {submissions.length === 0 ? (
-        <div className="card" style={{ marginTop: '1.4rem', padding: '1.8rem', textAlign: 'center', color: 'var(--color-muted)' }}>
-          <h3 style={{ marginTop: 0, marginBottom: '0.45rem' }}>No records yet</h3>
-          <p style={{ margin: '0 0 0.9rem' }}>Once people submit this form, their responses will appear here with filters and export options ready to use.</p>
-          <button onClick={() => window.history.back()}>Back to previous page</button>
-        </div>
+        <EmptyState
+          style={{ marginTop: '1.4rem' }}
+          title="No records yet"
+          message="Once people submit this form, their responses will appear here with filters and export options ready to use."
+          action={<button onClick={() => window.history.back()}>Back to previous page</button>}
+        />
       ) : visible.length === 0 ? (
-        <div className="card" style={{ marginTop: '1.4rem', padding: '1.8rem', textAlign: 'center', color: 'var(--color-muted)' }}>
-          <h3 style={{ marginTop: 0, marginBottom: '0.45rem' }}>No matches found</h3>
-          <p style={{ margin: '0 0 0.9rem' }}>Try widening the date range or clearing a filter to see more records.</p>
-          <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <button className="secondary" onClick={clearAllFilters}>Clear filters</button>
-            <button onClick={() => setSearchText('')}>Clear search</button>
+        <EmptyState
+          style={{ marginTop: '1.4rem' }}
+          icon={<SearchOffIcon />}
+          title="No matches found"
+          message="Try widening the date range or clearing a filter to see more records."
+          action={
+            <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+              <button className="secondary" onClick={clearAllFilters}>Clear filters</button>
+              <button onClick={() => setSearchText('')}>Clear search</button>
+            </div>
+          }
+        />
+      ) : isMobile ? (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', margin: '0.9rem 0 0.6rem', fontSize: '0.82rem', color: 'var(--color-muted)' }}>
+            <button
+              type="button"
+              className="secondary"
+              onClick={toggleSelectAllOnPage}
+              style={{ padding: '0.35rem 0.6rem', fontSize: '0.8rem' }}
+            >
+              {pageRows.length > 0 && pageRows.every(r => selectedIds.includes(r.id)) ? 'Clear page' : 'Select page'}
+            </button>
+            <span>{startIndex + 1}–{Math.min(startIndex + PAGE_SIZE, visible.length)} of {visible.length}</span>
           </div>
-        </div>
+          <DataCardList>
+            {pageRows.map(sub => (
+              <DataCard
+                key={sub.id}
+                title={recordCardTitle(sub)}
+                subtitle={new Date(sub.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                selected={selectedIds.includes(sub.id)}
+                onToggle={() => toggleSelectRow(sub.id)}
+                onOpen={() => setSelectedRecord(sub)}
+              >
+                {recordCardRows(sub)}
+              </DataCard>
+            ))}
+          </DataCardList>
+
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.75rem', marginTop: '1rem' }}>
+            <button disabled={safePage === 1} onClick={() => setCurrentPage(safePage - 1)}>Previous</button>
+            <span style={{ fontSize: '0.9rem' }}>Page {safePage} of {totalPages}</span>
+            <button disabled={safePage === totalPages} onClick={() => setCurrentPage(safePage + 1)}>Next</button>
+          </div>
+        </>
       ) : (
         <>
           <div className="table-scroll table-breakout">
@@ -1099,31 +1239,46 @@ function Records() {
                           <span style={{ whiteSpace: 'nowrap' }}>
                             {field.type === 'cart' ? 'Items' : field.label}
                           </span>
+                          {sortConfig?.fieldId === field.id && (
+                            <span style={{ color: 'var(--color-primary)', fontSize: '0.7rem', flexShrink: 0 }}>
+                              {sortConfig.dir === 'asc' ? '▲' : '▼'}
+                            </span>
+                          )}
                         </div>
 
-                        {field.type !== 'cart' && (
-                          <button
-                            onClick={() => setOpenFilterId(openFilterId === field.id ? null : field.id)}
-                            title="Filter"
-                            style={{
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              width: '22px', height: '22px', padding: 0, borderRadius: '5px', flexShrink: 0,
-                              background: filters[field.id] ? 'var(--color-primary)' : 'transparent',
-                              border: filters[field.id] ? 'none' : '1px solid var(--color-border)'
-                            }}
-                          >
-                            <FilterIcon color={filters[field.id] ? 'white' : (isHovered ? 'var(--color-primary)' : 'var(--color-muted)')} />
-                          </button>
-                        )}
+                        {field.type !== 'cart' && (() => {
+                          const active = !!filters[field.id] || sortConfig?.fieldId === field.id
+                          return (
+                            <button
+                              onClick={() => setOpenFilterId(openFilterId === field.id ? null : field.id)}
+                              title="Sort & filter"
+                              style={{
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                width: '22px', height: '22px', padding: 0, borderRadius: '5px', flexShrink: 0,
+                                background: active ? 'var(--color-primary)' : 'transparent',
+                                border: active ? 'none' : '1px solid var(--color-border)'
+                              }}
+                            >
+                              <FilterIcon color={active ? 'white' : (isHovered ? 'var(--color-primary)' : 'var(--color-muted)')} />
+                            </button>
+                          )
+                        })()}
                       </div>
 
                       {openFilterId === field.id && field.type !== 'cart' && (
-                        <FilterPopover
-                          field={field}
-                          currentFilter={filters[field.id]}
-                          onApply={(filterData) => applyFilter(field.id, filterData)}
-                          onClear={() => clearFilter(field.id)}
-                        />
+                        <>
+                          <div style={overlayStyle} onClick={() => setOpenFilterId(null)} />
+                          <ColumnHeaderMenu
+                            field={field}
+                            valueSummary={columnValueSummary(field.id)}
+                            currentFilter={filters[field.id]}
+                            currentSort={sortConfig?.fieldId === field.id ? sortConfig.dir : null}
+                            onSort={(dir) => { setSortConfig(dir ? { fieldId: field.id, dir } : null); setCurrentPage(1) }}
+                            onApply={(filterData) => applyFilter(field.id, filterData)}
+                            onClear={() => clearFilter(field.id)}
+                            onClose={() => setOpenFilterId(null)}
+                          />
+                        </>
                       )}
                     </th>
                     {field.type === 'cart' && hasCartField && (

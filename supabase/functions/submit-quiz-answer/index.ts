@@ -11,6 +11,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { jsonResponse, corsHeaders, requirePlayerCredential, scoreAnswer, broadcastPlayers, GRACE_MS } from '../_shared/quiz.ts'
+import { clientIp, enforceRateLimit } from '../_shared/rateLimit.ts'
 
 Deno.serve(async req => {
   // Captured before any I/O so DB round-trips below don't inflate this
@@ -31,6 +32,16 @@ Deno.serve(async req => {
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
+
+    // Public + unauthenticated - keyed by player_id (the stable per-player
+    // row from join-quiz-room), not IP, so a room full of players on one
+    // venue WiFi don't rate-limit each other.
+    const limited = await enforceRateLimit(
+      supabase, `submit-quiz-answer:${player_id}`,
+      { max: 60, windowSeconds: 60 },
+      { function: 'submit-quiz-answer', ip: clientIp(req), player_id },
+    )
+    if (limited) return limited
 
     const credential = await requirePlayerCredential(supabase, room_id, player_id, player_secret)
     if (credential.error) return jsonResponse({ error: credential.error }, credential.status)

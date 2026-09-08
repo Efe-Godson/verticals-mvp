@@ -8,6 +8,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { jsonResponse, corsHeaders, requireFormOwner } from '../_shared/stats.ts'
+import { enforceRateLimit } from '../_shared/rateLimit.ts'
 
 Deno.serve(async req => {
   try {
@@ -33,6 +34,15 @@ Deno.serve(async req => {
       const { data: userData, error: userError } = await supabase.auth.getUser(jwt)
       if (userError || !userData?.user) return jsonResponse({ error: 'Invalid or expired session' }, 401)
 
+      // Frequent by design (a heartbeat interval) - generous budget, separate
+      // from the owner-management actions below.
+      const heartbeatLimited = await enforceRateLimit(
+        supabase, `manage-staff:heartbeat:${userData.user.id}`,
+        { max: 30, windowSeconds: 60 },
+        { function: 'manage-staff', action: 'heartbeat', user_id: userData.user.id },
+      )
+      if (heartbeatLimited) return heartbeatLimited
+
       const { error } = await supabase
         .from('form_staff')
         .update({ last_seen_at: new Date().toISOString() })
@@ -44,6 +54,13 @@ Deno.serve(async req => {
     const { error: ownerError, status, form: ownedForm } = await requireFormOwner(req, supabase, form_id)
     if (ownerError) return jsonResponse({ error: ownerError }, status)
     const ownerId = ownedForm.user_id
+
+    const limited = await enforceRateLimit(
+      supabase, `manage-staff:${ownerId}`,
+      { max: 60, windowSeconds: 60 },
+      { function: 'manage-staff', action, form_id },
+    )
+    if (limited) return limited
 
     if (action === 'list') {
       const { data, error } = await supabase

@@ -38,9 +38,16 @@ export function AuthProvider({ children }) {
 
     initializeAuth()
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, newSession) => {
       if (!mounted) return
       setSession(newSession)
+      // Fire-and-forget: feeds list_concurrent_sessions() (see the
+      // sign_in_events migration), which powers AlertsPage.jsx's "same
+      // account signed in from multiple places" alert. Never blocks the
+      // login UX on it - a failed/slow log shouldn't hold up sign-in.
+      if (event === 'SIGNED_IN') {
+        supabase.functions.invoke('log-sign-in', { body: {} }).catch(() => {})
+      }
     })
 
     return () => {

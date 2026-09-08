@@ -151,10 +151,10 @@ export default function ConfigPanel({ visual, form, datasets = [], onDataset, on
               )}
 
               <Sel label="Sort" value={q.sort} onChange={v => onQuery({ sort: v })}>
-                <option value="metric-desc">Metric — high to low</option>
-                <option value="metric-asc">Metric — low to high</option>
-                <option value="label-asc">Label — A to Z</option>
-                <option value="label-desc">Label — Z to A</option>
+                <option value="metric-desc">Metric - high to low</option>
+                <option value="metric-asc">Metric - low to high</option>
+                <option value="label-asc">Label - A to Z</option>
+                <option value="label-desc">Label - Z to A</option>
               </Sel>
 
               <Sel label="Top N" value={q.topN ? String(q.topN) : ''} onChange={v => onQuery({ topN: v ? Number(v) : null })}>

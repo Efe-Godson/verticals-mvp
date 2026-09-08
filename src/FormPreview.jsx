@@ -254,7 +254,7 @@ function FormPreviewModal({ formName, description, fields, onClose }) {
   const isLastPage = pageIndex >= pages.length - 1
 
   return (
-    <Modal size="lg" onClose={onClose} title="Preview — respondent view">
+    <Modal size="lg" onClose={onClose} title="Preview - respondent view">
       <div>
 
         <h1 style={{ marginTop: 0 }}>{formName || 'Untitled Form'}</h1>

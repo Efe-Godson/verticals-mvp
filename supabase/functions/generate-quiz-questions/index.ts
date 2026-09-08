@@ -12,6 +12,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { jsonResponse, corsHeaders, requireQuizAdmin } from '../_shared/quiz.ts'
 import { generateText } from '../_shared/aiProvider.ts'
+import { callerId, enforceRateLimit } from '../_shared/rateLimit.ts'
 
 function questionSchema(fixedType: string | null) {
   return {
@@ -101,6 +102,14 @@ Deno.serve(async req => {
     const admin = await requireQuizAdmin(req, supabase, room_id)
     if (admin.error) return jsonResponse({ error: admin.error }, admin.status)
     const { room } = admin
+
+    // Calls a paid AI provider per request.
+    const limited = await enforceRateLimit(
+      supabase, `generate-quiz-questions:${await callerId(req, supabase)}`,
+      { max: 20, windowSeconds: 3600 },
+      { function: 'generate-quiz-questions', room_id },
+    )
+    if (limited) return limited
 
     if (room.state !== 'setup') {
       return jsonResponse({ error: 'Questions can only be generated while the room is in setup' }, 403)

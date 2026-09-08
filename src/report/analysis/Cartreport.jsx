@@ -139,14 +139,14 @@ export function cartReportTiles({ field, answered }) {
     tiles.push({
       id: `cart-${field.id}-rev`,
       title: `Revenue by Product${byRev.length > 10 ? ' (top 10)' : ''}`,
-      node: <HorizontalBarChart data={byRev.slice(0, 10)} formatValue={(v) => formatNaira(v)} bare />,
+      node: <HorizontalBarChart data={byRev} formatValue={(v) => formatNaira(v)} bare />,
     })
   }
   if (byQty.length > 0) {
     tiles.push({
       id: `cart-${field.id}-qty`,
       title: `Units Sold by Product${byQty.length > 10 ? ' (top 10)' : ''}`,
-      node: <HorizontalBarChart data={byQty.slice(0, 10)} bare />,
+      node: <HorizontalBarChart data={byQty} bare />,
     })
   }
   if (hasCategoryBreakdown) {

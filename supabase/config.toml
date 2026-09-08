@@ -116,3 +116,27 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/sheet-sync/deno.json"
 entrypoint = "./functions/sheet-sync/index.ts"
+
+[functions.list-alerts]
+enabled = true
+verify_jwt = true
+import_map = "./functions/list-alerts/deno.json"
+entrypoint = "./functions/list-alerts/index.ts"
+
+[functions.log-sign-in]
+enabled = true
+verify_jwt = true
+import_map = "./functions/log-sign-in/deno.json"
+entrypoint = "./functions/log-sign-in/index.ts"
+
+[functions.request-password-reset]
+enabled = true
+verify_jwt = false
+import_map = "./functions/request-password-reset/deno.json"
+entrypoint = "./functions/request-password-reset/index.ts"
+
+[functions.list-email-events]
+enabled = true
+verify_jwt = true
+import_map = "./functions/list-email-events/deno.json"
+entrypoint = "./functions/list-email-events/index.ts"

@@ -5,6 +5,7 @@
 
 import { useState } from 'react'
 import ChartTooltip, { useChartTooltip } from './ChartTooltip'
+import useIsMobile from '../../hooks/useIsMobile'
 
 // Fixed categorical order: a slot always means the same hue, and a 9th+
 // category folds into "Other" rather than generating a new color.
@@ -14,8 +15,10 @@ const SERIES_COLORS = [
 ]
 const MAX_SLICES = SERIES_COLORS.length
 
-function PieChart({ data, size = 240 }) {
+function PieChart({ data, size }) {
   const [hovered, setHovered] = useState(null)
+  const isMobile = useIsMobile()
+  const dim = size ?? (isMobile ? 190 : 240)
   const { tooltip, showTooltip, moveTooltip, hideTooltip } = useChartTooltip()
   const sorted = [...data].sort((a, b) => b.count - a.count)
   const shown = sorted.length > MAX_SLICES ? sorted.slice(0, MAX_SLICES - 1) : sorted
@@ -24,8 +27,8 @@ function PieChart({ data, size = 240 }) {
   const slicesData = restCount > 0 ? [...shown, { label: 'Other', count: restCount }] : shown
 
   const total = slicesData.reduce((sum, d) => sum + d.count, 0) || 1
-  const radius = size / 2
-  const center = size / 2
+  const radius = dim / 2
+  const center = dim / 2
 
   let cumulative = 0
   const slices = slicesData.map((d, i) => {
@@ -54,8 +57,8 @@ function PieChart({ data, size = 240 }) {
   })
 
   return (
-    <div style={{ display: 'flex', gap: '1.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ flexShrink: 0 }}>
+    <div style={{ display: 'flex', gap: isMobile ? '1rem' : '1.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+      <svg width={dim} height={dim} viewBox={`0 0 ${dim} ${dim}`} style={{ flexShrink: 0 }}>
         {slices.map((s, i) => {
           const dimmed = hovered !== null && hovered !== s.label
           const props = {

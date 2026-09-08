@@ -6,6 +6,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { buildStats, fetchSubmissions, jsonResponse, corsHeaders, requireFormOwner } from '../_shared/stats.ts'
 import { generateText } from '../_shared/aiProvider.ts'
+import { callerId, enforceRateLimit } from '../_shared/rateLimit.ts'
 
 Deno.serve(async req => {
   try {
@@ -22,6 +23,13 @@ Deno.serve(async req => {
     const owner = await requireFormOwner(req, supabase, form_id)
     if (owner.error) return jsonResponse({ error: owner.error }, owner.status)
     const { form } = owner
+
+    const limited = await enforceRateLimit(
+      supabase, `ai-ask:${await callerId(req, supabase)}`,
+      { max: 20, windowSeconds: 3600 },
+      { function: 'ai-ask', form_id },
+    )
+    if (limited) return limited
 
     const submissions = await fetchSubmissions(supabase, form_id, submission_ids)
     const stats = buildStats(form, submissions)

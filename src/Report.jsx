@@ -17,6 +17,8 @@ import PromotedVisuals from './report/PromotedVisuals'
 import TrendLineChart from './report/components/TrendLineChart'
 import Modal from './components/Modal'
 import { LoadingSpinner } from './LoadingState'
+import { RefreshingIndicator } from './components/InlineLoader'
+import { getPageCache, setPageCache } from './hooks/pageCache'
 import { getGroupableFields, getMeasureOptions, computePivot, toChartData } from './report/helpers/pivotEngine'
 import { formatNaira, median } from './report/helpers/analysisUtils'
 import { DATE_RANGE_OPTIONS, getDateRangeBounds, getDateRangeLabel } from './report/helpers/dateRange'
@@ -159,6 +161,7 @@ function Report() {
   const isSharedViewer = !!form && !!session && !isStaffView && form.user_id !== session.user.id
   const [submissions, setSubmissions] = useState([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
 
   const [dateRange, setDateRange] = useState('all')
@@ -185,15 +188,18 @@ function Report() {
     if (saveErr && import.meta.env.DEV) console.error('Could not save chart layout:', saveErr)
   }
 
+  const cacheKey = `report:${id}`
+
   useEffect(() => {
-    async function loadData() {
-      setLoading(true)
+    async function loadData(silent) {
+      if (!silent) setLoading(true)
+      setRefreshing(true)
       const { data: formData, error: formError } = await supabase
         .from('forms').select('*').eq('id', id).single()
 
       if (formError) {
-        setError('This form could not be found.')
-        setLoading(false)
+        if (!silent) { setError('This form could not be found.'); setLoading(false) }
+        setRefreshing(false)
         return
       }
       setForm(formData)
@@ -207,15 +213,26 @@ function Report() {
         .order('created_at', { ascending: true })
 
       if (subsError) {
-        setError('Could not load records: ' + subsError.message)
-        setLoading(false)
+        if (!silent) { setError('Could not load records: ' + subsError.message); setLoading(false) }
+        setRefreshing(false)
         return
       }
       setSubmissions(subsData)
+      setPageCache(cacheKey, { form: formData, submissions: subsData })
       setLoading(false)
+      setRefreshing(false)
     }
-    loadData()
-  }, [id, staffFormId])
+
+    const cached = getPageCache(cacheKey)
+    if (cached) {
+      setForm(cached.form)
+      setSubmissions(cached.submissions)
+      setLoading(false)
+      loadData(true)
+    } else {
+      loadData(false)
+    }
+  }, [id, staffFormId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Only shows the compact bar's "⋯" button once there's an actual report
   // (and Options menu) to open - not during loading/error/empty-state,
@@ -481,13 +498,22 @@ function Report() {
           fixed. A momentary, partial letter overlap while scrolling past a
           floating button is normal FAB behavior (see Gmail/WhatsApp etc.),
           not worth trading real content width for. */}      <style>{`
-        .kpi-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.8rem; }
+        .kpi-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.8rem; }
         .kpi-add-tile { transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease; }
         .kpi-add-tile:hover { border-color: var(--color-primary); color: var(--color-primary); background: #f8fbff; }
         @media (min-width: 500px) {
           .kpi-grid { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
         }
+        /* Chart-tile cards carry generous padding on desktop; on a phone that
+           eats most of a 320-360px width, so a chart ends up ~250px. Pull it
+           in hard below 640. */
+        .report-tile-card { padding: 1.75rem; }
         @media (max-width: 640px) {
+          .kpi-grid { gap: 0.6rem; }
+          /* padding pulled in, and a hard clip as a backstop so a chart's
+             internals can never paint past the card / page edge on a phone
+             (hover tooltips are desktop-only anyway - see ChartTooltip). */
+          .report-tile-card { padding: 1.05rem; overflow: hidden; }
           .report-filter-bar {
             position: sticky; top: 0.5rem; z-index: 30; background: rgba(255,255,255,0.95);
             backdrop-filter: blur(10px); border: 1px solid var(--color-border); border-radius: var(--radius);
@@ -497,8 +523,9 @@ function Report() {
       `}</style>
 
       <header className="report-header" data-html2canvas-ignore="true">
-        <div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.7rem', flexWrap: 'wrap' }}>
           <h1 className="report-title">Sales Report</h1>
+          <RefreshingIndicator show={refreshing && !loading} />
         </div>
       </header>
 
@@ -590,7 +617,8 @@ function Report() {
           <div className="dropdown-panel" style={{
             position: 'fixed', top: '4.2rem', right: '0.8rem',
             background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 150, minWidth: '220px', padding: '0.6rem',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 150,
+            width: 'min(220px, calc(100vw - 1.6rem))', padding: '0.6rem',
             overflow: 'hidden'
           }}>
             {optionsMenuItems}
@@ -786,8 +814,8 @@ function ChartTileGrid({ tiles, pairs, onTogglePair, onMove, canEdit }) {
       out.push(
         <div key={t.id} data-report-block className="report-tile-wide">
           <div className="report-chart-pair">
-            <div className="card" style={{ padding: '1.5rem' }}><ChartTileBody {...t} /></div>
-            <div className="card" style={{ padding: '1.5rem' }}><ChartTileBody {...next} /></div>
+            <div className="card report-tile-card"><ChartTileBody {...t} /></div>
+            <div className="card report-tile-card"><ChartTileBody {...next} /></div>
           </div>
           {canEdit && (
             <div className="report-tile-control" data-html2canvas-ignore="true" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.4rem', marginTop: '0.35rem' }}>
@@ -801,7 +829,7 @@ function ChartTileGrid({ tiles, pairs, onTogglePair, onMove, canEdit }) {
     } else {
       const showHeader = !!t.title || canEdit
       out.push(
-        <div key={t.id} data-report-block className="card" style={{ padding: '1.75rem' }}>
+        <div key={t.id} data-report-block className="card report-tile-card">
           {showHeader && (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', marginBottom: '0.9rem' }}>
               {t.title ? <div style={{ fontSize: '1.15rem', fontWeight: 800 }}>{t.title}</div> : <span />}
@@ -848,27 +876,29 @@ function OverviewCard({ form, submissions }) {
   const insights = computeInsights(form, submissions).slice(0, 4)
 
   return (
-    <div className="card" style={{ padding: '1.5rem', marginBottom: '1.2rem', background: 'linear-gradient(135deg, var(--color-surface) 0%, var(--color-primary-soft) 100%)' }}>
-      {hasCartData ? (
-        <div style={{ fontSize: '1.15rem', color: 'var(--color-text)', lineHeight: 1.5 }}>
-          Your business generated{' '}
-          <span style={{ fontSize: '2rem', fontWeight: 800, letterSpacing: '-0.01em', fontVariantNumeric: 'tabular-nums' }}>
-            {formatNaira(totalRevenue)}
-          </span>{' '}
-          during this period.
-        </div>
-      ) : (
-        <div style={{ fontSize: '1.15rem', color: 'var(--color-text)', lineHeight: 1.5 }}>
-          You received{' '}
-          <span style={{ fontSize: '2rem', fontWeight: 800, letterSpacing: '-0.01em', fontVariantNumeric: 'tabular-nums' }}>
-            {totalResponses.toLocaleString()}
-          </span>{' '}
-          response{totalResponses !== 1 ? 's' : ''} during this period.
-        </div>
-      )}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', marginBottom: '1.2rem' }}>
+      <div className="card" style={{ padding: '1.5rem', background: 'linear-gradient(135deg, var(--color-surface) 0%, var(--color-primary-soft) 100%)' }}>
+        {hasCartData ? (
+          <div style={{ fontSize: '1.15rem', color: 'var(--color-text)', lineHeight: 1.5 }}>
+            Your business generated{' '}
+            <span style={{ fontSize: 'clamp(1.5rem, 6vw, 2rem)', fontWeight: 800, letterSpacing: '-0.01em', fontVariantNumeric: 'tabular-nums' }}>
+              {formatNaira(totalRevenue)}
+            </span>{' '}
+            during this period.
+          </div>
+        ) : (
+          <div style={{ fontSize: '1.15rem', color: 'var(--color-text)', lineHeight: 1.5 }}>
+            You received{' '}
+            <span style={{ fontSize: 'clamp(1.5rem, 6vw, 2rem)', fontWeight: 800, letterSpacing: '-0.01em', fontVariantNumeric: 'tabular-nums' }}>
+              {totalResponses.toLocaleString()}
+            </span>{' '}
+            response{totalResponses !== 1 ? 's' : ''} during this period.
+          </div>
+        )}
+      </div>
 
       {insights.length > 0 && (
-        <div style={{ marginTop: '1.1rem', paddingTop: '1rem', borderTop: '1px solid rgba(15,23,42,0.08)' }}>
+        <div className="card" style={{ padding: '1.5rem' }}>
           <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.6rem' }}>
             Key highlights
           </div>

@@ -11,12 +11,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { jsonResponse, corsHeaders } from '../_shared/stats.ts'
-
-function clientIp(req: Request) {
-  const forwarded = req.headers.get('x-forwarded-for')
-  if (forwarded) return forwarded.split(',')[0].trim()
-  return req.headers.get('cf-connecting-ip') || null
-}
+import { clientIp, enforceRateLimit } from '../_shared/rateLimit.ts'
 
 Deno.serve(async req => {
   try {
@@ -32,6 +27,17 @@ Deno.serve(async req => {
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
+
+    // Public + unauthenticated by design (see the file header) - this is the
+    // one endpoint anyone on the internet can call with just a form_id, so it
+    // gets its own budget per (ip, form) rather than sharing one global key.
+    const ip = clientIp(req)
+    const limited = await enforceRateLimit(
+      supabase, `submit-form:${ip ?? 'unknown'}:${form_id}`,
+      { max: 20, windowSeconds: 300 },
+      { function: 'submit-form', ip, form_id },
+    )
+    if (limited) return limited
 
     const { data: form, error: formError } = await supabase
       .from('forms').select('id, status').eq('id', form_id).single()

@@ -61,7 +61,7 @@ function QuizHome() {
             <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>Overall Points</div>
           </div>
           <div className="card" style={{ padding: '1rem 1.3rem', flex: '1 1 140px' }}>
-            <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>{history.best_rank ?? '—'}</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>{history.best_rank ?? '-'}</div>
             <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>My Best Rank</div>
           </div>
           <div className="card" style={{ padding: '1rem 1.3rem', flex: '1 1 140px' }}>

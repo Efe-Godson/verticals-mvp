@@ -6,6 +6,7 @@
 import { useMemo, useState } from 'react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, LabelList, ResponsiveContainer } from 'recharts'
 import { bucketDate } from '../engine/dateBuckets'
+import useIsMobile from '../../hooks/useIsMobile'
 
 const GRANULARITIES = [
   ['day', 'D'],
@@ -42,10 +43,12 @@ export default function TrendLineChart({
   defaultGranularity = 'day',
   formatValue = (v) => v.toLocaleString(),
   currency = false,
-  height = 260,
+  height,
 }) {
   const [showLabels, setShowLabels] = useState(false)
   const [gran, setGran] = useState(defaultGranularity)
+  const isMobile = useIsMobile()
+  const chartHeight = height ?? (isMobile ? 210 : 260)
 
   const data = useMemo(() => {
     const buckets = {}
@@ -69,28 +72,34 @@ export default function TrendLineChart({
       <div
         data-html2canvas-ignore="true"
         className="report-tile-control"
-        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '.4rem', marginBottom: '.4rem' }}
+        style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          flexWrap: 'wrap', gap: '.4rem', marginBottom: '.4rem',
+        }}
       >
-        <div style={groupStyle}>
+        {/* On a phone the two segmented groups can't sit side by side without
+            the second one spilling off the card - each takes a full row and
+            its buttons split the width evenly. */}
+        <div style={{ ...groupStyle, ...(isMobile ? { width: '100%' } : null) }}>
           {GRANULARITIES.map(([value, short]) => (
             <button
               key={value}
               type="button"
               onClick={() => setGran(value)}
               title={value[0].toUpperCase() + value.slice(1)}
-              style={toggleBtnStyle(gran === value)}
+              style={{ ...toggleBtnStyle(gran === value), ...(isMobile ? { flex: 1 } : null) }}
             >
               {short}
             </button>
           ))}
         </div>
-        <div style={groupStyle}>
-          <button type="button" onClick={() => setShowLabels(false)} style={toggleBtnStyle(!showLabels)}>Hide labels</button>
-          <button type="button" onClick={() => setShowLabels(true)} style={toggleBtnStyle(showLabels)}>Show labels</button>
+        <div style={{ ...groupStyle, ...(isMobile ? { width: '100%' } : null) }}>
+          <button type="button" onClick={() => setShowLabels(false)} style={{ ...toggleBtnStyle(!showLabels), ...(isMobile ? { flex: 1 } : null) }}>Hide labels</button>
+          <button type="button" onClick={() => setShowLabels(true)} style={{ ...toggleBtnStyle(showLabels), ...(isMobile ? { flex: 1 } : null) }}>Show labels</button>
         </div>
       </div>
 
-      <div style={{ width: '100%', height }}>
+      <div style={{ width: '100%', height: chartHeight }}>
         <ResponsiveContainer>
           <AreaChart data={data} margin={{ top: showLabels ? 18 : 8, right: 16, bottom: 4, left: 0 }}>
             <defs>
@@ -104,15 +113,15 @@ export default function TrendLineChart({
                 their value labels + end ticks aren't clipped. */}
             <XAxis
               dataKey="label"
-              tick={{ fontSize: 11, fill: 'var(--color-muted)' }}
+              tick={{ fontSize: isMobile ? 10 : 11, fill: 'var(--color-muted)' }}
               interval="preserveStartEnd"
-              minTickGap={28}
-              padding={{ left: 20, right: 22 }}
+              minTickGap={isMobile ? 40 : 28}
+              padding={{ left: isMobile ? 14 : 20, right: isMobile ? 16 : 22 }}
             />
             <YAxis
-              tick={{ fontSize: 11, fill: 'var(--color-muted)' }}
+              tick={{ fontSize: isMobile ? 10 : 11, fill: 'var(--color-muted)' }}
               tickFormatter={axisFmt}
-              width={54}
+              width={isMobile ? 42 : 54}
             />
             <Tooltip
               formatter={(v) => formatValue(v)}

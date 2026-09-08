@@ -19,7 +19,7 @@ export default function ViewDataModal({ visual, result, form, submissions, onClo
   const fields = (form?.fields || []).filter(f => f.type !== 'section' && f.type !== 'fileupload').slice(0, 14)
 
   return (
-    <Modal size="xl" onClose={onClose} title={`${visual.title} — Data`} bodyStyle={{ padding: '0.8rem 1.1rem 1.1rem' }}>
+    <Modal size="xl" onClose={onClose} title={`${visual.title} - Data`} bodyStyle={{ padding: '0.8rem 1.1rem 1.1rem' }}>
       <div>
         <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.6rem', flexWrap: 'wrap' }}>
           <button className={tab === 'agg' ? '' : 'secondary'} style={{ fontSize: '0.8rem' }} onClick={() => setTab('agg')}>Aggregated Data</button>
@@ -43,7 +43,7 @@ export default function ViewDataModal({ visual, result, form, submissions, onClo
                       <td style={{ ...td, textAlign: 'right', fontWeight: 600 }}>{fmt(r.value)}</td>
                       <td style={{ ...td, textAlign: 'right' }}>{formatPercent(r.percentOfTotal || 0)}</td>
                       <td style={{ ...td, textAlign: 'right' }}>{(r.pctDiffFromMean || 0) >= 0 ? '+' : ''}{formatPercent(r.pctDiffFromMean || 0)}</td>
-                      <td style={{ ...td, textAlign: 'right' }}>{r.rank ?? '—'}</td>
+                      <td style={{ ...td, textAlign: 'right' }}>{r.rank ?? '-'}</td>
                     </tr>
                   ))}
                   {rows.length === 0 && <tr><td style={td} colSpan={5}>No aggregated rows.</td></tr>}

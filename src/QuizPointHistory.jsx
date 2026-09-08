@@ -3,12 +3,15 @@ import { useEffect, useState } from 'react'
 import { getQuizIdentityToken } from './quizIdentity'
 import { invokeQuiz } from './quizApi'
 import PageSkeleton from './components/PageSkeleton'
+import useIsMobile from './hooks/useIsMobile'
+import { DataCard, DataCardList } from './components/DataCards'
 
 function formatDate(dateString) {
   return new Date(dateString).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
 function QuizPointHistory() {
+  const isMobile = useIsMobile()
   const [history, setHistory] = useState(null)
 
   useEffect(() => {
@@ -40,7 +43,7 @@ function QuizPointHistory() {
           <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>Average Accuracy</div>
         </div>
         <div className="card" style={{ padding: '1rem 1.3rem', flex: '1 1 140px' }}>
-          <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>{history.best_rank ?? '—'}</div>
+          <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>{history.best_rank ?? '-'}</div>
           <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>Best Rank</div>
         </div>
       </div>
@@ -48,6 +51,15 @@ function QuizPointHistory() {
       <h3 style={{ marginBottom: '0.6rem' }}>History</h3>
       {!history.history.length ? (
         <p style={{ color: 'var(--color-muted)', fontSize: '0.9rem' }}>No finished quizzes yet.</p>
+      ) : isMobile ? (
+        <DataCardList>
+          {history.history.map(h => (
+            <DataCard key={h.room_id + h.date} title={h.name} subtitle={formatDate(h.date)}>
+              <DataCard.Row label="Points" value={h.points} strong />
+              <DataCard.Row label="Rank" value={`#${h.rank}`} muted />
+            </DataCard>
+          ))}
+        </DataCardList>
       ) : (
         <div className="table-wrap table-bleed">
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>

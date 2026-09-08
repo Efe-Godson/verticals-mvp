@@ -4,7 +4,7 @@
 //   grid     - a spreadsheet-style free grid (18)
 import { useMemo, useState } from 'react'
 import { useToast } from '../Toast'
-import { PayrollModal, Field, TextInput, Select, money, currentMonth, entryTypeGroups, categoryOf } from './ui'
+import { PayrollModal, Field, TextInput, Select, EmployeeChecklist, money, currentMonth, entryTypeGroups, categoryOf } from './ui'
 import { getDailyRate, ENTRY_TYPE_LABELS } from './calculatePayroll'
 import { createEntries } from './payrollApi'
 
@@ -35,6 +35,11 @@ export default function BulkEntryModal({ formId, settings, employees, onClose, o
   // --- days mode ---
   const [daysType, setDaysType] = useState('missed_day')
   const [dayCounts, setDayCounts] = useState({}) // { empId: qty }
+  const [daysSearch, setDaysSearch] = useState('')
+  const visibleDaysEmployees = useMemo(() => {
+    const q = daysSearch.trim().toLowerCase()
+    return q ? employees.filter(e => e.full_name.toLowerCase().includes(q)) : employees
+  }, [employees, daysSearch])
 
   // --- grid mode ---
   const [rows, setRows] = useState([{ employee_id: '', entry_type: 'fine', reason: '', quantity: '', amount: '' }])
@@ -130,14 +135,7 @@ export default function BulkEntryModal({ formId, settings, employees, onClose, o
           </div>
           <Field label="Reason"><TextInput value={sameReason} onChange={(e) => setSameReason(e.target.value)} /></Field>
           <Field label={`Employees (${sameIds.length} selected)`}>
-            <div style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)', padding: '0.5rem' }}>
-              {employees.map(emp => (
-                <label key={emp.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.2rem 0', fontSize: '0.9rem' }}>
-                  <input type="checkbox" checked={sameIds.includes(emp.id)} onChange={() => toggleSame(emp.id)} />
-                  {emp.full_name}
-                </label>
-              ))}
-            </div>
+            <EmployeeChecklist employees={employees} selectedIds={sameIds} onToggle={toggleSame} maxHeight="180px" />
           </Field>
         </>
       )}
@@ -150,8 +148,19 @@ export default function BulkEntryModal({ formId, settings, employees, onClose, o
               <option value="extra_day">Extra Day (addition)</option>
             </Select>
           </Field>
+          {employees.length > 5 && (
+            <TextInput
+              placeholder="Search employees…"
+              value={daysSearch}
+              onChange={(e) => setDaysSearch(e.target.value)}
+              style={{ marginBottom: '0.6rem' }}
+            />
+          )}
           <div style={{ border: '1px solid var(--color-border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
-            {employees.map(emp => {
+            {visibleDaysEmployees.length === 0 && (
+              <div style={{ padding: '0.6rem', fontSize: '0.85rem', color: 'var(--color-muted)' }}>No matches.</div>
+            )}
+            {visibleDaysEmployees.map(emp => {
               const qty = Number(dayCounts[emp.id]) || 0
               const amt = qty * getDailyRate(emp.monthly_salary, payrollMonth, settings)
               return (
@@ -163,7 +172,7 @@ export default function BulkEntryModal({ formId, settings, employees, onClose, o
                     style={{ width: '70px' }}
                   />
                   <span style={{ width: '110px', textAlign: 'right', fontSize: '0.82rem', color: 'var(--color-muted)' }}>
-                    {qty > 0 ? money(amt, 0) : '—'}
+                    {qty > 0 ? money(amt, 0) : '-'}
                   </span>
                 </div>
               )
@@ -187,7 +196,7 @@ export default function BulkEntryModal({ formId, settings, employees, onClose, o
                   <tr key={i}>
                     <td style={{ padding: '0.25rem' }}>
                       <Select value={r.employee_id} onChange={(e) => upd('employee_id', e.target.value)} style={{ minWidth: '130px' }}>
-                        <option value="">—</option>
+                        <option value="">-</option>
                         {employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
                       </Select>
                     </td>
@@ -212,7 +221,7 @@ export default function BulkEntryModal({ formId, settings, employees, onClose, o
             + Add row
           </button>
           <p style={{ fontSize: '0.76rem', color: 'var(--color-muted)', marginTop: '0.4rem' }}>
-            Leave Amount blank for Missed / Extra Day — it is computed from the day count.
+            Leave Amount blank for Missed / Extra Day - it is computed from the day count.
           </p>
         </div>
       )}

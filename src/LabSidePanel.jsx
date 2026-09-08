@@ -12,6 +12,10 @@ const ENTRIES = [
   { label: 'Lab Dashboard', to: '/lab' },
   { label: 'Templates', to: '/templates' },
   { label: '🎲 Quiz', to: '/lab/quiz' },
+  { label: '🚨 Alerts', to: '/lab/alerts' },
+  { label: '📧 Email Monitor', to: '/lab/email-monitor' },
+  { label: '🧭 Onboarding', to: '/lab/onboarding' },
+  { label: '🎬 Demo', to: '/lab/demo' },
 ]
 
 function LabSidePanel() {

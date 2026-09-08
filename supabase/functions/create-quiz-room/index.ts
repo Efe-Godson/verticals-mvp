@@ -8,6 +8,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { jsonResponse, corsHeaders, requireQuizAdmin, generateRoomCode } from '../_shared/quiz.ts'
+import { callerId, enforceRateLimit } from '../_shared/rateLimit.ts'
 
 const MAX_CODE_ATTEMPTS = 5
 const DIFFICULTIES = ['easy', 'medium', 'hard', 'mixed']
@@ -26,6 +27,13 @@ Deno.serve(async req => {
 
     const admin = await requireQuizAdmin(req, supabase)
     if (admin.error) return jsonResponse({ error: admin.error }, admin.status)
+
+    const limited = await enforceRateLimit(
+      supabase, `create-quiz-room:${await callerId(req, supabase)}`,
+      { max: 30, windowSeconds: 60 },
+      { function: 'create-quiz-room' },
+    )
+    if (limited) return limited
 
     const { name, topic, question_count, difficulty, question_type, time_per_question_seconds } = await req.json()
 

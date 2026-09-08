@@ -12,6 +12,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { jsonResponse, corsHeaders } from '../_shared/stats.ts'
 import { generateText } from '../_shared/aiProvider.ts'
+import { enforceRateLimit } from '../_shared/rateLimit.ts'
 
 const MAX_TEXT_LENGTH = 12000 // generous for a pasted menu/price list, cheap guard against runaway prompts
 
@@ -67,6 +68,14 @@ Deno.serve(async req => {
     )
     const { data: userData, error: userError } = await supabase.auth.getUser(jwt)
     if (userError || !userData?.user) return jsonResponse({ error: 'Invalid or expired session' }, 401)
+
+    // Calls a paid AI provider per request.
+    const limited = await enforceRateLimit(
+      supabase, `extract-products-ai:${userData.user.id}`,
+      { max: 20, windowSeconds: 3600 },
+      { function: 'extract-products-ai', user_id: userData.user.id },
+    )
+    if (limited) return limited
 
     const { text } = await req.json()
     if (!text?.trim()) return jsonResponse({ error: 'text is required' }, 400)

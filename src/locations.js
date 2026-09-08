@@ -19,11 +19,27 @@ export async function createLocationForm({ session, template, locationName }) {
       templateSlug: template.slug,
       locationName: trimmed,
       companyName: trimmed,
+      ...expenseDefaults(template),
     },
   }]).select().single()
 
   if (error || !data) throw new Error(error?.message || 'Could not create this location')
   return data
+}
+
+// Extra settings an Expenses book (src/expenses/) starts with: business
+// mode by default, the report engine pointed at the expense date rather
+// than created_at, and the noisier columns hidden so the reused Records
+// table opens lean (Date · Description · Category · Amount · Payment method).
+function expenseDefaults(template) {
+  if (template.slug !== 'expenses') return {}
+  return {
+    recordKind: 'expense',
+    expenseMode: 'business',
+    reportDateField: 'date',
+    reportAmountField: 'amount',
+    hiddenFieldIds: ['time', 'paid_from', 'notes', 'receipt'],
+  }
 }
 
 // Clones an existing location's own fields (its actual menu/products/
@@ -71,6 +87,9 @@ export async function duplicateLocationForm({ session, sourceFormId, locationNam
 // enough now that popping the menu open unprompted just gets in the way
 // of the catalogue you actually came here to see. The builder still does.
 export function locationDestination(template, formId) {
+  // Expenses books open on their own Overview (src/expenses/), like a
+  // cart template opens on its order screen - not the blank builder.
+  if (template.slug === 'expenses') return `/form/${formId}/expenses`
   const isCartTemplate = template.fields?.some(f => f.type === 'cart')
   return isCartTemplate ? `/form/${formId}` : `/form/${formId}/edit?panel=1`
 }

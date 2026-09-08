@@ -28,11 +28,18 @@ import JoinQuizRoom from './JoinQuizRoom'
 import QuizRoom from './QuizRoom'
 import QuizAdminDashboard from './QuizAdminDashboard'
 import QuizPointHistory from './QuizPointHistory'
+import AlertsPage from './AlertsPage'
+import EmailMonitorPage from './EmailMonitorPage'
+import OnboardingPrototype from './lab/onboarding/OnboardingPrototype'
+import DemoExperience from './lab/demo/DemoExperience'
+import DemoRibbon from './lab/demo/DemoRibbon'
 import PayrollShell from './payroll/PayrollShell'
 import PayrollEmployees from './payroll/PayrollEmployees'
 import PayrollEmployeeProfile from './payroll/PayrollEmployeeProfile'
 import PayrollEntries from './payroll/PayrollEntries'
 import PayrollMonthly from './payroll/PayrollMonthly'
+import ExpenseShell from './expenses/ExpenseShell'
+import ExpenseOverview from './expenses/ExpenseOverview'
 import Login from './Login'
 import SignUp from './SignUp'
 import ConfirmEmail from './ConfirmEmail'
@@ -115,7 +122,10 @@ function AppShell() {
   // Payroll is a contained environment with its own slide-out nav + back
   // button (see payroll/PayrollSidePanel.jsx), like the POS focus flow.
   const isPayrollEnv = /^\/form\/[^/]+\/payroll(\/|$)/.test(location.pathname)
-  const showNavBar = !isPublicForm && !isShortLink && !isQuizPlayer && !isLogin && !isSignUp && !isConfirmEmail && !isResetPassword && !isFocusMode && !isReportBuilder && !isPayrollEnv && !isSharedReport
+  // Expenses books (src/expenses/) are the same kind of contained environment,
+  // navigated via PosSidePanel's expense links - no app NavBar.
+  const isExpenseEnv = /^\/form\/[^/]+\/expenses(\/|$)/.test(location.pathname)
+  const showNavBar = !isPublicForm && !isShortLink && !isQuizPlayer && !isLogin && !isSignUp && !isConfirmEmail && !isResetPassword && !isFocusMode && !isReportBuilder && !isPayrollEnv && !isExpenseEnv && !isSharedReport
 
   // The POS side panel is mounted here (not inside each focus-mode page) so
   // it stays put across navigation between Records / Reports / Settings /
@@ -129,6 +139,7 @@ function AppShell() {
   return (
     <>
       <OfflineBanner />
+      <DemoRibbon />
       {showNavBar && <NavBar />}
       {showNavBar && <DarkModeToggle />}
       {posPanelFormId && <PosSidePanel formId={posPanelFormId} />}
@@ -163,6 +174,10 @@ function AppShell() {
         <Route path="/lab/quiz/room/:roomId/play" element={<QuizRoom />} />
         <Route path="/lab/quiz/room/:roomId/admin" element={<PrivateRoute><StaffScopedRoute><AdminOnlyRoute><QuizAdminDashboard /></AdminOnlyRoute></StaffScopedRoute></PrivateRoute>} />
         <Route path="/lab/quiz/history" element={<PrivateRoute><StaffScopedRoute><AdminOnlyRoute><QuizPointHistory /></AdminOnlyRoute></StaffScopedRoute></PrivateRoute>} />
+        <Route path="/lab/alerts" element={<PrivateRoute><StaffScopedRoute><AdminOnlyRoute><AlertsPage /></AdminOnlyRoute></StaffScopedRoute></PrivateRoute>} />
+        <Route path="/lab/email-monitor" element={<PrivateRoute><StaffScopedRoute><AdminOnlyRoute><EmailMonitorPage /></AdminOnlyRoute></StaffScopedRoute></PrivateRoute>} />
+        <Route path="/lab/onboarding" element={<PrivateRoute><StaffScopedRoute><AdminOnlyRoute><OnboardingPrototype /></AdminOnlyRoute></StaffScopedRoute></PrivateRoute>} />
+        <Route path="/lab/demo" element={<PrivateRoute><StaffScopedRoute><AdminOnlyRoute><DemoExperience /></AdminOnlyRoute></StaffScopedRoute></PrivateRoute>} />
         <Route path="/reports" element={<PrivateRoute><StaffScopedRoute><Reports /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/records" element={<PrivateRoute><StaffScopedRoute><RecordsHome /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/templates" element={<PrivateRoute><StaffScopedRoute><Templates /></StaffScopedRoute></PrivateRoute>} />
@@ -190,6 +205,11 @@ function AppShell() {
           <Route path="staff" element={<PayrollEmployees />} />
           <Route path="staff/:empId" element={<PayrollEmployeeProfile />} />
           <Route path="events" element={<PayrollEntries />} />
+        </Route>
+        {/* Expenses book: a contained environment like Payroll. ExpenseShell
+            loads the anchor form once and shares it via <Outlet>. */}
+        <Route path="/form/:id/expenses" element={<PrivateRoute><StaffScopedRoute><ExpenseShell /></StaffScopedRoute></PrivateRoute>}>
+          <Route index element={<ExpenseOverview />} />
         </Route>
       </Routes>
       </ErrorBoundary>

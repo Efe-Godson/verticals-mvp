@@ -76,8 +76,75 @@ export function getDateRangeBounds(range, customStart, customEnd) {
 }
 
 
+// True when a cell holds nothing worth showing - mirrors Records.jsx's
+// hasValue(), negated. Used for the "(Blanks)" filter option and to push
+// empty cells to the end when sorting.
+export function isBlankValue(v) {
+  if (v === null || v === undefined || v === '') return true
+  if (Array.isArray(v)) return v.length === 0
+  if (typeof v === 'object') return !Object.values(v).some(x => x !== null && x !== undefined && x !== '')
+  return String(v).trim() === ''
+}
+
+// The plain-text form of a cell, matching what formatCell() renders on
+// screen so the value list in the column menu lines up with the table.
+export function valueDisplayString(value, field) {
+  if (isBlankValue(value)) return ''
+  switch (field.type) {
+    case 'date': {
+      const d = new Date(value)
+      return isNaN(d) ? String(value) : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+    }
+    case 'number': {
+      const n = Number(value)
+      return isNaN(n) ? String(value) : n.toLocaleString()
+    }
+    case 'linked_record':
+      return value?.label ? String(value.label) : ''
+    case 'location':
+      return [value.city, value.state, value.country].filter(Boolean).join(', ')
+    default:
+      if (Array.isArray(value)) return value.join(', ')
+      if (typeof value === 'object') return Object.values(value).filter(Boolean).join(', ')
+      return String(value)
+  }
+}
+
+// Comparator for column sort. Blanks always sink to the bottom regardless of
+// direction (how a spreadsheet behaves); everything else compares by number,
+// timestamp, or locale string depending on the field type.
+export function makeSortComparator(field, dir) {
+  const mult = dir === 'desc' ? -1 : 1
+  const key = (sub) => {
+    const v = sub.data?.[field.id]
+    if (isBlankValue(v)) return null
+    if (field.type === 'number') { const n = Number(v); return isNaN(n) ? null : n }
+    if (field.type === 'date') { const t = new Date(v).getTime(); return isNaN(t) ? null : t }
+    return valueDisplayString(v, field).toLowerCase()
+  }
+  return (a, b) => {
+    const ka = key(a), kb = key(b)
+    if (ka === null && kb === null) return 0
+    if (ka === null) return 1
+    if (kb === null) return -1
+    if (typeof ka === 'number' && typeof kb === 'number') return (ka - kb) * mult
+    return String(ka).localeCompare(String(kb)) * mult
+  }
+}
+
 export function passesFilter(sub, field, filter) {
   const value = sub.data[field.id]
+
+  // Excel-style value picker: a set of ticked values plus an optional
+  // "(Blanks)" and a contains-text box. `values: null` means "any non-blank".
+  if (filter.kind === 'values') {
+    if (isBlankValue(value)) return !!filter.includeBlanks
+    const disp = valueDisplayString(value, field)
+    if (filter.text && !disp.toLowerCase().includes(filter.text.toLowerCase())) return false
+    if (filter.values == null) return true
+    return filter.values.includes(disp)
+  }
+
   if (field.type === 'number') {
     if (value === undefined || value === '') return false
     const num = Number(value)

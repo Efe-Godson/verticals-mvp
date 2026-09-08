@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useParams } from 'react-router-dom'
 import useIsMobile from './hooks/useIsMobile'
 import Modal from './components/Modal'
+import CardChoice from './components/CardChoice'
 import PosSidePanel from './PosSidePanel'
 import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
@@ -10,7 +11,7 @@ import SparkleIcon from './SparkleIcon'
 import { ExtractingOverlay } from './LoadingState'
 import PageSkeleton from './components/PageSkeleton'
 import { useDeferredLoading } from './components/loadingHooks'
-import { ErrorState } from './ErrorState'
+import { ErrorState, InlineError } from './ErrorState'
 import { InvoiceModal } from './InvoiceModal'
 import { printReceipt } from './receiptPrint'
 import { isRetailTemplate, isRestaurantTemplate } from './lib/templateFlags'
@@ -19,6 +20,17 @@ import { extractOrderFromText, describeAIError } from './lib/aiClient'
 import { COUNTRIES, statesFor, citiesForField } from './lib/locationData'
 const PAYMENT_METHODS = ['Cash', 'Card', 'Bank Transfer', 'Split']
 const TOP_CATEGORY_COUNT = 6 // category pills shown before collapsing the rest behind "+N more"
+// Field types that render as a group of controls (radios/checkboxes, a
+// grid, the cart, a file picker, ...) rather than one control with one
+// value - these keep the classic label-above-the-field layout in
+// renderFieldRow. Everything else gets a floating label instead (see
+// renderInput and the .field-floating rules in index.css); date/time are
+// deliberately excluded too - native date/time pickers render their own
+// placeholder text, which a floating label would sit on top of.
+const WIDGET_FIELD_TYPES = new Set([
+  'cart', 'multiplechoice', 'checkbox', 'multiplechoicegrid', 'checkboxgrid',
+  'linearscale', 'rating', 'fileupload', 'linked_record', 'date', 'time',
+])
 
 // Splits fields into pages at each 'section' marker, Google-Forms style:
 // fields before the first section (if any) form an unheaded first page,
@@ -400,6 +412,10 @@ function PublicForm() {
   const pages = useMemo(() => buildPages(form?.fields || []), [form])
   const currentPage = pages[pageIndex] || pages[0]
   const hasCartOnPage = currentPage.fields.some(f => f.type === 'cart')
+  // "Stepped" display style (form.settings.formStyle): one screen per section
+  // with large card options for choice fields. Never for cart/POS forms -
+  // that flow has its own dense order-screen UX.
+  const steppedStyle = form?.settings?.formStyle === 'stepped' && !form?.fields?.some(f => f.type === 'cart')
   // Retail-style forms (deferCheckout on the cart field) skip the embedded
   // checkout modal entirely: the cart is just one field among others, and
   // the whole page (cart + everything else) submits together via the
@@ -1048,29 +1064,53 @@ function PublicForm() {
     }
   }
 
+  // The floating label for a single-control field (see .field-floating in
+  // index.css) - must be the DOM sibling right after its input/select for
+  // the CSS to pick it up, so every floating branch below renders it last.
+  function floatingLabel(f) {
+    return <label>{f.label}{f.required && <span className="field-required-mark"> *</span>}</label>
+  }
+
   function renderInput(field) {
+    // Stepped display style: choice fields become large card grids.
+    if (steppedStyle && (field.type === 'dropdown' || field.type === 'multiplechoice' || field.type === 'checkbox')) {
+      return (
+        <CardChoice
+          options={field.options || []}
+          multi={field.type === 'checkbox'}
+          value={answers[field.id] ?? (field.type === 'checkbox' ? [] : '')}
+          onChange={(v) => updateAnswer(field.id, v)}
+        />
+      )
+    }
+
     if (field.type === 'longtext') {
       return (
-        <textarea
-          value={answers[field.id] || ''}
-          onChange={(e) => updateAnswer(field.id, e.target.value)}
-          style={{ padding: '0.5rem', width: '100%', minHeight: '80px' }}
-        />
+        <div className="field-floating">
+          <textarea
+            placeholder=" "
+            value={answers[field.id] || ''}
+            onChange={(e) => updateAnswer(field.id, e.target.value)}
+          />
+          {floatingLabel(field)}
+        </div>
       )
     }
 
     if (field.type === 'dropdown') {
       return (
-        <select
-          value={answers[field.id] || ''}
-          onChange={(e) => updateAnswer(field.id, e.target.value)}
-          style={{ padding: '0.5rem', width: '100%' }}
-        >
-          <option value="">Select an option</option>
-          {field.options?.map(opt => (
-            <option key={opt} value={opt}>{opt}</option>
-          ))}
-        </select>
+        <div className="field-floating">
+          <select
+            value={answers[field.id] || ''}
+            onChange={(e) => updateAnswer(field.id, e.target.value)}
+          >
+            <option value="">Select an option</option>
+            {field.options?.map(opt => (
+              <option key={opt} value={opt}>{opt}</option>
+            ))}
+          </select>
+          {floatingLabel(field)}
+        </div>
       )
     }
 
@@ -1886,18 +1926,19 @@ function PublicForm() {
 
     if (field.type === 'autocomplete') {
       return (
-        <>
+        <div className="field-floating">
           <input
             type="text"
             list={`autocomplete-${field.id}`}
+            placeholder=" "
             value={answers[field.id] || ''}
             onChange={(e) => updateAnswer(field.id, e.target.value)}
-            style={{ padding: '0.5rem', width: '100%' }}
           />
+          {floatingLabel(field)}
           <datalist id={`autocomplete-${field.id}`}>
             {field.options?.map(opt => <option key={opt} value={opt} />)}
           </datalist>
-        </>
+        </div>
       )
     }
 
@@ -1911,19 +1952,31 @@ function PublicForm() {
         updateAnswer(field.id, { country, ...value, ...patch })
       }
 
+      // No single group label here (see renderFieldRow - 'location' isn't a
+      // widget type) - each part gets its own floating caption instead, the
+      // required marker (if any) riding on the first one.
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <select value={country} onChange={(e) => setLocationPart({ country: e.target.value, state: '', city: '' })} style={{ padding: '0.5rem' }}>
-            {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-          <select value={value.state || ''} onChange={(e) => setLocationPart({ state: e.target.value, city: '' })} style={{ padding: '0.5rem' }}>
-            <option value="">Select state...</option>
-            {stateOptions.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-          <select value={value.city || ''} onChange={(e) => setLocationPart({ city: e.target.value })} style={{ padding: '0.5rem' }} disabled={!value.state}>
-            <option value="">Select city...</option>
-            {cityOptions.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
+          <div className="field-floating">
+            <select value={country} onChange={(e) => setLocationPart({ country: e.target.value, state: '', city: '' })}>
+              {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <label>Country{field.required && <span className="field-required-mark"> *</span>}</label>
+          </div>
+          <div className="field-floating">
+            <select value={value.state || ''} onChange={(e) => setLocationPart({ state: e.target.value, city: '' })}>
+              <option value="">Select state...</option>
+              {stateOptions.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <label>State</label>
+          </div>
+          <div className="field-floating">
+            <select value={value.city || ''} onChange={(e) => setLocationPart({ city: e.target.value })} disabled={!value.state}>
+              <option value="">Select city...</option>
+              {cityOptions.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <label>City</label>
+          </div>
         </div>
       )
     }
@@ -1936,13 +1989,30 @@ function PublicForm() {
       field.type === 'time' ? 'time' :
       'text'
 
+    // date/time keep the classic layout (see WIDGET_FIELD_TYPES) - native
+    // date/time pickers draw their own placeholder text that a floating
+    // label would collide with.
+    if (field.type === 'date' || field.type === 'time') {
+      return (
+        <input
+          type={inputType}
+          value={answers[field.id] || ''}
+          onChange={(e) => updateAnswer(field.id, e.target.value)}
+          style={{ padding: '0.5rem', width: '100%' }}
+        />
+      )
+    }
+
     return (
-      <input
-        type={inputType}
-        value={answers[field.id] || ''}
-        onChange={(e) => updateAnswer(field.id, e.target.value)}
-        style={{ padding: '0.5rem', width: '100%' }}
-      />
+      <div className="field-floating">
+        <input
+          type={inputType}
+          placeholder=" "
+          value={answers[field.id] || ''}
+          onChange={(e) => updateAnswer(field.id, e.target.value)}
+        />
+        {floatingLabel(field)}
+      </div>
     )
   }
 
@@ -2039,6 +2109,28 @@ function PublicForm() {
   // for the "primary" and "more details" groups separately on a
   // deferCheckout form, instead of one flat .map() over every field.
   function renderFieldRow(field) {
+    // Stepped style: no boxed "card" per field - a clean question + input,
+    // spaced out. Choice fields render as card grids (see renderInput);
+    // plain single inputs keep their floating label, so only choice/widget
+    // fields need an explicit question label here.
+    if (steppedStyle && field.type !== 'cart') {
+      const isChoice = field.type === 'dropdown' || field.type === 'multiplechoice' || field.type === 'checkbox'
+      const showLabel = isChoice || WIDGET_FIELD_TYPES.has(field.type)
+      return (
+        <div key={field.id} className="stepped-field" style={{ marginBottom: '1.8rem' }}>
+          {showLabel && (
+            <label style={{ display: 'block', fontWeight: 600, fontSize: '1.02rem', marginBottom: '0.6rem' }}>
+              {field.label}{field.required && <span className="field-required-mark"> *</span>}
+            </label>
+          )}
+          {renderInput(field)}
+          {errors[field.id] && (
+            <p style={{ color: '#c0392b', fontSize: '0.8rem', marginTop: '0.5rem', marginBottom: 0 }}>{errors[field.id]}</p>
+          )}
+        </div>
+      )
+    }
+
     // Matches the Current Order/Catalogue boxes' pale-green shade above,
     // instead of these fields being the only plain-white cards on the
     // page - deferCheckout only (Retail's inline "cart + fields + one
@@ -2047,14 +2139,21 @@ function PublicForm() {
     const fieldCardStyle = field.type === 'cart'
       ? { marginBottom: '1rem' }
       : { padding: '1rem', marginBottom: '1rem', ...(cartDefersCheckout ? { background: 'var(--color-primary-soft)' } : {}) }
+    // "Widget" fields (a group of checkboxes/radios, the cart, a file
+    // picker, ...) keep the classic label-above-the-field layout - a
+    // floating label only makes sense for one control with one value.
+    // Everything else (single inputs, textarea, dropdown, autocomplete,
+    // location) draws its own floating label inside renderInput instead, see
+    // the .field-floating rules in index.css.
+    const isWidget = WIDGET_FIELD_TYPES.has(field.type)
     return (
       <div key={field.id} className={field.type === 'cart' ? '' : 'card'} style={fieldCardStyle}>
-        {field.type !== 'cart' && (
+        {isWidget && field.type !== 'cart' && (
           <label style={{ fontWeight: '600' }}>
-            {field.label}{field.required && <span style={{ color: '#c0392b' }}> *</span>}
+            {field.label}{field.required && <span className="field-required-mark"> *</span>}
           </label>
         )}
-        <div style={field.type === 'cart' ? {} : { marginTop: '0.5rem' }}>
+        <div style={field.type === 'cart' || !isWidget ? {} : { marginTop: '0.5rem' }}>
           {renderInput(field)}
         </div>
         {errors[field.id] && (
@@ -2067,7 +2166,7 @@ function PublicForm() {
   }
 
   return (
-    <div className="page" style={{
+    <div className={steppedStyle ? 'page stepped-form' : 'page'} style={{
       // PosSidePanel's hamburger button is position:fixed at top:1rem/
       // left:1rem, 42px square - with no reserved space it sits directly on
       // top of the title below (the button is a later paint layer, so it
@@ -2093,7 +2192,10 @@ function PublicForm() {
               screen - the hamburger/back buttons already establish where
               you are, and cutting it saves real vertical space above the
               catalogue. Restaurant (and anything else) keeps it. */}
-          {!isRetail && <h1 style={{ margin: 0 }}>{form.name}</h1>}
+          {/* Hidden when the collapsed-sidebar compact top bar is showing the
+              same name (body.compact-topbar in index.css) - no point printing
+              it twice. */}
+          {!isRetail && <h1 className="pf-order-title" style={{ margin: 0 }}>{form.name}</h1>}
           {form.description && <p style={{ margin: '0.3rem 0 0' }}>{form.description}</p>}
         </div>
         {/* Staff/owner convenience only (session gated) - a customer filling
@@ -2161,9 +2263,15 @@ function PublicForm() {
         </div>
       )}
 
+      {steppedStyle && pages.length > 1 && (
+        <div className="no-print stepped-eyebrow">Step {pageIndex + 1} of {pages.length}</div>
+      )}
+
       {currentPage.section && (
-        <div className="no-print" style={{ marginBottom: '1.2rem' }}>
-          <h2 style={{ margin: '0 0 0.3rem', fontSize: '1.25rem' }}>{currentPage.section.title || 'Untitled Section'}</h2>
+        <div className="no-print" style={{ marginBottom: steppedStyle ? '1.8rem' : '1.2rem' }}>
+          <h2 style={{ margin: '0 0 0.3rem', fontSize: steppedStyle ? 'clamp(1.35rem, 3vw, 1.7rem)' : '1.25rem', lineHeight: 1.2 }}>
+            {currentPage.section.title || 'Untitled Section'}
+          </h2>
           {currentPage.section.description && (
             <p style={{ margin: 0, color: 'var(--color-muted)' }}>{currentPage.section.description}</p>
           )}
@@ -2269,7 +2377,7 @@ function PublicForm() {
       </div>
       )}
 
-      {message && <p className="no-print" style={{ marginTop: '1rem', color: 'red' }}>{message}</p>}
+      {message && <InlineError message={message} className="no-print" style={{ marginTop: '1rem' }} />}
 
       {showAiFill && (() => {
         const cartField = currentPage.fields.find(f => f.type === 'cart')

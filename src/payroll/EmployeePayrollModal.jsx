@@ -4,6 +4,7 @@
 import { useMemo, useState } from 'react'
 import { useToast } from '../Toast'
 import ConfirmDialog from '../ConfirmDialog'
+import ArrowLeftIcon from '../ArrowLeftIcon'
 import { PayrollModal, Field, TextInput, Select, money, monthLabel, friendlyError } from './ui'
 import { calculateEmployeePayroll } from './calculatePayroll'
 import { recalcEmployeeRecord, setRecordStatus, deleteEntry } from './payrollApi'
@@ -129,11 +130,17 @@ export default function EmployeePayrollModal({
       footer={
         <>
           {reviewPosition && (
-            <button className="secondary" onClick={onPrev} disabled={busy || reviewPosition.index <= 1} style={{ marginRight: 'auto' }}>← Back</button>
+            <button
+              className="secondary" onClick={onPrev} disabled={busy || reviewPosition.index <= 1}
+              aria-label="Previous employee" title="Previous employee"
+              style={{ marginRight: 'auto', padding: '0.55rem 0.7rem', display: 'flex', alignItems: 'center' }}
+            >
+              <ArrowLeftIcon size={16} />
+            </button>
           )}
           {record.status === 'paid' ? (
             <>
-              <span style={{ fontSize: '0.82rem', color: 'var(--color-muted)' }}>Paid — record locked.</span>
+              <span style={{ fontSize: '0.82rem', color: 'var(--color-muted)' }}>Paid - record locked.</span>
               <button className="secondary" onClick={() => move('draft')} disabled={busy}>Mark pending</button>
             </>
           ) : locked ? (
@@ -145,9 +152,17 @@ export default function EmployeePayrollModal({
             </>
           )}
           {reviewPosition && (
-            <button className="secondary" onClick={onNext} disabled={busy}>
-              {isLastInReview ? 'Finish' : 'Next →'}
-            </button>
+            isLastInReview ? (
+              <button className="secondary" onClick={onNext} disabled={busy}>Finish</button>
+            ) : (
+              <button
+                className="secondary" onClick={onNext} disabled={busy}
+                aria-label="Next employee" title="Next employee"
+                style={{ padding: '0.55rem 0.7rem', display: 'flex', alignItems: 'center' }}
+              >
+                <span style={{ display: 'inline-flex', transform: 'scaleX(-1)' }}><ArrowLeftIcon size={16} /></span>
+              </button>
+            )
           )}
         </>
       }
@@ -155,7 +170,7 @@ export default function EmployeePayrollModal({
       {reviewPosition && (
         <div style={{ marginBottom: '0.7rem' }}>
           <div style={{ fontSize: '0.78rem', color: 'var(--color-muted)', marginBottom: '0.3rem' }}>
-            Reviewing {reviewPosition.index} of {reviewPosition.total}
+            Reviewing {reviewPosition.index} of {reviewPosition.total} · {monthLabel(month)}
           </div>
           <div style={{ height: 5, borderRadius: 999, background: 'var(--color-primary-soft)', overflow: 'hidden' }}>
             <div style={{ width: `${Math.round((reviewPosition.index / reviewPosition.total) * 100)}%`, height: '100%', background: 'var(--color-primary)' }} />
@@ -163,31 +178,35 @@ export default function EmployeePayrollModal({
         </div>
       )}
 
-      {/* centred name, daily rate + month small underneath */}
-      <div style={{ textAlign: 'center', marginBottom: '0.7rem' }}>
-        <div style={{ fontSize: '1.4rem', fontWeight: 800, lineHeight: 1.15, color: 'var(--color-text)' }}>{employee.full_name}</div>
-        <div style={{ fontSize: '0.82rem', color: 'var(--color-text)', fontVariantNumeric: 'tabular-nums', marginTop: '0.15rem' }}>
-          {money(breakdown.dailyRate, 2)} per day · {monthLabel(month)}
-        </div>
-      </div>
+      {/* The employee IS the first line item now - name + daily rate as the
+          label, base pay as its amount - instead of a separate centered
+          heading sitting above a redundant "Base Pay" row. The rate rides
+          along much smaller/quieter than the name, not competing with it. */}
+      <Row
+        label={<>
+          {employee.full_name}{' '}
+          <span style={{ fontSize: '0.76rem', fontWeight: 400, color: 'var(--color-muted)' }}>
+            ({money(breakdown.dailyRate, 2)}/day)
+          </span>
+        </>}
+        amount={money(breakdown.baseSalary)}
+        bold
+      />
 
-      <Row label="Base Pay" amount={money(breakdown.baseSalary)} bold />
-
-      <div style={{ marginTop: '0.9rem', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--status-critical)' }}>
-        Deductions
-      </div>
+      {/* No "DEDUCTIONS"/"ADDITIONS" group label at all - the red/green color
+          plus a leading -/+ on every line (including each itemized one, not
+          just the total) already says exactly what it is. */}
+      {deductions.length > 0 && <div style={{ marginTop: '0.6rem' }} />}
       {deductions.map(item => (
-        <Row key={item.id} small indent label={eventLabel(item, showDates)} amount={money(item.amount)}
+        <Row key={item.id} small indent label={eventLabel(item, showDates)} amount={`- ${money(item.amount)}`}
           color="var(--status-critical)"
           onRemove={!locked ? () => setConfirmRemove(item) : undefined} disabled={busy} />
       ))}
       <Row top bold label="Total Deductions" amount={`- ${money(breakdown.totalDeductions)}`} color="var(--status-critical)" />
 
-      <div style={{ marginTop: '0.9rem', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--status-good)' }}>
-        Additions
-      </div>
+      {additions.length > 0 && <div style={{ marginTop: '0.6rem' }} />}
       {additions.map(item => (
-        <Row key={item.id} small indent label={eventLabel(item, showDates)} amount={money(item.amount)}
+        <Row key={item.id} small indent label={eventLabel(item, showDates)} amount={`+ ${money(item.amount)}`}
           color="var(--status-good)"
           onRemove={!locked ? () => setConfirmRemove(item) : undefined} disabled={busy} />
       ))}
@@ -205,7 +224,7 @@ export default function EmployeePayrollModal({
 
       {record.status === 'paid' && (
         <p style={{ fontSize: '0.82rem', color: 'var(--color-muted)', marginTop: '0.6rem' }}>
-          Paid {record.paid_at ? new Date(record.paid_at).toLocaleDateString('en-GB') : ''} · {PAY_METHODS.find(m => m.value === record.payment_method)?.label || record.payment_method || '—'}
+          Paid {record.paid_at ? new Date(record.paid_at).toLocaleDateString('en-GB') : ''} · {PAY_METHODS.find(m => m.value === record.payment_method)?.label || record.payment_method || '-'}
           {record.payment_reference ? ` · ref ${record.payment_reference}` : ''}
         </p>
       )}
@@ -257,7 +276,7 @@ export default function EmployeePayrollModal({
           </Field>
           {breakdown.finalAmount <= 0 && (
             <p style={{ fontSize: '0.82rem', color: 'var(--status-serious)', margin: '0.2rem 0 0' }}>
-              Net pay is {money(breakdown.finalAmount)} — double-check the deductions before marking this paid.
+              Net pay is {money(breakdown.finalAmount)} - double-check the deductions before marking this paid.
             </p>
           )}
           <p style={{ fontSize: '0.78rem', color: 'var(--color-muted)', margin: '0.6rem 0 0' }}>

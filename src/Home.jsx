@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
 import ConfirmDialog from './ConfirmDialog'
+import { InlineError } from './ErrorState'
 import { useToast } from './Toast'
 import HomeRecycleBinDialog from './HomeRecycleBinDialog'
 import { useRecycleBinTrigger } from './RecycleBinContext'
@@ -131,11 +132,12 @@ function Home() {
       if (error) {
         setError('Could not load forms: ' + error.message)
       } else {
-        // Secondary forms created as part of a bundle template (e.g.
-        // Salary Events, alongside its primary Employees form) carry
-        // settings.primaryFormId and are reached from the primary form's
-        // context instead of cluttering the main list as their own cards.
-        const visibleForms = data.filter(f => !f.settings?.primaryFormId)
+        // Template-created forms live in their own constrained environment
+        // (reached from "All Businesses" / Templates, grouped by
+        // settings.templateSlug), so they don't belong in this raw forms
+        // list. Bundle secondaries (settings.primaryFormId) are likewise
+        // reached from their primary form's context, not as their own cards.
+        const visibleForms = data.filter(f => !f.settings?.primaryFormId && !f.settings?.templateSlug)
         setForms(visibleForms)
 
         // One batched query for all forms' response counts, instead of a
@@ -447,7 +449,7 @@ function Home() {
       )}
 
       {loading && <InlineLoader />}
-      {error && <p style={{ color: 'var(--status-critical)' }}>{error}</p>}
+      {error && <InlineError message={error} style={{ margin: '0.5rem 0' }} />}
 
       {!loading && forms.length === 0 && (
         <div className="card" style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--color-muted)' }}>

@@ -55,7 +55,7 @@ export function exportPayrollToCSV(records, employeesById, month) {
 export function exportPayrollToPDF(records, employeesById, month) {
   const doc = new jsPDF({ orientation: 'landscape' })
   doc.setFontSize?.(14)
-  doc.text(`Payroll — ${monthLabel(month)}`, 14, 16)
+  doc.text(`Payroll - ${monthLabel(month)}`, 14, 16)
   autoTable(doc, {
     startY: 22,
     head: [COLUMNS],

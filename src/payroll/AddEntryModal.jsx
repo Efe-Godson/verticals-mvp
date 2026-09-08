@@ -3,13 +3,19 @@
 // instead, showing the computed amount live (quantity x daily rate).
 import { useMemo, useState } from 'react'
 import { useToast } from '../Toast'
-import { PayrollModal, Field, TextInput, Select, money, currentMonth, entryTypeGroups, categoryOf, DAY_ENTRY_TYPES } from './ui'
+import { PayrollModal, Field, TextInput, Select, EmployeeChecklist, money, currentMonth, entryTypeGroups, categoryOf, DAY_ENTRY_TYPES } from './ui'
 import { getDailyRate, ENTRY_TYPE_LABELS } from './calculatePayroll'
 import { createEntries } from './payrollApi'
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
 }
+
+// A pair of fields that sit side by side on a roomy width and stack once the
+// modal gets narrow (phone / bottom sheet), so inputs never get crushed.
+const pairRow = { display: 'flex', gap: '0.8rem', flexWrap: 'wrap' }
+const pairCol = { flex: '1 1 150px', minWidth: 0 }
+const req = <span aria-hidden="true" style={{ color: 'var(--status-critical)', marginLeft: 2 }}>*</span>
 
 export default function AddEntryModal({
   formId, settings, employees, presetEmployeeId, presetType, onClose, onSaved,
@@ -86,64 +92,53 @@ export default function AddEntryModal({
         <button onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save Entry'}</button>
       </>}
     >
-      <Field label={`Employees (${employeeIds.length} selected)`}>
-        <div style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)', padding: '0.5rem' }}>
-          {employees.length === 0 && <div style={{ color: 'var(--color-muted)', fontSize: '0.85rem' }}>No employees yet.</div>}
-          {employees.map(emp => (
-            <label key={emp.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.2rem 0', fontSize: '0.9rem' }}>
-              <input type="checkbox" checked={employeeIds.includes(emp.id)} onChange={() => toggleEmployee(emp.id)} />
-              {emp.full_name}
-            </label>
-          ))}
-        </div>
+      {/* Flow: who -> what -> how much -> when -> why -> notes. Related
+          fields (the two dates) share a row that stacks on a narrow modal. */}
+      <Field label={<>Employees ({employeeIds.length} selected){req}</>}>
+        <EmployeeChecklist employees={employees} selectedIds={employeeIds} onToggle={toggleEmployee} />
       </Field>
 
-      <div style={{ display: 'flex', gap: '0.8rem' }}>
-        <div style={{ flex: 1 }}>
-          <Field label="Entry Type">
-            <Select value={entryType} onChange={(e) => handleTypeChange(e.target.value)}>
-              <optgroup label="Deductions">
-                {groups.deduction.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </optgroup>
-              <optgroup label="Additions">
-                {groups.addition.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </optgroup>
-            </Select>
-          </Field>
-        </div>
-        <div style={{ flex: 1 }}>
+      <Field label={<>Entry Type{req}</>}>
+        <Select value={entryType} onChange={(e) => handleTypeChange(e.target.value)}>
+          <optgroup label="Deductions">
+            {groups.deduction.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </optgroup>
+          <optgroup label="Additions">
+            {groups.addition.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </optgroup>
+        </Select>
+      </Field>
+
+      {isDayType ? (
+        <Field label={<>Number of days{req}</>} hint={dayPreview ? `Computed amount: ${dayPreview}` : 'Amount is calculated from the daily rate.'}>
+          <TextInput type="number" min="0" step="0.5" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+        </Field>
+      ) : (
+        <Field label={<>Amount (₦){req}</>}>
+          <TextInput type="number" min="0" step="0.01" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
+        </Field>
+      )}
+
+      <div style={pairRow}>
+        <div style={pairCol}>
           <Field label="Date">
             <TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           </Field>
         </div>
-      </div>
-
-      {isDayType ? (
-        <Field label="Number of days" hint={dayPreview ? `Computed amount: ${dayPreview}` : 'Amount is calculated from the daily rate.'}>
-          <TextInput type="number" min="0" step="0.5" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
-        </Field>
-      ) : (
-        <Field label="Amount (₦)">
-          <TextInput type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
-        </Field>
-      )}
-
-      <Field label="Reason">
-        <TextInput value={reason} onChange={(e) => setReason(e.target.value)} placeholder={`e.g. ${ENTRY_TYPE_LABELS[entryType]} — details`} />
-      </Field>
-
-      <div style={{ display: 'flex', gap: '0.8rem' }}>
-        <div style={{ flex: 1 }}>
+        <div style={pairCol}>
           <Field label="Payroll Month" hint="Defaults from the entry date.">
             <TextInput type="month" value={payrollMonth} onChange={(e) => setPayrollMonth(e.target.value)} />
           </Field>
         </div>
-        <div style={{ flex: 1 }}>
-          <Field label="Notes (optional)">
-            <TextInput value={notes} onChange={(e) => setNotes(e.target.value)} />
-          </Field>
-        </div>
       </div>
+
+      <Field label="Reason">
+        <TextInput value={reason} onChange={(e) => setReason(e.target.value)} placeholder={`e.g. ${ENTRY_TYPE_LABELS[entryType]} - details`} />
+      </Field>
+
+      <Field label="Notes (optional)">
+        <TextInput value={notes} onChange={(e) => setNotes(e.target.value)} />
+      </Field>
     </PayrollModal>
   )
 }

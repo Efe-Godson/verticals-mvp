@@ -65,7 +65,7 @@ function lineItemsDataset(form, submissions) {
       const qty = Number(it.quantity) || 0
       const price = Number(it.price) || 0
       const data = {
-        product: it.name || '—',
+        product: it.name || '-',
         category: (it.category && String(it.category).trim()) || 'Uncategorized',
         quantity: qty,
         unit_price: price,
@@ -109,7 +109,7 @@ function productsDataset(form) {
       id: p.id || `p_${i}`,
       created_at: null,
       data: {
-        name: p.name || '—',
+        name: p.name || '-',
         category: (p.category && String(p.category).trim()) || 'Uncategorized',
         price: Number(p.price) || 0,
         stock_quantity: tracked ? stock : null,

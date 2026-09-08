@@ -4,6 +4,7 @@
 // richer, more practical analysis experience.
 import { useEffect, useState } from 'react'
 import { fetchAIAnalysis, describeAIError } from '../../lib/aiClient'
+import { InlineError } from '../../ErrorState'
 
 function getPriorityTone(priority) {
   if (priority === 'high') return { background: '#fef2f2', color: '#b91c1c' }
@@ -109,7 +110,7 @@ function AIInsightCards({ formId, dateRangeLabel, submissionIds, hideExecutiveSu
         </button>
       </div>
 
-      {error && <p style={{ color: 'red', fontSize: '0.85rem' }}>{error}</p>}
+      {error && <InlineError message={error} style={{ fontSize: '0.85rem' }} />}
 
       {!hasAnalysis && !loading && !error && (
         <div className="card" style={{ padding: '1.1rem 1.15rem', color: 'var(--color-muted)', lineHeight: 1.5 }}>

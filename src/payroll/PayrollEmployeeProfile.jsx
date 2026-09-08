@@ -16,6 +16,8 @@ import { supabase } from '../supabaseClient'
 import EmployeeFormModal from './EmployeeFormModal'
 import AddEntryModal from './AddEntryModal'
 import ConfirmDialog from '../ConfirmDialog'
+import useIsMobile from '../hooks/useIsMobile'
+import { DataCard, DataCardList } from '../components/DataCards'
 
 const QUICK = [
   { type: 'fine', label: 'Add Fine' },
@@ -35,6 +37,7 @@ export default function PayrollEmployeeProfile() {
   const { form, formId } = usePayroll()
   const { showToast } = useToast()
   const navigate = useNavigate()
+  const isMobile = useIsMobile()
   const settings = useMemo(() => payrollSettings(form), [form])
 
   const [employee, setEmployee] = useState(null)
@@ -118,8 +121,8 @@ export default function PayrollEmployeeProfile() {
       <div style={{ display: 'flex', gap: '2rem', marginTop: '1rem', flexWrap: 'wrap' }}>
         <div><div style={{ fontSize: '0.78rem', color: 'var(--color-muted)' }}>Monthly Salary</div><strong style={{ fontSize: '1.15rem' }}>{money(employee.monthly_salary)}</strong></div>
         <div><div style={{ fontSize: '0.78rem', color: 'var(--color-muted)' }}>Daily Rate</div><strong style={{ fontSize: '1.15rem' }}>{money(dailyRate, 2)}</strong></div>
-        <div><div style={{ fontSize: '0.78rem', color: 'var(--color-muted)' }}>Start Date</div><strong style={{ fontSize: '1.15rem' }}>{employee.start_date ? new Date(employee.start_date).toLocaleDateString('en-GB') : '—'}</strong></div>
-        <div><div style={{ fontSize: '0.78rem', color: 'var(--color-muted)' }}>Last Payment</div><strong style={{ fontSize: '1.15rem' }}>{lastPaid ? money(lastPaid.final_amount) : '—'}</strong></div>
+        <div><div style={{ fontSize: '0.78rem', color: 'var(--color-muted)' }}>Start Date</div><strong style={{ fontSize: '1.15rem' }}>{employee.start_date ? new Date(employee.start_date).toLocaleDateString('en-GB') : '-'}</strong></div>
+        <div><div style={{ fontSize: '0.78rem', color: 'var(--color-muted)' }}>Last Payment</div><strong style={{ fontSize: '1.15rem' }}>{lastPaid ? money(lastPaid.final_amount) : '-'}</strong></div>
       </div>
 
       <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', margin: '1.1rem 0' }}>
@@ -151,7 +154,7 @@ export default function PayrollEmployeeProfile() {
             <p style={{ color: 'var(--color-muted)', fontSize: '0.85rem', margin: 0 }}>No entries yet this month.</p>
           ) : thisMonthEntries.map(e => (
             <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.87rem', padding: '0.3rem 0', borderBottom: '1px solid var(--color-border)' }}>
-              <span>{ENTRY_TYPE_LABELS[e.entry_type]}{e.reason ? ` — ${e.reason}` : ''}</span>
+              <span>{ENTRY_TYPE_LABELS[e.entry_type]}{e.reason ? ` - ${e.reason}` : ''}</span>
               <span style={{ color: e.entry_category === 'deduction' ? 'var(--status-critical)' : 'var(--status-good)' }}>
                 {e.entry_category === 'deduction' ? '-' : '+'}{money(e.amount)}
               </span>
@@ -160,7 +163,34 @@ export default function PayrollEmployeeProfile() {
         </div>
       )}
 
-      {tab === 'entries' && (
+      {tab === 'entries' && isMobile && (
+        entries.length === 0 ? (
+          <p style={{ color: 'var(--color-muted)', fontSize: '0.85rem' }}>No entries.</p>
+        ) : (
+          <DataCardList>
+            {entries.map(e => (
+              <DataCard
+                key={e.id}
+                title={ENTRY_TYPE_LABELS[e.entry_type] || e.entry_type}
+                subtitle={`${new Date(e.entry_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} · ${monthLabel(e.payroll_month)}`}
+              >
+                <DataCard.Row
+                  label="Amount"
+                  strong
+                  value={
+                    <span style={{ color: e.entry_category === 'deduction' ? 'var(--status-critical)' : 'var(--status-good)' }}>
+                      {e.entry_category === 'deduction' ? '-' : '+'}{money(e.amount)}
+                    </span>
+                  }
+                />
+                <DataCard.Row label="Reason" align="left" muted value={e.reason || '-'} />
+              </DataCard>
+            ))}
+          </DataCardList>
+        )
+      )}
+
+      {tab === 'entries' && !isMobile && (
         <div className="table-wrap table-bleed">
           <table className="records-table" style={{ borderCollapse: 'collapse', width: '100%' }}>
             <thead><tr>{['Date', 'Type', 'Reason', 'Amount', 'Payroll'].map(h => (
@@ -172,7 +202,7 @@ export default function PayrollEmployeeProfile() {
                 <tr key={e.id}>
                   <td style={{ padding: '0.45rem 0.7rem', borderBottom: '1px solid var(--color-border)' }}>{new Date(e.entry_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</td>
                   <td style={{ padding: '0.45rem 0.7rem', borderBottom: '1px solid var(--color-border)' }}>{ENTRY_TYPE_LABELS[e.entry_type]}</td>
-                  <td style={{ padding: '0.45rem 0.7rem', borderBottom: '1px solid var(--color-border)', color: 'var(--color-muted)' }}>{e.reason || '—'}</td>
+                  <td style={{ padding: '0.45rem 0.7rem', borderBottom: '1px solid var(--color-border)', color: 'var(--color-muted)' }}>{e.reason || '-'}</td>
                   <td style={{ padding: '0.45rem 0.7rem', borderBottom: '1px solid var(--color-border)', textAlign: 'right', color: e.entry_category === 'deduction' ? 'var(--status-critical)' : 'var(--status-good)' }}>
                     {e.entry_category === 'deduction' ? '-' : '+'}{money(e.amount)}
                   </td>
@@ -184,7 +214,24 @@ export default function PayrollEmployeeProfile() {
         </div>
       )}
 
-      {(tab === 'history' || tab === 'payments') && (
+      {(tab === 'history' || tab === 'payments') && isMobile && (() => {
+        const rows = records.filter(r => tab === 'history' || r.status === 'paid')
+        if (rows.length === 0) return <p style={{ color: 'var(--color-muted)', fontSize: '0.85rem' }}>Nothing yet.</p>
+        return (
+          <DataCardList>
+            {rows.map(r => (
+              <DataCard key={r.id} title={monthLabel(r.payroll_month)} status={<RecordStatusBadge status={r.status} />}>
+                <DataCard.Row label="Final" value={money(r.final_amount)} strong />
+                <DataCard.Row label="Base" value={money(r.base_salary)} muted />
+                <DataCard.Row label="Additions" value={money(r.total_additions)} muted />
+                <DataCard.Row label="Deductions" value={money(r.total_deductions)} muted />
+              </DataCard>
+            ))}
+          </DataCardList>
+        )
+      })()}
+
+      {(tab === 'history' || tab === 'payments') && !isMobile && (
         <div className="table-wrap table-bleed">
           <table className="records-table" style={{ borderCollapse: 'collapse', width: '100%' }}>
             <thead><tr>{['Month', 'Base', 'Additions', 'Deductions', 'Final', 'Status'].map(h => (

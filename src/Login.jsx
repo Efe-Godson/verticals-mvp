@@ -48,11 +48,13 @@ function Login() {
     setMessage('')
  
     if (mode === 'forgot') {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`
-      })
-      if (error) setMessage(error.message)
-      else setMessage('Check your email for a password reset link.')
+      // Routed through an edge function (request-password-reset) instead of
+      // calling supabase.auth.resetPasswordForEmail directly, specifically
+      // so the response can never reveal whether this email has an account -
+      // it always answers the same way, success or failure, existing account
+      // or not. See that function for why.
+      await supabase.functions.invoke('request-password-reset', { body: { email } })
+      setMessage("If that account exists, we've sent an email with a reset link.")
     } else {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) setMessage(error.message)

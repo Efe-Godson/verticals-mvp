@@ -18,6 +18,11 @@ import Modal from './components/Modal'
 import PageSkeleton from './components/PageSkeleton'
 import { useDeferredLoading } from './components/loadingHooks'
 import { ErrorState } from './ErrorState'
+import useIsMobile from './hooks/useIsMobile'
+import { DataCard, DataCardList } from './components/DataCards'
+import { RefreshingIndicator } from './components/InlineLoader'
+import EmptyState, { SearchOffIcon } from './components/EmptyState'
+import { getPageCache, setPageCache } from './hooks/pageCache'
 
 const LOW_STOCK_THRESHOLD = 5
 
@@ -70,29 +75,44 @@ function Inventory() {
   const [searchParams] = useSearchParams()
   const isFocusMode = searchParams.get('focus') === '1'
   const { showToast } = useToast()
+  const isMobile = useIsMobile()
 
   const [form, setForm] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState('All')
   const [restockingProduct, setRestockingProduct] = useState(null)
   const [saving, setSaving] = useState(false)
 
+  const cacheKey = `inventory:${id}`
+
   useEffect(() => {
-    async function loadForm() {
-      setLoading(true)
+    async function loadForm(silent) {
+      if (!silent) setLoading(true)
+      setRefreshing(true)
       const { data, error: formError } = await supabase.from('forms').select('*').eq('id', id).single()
       if (formError || !data) {
-        setError('This form could not be found.')
-        setLoading(false)
+        if (!silent) { setError('This form could not be found.'); setLoading(false) }
+        setRefreshing(false)
         return
       }
       setForm(data)
+      setPageCache(cacheKey, data)
       setLoading(false)
+      setRefreshing(false)
     }
-    loadForm()
-  }, [id])
+
+    const cached = getPageCache(cacheKey)
+    if (cached) {
+      setForm(cached)
+      setLoading(false)
+      loadForm(true)
+    } else {
+      loadForm(false)
+    }
+  }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const showSkel = useDeferredLoading(loading)
   if (loading) return showSkel ? <PageSkeleton variant="table" /> : null
@@ -101,7 +121,8 @@ function Inventory() {
   const cartField = form.fields.find(f => f.type === 'cart')
   if (!cartField) {
     return (
-      <div className="page">        <h1>Inventory</h1>
+      <div className="page">
+        <h1>Inventory</h1>
         <p style={{ color: 'var(--color-muted)' }}>This form doesn't have a product catalogue to track stock for.</p>
       </div>
     )
@@ -151,11 +172,18 @@ function Inventory() {
   }
 
   return (
-    <div className="page" style={isFocusMode ? { paddingTop: '4rem' } : undefined}>      <h1 style={{ margin: 0 }}>Inventory</h1>
+    <div className="page" style={isFocusMode ? { paddingTop: '4rem' } : undefined}>
+      <h1 style={{ margin: 0, display: 'flex', alignItems: 'baseline', gap: '0.6rem' }}>
+        Inventory
+        <RefreshingIndicator show={refreshing && !loading} style={{ fontWeight: 400 }} />
+      </h1>
       <p style={{ color: 'var(--color-muted)', margin: '0.3rem 0 1.2rem' }}>{form.name}</p>
 
       {products.length === 0 ? (
-        <p style={{ color: 'var(--color-muted)' }}>No products yet - add some from the order screen's product catalogue first.</p>
+        <EmptyState
+          title="No products yet"
+          message="Add some from the order screen's product catalogue first."
+        />
       ) : (
         <>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.7rem', marginBottom: '1.2rem' }}>
@@ -193,7 +221,45 @@ function Inventory() {
           )}
 
           {filtered.length === 0 ? (
-            <p style={{ color: 'var(--color-muted)' }}>No products match your search.</p>
+            <EmptyState icon={<SearchOffIcon />} title="No matches" message="No products match your search." />
+          ) : isMobile ? (
+            <DataCardList>
+              {filtered.map(p => {
+                const stock = Number(p.stockQuantity) || 0
+                const isLow = p.trackInventory && stock <= LOW_STOCK_THRESHOLD
+                return (
+                  <DataCard
+                    key={p.id}
+                    title={p.name}
+                    subtitle={p.category || undefined}
+                    footer={
+                      p.trackInventory ? (
+                        <button type="button" className="secondary" disabled={saving} onClick={() => setRestockingProduct(p)}>
+                          Restock
+                        </button>
+                      ) : (
+                        <button type="button" className="secondary" disabled={saving} onClick={() => enableTracking(p)}>
+                          Track
+                        </button>
+                      )
+                    }
+                  >
+                    <DataCard.Row label="Price" value={`₦${Number(p.price).toLocaleString()}`} strong />
+                    <DataCard.Row
+                      label="Stock"
+                      muted={!isLow}
+                      value={
+                        p.trackInventory ? (
+                          <span style={{ fontWeight: 600, color: isLow ? '#c0392b' : 'inherit' }}>
+                            {stock}{p.unit ? ` ${p.unit}` : ''}{isLow && ' (low)'}
+                          </span>
+                        ) : 'Not tracked'
+                      }
+                    />
+                  </DataCard>
+                )
+              })}
+            </DataCardList>
           ) : (
             <div className="table-wrap table-bleed">
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>

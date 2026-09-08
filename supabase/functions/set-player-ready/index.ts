@@ -6,6 +6,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { jsonResponse, corsHeaders, requirePlayerCredential, broadcastPlayers } from '../_shared/quiz.ts'
+import { clientIp, enforceRateLimit } from '../_shared/rateLimit.ts'
 
 Deno.serve(async req => {
   try {
@@ -19,6 +20,13 @@ Deno.serve(async req => {
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
+
+    const limited = await enforceRateLimit(
+      supabase, `set-player-ready:${player_id ?? clientIp(req)}`,
+      { max: 60, windowSeconds: 60 },
+      { function: 'set-player-ready', ip: clientIp(req), player_id },
+    )
+    if (limited) return limited
 
     const credential = await requirePlayerCredential(supabase, room_id, player_id, player_secret)
     if (credential.error) return jsonResponse({ error: credential.error }, credential.status)
