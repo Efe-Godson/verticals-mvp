@@ -1345,8 +1345,8 @@ function PublicForm() {
                 {/* Retail only - moved down here from the page header so it
                     sits at the edge of the row it actually acts on, instead
                     of floating alone up top. See the header block above for
-                    the rest of the AI-fill gating (session/token/etc). */}
-                {isRetail && hasCartOnPage && session && !token && (
+                    the rest of the AI-fill gating (isOwnerOrStaff/token/etc). */}
+                {isRetail && hasCartOnPage && isOwnerOrStaff && !token && (
                   <button
                     type="button"
                     onClick={() => setShowAiFill(true)}
@@ -2058,6 +2058,18 @@ function PublicForm() {
   // object there - that one's a submission's snapshot).
   const isRetail = isRetailTemplate(form)
 
+  // Gates every admin-only bit of chrome below (PosSidePanel, its top
+  // padding reserve, the Fill-from-Text button) - `session` alone used to be
+  // enough, but this route (unlike /form/:id/edit, /records, ...) has no
+  // PrivateRoute/StaffScopedRoute wrapper at all (it has to stay reachable
+  // by a logged-out public respondent), so a *different* signed-in user
+  // opening someone else's shared link still had a `session` and saw the
+  // full owner side panel - Edit Form, Records, Settings, Share Link - for
+  // a form that isn't theirs. Checking the actual owner (or the one form a
+  // staff account is scoped to) is what makes a shared link truly "just the
+  // title, then the form" for anyone who isn't that form's own account.
+  const isOwnerOrStaff = !!session && (form.user_id === session.user.id || staffFormId === form.id)
+
   if (submitted) {
     return (
       <div className="page" style={{ maxWidth: 480, textAlign: 'center' }}>
@@ -2222,16 +2234,19 @@ function PublicForm() {
       // narrow phone to clip real content on the right edge instead - worse
       // than the momentary letter overlap it fixed, so just the top reserve
       // stays. Only needed when the panel actually renders (a saved-response
-      // edit link, `token`, skips it entirely; so does an anonymous public
-      // respondent with no session - see PosSidePanel below).
-      ...(!token && session ? { paddingTop: '4rem' } : {}),
+      // edit link, `token`, skips it entirely; so does anyone who isn't this
+      // form's own owner/staff - see PosSidePanel below).
+      ...(!token && isOwnerOrStaff ? { paddingTop: '4rem' } : {}),
       ...(cartDefersCheckout ? { paddingBottom: 'calc(7.5rem + env(safe-area-inset-bottom))' } : {}),
     }}>
       {/* The owner's/staff's own nav (Edit Form, Records, Settings, Admin,
-          Share Link, ...) - never shown to an anonymous public respondent
-          filling this form in from a shared link, only to whoever is
-          actually logged in when they open the same /form/:id URL. */}
-      {!token && session && (
+          Share Link, ...) - shown only to this form's actual owner or its
+          assigned staff (see isOwnerOrStaff above), never to an anonymous
+          public respondent nor to some other signed-in Verticals user who
+          just happens to open the same shared /form/:id link - this route
+          has no PrivateRoute/StaffScopedRoute wrapper (it must stay
+          reachable while logged out), so `session` alone isn't ownership. */}
+      {!token && isOwnerOrStaff && (
         <div className="no-print">
           <PosSidePanel formId={form.id} hasCartField={hasCartField} bottomBarPresent={cartDefersCheckout} />
         </div>
@@ -2269,19 +2284,21 @@ function PublicForm() {
           {!isRetail && <h1 className="pf-order-title" style={{ margin: 0 }}>{form.name}</h1>}
           {form.description && <p style={{ margin: '0.3rem 0 0' }}>{form.description}</p>}
         </div>
-        {/* Staff/owner convenience only (session gated) - a customer filling
-            this out themselves via a shared link (see PosSidePanel's Share
-            Link) has nothing to paste from, and letting an anonymous visitor
-            call the AI endpoint isn't something this needs to support.
-            Skipped entirely when editing an existing response (token) -
-            there's nothing to "paste an order" into at that point. Same
-            SparkleIcon + solid-button styling as ProductManager's "Use AI to
-            add new products" - keep new AI entry points matching this.
-            Restaurant doesn't get this at all (see lib/templateFlags.js) -
-            back to exactly how it worked before AI fill existed. Retail
-            moves this button down next to the search bar instead of
-            showing it up here - see the catalogue's search row below. */}
-        {hasCartOnPage && session && !token && !isRestaurantTemplate(form) && !isRetail && (
+        {/* Staff/owner convenience only (isOwnerOrStaff gated) - a customer
+            filling this out themselves via a shared link (see PosSidePanel's
+            Share Link) has nothing to paste from, and letting anyone else -
+            anonymous, or some other signed-in Verticals user who isn't this
+            form's own account - call the AI endpoint isn't something this
+            needs to support. Skipped entirely when editing an existing
+            response (token) - there's nothing to "paste an order" into at
+            that point. Same SparkleIcon + solid-button styling as
+            ProductManager's "Use AI to add new products" - keep new AI
+            entry points matching this. Restaurant doesn't get this at all
+            (see lib/templateFlags.js) - back to exactly how it worked before
+            AI fill existed. Retail moves this button down next to the
+            search bar instead of showing it up here - see the catalogue's
+            search row below. */}
+        {hasCartOnPage && isOwnerOrStaff && !token && !isRestaurantTemplate(form) && !isRetail && (
           <button
             type="button"
             onClick={() => setShowAiFill(true)}

@@ -507,6 +507,29 @@ input:focus, select:focus, textarea:focus {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px var(--color-primary-soft);
 }
+/* A filled field gets the theme's own soft tint as a plain visual "this
+   one's done" signal, matching the answered/pinned/selected fill used
+   elsewhere (records rows, selected cards, ...) instead of staying
+   indistinguishable from an empty one. :not(:placeholder-shown) is the same
+   "has a value" check the label-float rules above already rely on. */
+.field-floating input:not(:placeholder-shown),
+.field-floating textarea:not(:placeholder-shown) {
+  background: var(--color-primary-soft);
+}
+/* Browser autofill (name/email/phone are common autofill targets) paints
+   its own background via a UA style stronger than a plain `background`
+   declaration - only the `-webkit-box-shadow` inset trick actually
+   overrides it. Without this a filled, autofilled field would show the
+   browser's own yellow/blue instead of the theme's, and could force black
+   input text even in dark mode. */
+.field-floating input:-webkit-autofill,
+.field-floating input:-webkit-autofill:hover,
+.field-floating input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--color-text);
+  -webkit-box-shadow: 0 0 0 1000px var(--color-primary-soft) inset;
+  box-shadow: 0 0 0 1000px var(--color-primary-soft) inset;
+  transition: background-color 9999s ease-in-out 0s;
+}
 .field-required-mark {
   color: #c0392b;
 }
