@@ -7,6 +7,7 @@ import { PageTitleProvider } from './PageTitleContext'
 import Home from './Home'
 import BusinessesHome from './BusinessesHome'
 import TemplateLocations from './TemplateLocations'
+import FormsTemplateHome from './FormsTemplateHome'
 import { TEMPLATE_ADMIN_USER_ID } from './adminAccount'
 import Reports from './Reports'
 import RecordsHome from './RecordsHome'
@@ -191,6 +192,14 @@ function AppShell() {
         <Route path="/reports" element={<PrivateRoute><StaffScopedRoute><Reports /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/records" element={<PrivateRoute><StaffScopedRoute><RecordsHome /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/templates" element={<PrivateRoute><StaffScopedRoute><Templates /></StaffScopedRoute></PrivateRoute>} />
+        {/* The "Forms" template (blank-canvas, build-your-own) gets its own
+            richer home page - search/pin/Draft-Live-Paused-Archived states,
+            see FormsTemplateHome.jsx - instead of the generic tile grid
+            every other template's locations page uses. A literal path beats
+            the dynamic :slug one below regardless of declaration order
+            (React Router ranks static segments higher), but it's kept above
+            it here too for anyone reading the list top to bottom. */}
+        <Route path="/templates/forms/locations" element={<PrivateRoute><StaffScopedRoute><FormsTemplateHome /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/templates/:slug/locations" element={<PrivateRoute><StaffScopedRoute><TemplateLocations /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/account" element={<PrivateRoute><StaffScopedRoute><AccountPage /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/create" element={<PrivateRoute><StaffScopedRoute><CreateForm /></StaffScopedRoute></PrivateRoute>} />
