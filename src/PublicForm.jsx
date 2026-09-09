@@ -53,6 +53,27 @@ function buildPages(fields) {
   return pages
 }
 
+// The default look for any cart-less form (see the Lab's onboarding
+// prototype, src/lab/onboarding/OnboardingScreens.jsx, which this mirrors):
+// one field per screen instead of one section per screen. A section marker
+// no longer starts a page of its own - its title/description just rides
+// along on the very next field's screen (and only that one), the same way
+// a labs step's intro only shows once, on its first question.
+function buildQuestionScreens(fields) {
+  const screens = []
+  let pendingSection = null
+  fields.forEach(field => {
+    if (field.type === 'section') {
+      pendingSection = field
+      return
+    }
+    screens.push({ section: pendingSection, fields: [field] })
+    pendingSection = null
+  })
+  if (screens.length === 0) screens.push({ section: null, fields: [] })
+  return screens
+}
+
 // The model returns a location as free text ("City, State, Country" - see
 // extract-order-ai's prompt, best-effort and not always in that order or
 // complete). This is the client-side half of matching it against the real
@@ -409,13 +430,18 @@ function PublicForm() {
   const [showAiFill, setShowAiFill] = useState(false)
   const [orderConfirmation, setOrderConfirmation] = useState(null) // snapshot of the just-placed order, or null
 
-  const pages = useMemo(() => buildPages(form?.fields || []), [form])
+  // Cart/POS forms keep their own dense order-screen UX (catalogue + cart +
+  // checkout can't be split one field per screen); every other form always
+  // gets the one-question-per-screen design (see buildQuestionScreens) -
+  // this isn't a per-form opt-in, it's just what a plain form looks like now.
+  const hasCartField = form?.fields?.some(f => f.type === 'cart') ?? false
+  const steppedStyle = !hasCartField
+  const pages = useMemo(
+    () => (hasCartField ? buildPages(form?.fields || []) : buildQuestionScreens(form?.fields || [])),
+    [form, hasCartField]
+  )
   const currentPage = pages[pageIndex] || pages[0]
   const hasCartOnPage = currentPage.fields.some(f => f.type === 'cart')
-  // "Stepped" display style (form.settings.formStyle): one screen per section
-  // with large card options for choice fields. Never for cart/POS forms -
-  // that flow has its own dense order-screen UX.
-  const steppedStyle = form?.settings?.formStyle === 'stepped' && !form?.fields?.some(f => f.type === 'cart')
   // Retail-style forms (deferCheckout on the cart field) skip the embedded
   // checkout modal entirely: the cart is just one field among others, and
   // the whole page (cart + everything else) submits together via the
@@ -2034,11 +2060,12 @@ function PublicForm() {
 
   if (submitted) {
     return (
-      <div className="page">
-        <h2>{token ? 'Response updated successfully.' : 'Response submitted successfully.'}</h2>
-        <p>Thank you.</p>
+      <div className="page" style={{ maxWidth: 480, textAlign: 'center' }}>
+        <CheckIcon />
+        <h2 style={{ margin: '0.8rem 0 0.2rem' }}>{token ? 'Response updated' : 'Response submitted'}</h2>
+        <p style={{ color: 'var(--color-muted)', margin: 0 }}>Thank you.</p>
         {editLink && (
-          <div className="card" style={{ padding: '1rem', marginTop: '1rem' }}>
+          <div className="card" style={{ padding: '1rem', marginTop: '1.4rem', textAlign: 'left' }}>
             <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem', color: 'var(--color-muted)' }}>
               Save this link if you need to come back and edit your response:
             </p>
@@ -2064,7 +2091,7 @@ function PublicForm() {
               setUploading({})
               setPageIndex(0)
             }}
-            style={{ marginTop: '1rem' }}
+            style={{ marginTop: '1.4rem' }}
           >
             Submit another response
           </button>
@@ -2118,14 +2145,29 @@ function PublicForm() {
     // plain single inputs keep their floating label, so only choice/widget
     // fields need an explicit question label here.
     if (steppedStyle && field.type !== 'cart') {
-      const isChoice = field.type === 'dropdown' || field.type === 'multiplechoice' || field.type === 'checkbox'
-      const showLabel = isChoice || WIDGET_FIELD_TYPES.has(field.type)
+      // One field per screen (see buildQuestionScreens): the field's own
+      // label IS the screen's big question heading, same as the Lab's
+      // onboarding flow - not a small caption above the input. A section
+      // marker directly before this field (only true for the first field
+      // after it) rides along as a small pill + the section's own
+      // description, exactly like a labs step's intro only showing on its
+      // first question.
+      const introSection = currentPage.section
       return (
         <div key={field.id} className="stepped-field" style={{ marginBottom: '1.8rem' }}>
-          {showLabel && (
-            <label style={{ display: 'block', fontWeight: 600, fontSize: '1.02rem', marginBottom: '0.6rem' }}>
-              {field.label}{field.required && <span className="field-required-mark"> *</span>}
-            </label>
+          {introSection?.title && (
+            <p style={{
+              display: 'inline-block', margin: '0 0 0.9rem', padding: '0.3rem 0.75rem', borderRadius: 999,
+              background: 'var(--color-primary-soft)', color: 'var(--color-primary)', fontWeight: 700, fontSize: '0.8rem',
+            }}>
+              {introSection.title}
+            </p>
+          )}
+          <h2 style={{ margin: '0 0 0.5rem', fontSize: 'clamp(1.3rem, 3vw, 1.7rem)', lineHeight: 1.25 }}>
+            {field.label}{field.required && <span className="field-required-mark"> *</span>}
+          </h2>
+          {introSection?.description && (
+            <p style={{ margin: '0 0 1.3rem', color: 'var(--color-muted)', fontSize: '0.92rem' }}>{introSection.description}</p>
           )}
           {renderInput(field)}
           {errors[field.id] && (
@@ -2180,13 +2222,18 @@ function PublicForm() {
       // narrow phone to clip real content on the right edge instead - worse
       // than the momentary letter overlap it fixed, so just the top reserve
       // stays. Only needed when the panel actually renders (a saved-response
-      // edit link, `token`, skips it entirely).
-      ...(!token ? { paddingTop: '4rem' } : {}),
+      // edit link, `token`, skips it entirely; so does an anonymous public
+      // respondent with no session - see PosSidePanel below).
+      ...(!token && session ? { paddingTop: '4rem' } : {}),
       ...(cartDefersCheckout ? { paddingBottom: 'calc(7.5rem + env(safe-area-inset-bottom))' } : {}),
     }}>
-      {!token && (
+      {/* The owner's/staff's own nav (Edit Form, Records, Settings, Admin,
+          Share Link, ...) - never shown to an anonymous public respondent
+          filling this form in from a shared link, only to whoever is
+          actually logged in when they open the same /form/:id URL. */}
+      {!token && session && (
         <div className="no-print">
-          <PosSidePanel formId={form.id} hasCartField={form.fields.some(f => f.type === 'cart')} bottomBarPresent={cartDefersCheckout} />
+          <PosSidePanel formId={form.id} hasCartField={hasCartField} bottomBarPresent={cartDefersCheckout} />
         </div>
       )}
 
@@ -2251,7 +2298,7 @@ function PublicForm() {
         )}
       </div>
 
-      {pages.length > 1 && (
+      {pages.length > 1 && !steppedStyle && (
         <div className="no-print" style={{ margin: '0.8rem 0 1.2rem' }}>
           <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)', marginBottom: '0.4rem' }}>
             Page {pageIndex + 1} of {pages.length}
@@ -2262,6 +2309,18 @@ function PublicForm() {
               background: 'var(--color-primary)', transition: 'width 0.2s ease'
             }} />
           </div>
+        </div>
+      )}
+
+      {/* One continuous bar across every question, same as the Lab's
+          onboarding flow - a single progress read for the whole form
+          instead of a per-page fraction. */}
+      {steppedStyle && pages.length > 1 && (
+        <div className="no-print" style={{ height: 6, borderRadius: 999, background: 'var(--color-border)', overflow: 'hidden', marginBottom: '1.6rem' }}>
+          <div style={{
+            height: '100%', borderRadius: 999, background: 'var(--color-primary)',
+            width: `${((pageIndex + 1) / pages.length) * 100}%`, transition: 'width 200ms ease',
+          }} />
         </div>
       )}
 
@@ -2288,12 +2347,16 @@ function PublicForm() {
       )}
 
       {steppedStyle && pages.length > 1 && (
-        <div className="no-print stepped-eyebrow">Step {pageIndex + 1} of {pages.length}</div>
+        <div className="no-print stepped-eyebrow">Question {pageIndex + 1} of {pages.length}</div>
       )}
 
-      {currentPage.section && (
-        <div className="no-print" style={{ marginBottom: steppedStyle ? '1.8rem' : '1.2rem' }}>
-          <h2 style={{ margin: '0 0 0.3rem', fontSize: steppedStyle ? 'clamp(1.35rem, 3vw, 1.7rem)' : '1.25rem', lineHeight: 1.2 }}>
+      {/* Stepped forms fold the section intro into renderFieldRow itself
+          (a small pill above the field's own question heading) since a
+          screen only ever holds one field - this full-size heading is only
+          for cart/POS forms, which still page by section. */}
+      {currentPage.section && !steppedStyle && (
+        <div className="no-print" style={{ marginBottom: '1.2rem' }}>
+          <h2 style={{ margin: '0 0 0.3rem', fontSize: '1.25rem', lineHeight: 1.2 }}>
             {currentPage.section.title || 'Untitled Section'}
           </h2>
           {currentPage.section.description && (

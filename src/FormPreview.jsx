@@ -5,6 +5,7 @@
 // what a respondent will see without saving or leaving the editor.
 import { useState } from 'react'
 import Modal from './components/Modal'
+import CardChoice from './components/CardChoice'
 import { COUNTRIES, statesFor, citiesForField } from './lib/locationData'
 
 // Mirrors PublicForm.jsx's buildPages, kept as a separate copy rather than
@@ -28,7 +29,38 @@ function buildPages(fields) {
   return pages
 }
 
-function renderPreviewInput(field, value, onChange) {
+// Mirrors PublicForm.jsx's buildQuestionScreens - the one-question-per-screen
+// layout every cart-less form now uses for real respondents. A section
+// marker's title/description rides along on the very next field's screen
+// only, same as the real flow.
+function buildQuestionScreens(fields) {
+  const screens = []
+  let pendingSection = null
+  fields.forEach(field => {
+    if (field.type === 'section') {
+      pendingSection = field
+      return
+    }
+    screens.push({ section: pendingSection, fields: [field] })
+    pendingSection = null
+  })
+  if (screens.length === 0) screens.push({ section: null, fields: [] })
+  return screens
+}
+
+function renderPreviewInput(field, value, onChange, stepped) {
+  if (stepped && field.type === 'dropdown') {
+    return <CardChoice options={field.options || []} value={value ?? ''} onChange={onChange} />
+  }
+
+  if (stepped && field.type === 'multiplechoice') {
+    return <CardChoice options={field.options || []} value={value ?? ''} onChange={onChange} />
+  }
+
+  if (stepped && field.type === 'checkbox') {
+    return <CardChoice options={field.options || []} multi value={Array.isArray(value) ? value : []} onChange={onChange} maxSelect={field.maxSelect} />
+  }
+
   if (field.type === 'longtext') {
     return (
       <textarea
@@ -249,7 +281,12 @@ function FormPreviewModal({ formName, description, fields, onClose }) {
     setAnswers(current => ({ ...current, [fieldId]: value }))
   }
 
-  const pages = buildPages(fields)
+  // Cart/POS forms still preview as one section per page (their own dense
+  // order UX, unaffected by the stepped redesign); every other form now
+  // previews exactly like the real thing - one question per screen.
+  const hasCartField = fields.some(f => f.type === 'cart')
+  const stepped = !hasCartField
+  const pages = stepped ? buildQuestionScreens(fields) : buildPages(fields)
   const currentPage = pages[Math.min(pageIndex, pages.length - 1)]
   const isLastPage = pageIndex >= pages.length - 1
 
@@ -267,7 +304,7 @@ function FormPreviewModal({ formName, description, fields, onClose }) {
         {fields.length > 0 && pages.length > 1 && (
           <div style={{ margin: '0.6rem 0 1rem' }}>
             <div style={{ fontSize: '0.78rem', color: 'var(--color-muted)', marginBottom: '0.3rem' }}>
-              Page {Math.min(pageIndex, pages.length - 1) + 1} of {pages.length}
+              {stepped ? 'Question' : 'Page'} {Math.min(pageIndex, pages.length - 1) + 1} of {pages.length}
             </div>
             <div style={{ height: '4px', background: '#eee', borderRadius: '2px', overflow: 'hidden' }}>
               <div style={{
@@ -278,7 +315,7 @@ function FormPreviewModal({ formName, description, fields, onClose }) {
           </div>
         )}
 
-        {currentPage.section && (
+        {currentPage.section && !stepped && (
           <div style={{ marginBottom: '1rem' }}>
             <h2 style={{ margin: '0 0 0.3rem', fontSize: '1.15rem' }}>{currentPage.section.title || 'Untitled Section'}</h2>
             {currentPage.section.description && (
@@ -287,13 +324,31 @@ function FormPreviewModal({ formName, description, fields, onClose }) {
           </div>
         )}
 
-        {currentPage.fields.map(field => (
+        {stepped ? currentPage.fields.map(field => (
+          <div key={field.id} style={{ marginBottom: '1.4rem' }}>
+            {currentPage.section?.title && (
+              <p style={{
+                display: 'inline-block', margin: '0 0 0.7rem', padding: '0.25rem 0.7rem', borderRadius: 999,
+                background: 'var(--color-primary-soft)', color: 'var(--color-primary)', fontWeight: 700, fontSize: '0.76rem',
+              }}>
+                {currentPage.section.title}
+              </p>
+            )}
+            <h2 style={{ margin: '0 0 0.6rem', fontSize: '1.3rem', lineHeight: 1.25 }}>
+              {field.label || 'Untitled question'}{field.required && <span style={{ color: '#c0392b' }}> *</span>}
+            </h2>
+            {currentPage.section?.description && (
+              <p style={{ margin: '0 0 1rem', color: 'var(--color-muted)', fontSize: '0.88rem' }}>{currentPage.section.description}</p>
+            )}
+            {renderPreviewInput(field, answers[field.id], (value) => updateAnswer(field.id, value), stepped)}
+          </div>
+        )) : currentPage.fields.map(field => (
           <div key={field.id} className="card" style={{ padding: '1rem', marginBottom: '1rem' }}>
             <label style={{ fontWeight: 600 }}>
               {field.label || 'Untitled question'}{field.required && <span style={{ color: '#c0392b' }}> *</span>}
             </label>
             <div style={{ marginTop: '0.5rem' }}>
-              {renderPreviewInput(field, answers[field.id], (value) => updateAnswer(field.id, value))}
+              {renderPreviewInput(field, answers[field.id], (value) => updateAnswer(field.id, value), stepped)}
             </div>
           </div>
         ))}

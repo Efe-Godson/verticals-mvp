@@ -68,6 +68,8 @@ function EditForm() {
   const [error, setError] = useState('')
   const [formName, setFormName] = useState('')
   const [formDescription, setFormDescription] = useState('')
+  const [formBanner, setFormBanner] = useState('')
+  const [formBannerTone, setFormBannerTone] = useState('info') // info | warning | success | neutral
   const [formSettings, setFormSettings] = useState({})
   const [fields, setFields] = useState([])
   const [message, setMessage] = useState('')
@@ -116,6 +118,8 @@ function EditForm() {
       } else {
         setFormName(data.name)
         setFormDescription(data.description || '')
+        setFormBanner(data.settings?.formBanner ?? '')
+        setFormBannerTone(data.settings?.formBannerTone ?? 'info')
         setFormSettings(data.settings || {})
         setFields(data.fields || [])
       }
@@ -153,10 +157,14 @@ function EditForm() {
 
       setAutosaveStatus('saving')
       const cleanedFields = cleanFieldsForSave(fields)
+      // `settings` is a shared JSONB bag - other pages stash their own keys
+      // in it (see the same note in FormSettings.jsx), so this only ever
+      // overrides the two keys the builder itself owns.
+      const settings = { ...formSettings, formBanner: formBanner.trim() || null, formBannerTone }
 
       const { error } = await supabase
         .from('forms')
-        .update({ name: formName, description: formDescription.trim() || null, fields: cleanedFields })
+        .update({ name: formName, description: formDescription.trim() || null, fields: cleanedFields, settings })
         .eq('id', id)
 
       setAutosaveStatus(error ? 'error' : 'saved')
@@ -168,7 +176,7 @@ function EditForm() {
     pendingSaveRef.current = doSave
 
     return () => clearTimeout(debounceRef.current)
-  }, [formName, formDescription, fields, loading, id])
+  }, [formName, formDescription, formBanner, formBannerTone, fields, loading, id])
 
   // Runs only on true unmount (empty deps), unlike the effect above whose
   // cleanup also fires on every keystroke as the debounce resets - this is
@@ -313,11 +321,12 @@ function EditForm() {
     pendingSaveRef.current = null // this explicit save supersedes any pending autosave flush
 
     const cleanedFields = cleanFieldsForSave(fields)
+    const settings = { ...formSettings, formBanner: formBanner.trim() || null, formBannerTone }
 
     setSaving(true)
     const { error } = await supabase
       .from('forms')
-      .update({ name: formName, description: formDescription.trim() || null, fields: cleanedFields })
+      .update({ name: formName, description: formDescription.trim() || null, fields: cleanedFields, settings })
       .eq('id', id)
 
     setSaving(false)
@@ -502,26 +511,63 @@ function EditForm() {
       )}
 
       {!hasCartField && (
-        <div style={{ marginBottom: '1.5rem' }}>
-          <label style={{ fontSize: '0.85rem', color: 'var(--color-muted)' }}>Form Name</label>
+        <div className="card" style={{ padding: '1.2rem 1.4rem', marginBottom: '1.2rem' }}>
           <input
             type="text"
             value={formName}
             onChange={(e) => setFormName(e.target.value)}
-            style={{ padding: '0.6rem', width: '100%', fontSize: '1rem', marginTop: '0.3rem' }}
+            placeholder="Enter title here"
+            style={{
+              width: '100%', border: 'none', outline: 'none', background: 'transparent',
+              padding: '0.3rem 0', fontSize: '1.7rem', fontWeight: 800, color: 'var(--color-text)',
+            }}
           />
-          <label style={{ fontSize: '0.85rem', color: 'var(--color-muted)', marginTop: '0.8rem', display: 'block' }}>
-            Description <span style={{ fontWeight: 400 }}>(optional)</span>
-          </label>
           <textarea
             value={formDescription}
             onChange={(e) => setFormDescription(e.target.value)}
-            placeholder="Shown to respondents under the title"
+            placeholder="Add a description (optional) - shown to respondents under the title"
             rows={2}
-            style={{ padding: '0.6rem', width: '100%', fontSize: '0.92rem', marginTop: '0.3rem' }}
+            style={{
+              width: '100%', border: 'none', outline: 'none', background: 'transparent', resize: 'vertical',
+              padding: '0.2rem 0', fontSize: '0.92rem', color: 'var(--color-muted)', marginTop: '0.1rem',
+            }}
           />
         </div>
       )}
+
+      <div className="card" style={{ padding: '1.2rem 1.4rem', marginBottom: '1.5rem' }}>
+        <label style={{ fontWeight: 600, fontSize: '0.92rem' }}>Banner</label>
+        <p style={{ fontSize: '0.82rem', color: 'var(--color-muted)', margin: '0.2rem 0 0.7rem' }}>
+          A short message shown at the top of the form for everyone filling it in. Leave blank for none.
+        </p>
+        <textarea
+          value={formBanner}
+          onChange={(e) => setFormBanner(e.target.value)}
+          rows={2}
+          maxLength={280}
+          placeholder="e.g. Orders placed after 6pm are delivered the next day."
+          style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical' }}
+        />
+        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.7rem' }}>
+          {[
+            { value: 'info', label: 'Info' },
+            { value: 'warning', label: 'Warning' },
+            { value: 'success', label: 'Success' },
+            { value: 'neutral', label: 'Neutral' },
+          ].map(o => (
+            <button
+              key={o.value}
+              type="button"
+              onClick={() => setFormBannerTone(o.value)}
+              className={formBannerTone === o.value ? '' : 'secondary'}
+              disabled={!formBanner.trim()}
+              style={{ padding: '0.4rem 0.9rem', fontSize: '0.85rem' }}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
         {fields.map((field, index) => (

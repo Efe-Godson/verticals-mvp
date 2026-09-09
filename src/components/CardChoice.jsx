@@ -1,7 +1,8 @@
 // A card-grid selector: large lightweight cards instead of a native <select>
-// or a stack of radios/checkboxes. Powers the "stepped" form display style
-// (form.settings.formStyle === 'stepped') and reuses the visual language of
-// the Lab onboarding flow. Theme-driven, works in light/dark.
+// or a stack of radios/checkboxes. Powers every cart-less public form's
+// one-question-per-screen design (see PublicForm.jsx's steppedStyle) and
+// reuses the visual language of the Lab onboarding flow. Theme-driven,
+// works in light/dark.
 //
 //   <CardChoice options={['Yes','No']} value={v} onChange={setV} />
 //   <CardChoice options={[{value,label,help}]} multi value={arr} onChange={setArr} maxSelect={3} />
