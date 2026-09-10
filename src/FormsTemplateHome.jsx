@@ -612,7 +612,13 @@ function ListView({ pageForms, togglePin, publishForm, setFormStatus, duplicateF
               {form.pinned && (
                 <span title="Pinned"><PinIcon /></span>
               )}
-              <span style={{ fontWeight: '600', fontSize: '1.05rem' }}>{form.name}</span>
+              <Link
+                to={`/form/${form.id}/edit`}
+                title={`Edit "${form.name}"`}
+                style={{ fontWeight: '600', fontSize: '1.05rem', color: 'inherit' }}
+              >
+                {form.name}
+              </Link>
               <FormStateBadge status={form.status} />
             </div>
             <div style={{ color: 'var(--color-muted)', fontSize: '0.85rem', marginTop: '0.2rem' }}>
@@ -681,16 +687,23 @@ function ListView({ pageForms, togglePin, publishForm, setFormStatus, duplicateF
             </div>
           </div>
 
-          {/* Mobile: just the primary action plus an overflow menu for everything else */}
-          <div className="list-actions-mobile" style={{ display: 'flex', gap: '0.5rem', width: '100%' }}>
-            {form.status === 'draft' ? (
-              <button style={{ flex: 1 }} onClick={() => publishForm(form.id)}>Publish</button>
-            ) : form.status === 'paused' ? (
-              <button style={{ flex: 1 }} onClick={() => setFormStatus(form.id, 'published')}>Resume</button>
-            ) : form.status === 'archived' ? (
-              <button className="secondary" style={{ flex: 1 }} onClick={() => setFormStatus(form.id, 'paused')}>Restore</button>
-            ) : (
-              <span style={{ flex: 1, color: 'var(--color-muted)', fontSize: '0.82rem', alignSelf: 'center' }}>Live and accepting responses</span>
+          {/* Mobile: a few real quick actions on the strip + an overflow menu
+              for the rest. Every status gets Edit; the primary status action
+              (Publish / Resume / Restore) and Records ride alongside it so a
+              Live form's row isn't just passive text. */}
+          <div className="list-actions-mobile" style={{ display: 'flex', gap: '0.4rem', width: '100%' }}>
+            {form.status !== 'archived' && (
+              <Link to={`/form/${form.id}/edit`} style={{ flex: 1 }}>
+                <button className="secondary" style={{ width: '100%' }}>Edit</button>
+              </Link>
+            )}
+            {form.status === 'draft' && <button style={{ flex: 1 }} onClick={() => publishForm(form.id)}>Publish</button>}
+            {form.status === 'paused' && <button style={{ flex: 1 }} onClick={() => setFormStatus(form.id, 'published')}>Resume</button>}
+            {form.status === 'archived' && <button className="secondary" style={{ flex: 1 }} onClick={() => setFormStatus(form.id, 'paused')}>Restore</button>}
+            {(form.status === 'published' || form.status === 'paused' || form.status === 'archived') && (
+              <Link to={`/form/${form.id}/records`} style={{ flex: 1 }}>
+                <button className="secondary" style={{ width: '100%' }}>Records</button>
+              </Link>
             )}
 
             <div style={{ position: 'relative' }} ref={openMenuId === `m-${form.id}` ? menuRef : null}>
@@ -773,12 +786,16 @@ function GridView({ pageForms, togglePin, publishForm, setFormStatus, duplicateF
               {form.pinned && (
                 <span title="Pinned"><PinIcon size={12} /></span>
               )}
-              <div style={{
-                fontWeight: '700', fontSize: '1rem', lineHeight: 1.25,
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
-              }}>
+              <Link
+                to={`/form/${form.id}/edit`}
+                title={`Edit "${form.name}"`}
+                style={{
+                  fontWeight: '700', fontSize: '1rem', lineHeight: 1.25, color: 'inherit',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}
+              >
                 {form.name}
-              </div>
+              </Link>
             </div>
 
             <div style={{ position: 'relative', flexShrink: 0 }} ref={openMenuId === form.id ? menuRef : null}>
@@ -841,20 +858,25 @@ function GridView({ pageForms, togglePin, publishForm, setFormStatus, duplicateF
             {new Date(form.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
           </div>
 
-          <div style={{ marginTop: 'auto', paddingTop: '0.4rem' }}>
-            {form.status === 'draft' && <button style={{ width: '100%' }} onClick={() => publishForm(form.id)}>Publish</button>}
-            {form.status === 'paused' && <button style={{ width: '100%' }} onClick={() => setFormStatus(form.id, 'published')}>Resume</button>}
-            {form.status === 'archived' && <button className="secondary" style={{ width: '100%' }} onClick={() => setFormStatus(form.id, 'paused')}>Restore</button>}
+          <div style={{ marginTop: 'auto', paddingTop: '0.4rem', display: 'flex', gap: '0.4rem' }}>
+            {form.status !== 'archived' && (
+              <Link to={`/form/${form.id}/edit`} style={{ flex: 1 }}>
+                <button className="secondary" style={{ width: '100%' }}>Edit</button>
+              </Link>
+            )}
+            {form.status === 'draft' && <button style={{ flex: 1 }} onClick={() => publishForm(form.id)}>Publish</button>}
+            {form.status === 'paused' && <button style={{ flex: 1 }} onClick={() => setFormStatus(form.id, 'published')}>Resume</button>}
+            {form.status === 'archived' && <button className="secondary" style={{ flex: 1 }} onClick={() => setFormStatus(form.id, 'paused')}>Restore</button>}
 
             {form.status === 'published' && (() => {
               const action = getContextualAction(form.id, responseCounts)
               if (action === 'copyLink') {
-                return <button style={{ width: '100%' }} onClick={() => copyLink(form.id)}>Copy Link</button>
+                return <button style={{ flex: 1 }} onClick={() => copyLink(form.id)}>Copy Link</button>
               }
               if (action === 'records') {
-                return <Link to={`/form/${form.id}/records`}><button style={{ width: '100%' }}>Records</button></Link>
+                return <Link to={`/form/${form.id}/records`} style={{ flex: 1 }}><button style={{ width: '100%' }}>Records</button></Link>
               }
-              return <Link to={`/form/${form.id}/report`}><button style={{ width: '100%' }}>Reports</button></Link>
+              return <Link to={`/form/${form.id}/report`} style={{ flex: 1 }}><button style={{ width: '100%' }}>Reports</button></Link>
             })()}
           </div>
         </div>
