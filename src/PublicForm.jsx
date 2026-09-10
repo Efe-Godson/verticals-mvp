@@ -2348,13 +2348,14 @@ function PublicForm() {
         </div>
       )}
 
-      {/* List layout: a compact banner strip whose height follows the image,
-          with the form's own brand colour as its bottom border - one merged
-          branded-header element. With no image, just that brand rule. */}
+      {/* List layout: one fixed banner shape any picture crops to fill
+          (Google-Forms style), a solid brand-colour bar flush underneath.
+          With no image, just that bar as the header rule. */}
       {plainList ? (
         form.settings?.bannerImageUrl ? (
           <div className="no-print pf-banner-wrap">
             <img className="pf-banner" src={form.settings.bannerImageUrl} alt="" />
+            <div className="pf-banner-bar" />
           </div>
         ) : (
           <div className="no-print pf-accent-strip" />

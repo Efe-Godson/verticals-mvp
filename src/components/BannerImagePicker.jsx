@@ -1,8 +1,10 @@
-// The form builder's "Header image" card - a compact logo/banner strip
-// shown above the form title on the public form, with the form's brand
-// colour as its bottom border. Shared by CreateForm and EditForm. Upload
-// plumbing lives in lib/formImages.js (uploadBannerImage); this is just
-// the control - the preview mirrors how PublicForm renders it (.pf-banner).
+// The form builder's "Header image" card - one fixed banner shape any
+// picture crops to fill (so every form's header reads the same), with a
+// solid brand-colour bar flush underneath. Shared by CreateForm and
+// EditForm. Upload plumbing lives in lib/formImages.js (uploadBannerImage);
+// this is just the control - the preview mirrors PublicForm's .pf-banner.
+
+const SHAPE = { width: '100%', aspectRatio: '4 / 1', objectFit: 'cover', objectPosition: 'center', display: 'block' }
 
 export default function BannerImagePicker({ value, uploading, error, onPick, onClear }) {
   function handleInput(e) {
@@ -15,17 +17,14 @@ export default function BannerImagePicker({ value, uploading, error, onPick, onC
     <div className="card" style={{ padding: '1.2rem 1.4rem', marginBottom: '1.5rem' }}>
       <label style={{ fontWeight: 600, fontSize: '0.92rem' }}>Header image</label>
       <p style={{ fontSize: '0.82rem', color: 'var(--color-muted)', margin: '0.2rem 0 0.7rem' }}>
-        A small logo or banner strip above the form title. Its height follows the image. Optional, up to 5MB.
+        Fills a fixed banner shape above the form title - any picture is cropped to fit. Optional, up to 5MB.
       </p>
 
       {value ? (
         <div>
-          <div style={{ borderBottom: '3px solid var(--color-primary)', paddingBottom: '10px' }}>
-            <img
-              src={value}
-              alt=""
-              style={{ display: 'block', width: '100%', maxHeight: 104, objectFit: 'contain', objectPosition: 'center' }}
-            />
+          <div style={{ borderRadius: 'var(--radius) var(--radius) 0 0', overflow: 'hidden' }}>
+            <img src={value} alt="" style={{ ...SHAPE, background: 'var(--color-bg)' }} />
+            <div style={{ height: 6, background: 'var(--color-primary)' }} />
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem' }}>
             <label className="secondary" style={pickBtnStyle}>
@@ -38,8 +37,15 @@ export default function BannerImagePicker({ value, uploading, error, onPick, onC
           </div>
         </div>
       ) : (
-        <label className="secondary" style={pickBtnStyle}>
-          {uploading ? 'Uploading...' : 'Upload image'}
+        <label
+          style={{
+            ...SHAPE, cursor: uploading ? 'default' : 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            border: '1px dashed var(--color-border)', borderRadius: 'var(--radius)',
+            color: 'var(--color-muted)', fontSize: '0.85rem', textAlign: 'center',
+          }}
+        >
+          {uploading ? 'Uploading...' : '+ Upload header image'}
           <input type="file" accept="image/*" disabled={uploading} onChange={handleInput} style={{ display: 'none' }} />
         </label>
       )}

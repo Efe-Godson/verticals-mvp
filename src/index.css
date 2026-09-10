@@ -577,28 +577,33 @@ input:focus, select:focus, textarea:focus {
       color-mix(in srgb, var(--color-primary) 7%, var(--color-bg)) 100%
     );
 }
-/* Header rule when there's no banner image - the brand colour as a thin
-   underline under the form title area. */
-.pf-accent-strip {
-  height: 0;
-  border-bottom: 3px solid var(--color-primary);
-  margin-bottom: 16px;
-}
-/* Banner: a compact strip whose height follows the image (a wide banner
-   stays short; a tall logo scales down to fit), capped small. The brand
-   accent is the strip's own bottom border - one merged element, not a
-   separate bar floating above it. */
+/* Banner: one fixed placeholder shape (Google-Forms style) so every form's
+   header reads the same whatever the source image's dimensions are - any
+   picture is cropped to fill it. A solid brand-colour bar sits flush
+   underneath, connecting the image to the form below. */
 .pf-banner-wrap {
-  border-bottom: 3px solid var(--color-primary);
-  padding-bottom: 10px;
-  margin-bottom: 16px;
+  border-radius: var(--form-radius) var(--form-radius) 0 0;
+  overflow: hidden;
+  margin-bottom: 18px;
 }
 .pf-banner {
   display: block;
   width: 100%;
-  max-height: 104px;
-  object-fit: contain;
+  aspect-ratio: 4 / 1;
+  object-fit: cover;
   object-position: center;
+  background: var(--color-bg);
+}
+.pf-banner-bar {
+  height: 6px;
+  background: var(--color-primary);
+}
+/* No banner image: just the brand-colour bar as the header rule. */
+.pf-accent-strip {
+  height: 5px;
+  border-radius: 3px;
+  background: var(--color-primary);
+  margin-bottom: 16px;
 }
 .pf-header {
   margin-bottom: var(--form-section-gap);
