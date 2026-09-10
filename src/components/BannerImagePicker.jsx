@@ -1,7 +1,8 @@
-// The form builder's "Header image" card - a picture shown across the top
-// of the public form, Google-Forms style. Shared by CreateForm and
-// EditForm. Upload plumbing lives in lib/formImages.js (uploadBannerImage);
-// this is just the control.
+// The form builder's "Header image" card - a compact logo/banner strip
+// shown above the form title on the public form, with the form's brand
+// colour as its bottom border. Shared by CreateForm and EditForm. Upload
+// plumbing lives in lib/formImages.js (uploadBannerImage); this is just
+// the control - the preview mirrors how PublicForm renders it (.pf-banner).
 
 export default function BannerImagePicker({ value, uploading, error, onPick, onClear }) {
   function handleInput(e) {
@@ -14,16 +15,18 @@ export default function BannerImagePicker({ value, uploading, error, onPick, onC
     <div className="card" style={{ padding: '1.2rem 1.4rem', marginBottom: '1.5rem' }}>
       <label style={{ fontWeight: 600, fontSize: '0.92rem' }}>Header image</label>
       <p style={{ fontSize: '0.82rem', color: 'var(--color-muted)', margin: '0.2rem 0 0.7rem' }}>
-        A picture shown across the top of the form, above the title. Optional. Up to 5MB.
+        A small logo or banner strip above the form title. Its height follows the image. Optional, up to 5MB.
       </p>
 
       {value ? (
         <div>
-          <img
-            src={value}
-            alt=""
-            style={{ width: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 'var(--radius)', display: 'block' }}
-          />
+          <div style={{ borderBottom: '3px solid var(--color-primary)', paddingBottom: '10px' }}>
+            <img
+              src={value}
+              alt=""
+              style={{ display: 'block', width: '100%', maxHeight: 104, objectFit: 'contain', objectPosition: 'center' }}
+            />
+          </div>
           <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem' }}>
             <label className="secondary" style={pickBtnStyle}>
               {uploading ? 'Uploading...' : 'Replace'}

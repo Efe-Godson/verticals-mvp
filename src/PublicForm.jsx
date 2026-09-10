@@ -2348,22 +2348,28 @@ function PublicForm() {
         </div>
       )}
 
-      {/* A thin strip in the form's own brand colour at the very top of the
-          header - a branded-document cue without plastering the accent
-          everywhere. List layout only. */}
-      {plainList && <div className="no-print pf-accent-strip" />}
-
-      {form.settings?.bannerImageUrl && (
+      {/* List layout: a compact banner strip whose height follows the image,
+          with the form's own brand colour as its bottom border - one merged
+          branded-header element. With no image, just that brand rule. */}
+      {plainList ? (
+        form.settings?.bannerImageUrl ? (
+          <div className="no-print pf-banner-wrap">
+            <img className="pf-banner" src={form.settings.bannerImageUrl} alt="" />
+          </div>
+        ) : (
+          <div className="no-print pf-accent-strip" />
+        )
+      ) : form.settings?.bannerImageUrl ? (
         <img
-          className={plainList ? 'no-print pf-banner' : 'no-print'}
+          className="no-print"
           src={form.settings.bannerImageUrl}
           alt=""
-          style={plainList ? undefined : {
+          style={{
             width: '100%', maxHeight: 240, objectFit: 'cover',
             borderRadius: 'var(--radius)', marginBottom: '1.25rem', display: 'block',
           }}
         />
-      )}
+      ) : null}
 
       <div className={plainList ? 'no-print pf-header' : 'no-print'} style={plainList ? undefined : { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.6rem', flexWrap: 'wrap' }}>
         <div>

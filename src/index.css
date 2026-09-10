@@ -557,20 +557,48 @@ input:focus, select:focus, textarea:focus {
 .page.pf-form {
   max-width: 680px;
   padding: clamp(24px, 5vw, 52px) var(--form-pad);
+  position: relative;
+  background: transparent;
 }
+/* A soft diagonal wash behind the whole public form, tinted from the
+   form's own theme colour - covers the viewport at any size and sits
+   behind the content (the white inputs/section cards read against it). */
+.page.pf-form::before,
+.page.stepped-form::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--color-primary) 11%, var(--color-bg)) 0%,
+      var(--color-bg) 48%,
+      color-mix(in srgb, var(--color-primary) 7%, var(--color-bg)) 100%
+    );
+}
+/* Header rule when there's no banner image - the brand colour as a thin
+   underline under the form title area. */
 .pf-accent-strip {
-  height: 4px;
-  border-radius: 999px;
-  background: var(--color-primary);
-  margin-bottom: 18px;
+  height: 0;
+  border-bottom: 3px solid var(--color-primary);
+  margin-bottom: 16px;
+}
+/* Banner: a compact strip whose height follows the image (a wide banner
+   stays short; a tall logo scales down to fit), capped small. The brand
+   accent is the strip's own bottom border - one merged element, not a
+   separate bar floating above it. */
+.pf-banner-wrap {
+  border-bottom: 3px solid var(--color-primary);
+  padding-bottom: 10px;
+  margin-bottom: 16px;
 }
 .pf-banner {
   display: block;
   width: 100%;
-  aspect-ratio: 16 / 5;
-  object-fit: cover;
-  border-radius: var(--form-radius);
-  margin-bottom: 18px;
+  max-height: 104px;
+  object-fit: contain;
+  object-position: center;
 }
 .pf-header {
   margin-bottom: var(--form-section-gap);
@@ -605,10 +633,10 @@ input:focus, select:focus, textarea:focus {
 .pf-section > .pf-field + .pf-field { margin-top: var(--form-section-gap); }
 .pf-label {
   display: block;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--color-muted);
-  margin-bottom: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 7px;
 }
 .pf-control,
 .pf-field select.pf-control,
