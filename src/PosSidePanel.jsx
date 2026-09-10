@@ -308,7 +308,13 @@ function PosSidePanel({ formId, hasCartField: hasCartFieldProp, bottomBarPresent
 
       <div
         style={{
-          position: 'fixed', top: 0, left: 0, bottom: 0, width: `${PANEL_WIDTH}px`,
+          // On a phone this is a full-screen menu, not a partial slide-out
+          // panel - the ~210px drawer over a dimmed page reads as cramped
+          // app chrome; full width gives the nav room and a clear "you're
+          // in the menu now" state. Desktop/tablet keep the docked panel.
+          position: 'fixed', top: 0, left: 0, bottom: 0,
+          width: isMobile ? '100vw' : `${PANEL_WIDTH}px`,
+          maxWidth: '100vw',
           background: 'var(--color-primary)', color: 'white', zIndex: 151,
           transform: visible ? 'translateX(0)' : 'translateX(-100%)',
           transition: 'transform 0.2s ease',

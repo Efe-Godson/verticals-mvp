@@ -13,6 +13,12 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'icons/*.png'],
       workbox: {
+        // Take over and drop the previous build's precache as soon as the
+        // new service worker installs, so a deploy actually reaches open
+        // tabs on the next load instead of lingering a version behind.
+        clientsClaim: true,
+        skipWaiting: true,
+        cleanupOutdatedCaches: true,
         // Vendor chunks (jspdf, xlsx, pptxgenjs, html2canvas) can land above
         // the 2MB default - raise the ceiling so the precache build doesn't
         // silently drop them.
