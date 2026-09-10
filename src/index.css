@@ -584,12 +584,10 @@ input[type="checkbox"]:focus, input[type="radio"]:focus {
       color-mix(in srgb, var(--color-primary) 7%, var(--color-bg)) 100%
     );
 }
-/* Banner: one fixed placeholder shape so every form's header reads the
-   same whatever the source image's dimensions are. The whole picture is
-   stretched to fill the rectangle (object-fit: fill) - nothing is cropped
-   out and there's no empty letterbox band; the image just takes the shape
-   of the banner. A solid brand-colour bar sits flush underneath,
-   connecting the image to the form below. */
+/* Banner: one fixed 4:1 shape. The image is already cropped to 4:1 in the
+   builder (see BannerImagePicker's cropper), so it fills this exactly;
+   object-fit: cover just guards against a stray legacy image. A solid
+   brand-colour bar sits flush underneath, connecting it to the form. */
 .pf-banner-wrap {
   border-radius: var(--form-radius) var(--form-radius) 0 0;
   overflow: hidden;
@@ -599,7 +597,8 @@ input[type="checkbox"]:focus, input[type="radio"]:focus {
   display: block;
   width: 100%;
   aspect-ratio: 4 / 1;
-  object-fit: fill;
+  object-fit: cover;
+  object-position: center;
 }
 .pf-banner-bar {
   height: 6px;
