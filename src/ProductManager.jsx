@@ -291,6 +291,18 @@ function ProductManager({ products, onChange, onClose, inline = false, hideAiImp
   const [activeCategory, setActiveCategory] = useState('All')
   const [editingProduct, setEditingProduct] = useState(null) // null closed, 'new', or a product object
   const [openRowMenuId, setOpenRowMenuId] = useState(null)
+  // Screen coords of the row's ⋮ button, so the menu can render position:
+  // fixed and escape the .table-wrap scroll box (overflow:auto there clips
+  // an absolutely-positioned dropdown - the whole "Edit does nothing on
+  // the last row" bug).
+  const [rowMenuAnchor, setRowMenuAnchor] = useState(null)
+
+  function openRowMenu(e, id) {
+    if (openRowMenuId === id) { setOpenRowMenuId(null); return }
+    const r = e.currentTarget.getBoundingClientRect()
+    setRowMenuAnchor({ top: r.bottom + 4, right: window.innerWidth - r.right })
+    setOpenRowMenuId(id)
+  }
   const [showPackageBuilder, setShowPackageBuilder] = useState(false)
   const [importMenuOpen, setImportMenuOpen] = useState(false)
   const [showAiImport, setShowAiImport] = useState(false)
@@ -567,18 +579,18 @@ function ProductManager({ products, onChange, onClose, inline = false, hideAiImp
                     <td style={{ padding: '0.6rem 0.8rem' }}>₦{Number(p.price).toLocaleString()}</td>
                     <td style={{ padding: '0.6rem 0.8rem', color: 'var(--color-muted)' }}>{p.unit || '-'}</td>
                     <td style={{ padding: '0.6rem 0.8rem', color: 'var(--color-muted)' }}>{p.category || '-'}</td>
-                    <td style={{ padding: '0.6rem 0.4rem', position: 'relative' }}>
+                    <td style={{ padding: '0.6rem 0.4rem' }}>
                       <button
-                        type="button" className="secondary" onClick={() => setOpenRowMenuId(openRowMenuId === p.id ? null : p.id)}
+                        type="button" className="secondary" onClick={(e) => openRowMenu(e, p.id)}
                         style={{ padding: '0.2rem 0.5rem' }}
                       >
                         ⋮
                       </button>
-                      {openRowMenuId === p.id && (
+                      {openRowMenuId === p.id && rowMenuAnchor && (
                         <>
                           <div onClick={() => setOpenRowMenuId(null)} style={{ position: 'fixed', inset: 0, zIndex: 15 }} />
                           <div className="dropdown-panel" style={{
-                            position: 'absolute', top: '100%', right: 0, marginTop: '0.3rem', background: 'var(--color-surface)',
+                            position: 'fixed', top: rowMenuAnchor.top, right: rowMenuAnchor.right, background: 'var(--color-surface)',
                             border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
                             boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 20, minWidth: '130px', padding: '0.4rem'
                           }}>
