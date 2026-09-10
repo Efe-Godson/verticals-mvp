@@ -20,17 +20,6 @@ import { extractOrderFromText, describeAIError } from './lib/aiClient'
 import { COUNTRIES, statesFor, citiesForField } from './lib/locationData'
 const PAYMENT_METHODS = ['Cash', 'Card', 'Bank Transfer', 'Split']
 const TOP_CATEGORY_COUNT = 6 // category pills shown before collapsing the rest behind "+N more"
-// Field types that render as a group of controls (radios/checkboxes, a
-// grid, the cart, a file picker, ...) rather than one control with one
-// value - these keep the classic label-above-the-field layout in
-// renderFieldRow. Everything else gets a floating label instead (see
-// renderInput and the .field-floating rules in index.css); date/time are
-// deliberately excluded too - native date/time pickers render their own
-// placeholder text, which a floating label would sit on top of.
-const WIDGET_FIELD_TYPES = new Set([
-  'cart', 'multiplechoice', 'checkbox', 'multiplechoicegrid', 'checkboxgrid',
-  'linearscale', 'rating', 'fileupload', 'linked_record', 'date', 'time',
-])
 
 // Splits fields into pages at each 'section' marker, Google-Forms style:
 // fields before the first section (if any) form an unheaded first page,
@@ -1630,7 +1619,7 @@ function PublicForm() {
                         <label style={{ fontWeight: 600, fontSize: '0.85rem' }}>
                           {q.label}{q.required && <span style={{ color: '#c0392b' }}> *</span>}
                         </label>
-                        <div style={{ marginTop: '0.4rem' }}>{renderInput(q)}</div>
+                        <div style={{ marginTop: '0.4rem' }}>{renderInput(q, { plain: true })}</div>
                       </div>
                     ))}
 
@@ -1650,7 +1639,7 @@ function PublicForm() {
                         <label style={{ fontWeight: 600, fontSize: '0.85rem' }}>
                           {q.label}{q.required && <span style={{ color: '#c0392b' }}> *</span>}
                         </label>
-                        <div style={{ marginTop: '0.4rem' }}>{renderInput(q)}</div>
+                        <div style={{ marginTop: '0.4rem' }}>{renderInput(q, { plain: true })}</div>
                       </div>
                     ))}
 
@@ -2263,7 +2252,7 @@ function PublicForm() {
           {introSection?.description && (
             <p style={{ margin: '0 0 1.3rem', color: 'var(--color-muted)', fontSize: '0.92rem' }}>{introSection.description}</p>
           )}
-          {renderInput(field)}
+          {renderInput(field, { plain: true })}
           {errors[field.id] && (
             <p style={{ color: '#c0392b', fontSize: '0.8rem', marginTop: '0.5rem', marginBottom: 0 }}>{errors[field.id]}</p>
           )}
@@ -2290,36 +2279,34 @@ function PublicForm() {
       )
     }
 
-    // Matches the Current Order/Catalogue boxes' pale-green shade above,
-    // instead of these fields being the only plain-white cards on the
-    // page - deferCheckout only (Retail's inline "cart + fields + one
-    // Submit" flow), not a cart-less form's fields, which have no matching
-    // shaded boxes elsewhere on their page to stay consistent with.
-    const fieldCardStyle = field.type === 'cart'
-      ? { marginBottom: '1rem' }
-      : { padding: '1rem', marginBottom: '1rem', ...(cartDefersCheckout ? { background: 'var(--color-primary-soft)' } : {}) }
-    // "Widget" fields (a group of checkboxes/radios, the cart, a file
-    // picker, ...) keep the classic label-above-the-field layout - a
-    // floating label only makes sense for one control with one value.
-    // Everything else (single inputs, textarea, dropdown, autocomplete,
-    // location) draws its own floating label inside renderInput instead, see
-    // the .field-floating rules in index.css.
-    const isWidget = WIDGET_FIELD_TYPES.has(field.type)
-    return (
-      <div key={field.id} className={field.type === 'cart' ? '' : 'card'} style={fieldCardStyle}>
-        {isWidget && field.type !== 'cart' && (
-          <label style={{ fontWeight: '600' }}>
-            {field.label}{field.required && <span className="field-required-mark"> *</span>}
-          </label>
-        )}
-        <div style={field.type === 'cart' || !isWidget ? {} : { marginTop: '0.5rem' }}>
+    // The cart widget itself - no tile, no label above (it draws its own
+    // "Current Order" / catalogue chrome).
+    if (field.type === 'cart') {
+      return (
+        <div key={field.id} style={{ marginBottom: '1rem' }}>
           {renderInput(field)}
+          {errors[field.id] && <p className="pf-field-error">{errors[field.id]}</p>}
         </div>
-        {errors[field.id] && (
-          <p style={{ color: '#c0392b', fontSize: '0.8rem', marginTop: '0.5rem', marginBottom: 0 }}>
-            {errors[field.id]}
-          </p>
-        )}
+      )
+    }
+
+    // Every other field on a cart/POS or multi-section form: same
+    // label-above-the-fill-area model as the standalone list form, just
+    // wrapped in a light tile so it still reads as a card on the order
+    // screen. The tile only picks up the brand tint once the field has a
+    // value (.is-filled) rather than every field sitting pre-shaded.
+    const v = answers[field.id]
+    const filled = Array.isArray(v)
+      ? v.length > 0
+      : v != null && v !== '' && (typeof v !== 'object' || Object.values(v).some(Boolean))
+    return (
+      <div key={field.id} className={`pf-tile${filled ? ' is-filled' : ''}`}>
+        <label className="pf-label">
+          {field.label}{field.required && <span className="field-required-mark"> *</span>}
+        </label>
+        {field.description && <p className="pf-sublabel" style={{ marginTop: '-2px' }}>{field.description}</p>}
+        {renderInput(field, { plain: true })}
+        {errors[field.id] && <p className="pf-field-error">{errors[field.id]}</p>}
       </div>
     )
   }

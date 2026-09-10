@@ -636,6 +636,22 @@ input:focus, select:focus, textarea:focus {
   padding: clamp(18px, 3vw, 26px);
 }
 .pf-section > .pf-field + .pf-field { margin-top: var(--form-section-gap); }
+
+/* A tile is the same label-above-input field, wrapped so it reads as a
+   card on a cart/POS or multi-section screen. The brand tint only lands
+   once the field actually has a value - not every field pre-shaded. */
+.pf-tile {
+  padding: 14px 16px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+  margin-bottom: var(--form-gap);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.pf-tile.is-filled {
+  background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-primary) 30%, var(--color-border));
+}
 .pf-label {
   display: block;
   font-size: 15px;
@@ -643,9 +659,7 @@ input:focus, select:focus, textarea:focus {
   color: var(--color-text);
   margin-bottom: 7px;
 }
-.pf-control,
-.pf-field select.pf-control,
-.pf-field textarea.pf-control {
+.pf-control {
   width: 100%;
   box-sizing: border-box;
   height: var(--form-control-h);
@@ -657,7 +671,7 @@ input:focus, select:focus, textarea:focus {
   font-size: 16px; /* entered value */
   font-family: inherit;
 }
-.pf-field textarea.pf-control {
+textarea.pf-control {
   height: auto;
   min-height: 116px;
   padding: 12px var(--form-pad);

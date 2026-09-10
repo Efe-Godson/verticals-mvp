@@ -64,16 +64,16 @@ function renderPreviewInput(field, value, onChange, stepped) {
   if (field.type === 'longtext') {
     return (
       <textarea
+        className="pf-control"
         value={value || ''}
         onChange={(e) => onChange(e.target.value)}
-        style={{ padding: '0.5rem', width: '100%', minHeight: '80px' }}
       />
     )
   }
 
   if (field.type === 'dropdown') {
     return (
-      <select value={value || ''} onChange={(e) => onChange(e.target.value)} style={{ padding: '0.5rem', width: '100%' }}>
+      <select className="pf-control" value={value || ''} onChange={(e) => onChange(e.target.value)}>
         <option value="">Select an option</option>
         {field.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
       </select>
@@ -270,7 +270,7 @@ function renderPreviewInput(field, value, onChange, stepped) {
     field.type === 'time' ? 'time' :
     'text'
 
-  return <input type={inputType} value={value || ''} onChange={(e) => onChange(e.target.value)} style={{ padding: '0.5rem', width: '100%' }} />
+  return <input className="pf-control" type={inputType} value={value || ''} onChange={(e) => onChange(e.target.value)} />
 }
 
 function FormPreviewModal({ formName, description, bannerImageUrl, fields, formLayout, onClose }) {
@@ -350,13 +350,11 @@ function FormPreviewModal({ formName, description, bannerImageUrl, fields, formL
             {renderPreviewInput(field, answers[field.id], (value) => updateAnswer(field.id, value), stepped)}
           </div>
         )) : currentPage.fields.map(field => (
-          <div key={field.id} className="card" style={{ padding: '1rem', marginBottom: '1rem' }}>
-            <label style={{ fontWeight: 600 }}>
+          <div key={field.id} className="pf-field" style={{ marginBottom: 'var(--form-section-gap)' }}>
+            <label className="pf-label">
               {field.label || 'Untitled question'}{field.required && <span style={{ color: '#c0392b' }}> *</span>}
             </label>
-            <div style={{ marginTop: '0.5rem' }}>
-              {renderPreviewInput(field, answers[field.id], (value) => updateAnswer(field.id, value), stepped)}
-            </div>
+            {renderPreviewInput(field, answers[field.id], (value) => updateAnswer(field.id, value), stepped)}
           </div>
         ))}
 
