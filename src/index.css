@@ -585,10 +585,11 @@ input[type="checkbox"]:focus, input[type="radio"]:focus {
     );
 }
 /* Banner: one fixed placeholder shape so every form's header reads the
-   same whatever the source image's dimensions are - the whole picture is
-   scaled to fit inside it (never cropped), centred, on the surface colour.
-   A solid brand-colour bar sits flush underneath, connecting the image to
-   the form below. */
+   same whatever the source image's dimensions are. The whole picture is
+   stretched to fill the rectangle (object-fit: fill) - nothing is cropped
+   out and there's no empty letterbox band; the image just takes the shape
+   of the banner. A solid brand-colour bar sits flush underneath,
+   connecting the image to the form below. */
 .pf-banner-wrap {
   border-radius: var(--form-radius) var(--form-radius) 0 0;
   overflow: hidden;
@@ -598,9 +599,7 @@ input[type="checkbox"]:focus, input[type="radio"]:focus {
   display: block;
   width: 100%;
   aspect-ratio: 4 / 1;
-  object-fit: contain;
-  object-position: center;
-  background: var(--color-surface);
+  object-fit: fill;
 }
 .pf-banner-bar {
   height: 6px;

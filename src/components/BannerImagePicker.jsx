@@ -4,7 +4,7 @@
 // EditForm. Upload plumbing lives in lib/formImages.js (uploadBannerImage);
 // this is just the control - the preview mirrors PublicForm's .pf-banner.
 
-const SHAPE = { width: '100%', aspectRatio: '4 / 1', objectFit: 'contain', objectPosition: 'center', display: 'block' }
+const SHAPE = { width: '100%', aspectRatio: '4 / 1', objectFit: 'fill', display: 'block' }
 
 export default function BannerImagePicker({ value, uploading, error, onPick, onClear }) {
   function handleInput(e) {
@@ -17,7 +17,7 @@ export default function BannerImagePicker({ value, uploading, error, onPick, onC
     <div className="card" style={{ padding: '1.2rem 1.4rem', marginBottom: '1.5rem' }}>
       <label style={{ fontWeight: 600, fontSize: '0.92rem' }}>Header image</label>
       <p style={{ fontSize: '0.82rem', color: 'var(--color-muted)', margin: '0.2rem 0 0.7rem' }}>
-        Sits in a fixed banner shape above the form title - any picture is scaled to fit it whole, never cropped. Optional, up to 5MB.
+        Any picture is stretched to fill a fixed banner shape above the form title - nothing cropped, no empty edges. Optional, up to 5MB.
       </p>
 
       {value ? (
