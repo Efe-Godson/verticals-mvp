@@ -2326,34 +2326,24 @@ function PublicForm() {
 
   return (
     <div className={steppedStyle ? 'page stepped-form' : (plainList ? 'page pf-form' : 'page')} style={{
-      // PosSidePanel's hamburger button is position:fixed at top:1rem/
-      // left:1rem, 42px square - with no reserved space it sits directly on
-      // top of the title below (the button is a later paint layer, so it
-      // wins visually and clips the first few characters of the form name).
-      // A permanent left-padding reserve too (so a scrolled-past
-      // heading/section couldn't get clipped either) cost enough width on a
-      // narrow phone to clip real content on the right edge instead - worse
-      // than the momentary letter overlap it fixed, so just the top reserve
-      // stays. Only needed when the panel actually renders (a saved-response
-      // edit link, `token`, skips it entirely; so does anyone who isn't this
-      // form's own owner/staff - see PosSidePanel below).
-      ...(!token && isOwnerOrStaff ? { paddingTop: '4rem' } : {}),
+      // The POS side panel only mounts for a cart/POS form now (see below),
+      // and only that needs the fixed-hamburger top reserve.
+      ...(!token && isOwnerOrStaff && hasCartField ? { paddingTop: '4rem' } : {}),
       ...(cartDefersCheckout ? { paddingBottom: 'calc(7.5rem + env(safe-area-inset-bottom))' } : {}),
     }}>
-      {/* The owner's/staff's own nav (Edit Form, Records, Settings, Admin,
-          Share Link, ...) - shown only to this form's actual owner or its
-          assigned staff (see isOwnerOrStaff above), never to an anonymous
-          public respondent nor to some other signed-in Verticals user who
-          just happens to open the same shared /form/:id link - this route
-          has no PrivateRoute/StaffScopedRoute wrapper (it must stay
-          reachable while logged out), so `session` alone isn't ownership. */}
-      {!token && isOwnerOrStaff && (
+      {/* /form/:id IS the shareable public link. A plain data-collection
+          form must render clean for EVERYONE who opens it - the owner
+          included - with no hamburger menu, no back arrow, no app nav.
+          The owner reaches Edit / Records / Settings from the Forms list
+          or the Records page instead. The POS side panel stays only for
+          cart/POS forms, where /form/:id is the staff order screen and
+          that nav is the whole point (and it's still owner/staff-gated). */}
+      {!token && isOwnerOrStaff && hasCartField && (
         <div className="no-print">
           <PosSidePanel
             formId={form.id}
             hasCartField={hasCartField}
             bottomBarPresent={cartDefersCheckout}
-            startCollapsed={!hasCartField}
           />
         </div>
       )}
