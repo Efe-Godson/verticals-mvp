@@ -8,6 +8,7 @@
 // crowding the field. Products stay embedded in the form's own field
 // definition for now; there's no shared catalog across forms yet.
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import * as XLSX from 'xlsx'
 import Modal from './components/Modal'
 import PackageBuilder from './PackageBuilder'
@@ -23,6 +24,12 @@ function newProductId() {
 }
 
 const TOP_CATEGORY_COUNT = 6 // category pills shown before collapsing the rest behind "+N more"
+
+const rowMenuItemStyle = {
+  display: 'block', width: '100%', textAlign: 'left', border: 'none',
+  padding: '0.5rem 0.6rem', fontSize: '0.85rem', background: 'transparent',
+  cursor: 'pointer', borderRadius: '6px', color: 'inherit',
+}
 
 function ProductForm({ product, onSave, onCancel }) {
   const [showMore, setShowMore] = useState(false)
@@ -291,10 +298,12 @@ function ProductManager({ products, onChange, onClose, inline = false, hideAiImp
   const [activeCategory, setActiveCategory] = useState('All')
   const [editingProduct, setEditingProduct] = useState(null) // null closed, 'new', or a product object
   const [openRowMenuId, setOpenRowMenuId] = useState(null)
-  // Screen coords of the row's ⋮ button, so the menu can render position:
-  // fixed and escape the .table-wrap scroll box (overflow:auto there clips
-  // an absolutely-positioned dropdown - the whole "Edit does nothing on
-  // the last row" bug).
+  // Screen coords of the row's ⋮ button. The menu is rendered through a
+  // portal to <body> and positioned fixed at these coords - it has to
+  // escape BOTH the .table-wrap scroll box (overflow:auto) AND the Add-
+  // Products <Modal>, whose panel has a `transform` (which would otherwise
+  // trap position:fixed and clip it on a short/searched list - the "Edit
+  // does nothing when I search" bug).
   const [rowMenuAnchor, setRowMenuAnchor] = useState(null)
 
   function openRowMenu(e, id) {
@@ -302,6 +311,32 @@ function ProductManager({ products, onChange, onClose, inline = false, hideAiImp
     const r = e.currentTarget.getBoundingClientRect()
     setRowMenuAnchor({ top: r.bottom + 4, right: window.innerWidth - r.right })
     setOpenRowMenuId(id)
+  }
+
+  function closeRowMenu() { setOpenRowMenuId(null) }
+
+  // The shared row-action menu (Edit / Duplicate / Delete), portaled to
+  // <body> so no transformed / overflow-clipped ancestor can hide it.
+  function rowMenu(p) {
+    if (openRowMenuId !== p.id || !rowMenuAnchor) return null
+    return createPortal(
+      <>
+        <div onClick={closeRowMenu} style={{ position: 'fixed', inset: 0, zIndex: 3000 }} />
+        <div className="dropdown-panel" style={{
+          position: 'fixed', top: rowMenuAnchor.top, right: rowMenuAnchor.right, background: 'var(--color-surface)',
+          border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
+          boxShadow: '0 6px 20px rgba(0,0,0,0.16)', zIndex: 3001, minWidth: '140px', padding: '0.4rem',
+        }}>
+          <button type="button" onClick={() => { setEditingProduct(p); closeRowMenu() }}
+            style={rowMenuItemStyle}>Edit</button>
+          <button type="button" onClick={() => { duplicateProduct(p); closeRowMenu() }}
+            style={rowMenuItemStyle}>Duplicate</button>
+          <button type="button" onClick={() => { setPendingDeleteId(p.id); closeRowMenu() }}
+            style={{ ...rowMenuItemStyle, color: '#c0392b' }}>Delete</button>
+        </div>
+      </>,
+      document.body,
+    )
   }
   const [showPackageBuilder, setShowPackageBuilder] = useState(false)
   const [importMenuOpen, setImportMenuOpen] = useState(false)
@@ -555,17 +590,17 @@ function ProductManager({ products, onChange, onClose, inline = false, hideAiImp
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
               <thead>
                 <tr style={{ background: 'var(--color-bg)' }}>
-                  <th style={{ textAlign: 'left', padding: '0.6rem 0.8rem', borderBottom: '1px solid var(--color-border)' }}>Name</th>
-                  <th style={{ textAlign: 'left', padding: '0.6rem 0.8rem', borderBottom: '1px solid var(--color-border)' }}>Price</th>
-                  <th style={{ textAlign: 'left', padding: '0.6rem 0.8rem', borderBottom: '1px solid var(--color-border)' }}>Unit</th>
-                  <th style={{ textAlign: 'left', padding: '0.6rem 0.8rem', borderBottom: '1px solid var(--color-border)' }}>Category</th>
+                  <th style={{ textAlign: 'left', padding: '0.7rem 1rem', borderBottom: '1px solid var(--color-border)' }}>Name</th>
+                  <th style={{ textAlign: 'left', padding: '0.7rem 1rem', borderBottom: '1px solid var(--color-border)' }}>Price</th>
+                  <th style={{ textAlign: 'left', padding: '0.7rem 1rem', borderBottom: '1px solid var(--color-border)' }}>Unit</th>
+                  <th style={{ textAlign: 'left', padding: '0.7rem 1rem', borderBottom: '1px solid var(--color-border)' }}>Category</th>
                   <th style={{ width: '36px', borderBottom: '1px solid var(--color-border)' }} />
                 </tr>
               </thead>
               <tbody>
                 {filtered.map(p => (
                   <tr key={p.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                    <td style={{ padding: '0.6rem 0.8rem', fontWeight: 600 }}>
+                    <td style={{ padding: '0.85rem 1rem', fontWeight: 600 }}>
                       {p.name}
                       {p.isPackage && (
                         <span style={{
@@ -576,39 +611,17 @@ function ProductManager({ products, onChange, onClose, inline = false, hideAiImp
                         </span>
                       )}
                     </td>
-                    <td style={{ padding: '0.6rem 0.8rem' }}>₦{Number(p.price).toLocaleString()}</td>
-                    <td style={{ padding: '0.6rem 0.8rem', color: 'var(--color-muted)' }}>{p.unit || '-'}</td>
-                    <td style={{ padding: '0.6rem 0.8rem', color: 'var(--color-muted)' }}>{p.category || '-'}</td>
-                    <td style={{ padding: '0.6rem 0.4rem' }}>
+                    <td style={{ padding: '0.85rem 1rem' }}>₦{Number(p.price).toLocaleString()}</td>
+                    <td style={{ padding: '0.85rem 1rem', color: 'var(--color-muted)' }}>{p.unit || '-'}</td>
+                    <td style={{ padding: '0.85rem 1rem', color: 'var(--color-muted)' }}>{p.category || '-'}</td>
+                    <td style={{ padding: '0.85rem 0.6rem' }}>
                       <button
                         type="button" className="secondary" onClick={(e) => openRowMenu(e, p.id)}
                         style={{ padding: '0.2rem 0.5rem' }}
                       >
                         ⋮
                       </button>
-                      {openRowMenuId === p.id && rowMenuAnchor && (
-                        <>
-                          <div onClick={() => setOpenRowMenuId(null)} style={{ position: 'fixed', inset: 0, zIndex: 15 }} />
-                          <div className="dropdown-panel" style={{
-                            position: 'fixed', top: rowMenuAnchor.top, right: rowMenuAnchor.right, background: 'var(--color-surface)',
-                            border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 20, minWidth: '130px', padding: '0.4rem'
-                          }}>
-                            <button type="button" className="secondary" onClick={() => { setEditingProduct(p); setOpenRowMenuId(null) }}
-                              style={{ display: 'block', width: '100%', textAlign: 'left', border: 'none', padding: '0.4rem 0.5rem', fontSize: '0.85rem', background: 'transparent' }}>
-                              Edit
-                            </button>
-                            <button type="button" className="secondary" onClick={() => duplicateProduct(p)}
-                              style={{ display: 'block', width: '100%', textAlign: 'left', border: 'none', padding: '0.4rem 0.5rem', fontSize: '0.85rem', background: 'transparent' }}>
-                              Duplicate
-                            </button>
-                            <button type="button" className="secondary" onClick={() => { setPendingDeleteId(p.id); setOpenRowMenuId(null) }}
-                              style={{ display: 'block', width: '100%', textAlign: 'left', border: 'none', padding: '0.4rem 0.5rem', fontSize: '0.85rem', background: 'transparent', color: '#c0392b' }}>
-                              Delete
-                            </button>
-                          </div>
-                        </>
-                      )}
+                      {rowMenu(p)}
                     </td>
                   </tr>
                 ))}
