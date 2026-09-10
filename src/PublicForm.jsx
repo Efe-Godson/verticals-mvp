@@ -2260,25 +2260,6 @@ function PublicForm() {
       )
     }
 
-    // Standard list layout (a plain, cart-less form): label ABOVE the input,
-    // the input itself is the container - no white card wrapping every
-    // field. See the .pf-* rules in index.css. Widget branches (radio/
-    // checkbox groups, grids, rating, scale, file, date/time, linked
-    // record) still render their own controls; the .pf-label above covers
-    // the group heading so `plain` there just means "no floating label".
-    if (plainList && field.type !== 'cart' && field.type !== 'section') {
-      return (
-        <div key={field.id} className="pf-field">
-          <label className="pf-label">
-            {field.label}{field.required && <span className="field-required-mark"> *</span>}
-          </label>
-          {field.description && <p className="pf-sublabel" style={{ marginTop: '-2px' }}>{field.description}</p>}
-          {renderInput(field, { plain: true })}
-          {errors[field.id] && <p className="pf-field-error">{errors[field.id]}</p>}
-        </div>
-      )
-    }
-
     // The cart widget itself - no tile, no label above (it draws its own
     // "Current Order" / catalogue chrome).
     if (field.type === 'cart') {
@@ -2290,11 +2271,10 @@ function PublicForm() {
       )
     }
 
-    // Every other field on a cart/POS or multi-section form: same
-    // label-above-the-fill-area model as the standalone list form, just
-    // wrapped in a light tile so it still reads as a card on the order
-    // screen. The tile only picks up the brand tint once the field has a
-    // value (.is-filled) rather than every field sitting pre-shaded.
+    // Every other field, on any public form (standalone list, cart/POS,
+    // multi-section): label above the fill area, wrapped in a light tile.
+    // The tile only picks up the brand tint once the field has a value
+    // (.is-filled) rather than every field sitting pre-shaded.
     const v = answers[field.id]
     const filled = Array.isArray(v)
       ? v.length > 0

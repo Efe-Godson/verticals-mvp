@@ -350,7 +350,7 @@ function FormPreviewModal({ formName, description, bannerImageUrl, fields, formL
             {renderPreviewInput(field, answers[field.id], (value) => updateAnswer(field.id, value), stepped)}
           </div>
         )) : currentPage.fields.map(field => (
-          <div key={field.id} className="pf-field" style={{ marginBottom: 'var(--form-section-gap)' }}>
+          <div key={field.id} className="pf-tile" style={{ marginBottom: 'var(--form-gap)' }}>
             <label className="pf-label">
               {field.label || 'Untitled question'}{field.required && <span style={{ color: '#c0392b' }}> *</span>}
             </label>

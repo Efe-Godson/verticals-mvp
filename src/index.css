@@ -584,10 +584,11 @@ input[type="checkbox"]:focus, input[type="radio"]:focus {
       color-mix(in srgb, var(--color-primary) 7%, var(--color-bg)) 100%
     );
 }
-/* Banner: one fixed placeholder shape (Google-Forms style) so every form's
-   header reads the same whatever the source image's dimensions are - any
-   picture is cropped to fill it. A solid brand-colour bar sits flush
-   underneath, connecting the image to the form below. */
+/* Banner: one fixed placeholder shape so every form's header reads the
+   same whatever the source image's dimensions are - the whole picture is
+   scaled to fit inside it (never cropped), centred, on the surface colour.
+   A solid brand-colour bar sits flush underneath, connecting the image to
+   the form below. */
 .pf-banner-wrap {
   border-radius: var(--form-radius) var(--form-radius) 0 0;
   overflow: hidden;
@@ -597,9 +598,9 @@ input[type="checkbox"]:focus, input[type="radio"]:focus {
   display: block;
   width: 100%;
   aspect-ratio: 4 / 1;
-  object-fit: cover;
+  object-fit: contain;
   object-position: center;
-  background: var(--color-bg);
+  background: var(--color-surface);
 }
 .pf-banner-bar {
   height: 6px;
@@ -631,8 +632,9 @@ input[type="checkbox"]:focus, input[type="radio"]:focus {
 .pf-fields {
   display: flex;
   flex-direction: column;
-  gap: var(--form-section-gap);
+  gap: var(--form-gap);
 }
+.pf-fields > .pf-tile { margin-bottom: 0; } /* the flex gap handles spacing */
 .pf-field { display: block; }
 /* Optional grouping for longer forms - one subtle card per section, never
    per field. */
