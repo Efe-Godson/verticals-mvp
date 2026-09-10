@@ -17,7 +17,8 @@ import { printReceipt } from './receiptPrint'
 import { isRetailTemplate, isRestaurantTemplate } from './lib/templateFlags'
 import { submitForm, getSubmissionByToken, updateSubmissionByToken } from './lib/submissionsClient'
 import { extractOrderFromText, describeAIError } from './lib/aiClient'
-import { COUNTRIES, statesFor, citiesForField } from './lib/locationData'
+import LocationField from './components/LocationField'
+import { DEFAULT_COUNTRY, loadCountries, loadStates, loadCitiesForField } from './lib/locationData'
 const PAYMENT_METHODS = ['Cash', 'Card', 'Bank Transfer', 'Split']
 const TOP_CATEGORY_COUNT = 6 // category pills shown before collapsing the rest behind "+N more"
 
@@ -72,22 +73,23 @@ function buildQuestionScreens(fields) {
 // into the Deno function too. Requires at least a state or city hit to
 // count; a country-only "match" is just the fallback default, not
 // something the text actually confirmed.
-function matchLocationAnswer(field, rawValue) {
+async function matchLocationAnswer(field, rawValue) {
   const parts = rawValue.split(',').map(p => p.trim()).filter(Boolean)
   if (parts.length === 0) return null
 
-  const matchedCountry = parts.find(p => COUNTRIES.some(c => c.toLowerCase() === p.toLowerCase()))
+  const countries = await loadCountries()
+  const matchedCountry = parts.find(p => countries.some(c => c.name.toLowerCase() === p.toLowerCase()))
   const country = matchedCountry
-    ? COUNTRIES.find(c => c.toLowerCase() === matchedCountry.toLowerCase())
-    : (field.defaultCountry || COUNTRIES[0])
+    ? countries.find(c => c.name.toLowerCase() === matchedCountry.toLowerCase()).name
+    : (field.defaultCountry || DEFAULT_COUNTRY)
 
-  const stateOptions = statesFor(country)
+  const stateOptions = (await loadStates(country)).map(s => s.name)
   const matchedState = parts.find(p => stateOptions.some(s => s.toLowerCase() === p.toLowerCase()))
   const state = matchedState ? stateOptions.find(s => s.toLowerCase() === matchedState.toLowerCase()) : ''
 
   let city = ''
   if (state) {
-    const cityOptions = citiesForField(field, country, state)
+    const cityOptions = await loadCitiesForField(field, country, state)
     const matchedCity = parts.find(p => cityOptions.some(c => c.toLowerCase() === p.toLowerCase()))
     city = matchedCity ? cityOptions.find(c => c.toLowerCase() === matchedCity.toLowerCase()) : ''
   }
@@ -165,15 +167,15 @@ function AiFillModal({ cartField, fields, rules, showRulesButton, onSaveRules, o
         return product ? { productId: item.productId, name: product.name, price: product.price, quantity: item.quantity } : null
       }).filter(Boolean)
 
-      const answers = (result.answers || []).map(a => {
+      const answers = (await Promise.all((result.answers || []).map(async a => {
         const field = fields.find(f => f.id === a.fieldId)
         if (!field) return null
         if (field.type === 'location') {
-          const matched = matchLocationAnswer(field, a.value)
+          const matched = await matchLocationAnswer(field, a.value)
           return matched ? { fieldId: a.fieldId, label: field.label, value: matched, type: 'location' } : null
         }
         return { fieldId: a.fieldId, label: field.label, value: a.value, type: field.type }
-      }).filter(Boolean)
+      }))).filter(Boolean)
 
       if (items.length === 0 && answers.length === 0) {
         setExtractError("Couldn't match anything in that text to your catalogue or fields - try pasting more of it.")
@@ -2002,66 +2004,13 @@ function PublicForm() {
     }
 
     if (field.type === 'location') {
-      const value = answers[field.id] || {}
-      const country = value.country || field.defaultCountry || COUNTRIES[0]
-      const stateOptions = statesFor(country)
-      const cityOptions = value.state ? citiesForField(field, country, value.state) : []
-
-      function setLocationPart(patch) {
-        updateAnswer(field.id, { country, ...value, ...patch })
-      }
-
-      // No single group label here (see renderFieldRow - 'location' isn't a
-      // widget type) - each part gets its own caption instead.
-      if (plain) {
-        return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
-            <div>
-              <span className="pf-sublabel">Country</span>
-              <select className="pf-control" value={country} onChange={(e) => setLocationPart({ country: e.target.value, state: '', city: '' })}>
-                {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-            <div>
-              <span className="pf-sublabel">State</span>
-              <select className="pf-control" value={value.state || ''} onChange={(e) => setLocationPart({ state: e.target.value, city: '' })}>
-                <option value="">Select state...</option>
-                {stateOptions.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-            <div>
-              <span className="pf-sublabel">City</span>
-              <select className="pf-control" value={value.city || ''} onChange={(e) => setLocationPart({ city: e.target.value })} disabled={!value.state}>
-                <option value="">Select city...</option>
-                {cityOptions.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-          </div>
-        )
-      }
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <div className="field-floating">
-            <select value={country} onChange={(e) => setLocationPart({ country: e.target.value, state: '', city: '' })}>
-              {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <label>Country{field.required && <span className="field-required-mark"> *</span>}</label>
-          </div>
-          <div className="field-floating">
-            <select value={value.state || ''} onChange={(e) => setLocationPart({ state: e.target.value, city: '' })}>
-              <option value="">Select state...</option>
-              {stateOptions.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-            <label>State</label>
-          </div>
-          <div className="field-floating">
-            <select value={value.city || ''} onChange={(e) => setLocationPart({ city: e.target.value })} disabled={!value.state}>
-              <option value="">Select city...</option>
-              {cityOptions.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <label>City</label>
-          </div>
-        </div>
+        <LocationField
+          field={field}
+          value={answers[field.id] || {}}
+          onChange={(v) => updateAnswer(field.id, v)}
+          plain={plain}
+        />
       )
     }
 

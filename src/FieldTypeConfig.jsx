@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
 import Modal from './components/Modal'
-import { COUNTRIES, statesFor, citiesForField } from './lib/locationData'
+import { DEFAULT_COUNTRY, loadCountries, loadStates, loadCitiesForField } from './lib/locationData'
 
 const TYPES_WITH_GRID = ['multiplechoicegrid', 'checkboxgrid']
 
@@ -63,16 +63,26 @@ function LinkedRecordConfig({ field, index, updateField }) {
 // hold showCitiesModal - hooks can't live inside a plain if-branch.
 function LocationConfig({ field, index, updateField }) {
   const [showCitiesModal, setShowCitiesModal] = useState(false)
+  const [countries, setCountries] = useState([])
+
+  useEffect(() => {
+    let alive = true
+    loadCountries().then(list => { if (alive) setCountries(list) })
+    return () => { alive = false }
+  }, [])
+
+  const current = field.defaultCountry || DEFAULT_COUNTRY
 
   return (
     <div style={{ marginTop: '0.3rem' }}>
       <label style={{ fontSize: '0.78rem', color: 'var(--color-muted)' }}>Default country</label>
       <select
-        value={field.defaultCountry || COUNTRIES[0]}
+        value={current}
         onChange={(e) => updateField(index, { defaultCountry: e.target.value })}
         style={{ padding: '0.4rem', marginTop: '0.2rem', maxWidth: '100%', display: 'block' }}
       >
-        {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+        {countries.length === 0 && <option value={current}>{current}</option>}
+        {countries.map(c => <option key={c.code} value={c.name}>{c.name}</option>)}
       </select>
 
       <button
@@ -95,18 +105,29 @@ function LocationConfig({ field, index, updateField }) {
 // stored on the field itself (extraCities), merged in everywhere cities are
 // listed (citiesForField).
 function ManageCitiesModal({ field, index, updateField, onClose }) {
-  const country = field.defaultCountry || COUNTRIES[0]
-  const stateOptions = statesFor(country)
-  const [state, setState] = useState(stateOptions[0] || '')
+  const country = field.defaultCountry || DEFAULT_COUNTRY
+  const [stateOptions, setStateOptions] = useState([])
+  const [state, setState] = useState('')
   const [cityName, setCityName] = useState('')
+
+  useEffect(() => {
+    let alive = true
+    loadStates(country).then(list => {
+      if (!alive) return
+      const names = list.map(s => s.name)
+      setStateOptions(names)
+      setState(cur => cur || names[0] || '')
+    })
+    return () => { alive = false }
+  }, [country])
 
   const extraCities = field.extraCities || {}
   const addedStates = Object.keys(extraCities).filter(s => extraCities[s]?.length > 0)
 
-  function addCity() {
+  async function addCity() {
     const trimmed = cityName.trim()
     if (!trimmed || !state) return
-    const existing = citiesForField(field, country, state)
+    const existing = await loadCitiesForField(field, country, state)
     if (existing.some(c => c.toLowerCase() === trimmed.toLowerCase())) {
       setCityName('')
       return // already there (base dataset or already added) - nothing to do

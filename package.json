@@ -11,6 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@countrystatecity/countries-browser": "^1.0.4",
     "@supabase/supabase-js": "^2.110.1",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",

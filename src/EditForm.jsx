@@ -10,7 +10,7 @@ import BannerImagePicker from './components/BannerImagePicker'
 import { uploadBannerImage } from './lib/formImages'
 import ProductManager from './ProductManager'
 import MoreDetailsManager from './MoreDetailsManager'
-import { COUNTRIES } from './lib/locationData'
+import { DEFAULT_COUNTRY } from './lib/locationData'
 import { isRestaurantTemplate } from './lib/templateFlags'
 import PageSkeleton from './components/PageSkeleton'
 import { useDeferredLoading } from './components/loadingHooks'
@@ -214,7 +214,7 @@ function EditForm() {
   function updateFieldType(index, newType) {
     const changes = { type: newType }
     if (newType === 'location' && !fields[index].defaultCountry) {
-      changes.defaultCountry = session.user.user_metadata?.country || COUNTRIES[0]
+      changes.defaultCountry = session.user.user_metadata?.country || DEFAULT_COUNTRY
     }
     updateField(index, changes)
   }
@@ -284,7 +284,7 @@ function EditForm() {
       required: false,
     }
     if (preset.type === 'location') {
-      newField.defaultCountry = session.user.user_metadata?.country || COUNTRIES[0]
+      newField.defaultCountry = session.user.user_metadata?.country || DEFAULT_COUNTRY
     }
     setFields([...fields, newField])
   }

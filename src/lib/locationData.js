@@ -1,70 +1,105 @@
 // Place at: src/lib/locationData.js
-// Reference data for the "Location" field type's Country -> State -> City
-// cascade. Generated from the country-state-city npm package: run
-// `node scripts/generate-location-data.js` to regenerate or add a country
-// (edit COUNTRY_NAMES there), rather than hand-editing this file.
-export const LOCATION_DATA = {
-  "Nigeria": {
-    "Abia": ["Aba","Amaigbo","Arochukwu","Bende","Ohafia-Ifigh","Umuahia"],
-    "Abuja (FCT)": ["Abuja","Kuje","Kwali","Madala"],
-    "Adamawa": ["Ganye","Gombi","Holma","Jimeta","Madagali","Mayo-Belwa","Mubi","Ngurore","Numan","Toungo","Yola"],
-    "Akwa Ibom": ["Eket","Esuk Oron","Ikot Ekpene","Itu","Uyo"],
-    "Anambra": ["Agulu","Atani","Awka","Enugu-Ukwu","Igbo-Ukwu","Ihiala","Nkpor","Nnewi","Onitsha","Ozubulu","Uga","Uruobo-Okija"],
-    "Bauchi": ["Azare","Bauchi","Boi","Bununu","Darazo","Dass","Dindima","Disina","Gabarin","Gwaram","Kari","Lame","Lere","Madara","Misau","Sade","Yamrat","Yanda Bayo","Yuli","Zadawa","Zalanga"],
-    "Bayelsa": ["Amassoma","Twon-Brass","Yenagoa"],
-    "Benue": ["Aliade","Boju","Gboko","Igbor","Makurdi","Ochobo","Otukpa","Takum","Ugbokpo","Yandev","Zaki Biam"],
-    "Borno": ["Bama","Benisheikh","Biu","Bornu Yassu","Damasak","Damboa","Dikwa","Gamboru","Gwoza","Kukawa","Magumeri","Maiduguri","Marte","Miringa","Monguno","Ngala","Shaffa","Shani","Tokombere","Uba","Wuyo","Yajiwa"],
-    "Cross River": ["Akankpa","Calabar","Gakem","Ikang","Ugep"],
-    "Delta": ["Abraka","Agbor","Asaba","Bomadi","Burutu","Kwale","Obiaruku","Ogwashi-Uku","Orerokpe","Patani","Sapele","Ughelli","Umunede","Warri"],
-    "Ebonyi": ["Abakaliki","Afikpo","Effium","Ezza-Ohu","Isieke"],
-    "Edo": ["Agenebode","Auchi","Benin City","Ekpoma","Igarra","Illushi","Siluko","Ubiaja","Uromi"],
-    "Ekiti": ["Ado-Ekiti","Aramoko-Ekiti","Efon-Alaaye","Emure-Ekiti","Ifaki","Igbara-Odo","Igede-Ekiti","Ijero-Ekiti","Ikere-Ekiti","Ipoti","Ise-Ekiti","Oke Ila","Omuo-Ekiti"],
-    "Enugu": ["Adani","Ake-Eze","Aku","Amagunze","Awgu","Eha Amufu","Enugu","Enugu-Ezike","Ete","Ikem","Mberubu","Nsukka","Obolo-Eke (1)","Opi","Udi"],
-    "Gombe": ["Akko","Bara","Billiri","Dadiya","Deba","Dukku","Garko","Gombe","Hinna","Kafarati","Kaltungo","Kumo","Nafada","Pindiga"],
-    "Imo": ["Iho","Oguta","Okigwe","Orlu","Orodo","Owerri"],
-    "Jigawa": ["Babura","Birnin Kudu","Birniwa","Dutse","Gagarawa","Gumel","Gwaram","Hadejia","Kafin Hausa","Kazaure","Kiyawa","Mallammaduri","Ringim","Samamiya"],
-    "Kaduna": ["Anchau","Burumburum","Dutsen Wai","Hunkuyi","Kachia","Kaduna","Kafanchan","Kagoro","Kajuru","Kujama","Lere","Mando","Saminaka","Soba","Sofo-Birnin-Gwari","Zaria"],
-    "Kano": ["Dan Gora","Gaya","Kano"],
-    "Katsina": ["Danja","Dankama","Daura","Dutsin-Ma","Funtua","Gora","Jibia","Jikamshi","Kankara","Katsina","Mashi","Ruma","Runka","Wagini"],
-    "Kebbi": ["Argungu","Bagudo","Bena","Bin Yauri","Birnin Kebbi","Dabai","Dakingari","Gulma","Gwandu","Jega","Kamba","Kangiwa","Kende","Mahuta","Maiyama","Shanga","Wasagu","Zuru"],
-    "Kogi": ["Abocho","Adoru","Ankpa","Bugana","Dekina","Egbe","Icheu","Idah","Isanlu-Itedoijowa","Kabba","Koton-Karfe","Lokoja","Ogaminana","Ogurugu","Okene"],
-    "Kwara": ["Ajasse Ipo","Bode Saadu","Gwasero","Ilorin","Jebba","Kaiama","Lafiagi","Offa","Okuta","Omu-Aran","Patigi","Suya","Yashikera"],
-    "Lagos": ["Apapa","Badagry","Ebute Ikorodu","Ejirin","Epe","Ikeja","Lagos","Makoko"],
-    "Nasarawa": ["Buga","Doma","Keffi","Lafia","Nasarawa","Wamba"],
-    "Niger": ["Auna","Babana","Badeggi","Baro","Bokani","Duku","Ibeto","Konkwesso","Kontagora","Kusheriki","Kuta","Lapai","Minna","New Shagunnu","Suleja","Tegina","Ukata","Wawa","Zungeru"],
-    "Ogun": ["Abeokuta","Ado Odo","Idi Iroko","Ifo","Ijebu-Ife","Ijebu-Igbo","Ijebu-Ode","Ilaro","Imeko","Iperu","Isara","Owode"],
-    "Ondo": ["Agbabu","Akure","Idanre","Ifon","Ilare","Ode","Ondo","Ore","Owo"],
-    "Osun": ["Apomu","Ejigbo","Gbongan","Ijebu-Jesa","Ikire","Ikirun","Ila Orangun","Ile-Ife","Ilesa","Ilobu","Inisa","Iwo","Modakeke","Oke Mesi","Olupona","Osogbo","Otan Ayegbaju","Oyan"],
-    "Oyo": ["Ago Are","Alapa","Fiditi","Ibadan","Igbeti","Igbo-Ora","Igboho","Kisi","Lalupon","Ogbomoso","Okeho","Orita Eruwa","Oyo","Saki"],
-    "Plateau": ["Amper","Bukuru","Dengi","Jos","Kwolla","Langtang","Pankshin","Panyam","Vom","Yelwa"],
-    "Rivers": ["Abalama","Abonnema","Ahoada","Bori","Buguma","Chokocho","Elele","Obonoma","Omoku","Onne","Opobo","Port Harcourt","Rumuokoro"],
-    "Sokoto": ["Binji","Dange","Gandi","Goronyo","Gwadabawa","Illela","Rabah","Sokoto","Tambuwal","Wurno"],
-    "Taraba": ["Baissa","Beli","Gassol","Gembu","Ibi","Jalingo","Lau","Mutum Biyu","Riti","Wukari"],
-    "Yobe": ["Damaturu","Dankalwa","Dapchi","Daura","Fika","Gashua","Geidam","Goniri","Gorgoram","Gujba","Gwio Kura","Kumagunnam","Lajere","Machina","Nguru","Potiskum"],
-    "Zamfara": ["Anka","Dan Sadau","Gummi","Gusau","Kaura Namoda","Kwatarkwashi","Maru","Moriki","Sauri","Tsafe"],
-  },
+// Country -> State -> City data for the "Location" field type.
+//
+// Backed by @countrystatecity/countries-browser: ~10KB up front, then each
+// country's states and each state's cities lazy-load from the jsDelivr CDN
+// on demand. Everything here is async and name-in / name-out - the Location
+// field stores { country, state, city } as plain names (e.g. "Nigeria" /
+// "Lagos" / "Ikeja"), so existing submissions keep working and there's no
+// migration. Module-level Maps cache every response for the session.
+import {
+  getCountries,
+  getStatesOfCountry,
+  getCitiesOfState,
+} from '@countrystatecity/countries-browser'
+
+// Sensible default for this app's main market - used where a country is
+// needed before the async list has loaded (form builder defaults, SignUp).
+export const DEFAULT_COUNTRY = 'Nigeria'
+
+// A few Nigerian state names in the source data don't match common local
+// usage / what older submissions stored. Normalise on the way out (display)
+// and accept either spelling on the way in (lookups).
+const STATE_ALIASES = {
+  'Abuja Federal Capital Territory': 'Abuja (FCT)',
+  'Nassarawa': 'Nasarawa',
+}
+const normalizeState = (name) => STATE_ALIASES[name] || name
+
+// --- caches -------------------------------------------------------------
+let countriesPromise = null // Promise<[{ name, code }]>
+const statesCache = new Map() // countryCode -> Promise<[{ name, code }]>
+const citiesCache = new Map() // `${countryCode}|${stateCode}` -> Promise<string[]>
+
+// --- public API -------------------------------------------------------
+
+// [{ name, code }] sorted by name. `code` is the ISO2 the CDN lookups need;
+// callers only ever pass names around.
+export function loadCountries() {
+  if (!countriesPromise) {
+    countriesPromise = getCountries()
+      .then(list => list
+        .map(c => ({ name: c.name, code: c.iso2 }))
+        .sort((a, b) => a.name.localeCompare(b.name)))
+      .catch(() => { countriesPromise = null; return [] })
+  }
+  return countriesPromise
 }
 
-export const COUNTRIES = Object.keys(LOCATION_DATA)
-
-export function statesFor(country) {
-  return Object.keys(LOCATION_DATA[country] || {})
+async function countryCode(countryName) {
+  if (!countryName) return null
+  const list = await loadCountries()
+  const hit = list.find(c => c.name.toLowerCase() === countryName.toLowerCase())
+  return hit ? hit.code : null
 }
 
-export function citiesFor(country, state) {
-  return (LOCATION_DATA[country] || {})[state] || []
+// [{ name, code }] for a country name. `name` is already normalised.
+export async function loadStates(countryName) {
+  const code = await countryCode(countryName)
+  if (!code) return []
+  if (!statesCache.has(code)) {
+    statesCache.set(code, getStatesOfCountry(code)
+      .then(list => list
+        .map(s => ({ name: normalizeState(s.name), code: s.iso2 }))
+        .sort((a, b) => a.name.localeCompare(b.name)))
+      .catch(() => { statesCache.delete(code); return [] }))
+  }
+  return statesCache.get(code)
 }
 
-// The generated dataset (country-state-city) is genuinely incomplete for
-// many states - real towns just missing from it. Rather than hand-editing
-// this generated file (overwritten the next time it's regenerated), a
-// Location field can carry its own `extraCities: { [state]: string[] }`
-// patch (see FieldTypeConfig.jsx's "Add missing cities" popup), merged in
-// here so every place that lists cities - the respondent-facing field, the
-// builder preview, and AI order-fill matching - sees the same combined list.
-export function citiesForField(field, country, state) {
-  const base = citiesFor(country, state)
-  const extra = field?.extraCities?.[state] || []
-  if (extra.length === 0) return base
-  return Array.from(new Set([...base, ...extra])).sort((a, b) => a.localeCompare(b))
+async function stateCode(countryName, stateName) {
+  if (!stateName) return null
+  const states = await loadStates(countryName)
+  const hit = states.find(s => s.name.toLowerCase() === stateName.toLowerCase())
+  return hit ? hit.code : null
+}
+
+// [cityName] for a country + state name pair.
+export async function loadCities(countryName, stateName) {
+  const cCode = await countryCode(countryName)
+  const sCode = await stateCode(countryName, stateName)
+  if (!cCode || !sCode) return []
+  const key = `${cCode}|${sCode}`
+  if (!citiesCache.has(key)) {
+    citiesCache.set(key, getCitiesOfState(cCode, sCode)
+      .then(list => list.map(c => c.name).sort((a, b) => a.localeCompare(b)))
+      .catch(() => { citiesCache.delete(key); return [] }))
+  }
+  return citiesCache.get(key)
+}
+
+// The CDN dataset still misses real towns in some states, so a Location
+// field can carry its own extraCities: { [state]: string[] } patch (see
+// FieldTypeConfig's "Add Missing Cities"). Merge helper - sync, takes an
+// already-loaded base list.
+export function mergeExtraCities(baseCities, field, stateName) {
+  const extra = field?.extraCities?.[stateName] || []
+  if (extra.length === 0) return baseCities
+  return Array.from(new Set([...baseCities, ...extra])).sort((a, b) => a.localeCompare(b))
+}
+
+// Convenience: load the field's full city list for a state (base + extras).
+export async function loadCitiesForField(field, countryName, stateName) {
+  const base = await loadCities(countryName, stateName)
+  return mergeExtraCities(base, field, stateName)
 }

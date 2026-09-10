@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from './supabaseClient'
-import { COUNTRIES } from './lib/locationData'
+import { DEFAULT_COUNTRY, loadCountries } from './lib/locationData'
 import PasswordInput from './PasswordInput'
 
 function GoogleLogo() {
@@ -19,10 +19,17 @@ function SignUp() {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [country, setCountry] = useState(COUNTRIES[0] || '')
+  const [country, setCountry] = useState(DEFAULT_COUNTRY)
+  const [countries, setCountries] = useState([])
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
+
+  useEffect(() => {
+    let alive = true
+    loadCountries().then(list => { if (alive) setCountries(list) })
+    return () => { alive = false }
+  }, [])
 
   async function handleGoogleSignUp() {
     setGoogleLoading(true)
@@ -106,7 +113,8 @@ function SignUp() {
         <div>
           <label>Country</label><br />
           <select value={country} onChange={(e) => setCountry(e.target.value)} style={{ width: '100%' }}>
-            {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+            {countries.length === 0 && <option value={country}>{country}</option>}
+            {countries.map(c => <option key={c.code} value={c.name}>{c.name}</option>)}
           </select>
         </div>
 

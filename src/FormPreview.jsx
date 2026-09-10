@@ -6,7 +6,7 @@
 import { useState } from 'react'
 import Modal from './components/Modal'
 import CardChoice from './components/CardChoice'
-import { COUNTRIES, statesFor, citiesForField } from './lib/locationData'
+import LocationField from './components/LocationField'
 
 // Mirrors PublicForm.jsx's buildPages, kept as a separate copy rather than
 // a shared import since one lives in a modal with no data-submission
@@ -236,30 +236,7 @@ function renderPreviewInput(field, value, onChange, stepped) {
   }
 
   if (field.type === 'location') {
-    const locationValue = value || {}
-    const country = locationValue.country || field.defaultCountry || COUNTRIES[0]
-    const stateOptions = statesFor(country)
-    const cityOptions = locationValue.state ? citiesForField(field, country, locationValue.state) : []
-
-    function setLocationPart(patch) {
-      onChange({ country, ...locationValue, ...patch })
-    }
-
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        <select value={country} onChange={(e) => setLocationPart({ country: e.target.value, state: '', city: '' })} style={{ padding: '0.5rem' }}>
-          {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
-        <select value={locationValue.state || ''} onChange={(e) => setLocationPart({ state: e.target.value, city: '' })} style={{ padding: '0.5rem' }}>
-          <option value="">Select state...</option>
-          {stateOptions.map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
-        <select value={locationValue.city || ''} onChange={(e) => setLocationPart({ city: e.target.value })} style={{ padding: '0.5rem' }} disabled={!locationValue.state}>
-          <option value="">Select city...</option>
-          {cityOptions.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
-      </div>
-    )
+    return <LocationField field={field} value={value || {}} onChange={onChange} plain />
   }
 
   const inputType =

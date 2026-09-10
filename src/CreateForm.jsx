@@ -10,7 +10,7 @@ import FormPreviewModal from './FormPreview'
 import BannerImagePicker from './components/BannerImagePicker'
 import { uploadBannerImage } from './lib/formImages'
 import PackageBuilder from './PackageBuilder'
-import { COUNTRIES } from './lib/locationData'
+import { DEFAULT_COUNTRY } from './lib/locationData'
 
 const FIELD_TYPES = [
   { value: 'text', label: 'Short Text' },
@@ -187,7 +187,7 @@ function CreateForm() {
   function updateFieldType(index, newType) {
     const changes = { type: newType }
     if (newType === 'location' && !fields[index].defaultCountry) {
-      changes.defaultCountry = session.user.user_metadata?.country || COUNTRIES[0]
+      changes.defaultCountry = session.user.user_metadata?.country || DEFAULT_COUNTRY
     }
     updateField(index, changes)
   }
