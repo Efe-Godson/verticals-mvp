@@ -437,6 +437,11 @@ function PublicForm() {
   // that can't be split one field per screen.
   const hasCartField = form?.fields?.some(f => f.type === 'cart') ?? false
   const steppedStyle = form?.settings?.formLayout === 'stepped' && !hasCartField
+  // The standard public form: a plain cart-less form shown as one clean
+  // list - label-above-input, no per-field card, capped width (see .pf-form
+  // + renderFieldRow). Cart/POS and the stepped one-at-a-time flow each
+  // have their own layout.
+  const plainList = !hasCartField && !steppedStyle
   const pages = useMemo(
     () => (steppedStyle ? buildQuestionScreens(form?.fields || []) : buildPages(form?.fields || [])),
     [form, steppedStyle]
@@ -1098,7 +1103,12 @@ function PublicForm() {
     return <label>{f.label}{f.required && <span className="field-required-mark"> *</span>}</label>
   }
 
-  function renderInput(field) {
+  // `plain` (the standard list layout - see renderFieldRow): the label sits
+  // ABOVE the control as its own element, so the single-control branches
+  // return a bare .pf-control instead of the floating-label .field-floating
+  // wrapper. Widget branches (radio/checkbox groups, grids, cart, ...) are
+  // unaffected either way.
+  function renderInput(field, { plain = false } = {}) {
     // Stepped display style: choice fields become large card grids.
     if (steppedStyle && (field.type === 'dropdown' || field.type === 'multiplechoice' || field.type === 'checkbox')) {
       return (
@@ -1112,6 +1122,16 @@ function PublicForm() {
     }
 
     if (field.type === 'longtext') {
+      if (plain) {
+        return (
+          <textarea
+            className="pf-control"
+            placeholder={field.placeholder || ''}
+            value={answers[field.id] || ''}
+            onChange={(e) => updateAnswer(field.id, e.target.value)}
+          />
+        )
+      }
       return (
         <div className="field-floating">
           <textarea
@@ -1125,17 +1145,22 @@ function PublicForm() {
     }
 
     if (field.type === 'dropdown') {
+      const dropdown = (
+        <select
+          className={plain ? 'pf-control' : undefined}
+          value={answers[field.id] || ''}
+          onChange={(e) => updateAnswer(field.id, e.target.value)}
+        >
+          <option value="">{field.placeholder || 'Select an option'}</option>
+          {field.options?.map(opt => (
+            <option key={opt} value={opt}>{opt}</option>
+          ))}
+        </select>
+      )
+      if (plain) return dropdown
       return (
         <div className="field-floating">
-          <select
-            value={answers[field.id] || ''}
-            onChange={(e) => updateAnswer(field.id, e.target.value)}
-          >
-            <option value="">Select an option</option>
-            {field.options?.map(opt => (
-              <option key={opt} value={opt}>{opt}</option>
-            ))}
-          </select>
+          {dropdown}
           {floatingLabel(field)}
         </div>
       )
@@ -1938,12 +1963,13 @@ function PublicForm() {
       const current = answers[field.id]
       return (
         <select
+          className={plain ? 'pf-control' : undefined}
           value={current?.recordId || ''}
           onChange={(e) => {
             const option = options.find(o => o.recordId === e.target.value)
             updateAnswer(field.id, option ? { recordId: option.recordId, label: option.label } : undefined)
           }}
-          style={{ padding: '0.5rem', width: '100%' }}
+          style={plain ? undefined : { padding: '0.5rem', width: '100%' }}
         >
           <option value="">{options.length === 0 ? 'No records available' : 'Select...'}</option>
           {options.map(o => <option key={o.recordId} value={o.recordId}>{o.label}</option>)}
@@ -1952,6 +1978,23 @@ function PublicForm() {
     }
 
     if (field.type === 'autocomplete') {
+      if (plain) {
+        return (
+          <>
+            <input
+              className="pf-control"
+              type="text"
+              list={`autocomplete-${field.id}`}
+              placeholder={field.placeholder || ''}
+              value={answers[field.id] || ''}
+              onChange={(e) => updateAnswer(field.id, e.target.value)}
+            />
+            <datalist id={`autocomplete-${field.id}`}>
+              {field.options?.map(opt => <option key={opt} value={opt} />)}
+            </datalist>
+          </>
+        )
+      }
       return (
         <div className="field-floating">
           <input
@@ -1980,8 +2023,33 @@ function PublicForm() {
       }
 
       // No single group label here (see renderFieldRow - 'location' isn't a
-      // widget type) - each part gets its own floating caption instead, the
-      // required marker (if any) riding on the first one.
+      // widget type) - each part gets its own caption instead.
+      if (plain) {
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
+            <div>
+              <span className="pf-sublabel">Country</span>
+              <select className="pf-control" value={country} onChange={(e) => setLocationPart({ country: e.target.value, state: '', city: '' })}>
+                {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <span className="pf-sublabel">State</span>
+              <select className="pf-control" value={value.state || ''} onChange={(e) => setLocationPart({ state: e.target.value, city: '' })}>
+                <option value="">Select state...</option>
+                {stateOptions.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
+              <span className="pf-sublabel">City</span>
+              <select className="pf-control" value={value.city || ''} onChange={(e) => setLocationPart({ city: e.target.value })} disabled={!value.state}>
+                <option value="">Select city...</option>
+                {cityOptions.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          </div>
+        )
+      }
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <div className="field-floating">
@@ -2025,11 +2093,24 @@ function PublicForm() {
       const openPicker = (e) => { try { e.currentTarget.showPicker?.() } catch { /* not supported / already open */ } }
       return (
         <input
+          className={plain ? 'pf-control' : undefined}
           type={inputType}
           value={answers[field.id] || ''}
           onChange={(e) => updateAnswer(field.id, e.target.value)}
           onClick={openPicker}
-          style={{ padding: '0.5rem', width: '100%', cursor: 'pointer' }}
+          style={plain ? { cursor: 'pointer' } : { padding: '0.5rem', width: '100%', cursor: 'pointer' }}
+        />
+      )
+    }
+
+    if (plain) {
+      return (
+        <input
+          className="pf-control"
+          type={inputType}
+          placeholder={field.placeholder || ''}
+          value={answers[field.id] || ''}
+          onChange={(e) => updateAnswer(field.id, e.target.value)}
         />
       )
     }
@@ -2190,6 +2271,25 @@ function PublicForm() {
       )
     }
 
+    // Standard list layout (a plain, cart-less form): label ABOVE the input,
+    // the input itself is the container - no white card wrapping every
+    // field. See the .pf-* rules in index.css. Widget branches (radio/
+    // checkbox groups, grids, rating, scale, file, date/time, linked
+    // record) still render their own controls; the .pf-label above covers
+    // the group heading so `plain` there just means "no floating label".
+    if (plainList && field.type !== 'cart' && field.type !== 'section') {
+      return (
+        <div key={field.id} className="pf-field">
+          <label className="pf-label">
+            {field.label}{field.required && <span className="field-required-mark"> *</span>}
+          </label>
+          {field.description && <p className="pf-sublabel" style={{ marginTop: '-2px' }}>{field.description}</p>}
+          {renderInput(field, { plain: true })}
+          {errors[field.id] && <p className="pf-field-error">{errors[field.id]}</p>}
+        </div>
+      )
+    }
+
     // Matches the Current Order/Catalogue boxes' pale-green shade above,
     // instead of these fields being the only plain-white cards on the
     // page - deferCheckout only (Retail's inline "cart + fields + one
@@ -2225,7 +2325,7 @@ function PublicForm() {
   }
 
   return (
-    <div className={steppedStyle ? 'page stepped-form' : 'page'} style={{
+    <div className={steppedStyle ? 'page stepped-form' : (plainList ? 'page pf-form' : 'page')} style={{
       // PosSidePanel's hamburger button is position:fixed at top:1rem/
       // left:1rem, 42px square - with no reserved space it sits directly on
       // top of the title below (the button is a later paint layer, so it
@@ -2258,19 +2358,24 @@ function PublicForm() {
         </div>
       )}
 
+      {/* A thin strip in the form's own brand colour at the very top of the
+          header - a branded-document cue without plastering the accent
+          everywhere. List layout only. */}
+      {plainList && <div className="no-print pf-accent-strip" />}
+
       {form.settings?.bannerImageUrl && (
         <img
-          className="no-print"
+          className={plainList ? 'no-print pf-banner' : 'no-print'}
           src={form.settings.bannerImageUrl}
           alt=""
-          style={{
+          style={plainList ? undefined : {
             width: '100%', maxHeight: 240, objectFit: 'cover',
             borderRadius: 'var(--radius)', marginBottom: '1.25rem', display: 'block',
           }}
         />
       )}
 
-      <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.6rem', flexWrap: 'wrap' }}>
+      <div className={plainList ? 'no-print pf-header' : 'no-print'} style={plainList ? undefined : { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.6rem', flexWrap: 'wrap' }}>
         <div>
           {/* Retail-only: the form name is redundant chrome on a phone
               screen - the hamburger/back buttons already establish where
@@ -2280,7 +2385,7 @@ function PublicForm() {
               same name (body.compact-topbar in index.css) - no point printing
               it twice. */}
           {!isRetail && <h1 className="pf-order-title" style={{ margin: 0 }}>{form.name}</h1>}
-          {form.description && <p style={{ margin: '0.3rem 0 0' }}>{form.description}</p>}
+          {form.description && <p className={plainList ? 'pf-form-desc' : undefined} style={plainList ? undefined : { margin: '0.3rem 0 0' }}>{form.description}</p>}
         </div>
         {/* Staff/owner convenience only (isOwnerOrStaff gated) - a customer
             filling this out themselves via a shared link (see PosSidePanel's
@@ -2393,6 +2498,9 @@ function PublicForm() {
         // anymore for whoever's taking the order to second-guess that call.
         const primaryFields = cartDefersCheckout ? otherFields.filter(f => !f.collapsedInCheckout) : otherFields
 
+        if (plainList) {
+          return <div className="pf-fields">{primaryFields.map(renderFieldRow)}</div>
+        }
         return (
           <>
             {cartField && renderFieldRow(cartField)}
@@ -2403,7 +2511,7 @@ function PublicForm() {
 
       {(!hasCartOnPage || cartDefersCheckout) && (
       <div
-        className="no-print"
+        className={plainList ? 'no-print pf-submit-row' : 'no-print'}
         style={cartDefersCheckout ? {
           position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 50,
           background: 'var(--color-bg)', borderTop: '1px solid var(--color-border)',
@@ -2411,7 +2519,9 @@ function PublicForm() {
         } : undefined}
       >
         <div style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem',
+          display: 'flex',
+          justifyContent: plainList && pageIndex === 0 ? 'flex-start' : 'space-between',
+          alignItems: 'center', gap: '0.6rem',
           maxWidth: cartDefersCheckout ? '800px' : undefined,
           margin: cartDefersCheckout ? '0 auto' : undefined,
           padding: cartDefersCheckout ? '0.8rem 1.5rem 0.3rem' : undefined,
@@ -2440,20 +2550,22 @@ function PublicForm() {
             <button className="secondary" onClick={goBack} style={{ padding: '0.7rem 1.5rem', fontSize: '1rem' }}>
               Back
             </button>
-          ) : cartDefersCheckout ? null : <span />}
+          ) : cartDefersCheckout || (plainList && pageIndex === 0) ? null : <span />}
 
           {isLastPage ? (
             <button
+              className={plainList ? 'pf-submit' : undefined}
               onClick={() => submitAnswers()}
               disabled={submitting}
-              style={{ padding: '0.7rem 1.5rem', fontSize: '1rem', flex: cartDefersCheckout ? '1 1 auto' : undefined }}
+              style={plainList ? undefined : { padding: '0.7rem 1.5rem', fontSize: '1rem', flex: cartDefersCheckout ? '1 1 auto' : undefined }}
             >
               {submitting ? 'Submitting...' : (token ? 'Save Changes' : (isRetail ? 'Place Order' : 'Submit'))}
             </button>
           ) : (
             <button
+              className={plainList ? 'pf-submit' : undefined}
               onClick={goNext}
-              style={{ padding: '0.7rem 1.5rem', fontSize: '1rem', flex: cartDefersCheckout ? '1 1 auto' : undefined }}
+              style={plainList ? undefined : { padding: '0.7rem 1.5rem', fontSize: '1rem', flex: cartDefersCheckout ? '1 1 auto' : undefined }}
             >
               Next
             </button>
@@ -2515,7 +2627,10 @@ function PublicForm() {
       )}
 
       {!cartDefersCheckout && (
-        <p className="no-print" style={{ marginTop: '3rem', color: '#999', fontSize: '0.85rem' }}>
+        <p
+          className={plainList ? 'no-print pf-powered' : 'no-print'}
+          style={plainList ? undefined : { marginTop: '3rem', color: '#999', fontSize: '0.85rem' }}
+        >
           Powered by Verticals
         </p>
       )}

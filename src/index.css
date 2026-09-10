@@ -18,6 +18,15 @@
   --radius: 8px;
   --shadow: 0 1px 3px rgba(0,0,0,0.06);
 
+  /* Public-form spacing tokens (see .pf-form in this file + PublicForm.jsx).
+     One scale every generated form follows: 16 page pad / 16 field gap /
+     56 control height / 10 radius / 24 section gap. */
+  --form-pad: 16px;
+  --form-gap: 16px;
+  --form-section-gap: 24px;
+  --form-control-h: 56px;
+  --form-radius: 10px;
+
   /* Categorical chart palette: fixed order, validated for CVD-safe adjacent
      contrast (see dataviz skill). Never cycle/reassign per filter; a series
      always keeps its slot. */
@@ -524,30 +533,146 @@ input:focus, select:focus, textarea:focus {
   box-shadow: 0 0 0 3px var(--color-primary-soft);
 }
 /* A filled field gets the theme's own soft tint as a plain visual "this
-   one's done" signal, matching the answered/pinned/selected fill used
-   elsewhere (records rows, selected cards, ...) instead of staying
-   indistinguishable from an empty one. :not(:placeholder-shown) is the same
-   "has a value" check the label-float rules above already rely on. */
-.field-floating input:not(:placeholder-shown),
-.field-floating textarea:not(:placeholder-shown) {
-  background: var(--color-primary-soft);
-}
+   plain white/surface either way - a form field shouldn't carry a coloured
+   "done" tint (it reads as a state the respondent didn't choose). */
 /* Browser autofill (name/email/phone are common autofill targets) paints
-   its own background via a UA style stronger than a plain `background`
-   declaration - only the `-webkit-box-shadow` inset trick actually
-   overrides it. Without this a filled, autofilled field would show the
-   browser's own yellow/blue instead of the theme's, and could force black
-   input text even in dark mode. */
+   its own yellow/blue background via a UA style stronger than a plain
+   `background` declaration - only the `-webkit-box-shadow` inset trick
+   overrides it back to the field's own surface. */
 .field-floating input:-webkit-autofill,
 .field-floating input:-webkit-autofill:hover,
 .field-floating input:-webkit-autofill:focus {
   -webkit-text-fill-color: var(--color-text);
-  -webkit-box-shadow: 0 0 0 1000px var(--color-primary-soft) inset;
-  box-shadow: 0 0 0 1000px var(--color-primary-soft) inset;
+  -webkit-box-shadow: 0 0 0 1000px var(--color-surface) inset;
+  box-shadow: 0 0 0 1000px var(--color-surface) inset;
   transition: background-color 9999s ease-in-out 0s;
 }
 .field-required-mark {
   color: #c0392b;
+}
+
+/* ---- Standard public form (list layout) -------------------------------
+   The input itself is the container - no white card wrapping every field.
+   One shared scale via the --form-* tokens above. */
+.page.pf-form {
+  max-width: 680px;
+  padding: clamp(24px, 5vw, 52px) var(--form-pad);
+}
+.pf-accent-strip {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--color-primary);
+  margin-bottom: 18px;
+}
+.pf-banner {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 5;
+  object-fit: cover;
+  border-radius: var(--form-radius);
+  margin-bottom: 18px;
+}
+.pf-header {
+  margin-bottom: var(--form-section-gap);
+}
+.pf-form .pf-order-title {
+  font-size: clamp(1.55rem, 4vw, 1.9rem);
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0 0 6px;
+  overflow-wrap: anywhere; /* never clip a long form name */
+}
+.pf-form .pf-form-desc {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 15px;
+  line-height: 1.5;
+}
+.pf-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--form-section-gap);
+}
+.pf-field { display: block; }
+/* Optional grouping for longer forms - one subtle card per section, never
+   per field. */
+.pf-section {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: clamp(18px, 3vw, 26px);
+}
+.pf-section > .pf-field + .pf-field { margin-top: var(--form-section-gap); }
+.pf-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-muted);
+  margin-bottom: 6px;
+}
+.pf-control,
+.pf-field select.pf-control,
+.pf-field textarea.pf-control {
+  width: 100%;
+  box-sizing: border-box;
+  height: var(--form-control-h);
+  padding: 0 var(--form-pad);
+  border: 1px solid var(--color-border);
+  border-radius: var(--form-radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 16px; /* entered value */
+  font-family: inherit;
+}
+.pf-field textarea.pf-control {
+  height: auto;
+  min-height: 116px;
+  padding: 12px var(--form-pad);
+  resize: vertical;
+  line-height: 1.45;
+}
+.pf-control:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 5%, var(--color-surface));
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
+}
+.pf-control:-webkit-autofill,
+.pf-control:-webkit-autofill:hover,
+.pf-control:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--color-text);
+  -webkit-box-shadow: 0 0 0 1000px var(--color-surface) inset;
+  transition: background-color 9999s ease-in-out 0s;
+}
+.pf-field-error {
+  color: #c0392b;
+  font-size: 13px;
+  margin: 6px 0 0;
+}
+.pf-sublabel {
+  display: block;
+  font-size: 12px;
+  color: var(--color-muted);
+  margin: 0 0 4px;
+}
+.pf-submit-row {
+  margin-top: var(--form-section-gap);
+}
+.pf-submit {
+  min-width: 140px;
+  min-height: 52px;
+  padding: 0 1.5rem;
+  font-size: 1rem;
+}
+.pf-form .pf-powered {
+  text-align: center;
+  font-size: 13px;
+  color: #9aa0a6;
+  margin-top: 2.25rem;
+}
+@media (max-width: 768px) {
+  .pf-submit-row > div { gap: 0.6rem; }
+  .pf-submit { flex: 1; width: 100%; min-width: 0; min-height: 54px; }
 }
 
 .card {
