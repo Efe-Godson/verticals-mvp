@@ -7,6 +7,8 @@ import FieldValidationControls from './FieldValidationControls'
 import FieldTypeConfig from './FieldTypeConfig'
 import ConfirmDialog from './ConfirmDialog'
 import FormPreviewModal from './FormPreview'
+import BannerImagePicker from './components/BannerImagePicker'
+import { uploadBannerImage } from './lib/formImages'
 import PackageBuilder from './PackageBuilder'
 import { COUNTRIES } from './lib/locationData'
 
@@ -59,8 +61,9 @@ function CreateForm() {
   const [formId, setFormId] = useState(null)
   const [formName, setFormName] = useState('')
   const [formDescription, setFormDescription] = useState('')
-  const [formBanner, setFormBanner] = useState('')
-  const [formBannerTone, setFormBannerTone] = useState('info') // info | warning | success | neutral
+  const [bannerImageUrl, setBannerImageUrl] = useState('') // header/cover picture shown across the top of the public form
+  const [bannerUploading, setBannerUploading] = useState(false)
+  const [bannerError, setBannerError] = useState('')
   const [fields, setFields] = useState([])
   const [message, setMessage] = useState('')
   const [saving, setSaving] = useState(false)
@@ -127,7 +130,7 @@ function CreateForm() {
       setAutosaveStatus('saving')
       const cleanedFields = cleanFieldsForSave(fields)
       const nameToSave = formName.trim() === '' ? 'Untitled Form' : formName
-      const settings = { formBanner: formBanner.trim() || null, formBannerTone }
+      const settings = { bannerImageUrl: bannerImageUrl || null }
 
       try {
         const id = await ensureFormId(nameToSave, formDescription.trim() || null, cleanedFields, settings)
@@ -148,7 +151,7 @@ function CreateForm() {
     pendingSaveRef.current = doSave
 
     return () => clearTimeout(debounceRef.current)
-  }, [formName, formDescription, formBanner, formBannerTone, fields, session])
+  }, [formName, formDescription, bannerImageUrl, fields, session])
 
   // Runs only on true unmount (empty deps), unlike the effect above whose
   // cleanup also fires on every keystroke as the debounce resets - this is
@@ -164,6 +167,18 @@ function CreateForm() {
     const newFields = [...fields]
     newFields[index] = { ...newFields[index], ...changes }
     setFields(newFields)
+  }
+
+  async function handleBannerUpload(file) {
+    setBannerError('')
+    setBannerUploading(true)
+    try {
+      setBannerImageUrl(await uploadBannerImage(file, session))
+    } catch (err) {
+      setBannerError(err.message)
+    } finally {
+      setBannerUploading(false)
+    }
   }
 
   // Defaults a new Location field to wherever this account said it operates
@@ -369,7 +384,7 @@ function CreateForm() {
     pendingSaveRef.current = null // this explicit save supersedes any pending autosave flush
 
     const cleanedFields = cleanFieldsForSave(fields)
-    const settings = { formBanner: formBanner.trim() || null, formBannerTone }
+    const settings = { bannerImageUrl: bannerImageUrl || null }
     setSaving(true)
 
     try {
@@ -436,39 +451,13 @@ function CreateForm() {
         />
       </div>
 
-      <div className="card" style={{ padding: '1.2rem 1.4rem', marginBottom: '1.5rem' }}>
-        <label style={{ fontWeight: 600, fontSize: '0.92rem' }}>Banner</label>
-        <p style={{ fontSize: '0.82rem', color: 'var(--color-muted)', margin: '0.2rem 0 0.7rem' }}>
-          A short message shown at the top of the form for everyone filling it in. Leave blank for none.
-        </p>
-        <textarea
-          value={formBanner}
-          onChange={(e) => setFormBanner(e.target.value)}
-          rows={2}
-          maxLength={280}
-          placeholder="e.g. Orders placed after 6pm are delivered the next day."
-          style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical' }}
-        />
-        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.7rem' }}>
-          {[
-            { value: 'info', label: 'Info' },
-            { value: 'warning', label: 'Warning' },
-            { value: 'success', label: 'Success' },
-            { value: 'neutral', label: 'Neutral' },
-          ].map(o => (
-            <button
-              key={o.value}
-              type="button"
-              onClick={() => setFormBannerTone(o.value)}
-              className={formBannerTone === o.value ? '' : 'secondary'}
-              disabled={!formBanner.trim()}
-              style={{ padding: '0.4rem 0.9rem', fontSize: '0.85rem' }}
-            >
-              {o.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      <BannerImagePicker
+        value={bannerImageUrl}
+        uploading={bannerUploading}
+        error={bannerError}
+        onPick={handleBannerUpload}
+        onClear={() => { setBannerImageUrl(''); setBannerError('') }}
+      />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
         {fields.map((field, index) => (
@@ -742,6 +731,7 @@ function CreateForm() {
         <FormPreviewModal
           formName={formName}
           description={formDescription}
+          bannerImageUrl={bannerImageUrl}
           fields={fields}
           onClose={() => setShowPreview(false)}
         />

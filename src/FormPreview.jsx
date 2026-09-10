@@ -273,7 +273,7 @@ function renderPreviewInput(field, value, onChange, stepped) {
   return <input type={inputType} value={value || ''} onChange={(e) => onChange(e.target.value)} style={{ padding: '0.5rem', width: '100%' }} />
 }
 
-function FormPreviewModal({ formName, description, fields, onClose }) {
+function FormPreviewModal({ formName, description, bannerImageUrl, fields, formLayout, onClose }) {
   const [answers, setAnswers] = useState({})
   const [pageIndex, setPageIndex] = useState(0)
 
@@ -281,11 +281,11 @@ function FormPreviewModal({ formName, description, fields, onClose }) {
     setAnswers(current => ({ ...current, [fieldId]: value }))
   }
 
-  // Cart/POS forms still preview as one section per page (their own dense
-  // order UX, unaffected by the stepped redesign); every other form now
-  // previews exactly like the real thing - one question per screen.
+  // Default is the full list (every question on one page). "One question at
+  // a time" is opt-in (settings.formLayout === 'stepped') and never applies
+  // to a cart/POS form, which has its own dense order UX.
   const hasCartField = fields.some(f => f.type === 'cart')
-  const stepped = !hasCartField
+  const stepped = formLayout === 'stepped' && !hasCartField
   const pages = stepped ? buildQuestionScreens(fields) : buildPages(fields)
   const currentPage = pages[Math.min(pageIndex, pages.length - 1)]
   const isLastPage = pageIndex >= pages.length - 1
@@ -294,6 +294,13 @@ function FormPreviewModal({ formName, description, fields, onClose }) {
     <Modal size="lg" onClose={onClose} title="Preview - respondent view">
       <div>
 
+        {bannerImageUrl && (
+          <img
+            src={bannerImageUrl}
+            alt=""
+            style={{ width: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 'var(--radius)', marginBottom: '1rem', display: 'block' }}
+          />
+        )}
         <h1 style={{ marginTop: 0 }}>{formName || 'Untitled Form'}</h1>
         {description && <p>{description}</p>}
 

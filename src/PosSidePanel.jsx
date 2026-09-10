@@ -74,7 +74,7 @@ function ShareLinkModal({ url, onClose }) {
 // bottomBarPresent: kept for callers (PublicForm.jsx's deferCheckout order
 // screen) - no longer changes anything here now that the top bar treatment
 // (see `topBar` below) is universal on mobile rather than conditional on it.
-function PosSidePanel({ formId, hasCartField: hasCartFieldProp, bottomBarPresent: _bottomBarPresent = false }) {
+function PosSidePanel({ formId, hasCartField: hasCartFieldProp, bottomBarPresent: _bottomBarPresent = false, startCollapsed = false }) {
   const [searchParams] = useSearchParams()
   const { pathname } = useLocation()
   const isMobile = useIsMobile(768)
@@ -83,8 +83,14 @@ function PosSidePanel({ formId, hasCartField: hasCartFieldProp, bottomBarPresent
   const [fetchedHasCart, setFetchedHasCart] = useState(false)
   const hasCartField = hasCartFieldProp ?? fetchedHasCart
 
-  const [pinned, setPinned] = useState(readPinned)
-  const [open, setOpen] = useState(() => searchParams.get('panel') === '1' || (readPinned() && !isMobile))
+  // `startCollapsed` (a plain data-collection form opened by its owner):
+  // the panel is admin chrome that shouldn't greet a form-first page docked
+  // open - it stays tucked away behind the hamburger until asked for, and
+  // doesn't touch the shared pinned pref that the POS/order flow relies on.
+  // `?panel=1` (Templates' "Manage") still forces it open.
+  const forcedOpen = searchParams.get('panel') === '1'
+  const [pinned, setPinned] = useState(() => startCollapsed ? false : readPinned())
+  const [open, setOpen] = useState(() => forcedOpen || (!startCollapsed && readPinned() && !isMobile))
   const [shareLinkUrl, setShareLinkUrl] = useState(null)
   const [formName, setFormName] = useState('')
   const [templateSlug, setTemplateSlug] = useState(null)

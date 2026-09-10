@@ -430,15 +430,16 @@ function PublicForm() {
   const [showAiFill, setShowAiFill] = useState(false)
   const [orderConfirmation, setOrderConfirmation] = useState(null) // snapshot of the just-placed order, or null
 
-  // Cart/POS forms keep their own dense order-screen UX (catalogue + cart +
-  // checkout can't be split one field per screen); every other form always
-  // gets the one-question-per-screen design (see buildQuestionScreens) -
-  // this isn't a per-form opt-in, it's just what a plain form looks like now.
+  // Default is the full list - every question on one scrolling page.
+  // "One question at a time" (the Lab onboarding-style stepped flow) is
+  // opt-in per form via settings.formLayout === 'stepped', and never
+  // applies to a cart/POS form, which has its own dense order-screen UX
+  // that can't be split one field per screen.
   const hasCartField = form?.fields?.some(f => f.type === 'cart') ?? false
-  const steppedStyle = !hasCartField
+  const steppedStyle = form?.settings?.formLayout === 'stepped' && !hasCartField
   const pages = useMemo(
-    () => (hasCartField ? buildPages(form?.fields || []) : buildQuestionScreens(form?.fields || [])),
-    [form, hasCartField]
+    () => (steppedStyle ? buildQuestionScreens(form?.fields || []) : buildPages(form?.fields || [])),
+    [form, steppedStyle]
   )
   const currentPage = pages[pageIndex] || pages[0]
   const hasCartOnPage = currentPage.fields.some(f => f.type === 'cart')
@@ -2076,7 +2077,7 @@ function PublicForm() {
         <CheckIcon />
         <h2 style={{ margin: '0.8rem 0 0.2rem' }}>{token ? 'Response updated' : 'Response submitted'}</h2>
         <p style={{ color: 'var(--color-muted)', margin: 0 }}>Thank you.</p>
-        {editLink && (
+        {editLink && form.settings?.allowEditResponse && (
           <div className="card" style={{ padding: '1rem', marginTop: '1.4rem', textAlign: 'left' }}>
             <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem', color: 'var(--color-muted)' }}>
               Save this link if you need to come back and edit your response:
@@ -2248,28 +2249,25 @@ function PublicForm() {
           reachable while logged out), so `session` alone isn't ownership. */}
       {!token && isOwnerOrStaff && (
         <div className="no-print">
-          <PosSidePanel formId={form.id} hasCartField={hasCartField} bottomBarPresent={cartDefersCheckout} />
+          <PosSidePanel
+            formId={form.id}
+            hasCartField={hasCartField}
+            bottomBarPresent={cartDefersCheckout}
+            startCollapsed={!hasCartField}
+          />
         </div>
       )}
 
-      {form.settings?.formBanner && (
-        <div className="no-print" style={(() => {
-          const t = form.settings.formBannerTone || 'info'
-          const map = {
-            info: ['var(--color-primary-soft)', 'var(--color-primary)'],
-            warning: ['var(--color-warning-soft)', 'var(--status-warning)'],
-            success: ['color-mix(in srgb, var(--status-good) 12%, var(--color-surface))', 'var(--status-good)'],
-            neutral: ['var(--color-bg)', 'var(--color-border)'],
-          }
-          const [bg, accent] = map[t] || map.info
-          return {
-            background: bg, borderLeft: `3px solid ${accent}`, borderRadius: 'var(--radius)',
-            padding: '0.7rem 0.95rem', marginBottom: '1rem', fontSize: '0.9rem',
-            color: 'var(--color-text)', whiteSpace: 'pre-wrap',
-          }
-        })()}>
-          {form.settings.formBanner}
-        </div>
+      {form.settings?.bannerImageUrl && (
+        <img
+          className="no-print"
+          src={form.settings.bannerImageUrl}
+          alt=""
+          style={{
+            width: '100%', maxHeight: 240, objectFit: 'cover',
+            borderRadius: 'var(--radius)', marginBottom: '1.25rem', display: 'block',
+          }}
+        />
       )}
 
       <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.6rem', flexWrap: 'wrap' }}>

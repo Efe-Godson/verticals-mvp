@@ -6,6 +6,8 @@ import FieldValidationControls from './FieldValidationControls'
 import FieldTypeConfig from './FieldTypeConfig'
 import ConfirmDialog from './ConfirmDialog'
 import FormPreviewModal from './FormPreview'
+import BannerImagePicker from './components/BannerImagePicker'
+import { uploadBannerImage } from './lib/formImages'
 import ProductManager from './ProductManager'
 import MoreDetailsManager from './MoreDetailsManager'
 import { COUNTRIES } from './lib/locationData'
@@ -68,8 +70,9 @@ function EditForm() {
   const [error, setError] = useState('')
   const [formName, setFormName] = useState('')
   const [formDescription, setFormDescription] = useState('')
-  const [formBanner, setFormBanner] = useState('')
-  const [formBannerTone, setFormBannerTone] = useState('info') // info | warning | success | neutral
+  const [bannerImageUrl, setBannerImageUrl] = useState('') // header/cover picture shown across the top of the public form
+  const [bannerUploading, setBannerUploading] = useState(false)
+  const [bannerError, setBannerError] = useState('')
   const [formSettings, setFormSettings] = useState({})
   const [fields, setFields] = useState([])
   const [message, setMessage] = useState('')
@@ -118,8 +121,7 @@ function EditForm() {
       } else {
         setFormName(data.name)
         setFormDescription(data.description || '')
-        setFormBanner(data.settings?.formBanner ?? '')
-        setFormBannerTone(data.settings?.formBannerTone ?? 'info')
+        setBannerImageUrl(data.settings?.bannerImageUrl ?? '')
         setFormSettings(data.settings || {})
         setFields(data.fields || [])
       }
@@ -159,8 +161,11 @@ function EditForm() {
       const cleanedFields = cleanFieldsForSave(fields)
       // `settings` is a shared JSONB bag - other pages stash their own keys
       // in it (see the same note in FormSettings.jsx), so this only ever
-      // overrides the two keys the builder itself owns.
-      const settings = { ...formSettings, formBanner: formBanner.trim() || null, formBannerTone }
+      // touches the one key the builder itself owns. The old text-banner
+      // keys are stripped so stale values don't ride along forever.
+      const settings = { ...formSettings, bannerImageUrl: bannerImageUrl || null }
+      delete settings.formBanner
+      delete settings.formBannerTone
 
       const { error } = await supabase
         .from('forms')
@@ -176,7 +181,7 @@ function EditForm() {
     pendingSaveRef.current = doSave
 
     return () => clearTimeout(debounceRef.current)
-  }, [formName, formDescription, formBanner, formBannerTone, fields, loading, id])
+  }, [formName, formDescription, bannerImageUrl, fields, loading, id])
 
   // Runs only on true unmount (empty deps), unlike the effect above whose
   // cleanup also fires on every keystroke as the debounce resets - this is
@@ -192,6 +197,18 @@ function EditForm() {
     const newFields = [...fields]
     newFields[index] = { ...newFields[index], ...changes }
     setFields(newFields)
+  }
+
+  async function handleBannerUpload(file) {
+    setBannerError('')
+    setBannerUploading(true)
+    try {
+      setBannerImageUrl(await uploadBannerImage(file, session))
+    } catch (err) {
+      setBannerError(err.message)
+    } finally {
+      setBannerUploading(false)
+    }
   }
 
   function updateFieldType(index, newType) {
@@ -321,7 +338,9 @@ function EditForm() {
     pendingSaveRef.current = null // this explicit save supersedes any pending autosave flush
 
     const cleanedFields = cleanFieldsForSave(fields)
-    const settings = { ...formSettings, formBanner: formBanner.trim() || null, formBannerTone }
+    const settings = { ...formSettings, bannerImageUrl: bannerImageUrl || null }
+    delete settings.formBanner
+    delete settings.formBannerTone
 
     setSaving(true)
     const { error } = await supabase
@@ -535,39 +554,13 @@ function EditForm() {
         </div>
       )}
 
-      <div className="card" style={{ padding: '1.2rem 1.4rem', marginBottom: '1.5rem' }}>
-        <label style={{ fontWeight: 600, fontSize: '0.92rem' }}>Banner</label>
-        <p style={{ fontSize: '0.82rem', color: 'var(--color-muted)', margin: '0.2rem 0 0.7rem' }}>
-          A short message shown at the top of the form for everyone filling it in. Leave blank for none.
-        </p>
-        <textarea
-          value={formBanner}
-          onChange={(e) => setFormBanner(e.target.value)}
-          rows={2}
-          maxLength={280}
-          placeholder="e.g. Orders placed after 6pm are delivered the next day."
-          style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical' }}
-        />
-        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.7rem' }}>
-          {[
-            { value: 'info', label: 'Info' },
-            { value: 'warning', label: 'Warning' },
-            { value: 'success', label: 'Success' },
-            { value: 'neutral', label: 'Neutral' },
-          ].map(o => (
-            <button
-              key={o.value}
-              type="button"
-              onClick={() => setFormBannerTone(o.value)}
-              className={formBannerTone === o.value ? '' : 'secondary'}
-              disabled={!formBanner.trim()}
-              style={{ padding: '0.4rem 0.9rem', fontSize: '0.85rem' }}
-            >
-              {o.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      <BannerImagePicker
+        value={bannerImageUrl}
+        uploading={bannerUploading}
+        error={bannerError}
+        onPick={handleBannerUpload}
+        onClear={() => { setBannerImageUrl(''); setBannerError('') }}
+      />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
         {fields.map((field, index) => (
@@ -733,6 +726,8 @@ function EditForm() {
         <FormPreviewModal
           formName={formName}
           description={formDescription}
+          bannerImageUrl={bannerImageUrl}
+          formLayout={formSettings?.formLayout}
           fields={fields}
           onClose={() => setShowPreview(false)}
         />

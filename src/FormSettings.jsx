@@ -23,7 +23,9 @@ function FormSettings() {
   const { session } = useAuth()
   const isAdmin = session?.user?.id === TEMPLATE_ADMIN_USER_ID
 
-  const [allowMultipleResponses, setAllowMultipleResponses] = useState(true)
+  const [allowMultipleResponses, setAllowMultipleResponses] = useState(false)
+  const [allowEditResponse, setAllowEditResponse] = useState(false)
+  const [formLayout, setFormLayout] = useState('list') // 'list' (all questions on one page) | 'stepped' (one at a time)
   const [collectEmail, setCollectEmail] = useState(false)
   const [isDemo, setIsDemo] = useState(false) // the /lab/demo sample business (admin only)
   const [companyName, setCompanyName] = useState('')
@@ -64,7 +66,9 @@ function FormSettings() {
         setError('This form could not be found.')
       } else {
         setForm(data)
-        setAllowMultipleResponses(data.settings?.allowMultipleResponses ?? true)
+        setAllowMultipleResponses(data.settings?.allowMultipleResponses ?? false)
+        setAllowEditResponse(data.settings?.allowEditResponse ?? false)
+        setFormLayout(data.settings?.formLayout === 'stepped' ? 'stepped' : 'list')
         setCollectEmail(data.settings?.collectEmail ?? false)
         setIsDemo(data.is_demo ?? false)
         setCompanyName(data.settings?.companyName ?? '')
@@ -110,7 +114,7 @@ function FormSettings() {
 
     const newSettings = {
       ...form.settings,
-      allowMultipleResponses, collectEmail,
+      allowMultipleResponses, allowEditResponse, formLayout, collectEmail,
       companyName, companyPhone, companyAddress, companyEmail, receiptPaperWidth,
       staffReportRange, expenseMode, reportDateField, reportSharedEmails, aiFillRules, logoUrl, logoIconKey,
       showVerticalsBranding, defaultInvoiceView, paymentBankName, paymentAccountNumber, paymentAccountName, invoiceNotes,
@@ -331,6 +335,10 @@ function FormSettings() {
         <div className="card" style={{ padding: '1.5rem', marginTop: '1.5rem' }}>
           <h3 style={{ marginTop: 0 }}>Responses</h3>
 
+          <p style={{ fontSize: '0.8rem', color: 'var(--color-muted)', margin: '-0.3rem 0 1.1rem' }}>
+            By default each person can submit once, and a response can&apos;t be changed after it&apos;s sent.
+          </p>
+
           <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.2rem', cursor: 'pointer' }}>
             <input
               type="checkbox"
@@ -338,9 +346,23 @@ function FormSettings() {
               onChange={(e) => setAllowMultipleResponses(e.target.checked)}
             />
             <span>
-              Allow respondents to submit another response
+              Allow respondents to submit more than one response
               <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>
-                Shows a "Submit another response" option after someone submits the form.
+                Shows a "Submit another response" button after someone submits.
+              </div>
+            </span>
+          </label>
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.2rem', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={allowEditResponse}
+              onChange={(e) => setAllowEditResponse(e.target.checked)}
+            />
+            <span>
+              Let respondents edit their response after submitting
+              <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>
+                Shows an "edit this response" link on the confirmation screen.
               </div>
             </span>
           </label>
@@ -358,6 +380,32 @@ function FormSettings() {
               </div>
             </span>
           </label>
+        </div>
+      )}
+
+      {!hasCartField && (
+        <div className="card" style={{ padding: '1.5rem', marginTop: '1.5rem' }}>
+          <h3 style={{ marginTop: 0 }}>Form layout</h3>
+          <p style={{ fontSize: '0.8rem', color: 'var(--color-muted)', margin: '-0.3rem 0 1rem' }}>
+            How respondents move through the questions.
+          </p>
+          <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+            {[
+              { value: 'list', label: 'All questions on one page', hint: 'A single scrolling form (default).' },
+              { value: 'stepped', label: 'One question at a time', hint: 'A focused card per question, with a progress bar.' },
+            ].map(o => (
+              <button
+                key={o.value}
+                type="button"
+                onClick={() => setFormLayout(o.value)}
+                className={formLayout === o.value ? '' : 'secondary'}
+                style={{ flex: '1 1 220px', textAlign: 'left', padding: '0.8rem 1rem' }}
+              >
+                <div style={{ fontWeight: 600 }}>{o.label}</div>
+                <div style={{ fontSize: '0.78rem', opacity: 0.8, fontWeight: 400, marginTop: 2 }}>{o.hint}</div>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
