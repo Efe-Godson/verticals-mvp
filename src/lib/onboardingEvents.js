@@ -25,15 +25,16 @@ function getSessionId() {
   }
 }
 
-// event: 'started_onboarding' | 'selected_intent' | 'opened_demo' |
-//        'started_signup' | 'completed_signup'
-export function track(event, { entryIntent, customIntentText } = {}) {
+// event: 'started_onboarding' | 'selected_intent' | 'selected_records_method' |
+//        'opened_demo' | 'started_signup' | 'completed_signup'
+export function track(event, { entryIntent, customIntentText, recordsMethod } = {}) {
   try {
     supabase.from('onboarding_events').insert([{
       session_id: getSessionId(),
       event_type: event,
       entry_intent: entryIntent || null,
       custom_intent_text: customIntentText || null,
+      current_records_method: recordsMethod || null,
     }]).then(() => {}, () => {})
   } catch {
     // Swallow - see module note above.

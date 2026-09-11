@@ -7,9 +7,10 @@ import { track } from './lib/onboardingEvents'
 import { ONBOARDING_STORAGE_KEY } from './onboarding/OnboardingPage'
 
 // Whatever the new entry flow (src/onboarding/OnboardingPage.jsx) stashed
-// before handing off here - { entry_intent, custom_intent_text? } - or null
-// if this account is being created without going through onboarding at all
-// (e.g. an existing visitor who skipped straight to /signup).
+// before handing off here - { entry_intent, custom_intent_text?,
+// current_records_method? } - or null if this account is being created
+// without going through onboarding at all (e.g. an existing visitor who
+// skipped straight to /signup).
 function readOnboardingIntent() {
   try {
     const raw = sessionStorage.getItem(ONBOARDING_STORAGE_KEY)
@@ -88,7 +89,7 @@ function SignUp() {
           // Set here too (not just backfilled post-confirmation by
           // completeOnboardingEntry.js) so it's on the account from the
           // moment it exists, in case anything reads it before that runs.
-          ...(pending ? { entry_intent: pending.entry_intent, custom_intent_text: pending.custom_intent_text || null } : {}),
+          ...(pending ? { entry_intent: pending.entry_intent, custom_intent_text: pending.custom_intent_text || null, current_records_method: pending.current_records_method || null } : {}),
         },
       }
     })

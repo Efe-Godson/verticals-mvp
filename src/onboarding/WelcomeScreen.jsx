@@ -1,7 +1,10 @@
 // Place at: src/onboarding/WelcomeScreen.jsx
 // The very first screen a new visitor sees. Deliberately bare - see the
 // entry/onboarding design brief this was built from: no feature copy, no
-// testimonials, just the two places a visitor could be trying to go.
+// testimonials, just the two places a visitor could be trying to go. No
+// logo here - the wordmark already showing in OnboardingPage.jsx's own
+// header (on every stage after this one) made a second, larger copy here
+// redundant rather than reinforcing.
 // "Sign in" is a full button, not a small link under Get Started, so a
 // returning user's eye lands on it just as fast as a new one's does on
 // Get Started.
@@ -13,7 +16,6 @@ export default function WelcomeScreen({ onGetStarted, onSignIn }) {
       padding: '2rem 1.25rem', gap: '2.5rem',
     }}>
       <div>
-        <img src="/verticals-logo.png" alt="" style={{ height: 34, width: 'auto', marginBottom: '1.4rem' }} />
         <h1 style={{ margin: 0, fontSize: 'clamp(1.7rem, 6vw, 2.2rem)' }}>Welcome to Verticals</h1>
         <p style={{ margin: '0.6rem 0 0', color: 'var(--color-muted)', fontSize: '1rem', letterSpacing: '0.02em' }}>
           Capture · Understand · Act

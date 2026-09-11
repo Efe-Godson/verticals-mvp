@@ -48,7 +48,11 @@ export async function completeOnboardingEntry(session) {
 
   const payload = readPendingFromSessionStorage() ||
     (session.user.user_metadata?.entry_intent
-      ? { entry_intent: session.user.user_metadata.entry_intent, custom_intent_text: session.user.user_metadata.custom_intent_text }
+      ? {
+          entry_intent: session.user.user_metadata.entry_intent,
+          custom_intent_text: session.user.user_metadata.custom_intent_text,
+          current_records_method: session.user.user_metadata.current_records_method,
+        }
       : null)
 
   try { sessionStorage.removeItem(ONBOARDING_STORAGE_KEY) } catch { /* private mode */ }
@@ -57,7 +61,11 @@ export async function completeOnboardingEntry(session) {
 
   if (session.user.user_metadata?.entry_intent !== payload.entry_intent) {
     await supabase.auth.updateUser({
-      data: { entry_intent: payload.entry_intent, custom_intent_text: payload.custom_intent_text || null },
+      data: {
+        entry_intent: payload.entry_intent,
+        custom_intent_text: payload.custom_intent_text || null,
+        current_records_method: payload.current_records_method || null,
+      },
     })
   }
 
