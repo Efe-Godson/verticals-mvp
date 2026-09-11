@@ -15,7 +15,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { markVisited } from '../firstVisit'
 import { track } from '../lib/onboardingEvents'
-import { ENTRY_INTENTS, getEntryIntent, needsTextPrompt, loadActiveDemoRoutes } from './entryIntents'
+import { ENTRY_INTENTS, getEntryIntent, needsTextPrompt, loadActiveDemoRoutes, resolveWorkflowExample } from './entryIntents'
 import WelcomeScreen from './WelcomeScreen'
 import SetupSelection from './SetupSelection'
 import IntentTextPrompt from './IntentTextPrompt'
@@ -35,6 +35,11 @@ export default function OnboardingPage() {
   // null while loading, then either the fetched map or 'all' meaning "show
   // every intent" (the fetch failed - see loadActiveDemoRoutes's own note).
   const [routesById, setRoutesById] = useState(null)
+  // Set only when Workflow/Other's typed answer matches a seeded workflow
+  // example (resolveWorkflowExample) - takes priority over the intent's own
+  // (empty) demo_routes entry when present. Cleared on every fresh
+  // selection so a stale match from a previous attempt never leaks in.
+  const [matchedRoute, setMatchedRoute] = useState(null)
 
   useEffect(() => {
     track('started_onboarding')
@@ -55,12 +60,15 @@ export default function OnboardingPage() {
   function handleContinueFromSelection() {
     if (!selectedId) return
     track('selected_intent', { entryIntent: selectedId })
+    setMatchedRoute(null)
     if (needsTextPrompt(selectedId)) setStage('text_prompt')
     else enterDestination(selectedId, null)
   }
 
-  function handleContinueFromTextPrompt() {
+  async function handleContinueFromTextPrompt() {
     if (!selectedId || !customText.trim()) return
+    const match = await resolveWorkflowExample(customText.trim())
+    setMatchedRoute(match)
     enterDestination(selectedId, customText.trim())
   }
 
@@ -104,7 +112,7 @@ export default function OnboardingPage() {
       )}
 
       {stage === 'destination' && (
-        <IntentDestination route={route} customIntentText={customText.trim()} onCreateWorkspace={handleCreateWorkspace} />
+        <IntentDestination route={matchedRoute || route} customIntentText={customText.trim()} onCreateWorkspace={handleCreateWorkspace} />
       )}
     </div>
   )

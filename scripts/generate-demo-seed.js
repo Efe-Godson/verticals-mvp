@@ -33,7 +33,14 @@ function weightedChoice(pairs) { // [[value, weight], ...]
 }
 
 // -------------------------------------------------------------- dates ---
-const TODAY = new Date()
+// Pinned, not `new Date()` - the script otherwise silently drifts every
+// re-run (the RNG is seeded, but wall-clock "now" isn't), which already
+// once produced a byte-different regeneration of the *already-applied*
+// 20260911160000 migration. This is the instant that file was actually
+// generated at; anything added later (e.g. 20260911170000) shares it too,
+// so both stay anchored to the same "last 365 days" window. Update this
+// only when deliberately regenerating everything from scratch.
+const TODAY = new Date('2026-09-11T16:41:34.103Z')
 function daysAgo(n) {
   const d = new Date(TODAY)
   d.setDate(d.getDate() - n)
@@ -269,11 +276,113 @@ function buildFeedbackSubmissions(count) {
   return { rows, ratingCounts }
 }
 
+// ================================================ WORKFLOW EXAMPLES ====
+// Seeded so "A Workflow"/"Something Else"'s free-text answer can match a
+// real example instead of always falling into the empty Forms preview -
+// see src/onboarding/entryIntents.jsx's resolveWorkflowExample(). Not tied
+// to a fixed entry_intent (no demo_routes row): demo_datasets.keywords is
+// what makes a dataset discoverable this way instead.
+const INVENTORY_FORM_ID = '99999999-9999-4999-8999-999999999999'
+const INVENTORY_DATASET_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+const STAFF_FORM_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+const STAFF_DATASET_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+const SURVEY_FORM_ID = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+const SURVEY_DATASET_ID = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'
+
+// [name, category, unitCost, maxQty] - maxQty varies by kind: bulk raw
+// materials/packaging realistically sit in the hundreds, equipment in the
+// single digits (a shop doesn't stock 500 sewing machines) - a flat
+// quantity range across every category was inflating stock value into the
+// billions (500 units of a ₦185k sewing machine alone is ₦92.5M).
+const INVENTORY_ITEMS = [
+  ['Ankara Fabric Bolt', 'Raw Materials', 4500, 120], ['Packaging Boxes (Small)', 'Packaging', 250, 400],
+  ['Packaging Boxes (Large)', 'Packaging', 450, 250], ['Finished Dresses', 'Finished Goods', 12000, 60],
+  ['Finished Kaftans', 'Finished Goods', 16000, 50], ['Sewing Machine', 'Equipment', 35000, 6],
+  ['Thread Spools', 'Raw Materials', 800, 300], ['Buttons (pack of 100)', 'Raw Materials', 1500, 200],
+  ['Shipping Labels', 'Packaging', 50, 500], ['Display Mannequin', 'Equipment', 12000, 8],
+  ['Zippers (pack of 50)', 'Raw Materials', 3500, 150], ['Finished Bags', 'Finished Goods', 8000, 80],
+]
+function buildInventorySubmissions(count) {
+  const dates = generateDates(count, { weekendBoost: 0.7, hourRange: [9, 17] })
+  assertEveryTrailingMonthCovered(dates, 'Inventory')
+  const rows = []
+  let totalValue = 0
+  dates.forEach((createdAt, i) => {
+    const [name, category, unitCost, maxQty] = choice(INVENTORY_ITEMS)
+    const quantity = randInt(Math.max(1, Math.round(maxQty * 0.1)), maxQty)
+    const stockValue = quantity * unitCost
+    totalValue += stockValue
+    rows.push({
+      form_id: INVENTORY_FORM_ID,
+      createdAt,
+      data: {
+        item_name: `${name} #${i + 1}`, sku: `SKU-${1000 + i}`, category,
+        quantity_on_hand: quantity, reorder_level: randInt(5, 50), unit_cost: unitCost,
+        stock_value: stockValue, supplier: choice(['Lagos Textiles Ltd', 'Kano Wholesale', 'Prime Print & Pack', 'Local Supplier Co']),
+        last_restocked: createdAt.toISOString().slice(0, 10),
+        notes: quantity < 20 ? 'Running low - reorder soon' : '',
+      },
+    })
+  })
+  return { rows, totalValue }
+}
+
+const STAFF_ROLES = ['Sales Associate', 'Manager', 'Cashier', 'Support', 'Technician', 'Intern']
+const DEPARTMENTS = ['Operations', 'Sales', 'Support', 'Admin']
+function buildStaffSubmissions(count) {
+  const dates = generateDates(count, { weekendBoost: 0.3, hourRange: [9, 16] })
+  assertEveryTrailingMonthCovered(dates, 'Staff Directory')
+  const rows = []
+  dates.forEach((startDate, i) => {
+    const name = `${choice(NAMES)} ${choice(['Okafor', 'Bello', 'Eze', 'Balogun', 'Nwosu', 'Adeyemi', 'Ibrahim', 'Chukwu'])}`
+    rows.push({
+      form_id: STAFF_FORM_ID,
+      createdAt: startDate,
+      data: {
+        full_name: name, role: choice(STAFF_ROLES), department: choice(DEPARTMENTS),
+        start_date: startDate.toISOString().slice(0, 10),
+        phone: `081${randInt(10000000, 99999999)}`,
+        email: `${name.toLowerCase().replace(/\s+/g, '.')}${i}@example.com`,
+        status: weightedChoice([['Active', 8], ['On Leave', 1], ['Inactive', 1]]),
+      },
+    })
+  })
+  return { rows }
+}
+
+const AGE_BRACKETS = ['Under 18', '18-24', '25-34', '35-44', '45-54', '55+']
+const PAIN_POINTS = ['Prices are a bit high for what I get.', 'Wish delivery was faster.', 'Would love more product variety.', 'Customer support could respond quicker.', 'Nothing major, overall satisfied.', 'Packaging could be sturdier.']
+function buildSurveySubmissions(count) {
+  const dates = generateDates(count, { weekendBoost: 1, hourRange: [9, 20] })
+  assertEveryTrailingMonthCovered(dates, 'Survey')
+  const rows = []
+  const satisfactionCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+  dates.forEach(createdAt => {
+    const satisfaction = weightedChoice([[5, 30], [4, 32], [3, 22], [2, 10], [1, 6]])
+    satisfactionCounts[satisfaction]++
+    rows.push({
+      form_id: SURVEY_FORM_ID,
+      createdAt,
+      data: {
+        age_bracket: choice(AGE_BRACKETS),
+        how_often_buy: weightedChoice([['Weekly', 2], ['Monthly', 3], ['Occasionally', 3], ['First time', 2]]),
+        price_sensitivity: weightedChoice([['Very price-sensitive', 2], ['Somewhat price-sensitive', 3], ['Not very price-sensitive', 1]]),
+        biggest_pain_point: choice(PAIN_POINTS),
+        satisfaction,
+      },
+    })
+  })
+  return { rows, satisfactionCounts }
+}
+
 // ================================================================ RUN ===
 const restaurant = buildRestaurantSubmissions(1000)
 const retail = buildRetailSubmissions(800)
 const expenses = buildExpensesSubmissions()
 const feedback = buildFeedbackSubmissions(500)
+const inventory = buildInventorySubmissions(200)
+const staff = buildStaffSubmissions(60)
+const survey = buildSurveySubmissions(350)
 
 function printSummary(label, rows, annualTotal) {
   const byMonth = {}
@@ -286,6 +395,10 @@ printSummary('Retail (Glow Fashion Retail)', retail.rows, retail.annualTotal)
 printSummary('Expenses (Kola & Co Ventures)', expenses.rows, expenses.annualTotal)
 printSummary('Data Collection (Customer Feedback)', feedback.rows)
 console.log('\nFeedback rating distribution:', feedback.ratingCounts)
+printSummary('Workflow example: Inventory Tracking', inventory.rows, inventory.totalValue)
+printSummary('Workflow example: Staff Directory', staff.rows)
+printSummary('Workflow example: Customer Survey', survey.rows)
+console.log('\nSurvey satisfaction distribution:', survey.satisfactionCounts)
 
 // Arithmetic self-check: every cart row's stored total must equal the sum
 // of its own items - the exact class of bug caught by hand-typing the
@@ -300,6 +413,15 @@ function verifyCartTotals(rows, label) {
 verifyCartTotals(restaurant.rows, 'Restaurant')
 verifyCartTotals(retail.rows, 'Retail')
 console.log('\nCart total arithmetic verified for Restaurant and Retail.')
+
+function verifyStockValues(rows) {
+  rows.forEach((r, i) => {
+    const expected = r.data.quantity_on_hand * r.data.unit_cost
+    if (expected !== r.data.stock_value) throw new Error(`Inventory row ${i}: computed ${expected} !== stored ${r.data.stock_value}`)
+  })
+}
+verifyStockValues(inventory.rows)
+console.log('Stock value arithmetic verified for Inventory.')
 
 // ============================================================ WRITE SQL =
 const timestamp = '20260911160000'
@@ -410,3 +532,98 @@ update demo_routes set demo_dataset_id = ${sqlStr(FEEDBACK_DATASET_ID)}, destina
 
 fs.writeFileSync(outPath, sql)
 console.log(`\nWrote ${outPath} (${(sql.length / 1024).toFixed(0)} KB)`)
+
+// --------------------------------------------- workflow examples file --
+// Separate migration/timestamp on purpose: 20260911160000 above is already
+// applied - editing an already-applied migration's file after the fact
+// (rather than a new one) desyncs it from what was actually pushed, the
+// exact mistake corrected earlier this session (see 20260911130000's own
+// note on that).
+const workflowTimestamp = '20260911170000'
+const workflowOutPath = path.join(__dirname, '..', 'supabase', 'migrations', `${workflowTimestamp}_seed_workflow_examples.sql`)
+
+const workflowSql = `-- Seeds 3 "workflow example" datasets - discoverable from A Workflow/
+-- Something Else's free-text answer (see src/onboarding/entryIntents.jsx's
+-- resolveWorkflowExample()) instead of always falling into the empty
+-- Forms-template preview. Not tied to a fixed entry_intent (no demo_routes
+-- row) - demo_datasets.keywords is what makes one of these discoverable.
+-- Generated by scripts/generate-demo-seed.js.
+
+alter table demo_datasets add column if not exists keywords text[];
+alter table demo_datasets add column if not exists destination text default 'report'
+  check (destination in ('form', 'records', 'report', 'dashboard', 'payroll'));
+
+-- Inventory Tracking
+insert into forms (id, name, description, status, is_demo, user_id, settings, fields)
+values (
+  ${sqlStr(INVENTORY_FORM_ID)},
+  'Kola & Co Ventures Inventory',
+  'A sample inventory tracker, used to power the onboarding demo.',
+  'published', true, '7d91d04c-d223-4ef1-a94d-382aa2d31bfe',
+  ${sqlJson({ reportDateField: 'last_restocked', reportAmountField: 'stock_value' })},
+  ${sqlJson([
+    { id: 'item_name', type: 'text', label: 'Item Name', required: true },
+    { id: 'sku', type: 'text', label: 'SKU', required: false },
+    { id: 'category', type: 'dropdown', label: 'Category', required: false, options: ['Raw Materials', 'Packaging', 'Finished Goods', 'Equipment', 'Other'] },
+    { id: 'quantity_on_hand', type: 'number', label: 'Quantity on Hand', required: true },
+    { id: 'reorder_level', type: 'number', label: 'Reorder Level', required: false },
+    { id: 'unit_cost', type: 'number', label: 'Unit Cost', required: false },
+    { id: 'stock_value', type: 'number', label: 'Stock Value', required: false },
+    { id: 'supplier', type: 'text', label: 'Supplier', required: false },
+    { id: 'last_restocked', type: 'date', label: 'Last Restocked', required: false },
+    { id: 'notes', type: 'longtext', label: 'Notes', required: false },
+  ])}
+)
+on conflict (id) do nothing;
+
+${submissionsInsertSQL(inventory.rows)}
+
+-- Staff Directory / Headcount
+insert into forms (id, name, description, status, is_demo, user_id, settings, fields)
+values (
+  ${sqlStr(STAFF_FORM_ID)},
+  'Kola & Co Ventures Staff',
+  'A sample staff directory, used to power the onboarding demo.',
+  'published', true, '7d91d04c-d223-4ef1-a94d-382aa2d31bfe', '{}'::jsonb,
+  ${sqlJson([
+    { id: 'full_name', type: 'text', label: 'Full Name', required: true },
+    { id: 'role', type: 'dropdown', label: 'Role', required: false, options: STAFF_ROLES },
+    { id: 'department', type: 'dropdown', label: 'Department', required: false, options: DEPARTMENTS },
+    { id: 'start_date', type: 'date', label: 'Start Date', required: false },
+    { id: 'phone', type: 'phone', label: 'Phone', required: false },
+    { id: 'email', type: 'email', label: 'Email', required: false },
+    { id: 'status', type: 'dropdown', label: 'Status', required: false, options: ['Active', 'On Leave', 'Inactive'] },
+  ])}
+)
+on conflict (id) do nothing;
+
+${submissionsInsertSQL(staff.rows)}
+
+-- Customer Survey / Market Research
+insert into forms (id, name, description, status, is_demo, user_id, settings, fields)
+values (
+  ${sqlStr(SURVEY_FORM_ID)},
+  'Market Research Survey',
+  'A sample market research survey and its responses, used to power the onboarding demo.',
+  'published', true, '7d91d04c-d223-4ef1-a94d-382aa2d31bfe', '{}'::jsonb,
+  ${sqlJson([
+    { id: 'age_bracket', type: 'dropdown', label: 'Age Bracket', required: false, options: AGE_BRACKETS },
+    { id: 'how_often_buy', type: 'dropdown', label: 'How often do you buy from us?', required: false, options: ['Weekly', 'Monthly', 'Occasionally', 'First time'] },
+    { id: 'price_sensitivity', type: 'dropdown', label: 'Price sensitivity', required: false, options: ['Very price-sensitive', 'Somewhat price-sensitive', 'Not very price-sensitive'] },
+    { id: 'biggest_pain_point', type: 'longtext', label: 'Biggest pain point with us', required: false },
+    { id: 'satisfaction', type: 'rating', label: 'Overall satisfaction', required: true, maxStars: 5 },
+  ])}
+)
+on conflict (id) do nothing;
+
+${submissionsInsertSQL(survey.rows)}
+
+insert into demo_datasets (id, name, form_id, keywords, destination) values
+  (${sqlStr(INVENTORY_DATASET_ID)}, 'Inventory Tracking Demo', ${sqlStr(INVENTORY_FORM_ID)}, array['inventory','stock','warehouse','supplies'], 'report'),
+  (${sqlStr(STAFF_DATASET_ID)}, 'Staff Directory Demo', ${sqlStr(STAFF_FORM_ID)}, array['staff','employees','headcount','team','personnel'], 'records'),
+  (${sqlStr(SURVEY_DATASET_ID)}, 'Market Research Survey Demo', ${sqlStr(SURVEY_FORM_ID)}, array['survey','research','market research','questionnaire','poll'], 'report')
+on conflict (id) do nothing;
+`
+
+fs.writeFileSync(workflowOutPath, workflowSql)
+console.log(`Wrote ${workflowOutPath} (${(workflowSql.length / 1024).toFixed(0)} KB)`)

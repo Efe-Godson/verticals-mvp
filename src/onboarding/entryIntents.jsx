@@ -55,6 +55,34 @@ export async function loadActiveDemoRoutes() {
   return byIntent
 }
 
+// Workflow/Other's one free-text answer is matched against every seeded
+// "workflow example" dataset (demo_datasets.keywords set, e.g. Inventory
+// Tracking, Staff Directory, Market Research Survey - see supabase/
+// migrations/20260911170000_seed_workflow_examples.sql) - plain substring
+// containment, first match wins. Returns a route-shaped object identical to
+// what loadActiveDemoRoutes() already produces from demo_routes, so
+// IntentDestination.jsx needs no changes to consume either one - or null if
+// nothing matched (OnboardingPage.jsx falls back to the generic 'forms'
+// template preview in that case, same as before this existed).
+export async function resolveWorkflowExample(text) {
+  const answer = text.trim().toLowerCase()
+  if (!answer) return null
+  const { data, error } = await supabase
+    .from('demo_datasets')
+    .select('id, name, form_id, keywords, destination')
+    .not('keywords', 'is', null)
+  if (error || !data) return null
+  const match = data.find(d => (d.keywords || []).some(k => answer.includes(k)))
+  if (!match) return null
+  return {
+    template_slug: null,
+    demo_dataset_id: match.id,
+    demo_datasets: { form_id: match.form_id },
+    destination: match.destination,
+    cta_text: 'Create your workspace',
+  }
+}
+
 // Flat, single-color line icons, same visual language as
 // templateVisuals.jsx's CategoryIcon (no fills/gradients, one stroke width).
 export function EntryIntentIcon({ id, color = 'currentColor', size = 26 }) {
