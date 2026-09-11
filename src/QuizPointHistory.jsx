@@ -5,12 +5,14 @@ import { invokeQuiz } from './quizApi'
 import PageSkeleton from './components/PageSkeleton'
 import useIsMobile from './hooks/useIsMobile'
 import { DataCard, DataCardList } from './components/DataCards'
+import { usePageBack } from './PageTitleContext'
 
 function formatDate(dateString) {
   return new Date(dateString).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
 function QuizPointHistory() {
+  usePageBack('/lab/quiz', 'Quiz')
   const isMobile = useIsMobile()
   const [history, setHistory] = useState(null)
 

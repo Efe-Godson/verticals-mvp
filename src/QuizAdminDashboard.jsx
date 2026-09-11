@@ -14,10 +14,12 @@ import RoomCodeBadge from './quiz/RoomCodeBadge'
 import HorizontalBarChart from './report/components/HorizontalBarChart'
 import PageSkeleton from './components/PageSkeleton'
 import { ErrorState } from './ErrorState'
+import { usePageBack } from './PageTitleContext'
 
 const POLL_MS = 2000
 
 function QuizAdminDashboard() {
+  usePageBack('/lab/quiz', 'Quiz')
   const { roomId } = useParams()
   const { showToast } = useToast()
   const [state, setState] = useState(null)

@@ -12,8 +12,10 @@
 import { useState } from 'react'
 import LabSidePanel from '../../LabSidePanel'
 import OnboardingPage from '../../onboarding/OnboardingPage'
+import { usePageBack } from '../../PageTitleContext'
 
 export default function OnboardingPrototype() {
+  usePageBack('/lab', 'Lab')
   const [runId, setRunId] = useState(0) // bump to remount OnboardingPage from Welcome
 
   return (

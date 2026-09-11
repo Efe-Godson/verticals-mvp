@@ -11,6 +11,7 @@ import PageSkeleton from './components/PageSkeleton'
 import { useDeferredLoading } from './components/loadingHooks'
 import { ErrorState } from './ErrorState'
 import EmptyState from './components/EmptyState'
+import { usePageBack } from './PageTitleContext'
 
 function formatWhen(iso) {
   return new Date(iso).toLocaleString('en-GB', {
@@ -56,6 +57,7 @@ const TYPE_COLOR = {
 }
 
 function AlertsPage() {
+  usePageBack('/lab', 'Lab')
   const [alerts, setAlerts] = useState(null)
   const [error, setError] = useState('')
 

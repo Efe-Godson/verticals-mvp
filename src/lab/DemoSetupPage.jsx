@@ -13,6 +13,7 @@ import PageSkeleton from '../components/PageSkeleton'
 import { useDeferredLoading } from '../components/loadingHooks'
 import { ErrorState } from '../ErrorState'
 import { ENTRY_INTENTS, EntryIntentIcon } from '../onboarding/entryIntents'
+import { usePageBack } from '../PageTitleContext'
 
 const DESTINATIONS = [
   { value: 'form', label: 'Form (preview)' },
@@ -44,6 +45,7 @@ function computeFunnel(events, intentId) {
 }
 
 function DemoSetupPage() {
+  usePageBack('/lab', 'Lab')
   const { showToast } = useToast()
   const [templates, setTemplates] = useState([])
   const [datasets, setDatasets] = useState([])

@@ -12,12 +12,14 @@ import { useAuth } from './AuthContext'
 import { getQuizIdentityToken } from './quizIdentity'
 import { InlineLoader } from './components/InlineLoader'
 import { invokeQuiz } from './quizApi'
+import { usePageBack } from './PageTitleContext'
 
 function formatDate(dateString) {
   return new Date(dateString).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
 function QuizHome() {
+  usePageBack('/lab', 'Lab')
   const { session } = useAuth()
   const navigate = useNavigate()
   const [recentRooms, setRecentRooms] = useState([])

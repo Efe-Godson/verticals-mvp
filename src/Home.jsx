@@ -8,6 +8,7 @@ import { useToast } from './Toast'
 import HomeRecycleBinDialog from './HomeRecycleBinDialog'
 import { useRecycleBinTrigger } from './RecycleBinContext'
 import LabSidePanel from './LabSidePanel'
+import { usePageBack } from './PageTitleContext'
 import { InlineLoader } from './components/InlineLoader'
 
 const PAGE_SIZE = 8
@@ -91,6 +92,7 @@ function getContextualAction(formId, responseCounts) {
 }
 
 function Home() {
+  usePageBack('/', 'All Businesses')
   const { session } = useAuth()
   const { showToast } = useToast()
   const { setTrigger } = useRecycleBinTrigger()

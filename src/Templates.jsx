@@ -8,7 +8,7 @@ import { TEMPLATE_ADMIN_USER_ID } from './adminAccount'
 import TemplateEditorDialog from './TemplateEditorDialog'
 import { categoryColor, CategoryIcon } from './templateVisuals'
 import { createLocationForm, locationDestination, createBundleTemplateForms, bundleDestination } from './locations'
-import { usePageTitle } from './PageTitleContext'
+import { usePageTitle, usePageBack } from './PageTitleContext'
 import { Skeleton } from './components/Skeleton'
 
 function TemplatesSkeleton() {
@@ -69,6 +69,7 @@ function Templates() {
   const { showToast } = useToast()
   const navigate = useNavigate()
   usePageTitle('Templates')
+  usePageBack('/', 'All Businesses')
 
   const [templates, setTemplates] = useState([])
   const [loading, setLoading] = useState(true)

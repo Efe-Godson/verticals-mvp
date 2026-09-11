@@ -19,6 +19,7 @@ import LabSidePanel from '../LabSidePanel'
 import PageSkeleton from '../components/PageSkeleton'
 import { useDeferredLoading } from '../components/loadingHooks'
 import { ErrorState } from '../ErrorState'
+import { usePageBack } from '../PageTitleContext'
 
 // Clones a dataset's underlying form *and* its submissions (unlike
 // locations.js's duplicateLocationForm, which deliberately never copies
@@ -53,6 +54,7 @@ async function duplicateDataset({ session, dataset, name }) {
 }
 
 function DemoDataManagerPage() {
+  usePageBack('/lab', 'Lab')
   const { session } = useAuth()
   const navigate = useNavigate()
   const { showToast } = useToast()

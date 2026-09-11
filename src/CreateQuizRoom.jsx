@@ -8,6 +8,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useToast } from './Toast'
 import { invokeQuiz } from './quizApi'
+import { usePageBack } from './PageTitleContext'
 
 const DIFFICULTIES = ['easy', 'medium', 'hard', 'mixed']
 const QUESTION_TYPES = [
@@ -22,6 +23,7 @@ function emptyQuestionDraft(q) {
 }
 
 function CreateQuizRoom() {
+  usePageBack('/lab/quiz', 'Quiz')
   const navigate = useNavigate()
   const { showToast } = useToast()
 

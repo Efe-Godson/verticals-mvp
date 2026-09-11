@@ -9,6 +9,7 @@ import StatTile from './report/components/StatTile'
 import PageSkeleton from './components/PageSkeleton'
 import { useDeferredLoading } from './components/loadingHooks'
 import { ErrorState, InlineError } from './ErrorState'
+import { usePageBack } from './PageTitleContext'
 
 const EXAMPLE_QUESTIONS = [
   'Which product should I restock first?',
@@ -120,6 +121,7 @@ function AnalysisSkeleton() {
 
 function AIAnalystPage() {
   const { id } = useParams()
+  usePageBack(`/form/${id}/report`, 'Report')
   const [form, setForm] = useState(null)
   const [submissions, setSubmissions] = useState([])
   const [dateRange, setDateRange] = useState('all')

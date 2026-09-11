@@ -9,6 +9,7 @@ import { supabase } from './supabaseClient'
 import PageSkeleton from './components/PageSkeleton'
 import { useDeferredLoading } from './components/loadingHooks'
 import { ErrorState } from './ErrorState'
+import { usePageBack } from './PageTitleContext'
 
 function formatWhen(iso) {
   return new Date(iso).toLocaleString('en-GB', {
@@ -71,6 +72,7 @@ function PasswordResetCard({ events, counts }) {
 }
 
 function EmailMonitorPage() {
+  usePageBack('/lab', 'Lab')
   const [result, setResult] = useState(null)
   const [error, setError] = useState('')
 
