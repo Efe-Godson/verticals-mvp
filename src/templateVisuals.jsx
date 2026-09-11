@@ -9,7 +9,7 @@
 const CATEGORY_COLORS = {
   'Retail': '#0ea5e9', 'Restaurant': '#f97316', 'Education': '#8b5cf6',
   'Healthcare': '#ef4444', 'Nonprofit': '#16a34a', 'Events': '#d946ef',
-  'HR & Operations': '#0070f3', 'Other': '#6b7280',
+  'HR & Operations': '#0070f3', 'Finance': '#ca8a04', 'Other': '#6b7280',
 }
 export function categoryColor(category) {
   return CATEGORY_COLORS[category] || '#6b7280'
@@ -70,6 +70,16 @@ export function CategoryIcon({ category, color }) {
         <svg {...common}>
           <rect x="3" y="8" width="18" height="12" rx="2" />
           <path d="M9 8V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18" />
+        </svg>
+      )
+    // "Money flying away" for Expenses/Finance - a banknote with motion
+    // lines trailing off it, rather than a generic wallet/coin icon.
+    case 'Finance':
+      return (
+        <svg {...common}>
+          <rect x="2" y="9" width="14" height="9.5" rx="2" />
+          <circle cx="9" cy="13.75" r="2" />
+          <path d="M15.5 5.5l2.5-2.5M18.5 7.5l3-3M15 2.5l2 .8" />
         </svg>
       )
     default:
