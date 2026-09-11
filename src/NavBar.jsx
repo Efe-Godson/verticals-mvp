@@ -278,52 +278,36 @@ function NavBar() {
       </div>
 
       {/* Compact bar: hidden on desktop, shown below 768px instead of the
-          row above. Back is a hierarchical "one level up" control (only for
+          row above. Menu/Options now leads on the left and Back trails on
+          the right - matching CompactTopBar.jsx's own [menu] Title ...
+          (back) convention for the Payroll/Expenses side-panel flows, which
+          used to put these two in the opposite spots from everywhere else
+          in the app. Back is a hierarchical "one level up" control (only for
           pages that registered a destination via usePageBack, e.g.
-          TemplateLocations.jsx -> "/") - it stays paired with the title up
-          here, since it means something different from the persistent
-          Home/Records/Reports tabs below (see MobileBottomNav.jsx): this is
-          "back to where I came from", not "jump to a top-level section".
-          The hamburger on the right opens the same bottom sheet the old
-          Menu tab used to - Menu is secondary/admin surface (Templates,
-          Lab, Recycle Bin, account), so it doesn't belong at equal weight
-          with Home/Records/Reports in the primary tab bar below. */}
+          TemplateLocations.jsx -> "/") - it means something different from
+          the persistent Home/Records/Reports tabs below (see
+          MobileBottomNav.jsx): this is "back to where I came from", not
+          "jump to a top-level section". The hamburger opens the same bottom
+          sheet the old Menu tab used to - Menu is secondary/admin surface
+          (Templates, Lab, Recycle Bin, account), so it doesn't belong at
+          equal weight with Home/Records/Reports in the primary tab bar
+          below. */}
       <div className="navbar-mobile-row">
-        <div style={{ display: 'flex', alignItems: 'center', flex: '1 1 auto', minWidth: 0 }}>
-          {pageBack && (
-            <Link
-              to={pageBack.to}
-              aria-label={pageBack.label ? `Back to ${pageBack.label}` : 'Back'}
-              style={{
-                width: '44px', height: '44px', flexShrink: 0, color: 'var(--color-text)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: '-0.4rem',
-              }}
-            >
-              <ArrowLeftIcon size={22} />
-            </Link>
-          )}
-          <span style={{
-            fontWeight: 'bold', fontSize: '1rem', flex: '1 1 auto', minWidth: 0,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}>
-            {mobileBrand}
-          </span>
-        </div>
         {/* A page with its own Options menu (Report.jsx/Records.jsx) gets
             that button here INSTEAD OF the hamburger, not alongside it -
-            one top-right button, not two. Menu (Templates/Lab/Recycle
-            Bin/Account) is reachable from Home's hamburger; every page under
-            Records/Reports trades that slot for Options instead (or nothing,
-            on the picker pages that have no Options of their own yet -
-            never falling back to Menu there, see isRecordsOrReportsRoute
-            above), since Home is one tap away on the bottom bar regardless. */}
+            one button, not two. Menu (Templates/Lab/Recycle Bin/Account) is
+            reachable from Home's hamburger; every page under Records/
+            Reports trades that slot for Options instead (or nothing, on the
+            picker pages that have no Options of their own yet - never
+            falling back to Menu there, see isRecordsOrReportsRoute above),
+            since Home is one tap away on the bottom bar regardless. */}
         {pageOptions ? (
           <button
             type="button"
             onClick={pageOptions.onClick}
             aria-label="Page options"
             style={{
-              width: '44px', height: '44px', flexShrink: 0, marginRight: '-0.4rem',
+              width: '44px', height: '44px', flexShrink: 0, marginLeft: '-0.4rem',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               background: 'transparent', border: 'none', color: 'var(--color-text)', cursor: 'pointer', padding: 0,
             }}
@@ -340,7 +324,7 @@ function NavBar() {
             onClick={() => setMenuOpen(true)}
             aria-label="Open menu"
             style={{
-              width: '44px', height: '44px', flexShrink: 0, marginRight: '-0.4rem',
+              width: '44px', height: '44px', flexShrink: 0, marginLeft: '-0.4rem',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               background: 'transparent', border: 'none', color: 'var(--color-text)', cursor: 'pointer', padding: 0,
             }}
@@ -349,6 +333,24 @@ function NavBar() {
               <path d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
+        )}
+        <span style={{
+          fontWeight: 'bold', fontSize: '1rem', flex: '1 1 auto', minWidth: 0,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {mobileBrand}
+        </span>
+        {pageBack && (
+          <Link
+            to={pageBack.to}
+            aria-label={pageBack.label ? `Back to ${pageBack.label}` : 'Back'}
+            style={{
+              width: '44px', height: '44px', flexShrink: 0, marginRight: '-0.4rem', color: 'var(--color-text)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <ArrowLeftIcon size={22} />
+          </Link>
         )}
       </div>
 
