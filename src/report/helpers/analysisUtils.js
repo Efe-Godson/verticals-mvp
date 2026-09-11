@@ -68,6 +68,24 @@ export function formatNaira(value, decimals = 0) {
   }).format(amount);
 }
 
+// What to call one submission, everywhere a report or records view would
+// otherwise say the generic (and often wrong-sounding) "response" - a cart
+// field means "Order" reads better than "Response", and a template that
+// tags its own settings.recordKind (Expenses sets 'expense', see
+// src/locations.js) gets that instead of guessing. Falls back to
+// "Response"/"Responses", the neutral, Google-Forms-standard term, for
+// anything with no more specific identity (Data Collection, a Workflow
+// example, a plain Forms template).
+export function getEntryNoun(form, hasCartField) {
+  if (hasCartField) return { singular: "Order", plural: "Orders" };
+  const kind = form?.settings?.recordKind;
+  if (kind) {
+    const cap = kind.charAt(0).toUpperCase() + kind.slice(1);
+    return { singular: cap, plural: `${cap}s` };
+  }
+  return { singular: "Response", plural: "Responses" };
+}
+
 export const thStyle = {
   textAlign: "left",
   padding: "0.5rem 0.7rem",

@@ -23,6 +23,7 @@ import { RefreshingIndicator } from './components/InlineLoader'
 import EmptyState, { SearchOffIcon } from './components/EmptyState'
 import useIsMobile from './hooks/useIsMobile'
 import { DataCard, DataCardList } from './components/DataCards'
+import { getEntryNoun } from './report/helpers/analysisUtils'
 
 const PAGE_SIZE = 10
 
@@ -393,6 +394,7 @@ function Records({ formId: formIdProp } = {}) {
   // Submission ID are debugging-grade columns nobody's checking out orders needs.
   const cartField = form.fields.find(f => f.type === 'cart')
   const hasCartField = !!cartField
+  const entryNoun = getEntryNoun(form, hasCartField)
 
   // Phone card view (see the isMobile branch in the render): a wide row of
   // columns becomes a short stack showing only what's worth a glance, tap for
@@ -1147,7 +1149,7 @@ function Records({ formId: formIdProp } = {}) {
         <EmptyState
           style={{ marginTop: '1.4rem' }}
           title="No records yet"
-          message="Once people submit this form, their responses will appear here with filters and export options ready to use."
+          message={`Once people submit this form, their ${entryNoun.plural.toLowerCase()} will appear here with filters and export options ready to use.`}
           action={<button onClick={() => window.history.back()}>Back to previous page</button>}
         />
       ) : visible.length === 0 ? (

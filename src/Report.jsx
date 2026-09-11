@@ -21,7 +21,7 @@ import { LoadingSpinner } from './LoadingState'
 import { RefreshingIndicator } from './components/InlineLoader'
 import { getPageCache, setPageCache } from './hooks/pageCache'
 import { getGroupableFields, getMeasureOptions, computePivot, toChartData } from './report/helpers/pivotEngine'
-import { formatNaira, median } from './report/helpers/analysisUtils'
+import { formatNaira, median, getEntryNoun } from './report/helpers/analysisUtils'
 import { DATE_RANGE_OPTIONS, getDateRangeBounds, getDateRangeLabel } from './report/helpers/dateRange'
 import PageSkeleton from './components/PageSkeleton'
 import { useDeferredLoading } from './components/loadingHooks'
@@ -128,7 +128,7 @@ function locationCartTiles({ locationField, cartField, submissions }) {
 }
 
 // Plain response-count breakdown by location, for forms with no cart field.
-function locationCountTile({ locationField, submissions }) {
+function locationCountTile({ locationField, submissions, noun }) {
   const counts = {}
   let total = 0
   submissions.forEach(s => {
@@ -141,7 +141,7 @@ function locationCountTile({ locationField, submissions }) {
     .map(([label, count]) => ({ label, count, percent: total > 0 ? Math.round((count / total) * 100) : 0 }))
     .sort((a, b) => b.count - a.count)
   if (rows.length === 0) return []
-  return [{ id: `loc-${locationField.id}-count`, title: `Responses by ${locationField.label}`, node: <HorizontalBarChart data={rows} bare /> }]
+  return [{ id: `loc-${locationField.id}-count`, title: `${noun.plural} by ${locationField.label}`, node: <HorizontalBarChart data={rows} bare /> }]
 }
 
 function Report({ formId: formIdProp } = {}) {
@@ -297,6 +297,7 @@ function Report({ formId: formIdProp } = {}) {
   const cartFields = form.fields.filter(f => f.type === 'cart')
   const categoryFields = form.fields.filter(f => CATEGORICAL_TYPES.includes(f.type))
   const locationFields = form.fields.filter(f => f.type === 'location')
+  const entryNoun = getEntryNoun(form, cartFields.length > 0)
 
   const salesByCategoryPairs = []
   cartFields.forEach(cartField => {
@@ -327,6 +328,7 @@ function Report({ formId: formIdProp } = {}) {
 
     const orderPoints = []
     const revenuePoints = []
+    const amountPoints = []
     filteredSubmissions.forEach(s => {
       const d = recordDate(s)
       orderPoints.push({ date: d, value: 1 })
@@ -336,21 +338,37 @@ function Report({ formId: formIdProp } = {}) {
         if (v && v.items && v.items.length > 0) rev += v.total + (v.deliveryFee || 0)
       })
       if (rev > 0) revenuePoints.push({ date: d, value: rev })
+      if (reportAmountField) {
+        const amt = Number(s.data[reportAmountField.id])
+        if (!isNaN(amt) && amt !== 0) amountPoints.push({ date: d, value: amt })
+      }
     })
 
     const byLabel = reportDateField ? ` (by ${reportDateField.label})` : ''
-    const tiles = [{
+    const countTile = {
       id: 'trend-orders',
-      title: `${cartFields.length > 0 ? 'Orders' : 'Responses'} over time${byLabel}`,
+      title: `${entryNoun.plural} over time${byLabel}`,
       node: <TrendLineChart points={orderPoints} defaultGranularity={defaultGran} />,
-    }]
+    }
+    const tiles = []
+    // Lead with a money/amount trend where one exists - a plain count of
+    // records is the least interesting way to open a report when there's an
+    // actual result (revenue, or an Expenses book's own amount field) to
+    // show instead. Same ordering KPIGrid already gives Revenue over Orders.
     if (revenuePoints.length > 0) {
       tiles.push({
         id: 'trend-revenue',
         title: `Revenue over time${byLabel}`,
         node: <TrendLineChart points={revenuePoints} defaultGranularity={defaultGran} formatValue={formatNaira} currency />,
       })
+    } else if (amountPoints.length > 0) {
+      tiles.push({
+        id: 'trend-amount',
+        title: `${reportAmountField.label} over time${byLabel}`,
+        node: <TrendLineChart points={amountPoints} defaultGranularity={defaultGran} formatValue={formatNaira} currency />,
+      })
     }
+    tiles.push(countTile)
     return tiles
   })()
 
@@ -375,13 +393,13 @@ function Report({ formId: formIdProp } = {}) {
     // per value when the form has one (e.g. Expenses' own "amount").
     ...(cartFields.length === 0
       ? categoryFields.flatMap(catField =>
-          categoryCountTiles({ categoryField: catField, submissions: filteredSubmissions, amountField: reportAmountField }),
+          categoryCountTiles({ categoryField: catField, submissions: filteredSubmissions, amountField: reportAmountField, noun: entryNoun }),
         )
       : []),
     ...locationFields.flatMap(lf =>
       cartFields.length > 0
         ? cartFields.flatMap(cf => locationCartTiles({ locationField: lf, cartField: cf, submissions: filteredSubmissions }))
-        : locationCountTile({ locationField: lf, submissions: filteredSubmissions }),
+        : locationCountTile({ locationField: lf, submissions: filteredSubmissions, noun: entryNoun }),
     ),
     ...(form.settings?.reportWidgets || []).map(widget => ({
       id: `widget-${widget.id}`,
@@ -653,7 +671,7 @@ function Report({ formId: formIdProp } = {}) {
 
       {filteredSubmissions.length === 0 ? (
         <div className="card" style={{ padding: '1.8rem', marginBottom: '1.2rem' }}>
-          <h3 style={{ marginTop: 0, marginBottom: '0.5rem' }}>No responses in this range yet</h3>
+          <h3 style={{ marginTop: 0, marginBottom: '0.5rem' }}>No {entryNoun.plural.toLowerCase()} in this range yet</h3>
           <p style={{ color: 'var(--color-muted)', margin: '0 0 0.9rem' }}>
             Try a wider date range, or collect a few more submissions to unlock richer insights.
           </p>
@@ -895,6 +913,7 @@ function OverviewCard({ form, submissions }) {
   })
 
   const totalResponses = submissions.length
+  const noun = getEntryNoun(form, cartFields.length > 0)
   // Keep this concise: a briefing, not a list of everything the data could
   // say - revenue and salesperson lines only, capped at 4.
   const insights = computeInsights(form, submissions).slice(0, 4)
@@ -912,11 +931,11 @@ function OverviewCard({ form, submissions }) {
           </div>
         ) : (
           <div style={{ fontSize: '1.15rem', color: 'var(--color-text)', lineHeight: 1.5 }}>
-            You received{' '}
+            You recorded{' '}
             <span style={{ fontSize: 'clamp(1.5rem, 6vw, 2rem)', fontWeight: 800, letterSpacing: '-0.01em', fontVariantNumeric: 'tabular-nums' }}>
               {totalResponses.toLocaleString()}
             </span>{' '}
-            response{totalResponses !== 1 ? 's' : ''} during this period.
+            {(totalResponses !== 1 ? noun.plural : noun.singular).toLowerCase()} during this period.
           </div>
         )}
       </div>
@@ -982,6 +1001,7 @@ function KPIGrid({ form, submissions, previousSubmissions = [], totalResponses, 
   const demographicFields = form.fields.filter(f => DEMOGRAPHIC_TYPES.includes(f.type))
   const dateFields = form.fields.filter(f => f.type === 'date')
   const hasPreviousPeriod = previousSubmissions.length > 0
+  const noun = getEntryNoun(form, cartFields.length > 0)
 
   const primaryKpis = []
   // Every other computed metric lives behind "More metrics" so the grid above
@@ -1024,7 +1044,7 @@ function KPIGrid({ form, submissions, previousSubmissions = [], totalResponses, 
   }
 
   moreKpis.push({
-    label: 'Total Responses', value: totalResponses.toLocaleString(),
+    label: `Total ${noun.plural}`, value: totalResponses.toLocaleString(),
     trend: computeTrend(totalResponses, hasPreviousPeriod ? previousSubmissions.length : undefined)
   })
 
@@ -1038,7 +1058,7 @@ function KPIGrid({ form, submissions, previousSubmissions = [], totalResponses, 
     const timestamps = submissions.map(s => new Date(s.created_at).getTime()).filter(t => !isNaN(t))
     if (timestamps.length > 1) {
       const spanDays = Math.max(1, (Math.max(...timestamps) - Math.min(...timestamps)) / (1000 * 60 * 60 * 24))
-      moreKpis.push({ label: 'Responses per Day', value: (totalResponses / spanDays).toFixed(1) })
+      moreKpis.push({ label: `${noun.plural} per Day`, value: (totalResponses / spanDays).toFixed(1) })
     }
   }
 
@@ -1177,6 +1197,7 @@ function computeInsights(form, submissions) {
   // "category", a survey's "how_heard", ...) - none of them salesperson-
   // shaped - left that branch nothing to iterate over, ever.
   const categoryFields = allCategoryFields.filter(f => isSalespersonField(f.label))
+  const noun = getEntryNoun(form, cartFields.length > 0)
 
   if (cartFields.length > 0) {
     const itemQty = {}
@@ -1245,13 +1266,13 @@ function computeInsights(form, submissions) {
       const top = Object.entries(countMap).sort((a, b) => b[1] - a[1])[0]
       if (top) {
         const percent = Math.round((top[1] / answered.length) * 100)
-        insights.push(`${top[0]} is the most common ${field.label.toLowerCase()}, at ${percent}% of responses.`)
+        insights.push(`${top[0]} is the most common ${field.label.toLowerCase()}, at ${percent}% of ${noun.plural.toLowerCase()}.`)
       }
     })
   }
 
   if (insights.length === 0) {
-    insights.push('Collect a few more responses to start seeing insights here.')
+    insights.push(`Collect a few more ${noun.plural.toLowerCase()} to start seeing insights here.`)
   }
 
   return insights

@@ -49,12 +49,12 @@ function aggregate({ categoryField, submissions, amountField }) {
 // Separate tile descriptors for the Reports page, same convention as
 // cartCategoryTiles - the sum-by-value chart only appears when there's an
 // amount field to sum.
-export function categoryCountTiles({ categoryField, submissions, amountField }) {
+export function categoryCountTiles({ categoryField, submissions, amountField, noun = { plural: 'Responses' } }) {
   const { countData, sumData } = aggregate({ categoryField, submissions, amountField })
   if (countData.length === 0) return []
   const base = `catcount-${categoryField.id}`
   const tiles = [
-    { id: `${base}-count`, title: `Responses by ${categoryField.label}`, node: <HorizontalBarChart data={countData} bare /> },
+    { id: `${base}-count`, title: `${noun.plural} by ${categoryField.label}`, node: <HorizontalBarChart data={countData} bare /> },
   ]
   if (sumData.length > 0) {
     tiles.unshift({
