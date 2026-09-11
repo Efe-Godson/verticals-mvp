@@ -215,6 +215,15 @@ function AppShell() {
           <Route path="records" element={<PublicDemoRecords />} />
           <Route path="report" element={<PublicDemoReport />} />
         </Route>
+        {/* A specific dataset (the switcher inside PublicDemoShell navigates
+            here) - same three child routes, mirrored rather than made
+            optional in one route, since react-router v6 has no clean
+            optional-segment syntax for this shape. */}
+        <Route path="/demo/:datasetId" element={<PublicDemoShell />}>
+          <Route index element={<PublicDemoHome />} />
+          <Route path="records" element={<PublicDemoRecords />} />
+          <Route path="report" element={<PublicDemoReport />} />
+        </Route>
         <Route path="/form/:id/edit" element={<PrivateRoute><StaffScopedRoute><EditForm /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/form/:id/records" element={<PrivateRoute><StaffScopedRoute><Records /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/form/:id/inventory" element={<PrivateRoute><StaffScopedRoute><Inventory /></StaffScopedRoute></PrivateRoute>} />
