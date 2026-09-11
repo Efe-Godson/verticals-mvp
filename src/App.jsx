@@ -1,59 +1,74 @@
+import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './AuthContext'
 import { isFirstVisit } from './firstVisit'
 import { ToastProvider } from './Toast'
 import { RecycleBinProvider } from './RecycleBinContext'
 import { PageTitleProvider } from './PageTitleContext'
-import Home from './Home'
-import BusinessesHome from './BusinessesHome'
-import TemplateLocations from './TemplateLocations'
-import FormsTemplateHome from './FormsTemplateHome'
 import { TEMPLATE_ADMIN_USER_ID } from './adminAccount'
-import Reports from './Reports'
-import RecordsHome from './RecordsHome'
-import CreateForm from './CreateForm'
-import EditForm from './EditForm'
-import PublicForm from './PublicForm'
-import Records from './Records'
-import Inventory from './Inventory'
-import ShortLinkRedirect from './ShortLinkRedirect'
-import Report from './Report'
 import ErrorBoundary from './ErrorBoundary'
-import ReportBuilderWorkspace from './report/builder/ReportBuilderWorkspace'
-import AIAnalystPage from './AIAnalystPage'
-import FormSettings from './FormSettings'
-import AdminStaff from './AdminStaff'
-import QuizHome from './QuizHome'
-import CreateQuizRoom from './CreateQuizRoom'
-import JoinQuizRoom from './JoinQuizRoom'
-import QuizRoom from './QuizRoom'
-import QuizAdminDashboard from './QuizAdminDashboard'
-import QuizPointHistory from './QuizPointHistory'
-import AlertsPage from './AlertsPage'
-import EmailMonitorPage from './EmailMonitorPage'
-import OnboardingPrototype from './lab/onboarding/OnboardingPrototype'
-import DemoSetupPage from './lab/DemoSetupPage'
-import PublicDemoShell, { PublicDemoHome, PublicDemoRecords, PublicDemoReport } from './PublicDemoExperience'
-import DemoDataManagerPage from './lab/DemoDataManagerPage'
-import OnboardingPage from './onboarding/OnboardingPage'
-import PayrollShell from './payroll/PayrollShell'
-import PayrollEmployees from './payroll/PayrollEmployees'
-import PayrollEmployeeProfile from './payroll/PayrollEmployeeProfile'
-import PayrollEntries from './payroll/PayrollEntries'
-import PayrollMonthly from './payroll/PayrollMonthly'
-import ExpenseShell from './expenses/ExpenseShell'
-import ExpenseOverview from './expenses/ExpenseOverview'
-import Login from './Login'
-import SignUp from './SignUp'
-import ConfirmEmail from './ConfirmEmail'
-import ResetPassword from './ResetPassword'
-import Templates from './Templates'
-import AccountPage from './AccountPage'
 import NavBar from './NavBar'
 import PosSidePanel from './PosSidePanel'
 import DarkModeToggle from './DarkModeToggle'
 import { LoadingState } from './LoadingState'
 import OfflineBanner from './OfflineBanner'
+
+// Every route's own page component is lazy-loaded instead of imported
+// up front - previously all of them (Payroll's calculators, the Quiz game
+// engine, the Report Builder's drag-and-drop workspace, every Lab/admin
+// page, ...) landed in one single ~3.3MB (~930KB gzipped) bundle that had
+// to download and parse before *anything* could render, on every fresh
+// visit or reload - the concrete cause behind "some things take forever".
+// Splitting per route means a fresh visitor only ever pays for the pages
+// they actually open; NavBar/PosSidePanel/DarkModeToggle/OfflineBanner/
+// ErrorBoundary/LoadingState above stay eager since they're app-shell
+// chrome mounted outside <Routes>, not routed pages.
+const Home = lazy(() => import('./Home'))
+const BusinessesHome = lazy(() => import('./BusinessesHome'))
+const TemplateLocations = lazy(() => import('./TemplateLocations'))
+const FormsTemplateHome = lazy(() => import('./FormsTemplateHome'))
+const Reports = lazy(() => import('./Reports'))
+const RecordsHome = lazy(() => import('./RecordsHome'))
+const CreateForm = lazy(() => import('./CreateForm'))
+const EditForm = lazy(() => import('./EditForm'))
+const PublicForm = lazy(() => import('./PublicForm'))
+const Records = lazy(() => import('./Records'))
+const Inventory = lazy(() => import('./Inventory'))
+const ShortLinkRedirect = lazy(() => import('./ShortLinkRedirect'))
+const Report = lazy(() => import('./Report'))
+const ReportBuilderWorkspace = lazy(() => import('./report/builder/ReportBuilderWorkspace'))
+const AIAnalystPage = lazy(() => import('./AIAnalystPage'))
+const FormSettings = lazy(() => import('./FormSettings'))
+const AdminStaff = lazy(() => import('./AdminStaff'))
+const QuizHome = lazy(() => import('./QuizHome'))
+const CreateQuizRoom = lazy(() => import('./CreateQuizRoom'))
+const JoinQuizRoom = lazy(() => import('./JoinQuizRoom'))
+const QuizRoom = lazy(() => import('./QuizRoom'))
+const QuizAdminDashboard = lazy(() => import('./QuizAdminDashboard'))
+const QuizPointHistory = lazy(() => import('./QuizPointHistory'))
+const AlertsPage = lazy(() => import('./AlertsPage'))
+const EmailMonitorPage = lazy(() => import('./EmailMonitorPage'))
+const OnboardingPrototype = lazy(() => import('./lab/onboarding/OnboardingPrototype'))
+const DemoSetupPage = lazy(() => import('./lab/DemoSetupPage'))
+const DemoDataManagerPage = lazy(() => import('./lab/DemoDataManagerPage'))
+const PublicDemoShell = lazy(() => import('./PublicDemoExperience'))
+const PublicDemoHome = lazy(() => import('./PublicDemoExperience').then(m => ({ default: m.PublicDemoHome })))
+const PublicDemoRecords = lazy(() => import('./PublicDemoExperience').then(m => ({ default: m.PublicDemoRecords })))
+const PublicDemoReport = lazy(() => import('./PublicDemoExperience').then(m => ({ default: m.PublicDemoReport })))
+const OnboardingPage = lazy(() => import('./onboarding/OnboardingPage'))
+const PayrollShell = lazy(() => import('./payroll/PayrollShell'))
+const PayrollEmployees = lazy(() => import('./payroll/PayrollEmployees'))
+const PayrollEmployeeProfile = lazy(() => import('./payroll/PayrollEmployeeProfile'))
+const PayrollEntries = lazy(() => import('./payroll/PayrollEntries'))
+const PayrollMonthly = lazy(() => import('./payroll/PayrollMonthly'))
+const ExpenseShell = lazy(() => import('./expenses/ExpenseShell'))
+const ExpenseOverview = lazy(() => import('./expenses/ExpenseOverview'))
+const Login = lazy(() => import('./Login'))
+const SignUp = lazy(() => import('./SignUp'))
+const ConfirmEmail = lazy(() => import('./ConfirmEmail'))
+const ResetPassword = lazy(() => import('./ResetPassword'))
+const Templates = lazy(() => import('./Templates'))
+const AccountPage = lazy(() => import('./AccountPage'))
 
 function PrivateRoute({ children }) {
   const { session, loading } = useAuth()
@@ -159,6 +174,7 @@ function AppShell() {
           space at the bottom otherwise. */}
       <div className={[showNavBar && 'app-content-under-navbar', posPanelFormId && 'pos-flow'].filter(Boolean).join(' ') || undefined}>
       <ErrorBoundary key={location.pathname}>
+      <Suspense fallback={<LoadingState />}>
       <Routes>
         <Route path="/s/:code" element={<ShortLinkRedirect />} />
         <Route path="/onboarding" element={<PublicOnlyRoute><OnboardingPage /></PublicOnlyRoute>} />
@@ -250,6 +266,7 @@ function AppShell() {
           <Route index element={<ExpenseOverview />} />
         </Route>
       </Routes>
+      </Suspense>
       </ErrorBoundary>
       </div>
     </>
