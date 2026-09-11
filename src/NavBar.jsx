@@ -334,24 +334,33 @@ function NavBar() {
             </svg>
           </button>
         )}
-        <span style={{
-          fontWeight: 'bold', fontSize: '1rem', flex: '1 1 auto', minWidth: 0,
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
-          {mobileBrand}
-        </span>
-        {pageBack && (
-          <Link
-            to={pageBack.to}
-            aria-label={pageBack.label ? `Back to ${pageBack.label}` : 'Back'}
-            style={{
-              width: '44px', height: '44px', flexShrink: 0, marginRight: '-0.4rem', color: 'var(--color-text)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-          >
-            <ArrowLeftIcon size={22} />
-          </Link>
-        )}
+        {/* Title (+ Back, when the page has one) as one tight group pinned
+            to the right via marginLeft: auto - the hamburger/options button
+            above is the only thing anchored left. Giving the title its own
+            flex:1 box used to leave a wide, empty-looking gap before Back
+            (Back sat pinned right on its own, title merely started at the
+            left edge of that leftover space) - grouping them removes that
+            gap outright instead of just repositioning around it. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0, marginLeft: 'auto' }}>
+          <span style={{
+            fontWeight: 'bold', fontSize: '1rem', minWidth: 0,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {mobileBrand}
+          </span>
+          {pageBack && (
+            <Link
+              to={pageBack.to}
+              aria-label={pageBack.label ? `Back to ${pageBack.label}` : 'Back'}
+              style={{
+                width: '44px', height: '44px', flexShrink: 0, marginRight: '-0.4rem', color: 'var(--color-text)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <ArrowLeftIcon size={22} />
+            </Link>
+          )}
+        </div>
       </div>
 
       {/* Fixed bottom tab bar - Home/Records/Reports, see
