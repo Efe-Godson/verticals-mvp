@@ -544,7 +544,11 @@ function Report({ formId: formIdProp } = {}) {
 
       <header className="report-header" data-html2canvas-ignore="true">
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.7rem', flexWrap: 'wrap' }}>
-          <h1 className="report-title">Sales Report</h1>
+          {/* Report.jsx is generic across every vertical (Expenses, Data
+              Collection, Inventory, Survey, ...) - "Sales Report" was a
+              leftover from when this only served Retail/Restaurant, and read
+              as wrong (and inconsistent from demo to demo) everywhere else. */}
+          <h1 className="report-title">Report</h1>
           <RefreshingIndicator show={refreshing && !loading} />
         </div>
       </header>
