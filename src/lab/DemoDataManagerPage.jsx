@@ -164,8 +164,9 @@ function DemoDataManagerPage() {
       </div>
       <p style={{ color: 'var(--color-muted)', marginTop: 0 }}>
         Reusable sample businesses that power the onboarding demo (see <Link to="/lab/demo-setup">Demo Setup</Link> to
-        connect one to an entry option). Each is a real form you own, flagged as demo data - build it out with the
-        normal builder and Records, same as any other form.
+        connect one to an entry option) and the public <Link to="/demo" target="_blank" rel="noreferrer">/demo</Link> page
+        - link that one directly from outside the app. Each dataset is a real form you own, flagged as demo data -
+        build it out with the normal builder and Records, same as any other form.
       </p>
 
       {datasets.length === 0 ? (

@@ -33,6 +33,7 @@ import AlertsPage from './AlertsPage'
 import EmailMonitorPage from './EmailMonitorPage'
 import OnboardingPrototype from './lab/onboarding/OnboardingPrototype'
 import DemoSetupPage from './lab/DemoSetupPage'
+import PublicDemoShell, { PublicDemoHome, PublicDemoRecords, PublicDemoReport } from './PublicDemoExperience'
 import DemoDataManagerPage from './lab/DemoDataManagerPage'
 import OnboardingPage from './onboarding/OnboardingPage'
 import PayrollShell from './payroll/PayrollShell'
@@ -130,7 +131,11 @@ function AppShell() {
   // Expenses books (src/expenses/) are the same kind of contained environment,
   // navigated via PosSidePanel's expense links - no app NavBar.
   const isExpenseEnv = /^\/form\/[^/]+\/expenses(\/|$)/.test(location.pathname)
-  const showNavBar = !isPublicForm && !isShortLink && !isQuizPlayer && !isLogin && !isSignUp && !isOnboarding && !isConfirmEmail && !isResetPassword && !isFocusMode && !isReportBuilder && !isPayrollEnv && !isExpenseEnv && !isSharedReport
+  // /demo is a public, contained environment with its own top bar + Home/
+  // Records/Report tabs (see src/PublicDemoExperience.jsx) - no app NavBar,
+  // same reasoning as isPublicForm above.
+  const isPublicDemo = location.pathname.startsWith('/demo')
+  const showNavBar = !isPublicForm && !isShortLink && !isQuizPlayer && !isLogin && !isSignUp && !isOnboarding && !isConfirmEmail && !isResetPassword && !isFocusMode && !isReportBuilder && !isPayrollEnv && !isExpenseEnv && !isSharedReport && !isPublicDemo
 
   // The POS side panel is mounted here (not inside each focus-mode page) so
   // it stays put across navigation between Records / Reports / Settings /
@@ -202,6 +207,14 @@ function AppShell() {
         <Route path="/create" element={<PrivateRoute><StaffScopedRoute><CreateForm /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/form/:id" element={<PublicForm />} />
         <Route path="/form/:id/response/:token" element={<PublicForm />} />
+        {/* Fully public - no PrivateRoute/StaffScopedRoute, same as
+            PublicForm above - meant to be linked to directly from outside
+            the app. See src/PublicDemoExperience.jsx. */}
+        <Route path="/demo" element={<PublicDemoShell />}>
+          <Route index element={<PublicDemoHome />} />
+          <Route path="records" element={<PublicDemoRecords />} />
+          <Route path="report" element={<PublicDemoReport />} />
+        </Route>
         <Route path="/form/:id/edit" element={<PrivateRoute><StaffScopedRoute><EditForm /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/form/:id/records" element={<PrivateRoute><StaffScopedRoute><Records /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/form/:id/inventory" element={<PrivateRoute><StaffScopedRoute><Inventory /></StaffScopedRoute></PrivateRoute>} />

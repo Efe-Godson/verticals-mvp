@@ -227,6 +227,63 @@ body.compact-topbar .pf-order-title {
   display: none;
 }
 
+/* Public demo environment (src/PublicDemoExperience.jsx): its own top bar +
+   Home / Records / Report tabs, no app NavBar. */
+.demo-tabs {
+  display: flex;
+  gap: 0.15rem;
+  padding: 0 clamp(1rem, 4vw, 2rem);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg);
+  overflow-x: auto;
+}
+.demo-tab {
+  padding: 0.7rem 0.9rem;
+  font-size: 0.92rem;
+  font-weight: 500;
+  color: var(--color-muted);
+  text-decoration: none;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.demo-tab:hover { color: var(--color-text); }
+.demo-tab.is-active {
+  color: var(--color-primary);
+  font-weight: 700;
+  border-bottom-color: var(--color-primary);
+}
+
+/* Demo Home's Records/Report link cards - a brand-tinted, liftable CTA so
+   they read as the two things to actually click, distinct from the plain
+   stat tiles above them. */
+.demo-cta {
+  display: block;
+  text-decoration: none;
+  border-radius: 14px;
+  padding: 1.1rem 1.2rem;
+  background: var(--color-primary-soft);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 35%, var(--color-border));
+  box-shadow: var(--shadow);
+  transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease;
+}
+.demo-cta:hover {
+  transform: translateY(-2px);
+  border-color: var(--color-primary);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+}
+.demo-cta-title {
+  font-weight: 800;
+  font-size: 1.05rem;
+  color: var(--color-primary);
+}
+.demo-cta-desc {
+  font-size: 0.86rem;
+  color: var(--color-text);
+  opacity: 0.8;
+  margin-top: 3px;
+}
+
 /* Card-grid selector (src/components/CardChoice.jsx) - the "stepped" form
    display style and the Lab onboarding flow. Translucent-free, theme-driven,
    readable in light and dark. */
