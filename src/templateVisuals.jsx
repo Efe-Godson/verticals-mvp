@@ -9,7 +9,8 @@
 const CATEGORY_COLORS = {
   'Retail': '#0ea5e9', 'Restaurant': '#f97316', 'Education': '#8b5cf6',
   'Healthcare': '#ef4444', 'Nonprofit': '#16a34a', 'Events': '#d946ef',
-  'HR & Operations': '#0070f3', 'Finance': '#ca8a04', 'Other': '#6b7280',
+  'HR & Operations': '#0070f3', 'Finance': '#ca8a04', 'Forms': '#0d9488',
+  'Other': '#6b7280',
 }
 export function categoryColor(category) {
   return CATEGORY_COLORS[category] || '#6b7280'
@@ -80,6 +81,16 @@ export function CategoryIcon({ category, color }) {
           <rect x="2" y="9" width="14" height="9.5" rx="2" />
           <circle cx="9" cy="13.75" r="2" />
           <path d="M15.5 5.5l2.5-2.5M18.5 7.5l3-3M15 2.5l2 .8" />
+        </svg>
+      )
+    // A form: a clipboard with a clip tab and field lines, distinct from
+    // the generic 4-square "Other" tile it used to share.
+    case 'Forms':
+      return (
+        <svg {...common}>
+          <rect x="5" y="3" width="14" height="18" rx="2" />
+          <path d="M9 3V2.5A1.5 1.5 0 0 1 10.5 1h3A1.5 1.5 0 0 1 15 2.5V3" />
+          <path d="M8 9.5h8M8 13.5h8M8 17.5h5" />
         </svg>
       )
     default:
