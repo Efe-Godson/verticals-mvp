@@ -7,7 +7,7 @@ import Modal from './components/Modal'
 import { TEMPLATE_ADMIN_USER_ID } from './adminAccount'
 import TemplateEditorDialog from './TemplateEditorDialog'
 import { categoryColor, CategoryIcon } from './templateVisuals'
-import { createLocationForm, locationDestination } from './locations'
+import { createLocationForm, locationDestination, createBundleTemplateForms, bundleDestination } from './locations'
 import { usePageTitle } from './PageTitleContext'
 import { Skeleton } from './components/Skeleton'
 
@@ -155,63 +155,22 @@ function Templates() {
   // entirely (they'd otherwise clutter it as extra, mostly-internal cards,
   // e.g. Salary Events isn't something you browse on its own, you reach it
   // from the Employees form's Payroll tab or NavBar's Linked Forms menu).
-  async function startBundleTemplate(template) {
-    const createdByKey = {}
-    let primaryFormId = null
-
-    function resolvePlaceholder(value) {
-      return typeof value === 'string' && value.startsWith('$') ? createdByKey[value.slice(1)] : value
-    }
-
-    for (const spec of template.bundle) {
-      const resolvedFields = spec.fields.map(field => (
-        field.type === 'linked_record' ? { ...field, linkedFormId: resolvePlaceholder(field.linkedFormId) } : field
-      ))
-      const resolvedSpecSettings = spec.settings
-        ? Object.fromEntries(Object.entries(spec.settings).map(([k, v]) => [k, resolvePlaceholder(v)]))
-        : {}
-      const resolvedSettings = {
-        ...resolvedSpecSettings,
-        templateSlug: template.slug,
-        templateBundleKey: spec.key,
-        ...(primaryFormId ? { primaryFormId } : {}),
-      }
-
-      const { data, error } = await supabase.from('forms').insert([{
-        name: spec.name,
-        fields: resolvedFields,
-        settings: resolvedSettings,
-        status: 'draft',
-        user_id: session.user.id,
-      }]).select().single()
-
-      if (error || !data) throw new Error(error?.message || `Could not create "${spec.name}"`)
-      if (!primaryFormId) primaryFormId = data.id
-      createdByKey[spec.key] = data.id
-    }
-
-    return createdByKey
-  }
-
   // Bundle templates (multi-form, e.g. Employees + Salary Events) keep the
   // old single-instance behavior - locations are a per-form concept, and a
   // bundle is already several linked forms, so layering locations on top
-  // of that is its own project, not folded in here.
+  // of that is its own project, not folded in here. The actual multi-form
+  // creation lives in locations.js's createBundleTemplateForms, shared with
+  // the post-signup deferred workspace creation (src/lib/
+  // completeOnboardingEntry.js) so a bundle only ever gets built one way.
   async function startTemplate(template) {
     setStartingSlug(template.slug)
     try {
       if (template.bundle?.length > 0) {
-        const createdByKey = await startBundleTemplate(template)
+        const createdByKey = await createBundleTemplateForms({ session, template })
         showToast(`"${template.name}" created: ${template.bundle.length} forms set up and linked.`, 'success')
         const primaryFormId = createdByKey[template.bundle[0].key]
-        // Payroll-flavored bundles (settings.payrollRole === 'employees' on
-        // the primary entry) have a purpose-built Dashboard, more useful
-        // as a landing page than the empty form builder.
-        const destination = template.bundle[0].settings?.payrollRole === 'employees'
-          ? `/form/${primaryFormId}/payroll?panel=1`
-          : `/form/${primaryFormId}/edit?panel=1`
         setMyFormsBySlug(current => ({ ...current, [template.slug]: primaryFormId }))
-        navigate(destination)
+        navigate(bundleDestination(template, primaryFormId))
         return
       }
 

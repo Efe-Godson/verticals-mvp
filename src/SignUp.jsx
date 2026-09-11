@@ -3,6 +3,19 @@ import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { DEFAULT_COUNTRY, loadCountries } from './lib/locationData'
 import PasswordInput from './PasswordInput'
+import { track } from './lib/onboardingEvents'
+import { ONBOARDING_STORAGE_KEY } from './onboarding/OnboardingPage'
+
+// Whatever the new entry flow (src/onboarding/OnboardingPage.jsx) stashed
+// before handing off here - { entry_intent, custom_intent_text? } - or null
+// if this account is being created without going through onboarding at all
+// (e.g. an existing visitor who skipped straight to /signup).
+function readOnboardingIntent() {
+  try {
+    const raw = sessionStorage.getItem(ONBOARDING_STORAGE_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch { return null }
+}
 
 function GoogleLogo() {
   return (
@@ -34,6 +47,12 @@ function SignUp() {
   async function handleGoogleSignUp() {
     setGoogleLoading(true)
     setMessage('')
+    const pending = readOnboardingIntent()
+    if (pending) track('started_signup', { entryIntent: pending.entry_intent, customIntentText: pending.custom_intent_text })
+    // Google's OAuth flow has no equivalent to signUp()'s own `data` option -
+    // entry_intent gets backfilled onto user_metadata post-redirect instead,
+    // see completeOnboardingEntry.js (called from BusinessesHome.jsx, the
+    // first page this redirect actually lands back on).
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -53,15 +72,24 @@ function SignUp() {
     setLoading(true)
     setMessage('')
 
+    const pending = readOnboardingIntent()
+    if (pending) track('started_signup', { entryIntent: pending.entry_intent, customIntentText: pending.custom_intent_text })
+
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         emailRedirectTo: `${window.location.origin}/confirm-email`,
-        // Lets a "Location" field on any form this account builds default
-        // its Country to wherever the business actually operates, instead
-        // of asking the respondent to pick it every time.
-        data: { country },
+        data: {
+          // Lets a "Location" field on any form this account builds default
+          // its Country to wherever the business actually operates, instead
+          // of asking the respondent to pick it every time.
+          country,
+          // Set here too (not just backfilled post-confirmation by
+          // completeOnboardingEntry.js) so it's on the account from the
+          // moment it exists, in case anything reads it before that runs.
+          ...(pending ? { entry_intent: pending.entry_intent, custom_intent_text: pending.custom_intent_text || null } : {}),
+        },
       }
     })
 
@@ -73,8 +101,7 @@ function SignUp() {
     }
   }
 
-  let fromOnboarding = false
-  try { fromOnboarding = !!sessionStorage.getItem('verticals_onboarding') } catch { /* private mode */ }
+  const fromOnboarding = !!readOnboardingIntent()
 
   return (
     <div className="page" style={{ maxWidth: '380px' }}>

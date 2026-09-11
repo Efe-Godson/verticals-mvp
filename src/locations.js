@@ -79,6 +79,63 @@ export async function duplicateLocationForm({ session, sourceFormId, locationNam
   return data
 }
 
+// Bundle templates (multi-form, e.g. Employees + Salary Events) create
+// several linked forms in one go instead of the single insert
+// createLocationForm does - a $key placeholder in a bundle spec's
+// linkedFormId/settings value resolves to whichever earlier-created form in
+// this same call actually got that key, so the bundle's JSON never has to
+// store real (and non-reusable) form ids. Returns { [spec.key]: formId }.
+// Shared by Templates.jsx's "start a template" flow and the post-signup
+// deferred workspace creation (src/lib/completeOnboardingEntry.js).
+export async function createBundleTemplateForms({ session, template }) {
+  const createdByKey = {}
+  let primaryFormId = null
+
+  function resolvePlaceholder(value) {
+    return typeof value === 'string' && value.startsWith('$') ? createdByKey[value.slice(1)] : value
+  }
+
+  for (const spec of template.bundle) {
+    const resolvedFields = spec.fields.map(field => (
+      field.type === 'linked_record' ? { ...field, linkedFormId: resolvePlaceholder(field.linkedFormId) } : field
+    ))
+    const resolvedSpecSettings = spec.settings
+      ? Object.fromEntries(Object.entries(spec.settings).map(([k, v]) => [k, resolvePlaceholder(v)]))
+      : {}
+    const resolvedSettings = {
+      ...resolvedSpecSettings,
+      templateSlug: template.slug,
+      templateBundleKey: spec.key,
+      ...(primaryFormId ? { primaryFormId } : {}),
+    }
+
+    const { data, error } = await supabase.from('forms').insert([{
+      name: spec.name,
+      fields: resolvedFields,
+      settings: resolvedSettings,
+      status: 'draft',
+      user_id: session.user.id,
+    }]).select().single()
+
+    if (error || !data) throw new Error(error?.message || `Could not create "${spec.name}"`)
+    if (!primaryFormId) primaryFormId = data.id
+    createdByKey[spec.key] = data.id
+  }
+
+  return createdByKey
+}
+
+// Where the primary form of a just-created bundle should open - payroll-
+// flavored bundles (settings.payrollRole === 'employees' on the first
+// entry) have a purpose-built Dashboard, more useful as a landing page than
+// the empty form builder every other bundle still opens to.
+export function bundleDestination(template, primaryFormId) {
+  const destination = template.bundle[0].settings?.payrollRole === 'employees'
+    ? `/form/${primaryFormId}/payroll?panel=1`
+    : `/form/${primaryFormId}/edit?panel=1`
+  return destination
+}
+
 // Where a freshly created (or existing) location should open by default -
 // cart/POS templates land on the order screen, everything else on the
 // builder, same convention Templates.jsx already used for single instances.

@@ -18,6 +18,7 @@ import { SkeletonCard } from './components/Skeleton'
 import { RefreshingIndicator } from './components/InlineLoader'
 import { getPageCache, setPageCache } from './hooks/pageCache'
 import { ErrorState } from './ErrorState'
+import { completeOnboardingEntry } from './lib/completeOnboardingEntry'
 
 // Retail/Restaurant are the only categories where "how many locations" is
 // itself the meaningful fact about the business - every other template is
@@ -147,6 +148,21 @@ function BusinessesHome() {
   const [loadingBin, setLoadingBin] = useState(false)
 
   const cacheKey = session ? `businesses-home:${session.user.id}` : null
+
+  // The one place a workspace picked pre-signup (src/onboarding/
+  // OnboardingPage.jsx) actually gets created - see completeOnboardingEntry
+  // for why this can't happen until now. This is the first authenticated
+  // page every login lands on, so it's the natural place to check once per
+  // session; a normal login with nothing pending is a no-op read of an
+  // empty sessionStorage key.
+  useEffect(() => {
+    if (!session) return
+    let cancelled = false
+    completeOnboardingEntry(session).then(destination => {
+      if (!cancelled && destination) navigate(destination, { replace: true })
+    })
+    return () => { cancelled = true }
+  }, [session]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadTemplates({ quiet = false } = {}) {
     if (!quiet) setLoading(true)
