@@ -172,14 +172,20 @@ export default function PublicDemoShell() {
 
 // --- the three pages -------------------------------------------------------
 
+// key={formId} on both: the dataset switcher changes `formId` without an
+// actual navigation, and neither Records nor Report resets its own
+// internal state (date range, selected metrics, chart pairing) just
+// because its formId prop changed - without a key React updates the
+// existing instance in place instead of remounting it, so a filter or
+// metric picked on one dataset could still be showing on the next.
 export function PublicDemoRecords() {
   const { formId } = usePublicDemo()
-  return <Records formId={formId} />
+  return <Records key={formId} formId={formId} />
 }
 
 export function PublicDemoReport() {
   const { formId } = usePublicDemo()
-  return <Report formId={formId} />
+  return <Report key={formId} formId={formId} />
 }
 
 export function PublicDemoHome() {

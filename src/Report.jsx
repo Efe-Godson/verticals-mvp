@@ -9,6 +9,7 @@ import { printReport, exportReportToPDF, exportReportToPPTX } from './reportExpo
 import StatTile from './report/components/StatTile'
 import { cartReportTiles } from './report/analysis/Cartreport'
 import { cartCategoryTiles } from './report/analysis/components/CartCategoryChart'
+import { categoryCountTiles } from './report/analysis/components/CategoryCountChart'
 import AIRecommendationsModal from './report/ai/AIRecommendationsModal'
 import HorizontalBarChart from './report/components/HorizontalBarChart'
 import PieChart from './report/components/PieChart'
@@ -259,6 +260,10 @@ function Report({ formId: formIdProp } = {}) {
   // (so backdated / backlog entries count on the date actually set), falling
   // back to when the record was submitted.
   const reportDateField = form.fields.find(f => f.id === form.settings?.reportDateField && f.type === 'date')
+  // Same setting Expenses' own dashboard reads (src/expenses/expenseFields.js)
+  // to know which number field is "the amount" - used here so a non-cart
+  // form's category breakdown can show spend-by-category, not just a count.
+  const reportAmountField = form.fields.find(f => f.id === form.settings?.reportAmountField && f.type === 'number')
   function recordDate(sub) {
     if (reportDateField) {
       const raw = sub.data[reportDateField.id]
@@ -314,7 +319,11 @@ function Report({ formId: formIdProp } = {}) {
     const times = filteredSubmissions.map(s => recordDate(s).getTime()).filter(t => !isNaN(t))
     if (times.length < 2) return []
     const spanDays = (Math.max(...times) - Math.min(...times)) / 86400000
-    const defaultGran = spanDays <= 62 ? 'day' : spanDays <= 550 ? 'week' : spanDays <= 1500 ? 'month' : 'quarter'
+    // Tightened from the original 62/550/1500 thresholds: those gave a full
+    // year of data (the seeded demo datasets' actual span) a *weekly*
+    // default, which is a lot of noisy points for a trend line meant to
+    // show shape at a glance - a year now defaults to monthly instead.
+    const defaultGran = spanDays <= 45 ? 'day' : spanDays <= 120 ? 'week' : spanDays <= 900 ? 'month' : 'quarter'
 
     const orderPoints = []
     const revenuePoints = []
@@ -359,6 +368,16 @@ function Report({ formId: formIdProp } = {}) {
     ...[...channelCategoryPairs, ...operationsCategoryPairs, ...otherCategoryPairs].flatMap(({ cartField, catField }) =>
       cartCategoryTiles({ categoryField: catField, cartField, submissions: filteredSubmissions }),
     ),
+    // No cart field means salesByCategoryPairs above is empty (it's built
+    // as a cart x category cartesian product) - without this, a non-cart
+    // form never got a single category breakdown chart no matter how much
+    // data it had. Counts responses per value, or sums reportAmountField
+    // per value when the form has one (e.g. Expenses' own "amount").
+    ...(cartFields.length === 0
+      ? categoryFields.flatMap(catField =>
+          categoryCountTiles({ categoryField: catField, submissions: filteredSubmissions, amountField: reportAmountField }),
+        )
+      : []),
     ...locationFields.flatMap(lf =>
       cartFields.length > 0
         ? cartFields.flatMap(cf => locationCartTiles({ locationField: lf, cartField: cf, submissions: filteredSubmissions }))
@@ -1144,9 +1163,16 @@ function computeInsights(form, submissions) {
   // Dynamic on purpose: aggregates across every cart field on the form, not
   // just the first one, a form can use the cart feature more than once.
   const cartFields = form.fields.filter(f => f.type === 'cart')
-  const categoryFields = form.fields
-    .filter(f => CATEGORICAL_TYPES.includes(f.type))
-    .filter(f => isSalespersonField(f.label))
+  const allCategoryFields = form.fields.filter(f => CATEGORICAL_TYPES.includes(f.type))
+  // Only the cart branch below narrows to salesperson-shaped fields
+  // (payment method/gender/channel don't belong in that revenue-attribution
+  // briefing, per the comment above isSalespersonField) - the non-cart
+  // fallback further down wants every category field, same as its own
+  // comment already says. This used to be one filtered list shared by both
+  // branches, which meant a non-cart form's category fields (Expenses'
+  // "category", a survey's "how_heard", ...) - none of them salesperson-
+  // shaped - left that branch nothing to iterate over, ever.
+  const categoryFields = allCategoryFields.filter(f => isSalespersonField(f.label))
 
   if (cartFields.length > 0) {
     const itemQty = {}
@@ -1203,7 +1229,7 @@ function computeInsights(form, submissions) {
     }
   } else {
     // No cart data: fall back to plain response-count share per category field.
-    categoryFields.forEach(field => {
+    allCategoryFields.forEach(field => {
       const answered = submissions.filter(s => s.data[field.id])
       if (answered.length === 0) return
       const countMap = {}

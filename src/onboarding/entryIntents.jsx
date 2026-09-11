@@ -40,6 +40,23 @@ export function getEntryIntent(id) {
   return ENTRY_INTENTS.find(i => i.id === id) || null
 }
 
+// When an intent has nothing real connected (Payroll always, right now -
+// its data lives in a dedicated schema Records/Report can't read at all;
+// or Workflow/Other's typed answer matched no seeded example) - rather than
+// a dead "ready to configure" placeholder, IntentDestination.jsx drops the
+// visitor straight into a real sample instead. Same "sales-connected, else
+// oldest" resolution PublicDemoExperience.jsx's bare /demo already uses, so
+// the flagship demo means the same thing everywhere it's the default.
+export async function resolveFallbackDataset() {
+  const { data: route } = await supabase
+    .from('demo_routes').select('demo_datasets(form_id, name)').eq('entry_intent', 'sales').maybeSingle()
+  if (route?.demo_datasets?.form_id) return route.demo_datasets
+
+  const { data: fallback } = await supabase
+    .from('demo_datasets').select('form_id, name').order('created_at', { ascending: true }).limit(1).maybeSingle()
+  return fallback || null
+}
+
 // One fetch, resolves every active intent's real destination. Falls back to
 // null on error rather than throwing - OnboardingPage.jsx shows every intent
 // (not admin-curated) if this fails, so a transient network hiccup never

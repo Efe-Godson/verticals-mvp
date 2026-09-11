@@ -7,13 +7,62 @@
 // what Verticals is replacing for this visitor (see the design brief this
 // was built from - "46% of new users previously relied on notebooks").
 const RECORDS_METHODS = [
-  { id: 'notebook_paper', label: 'Notebook / Paper', emoji: '📓' },
-  { id: 'spreadsheet', label: 'Excel / Google Sheets', emoji: '📊' },
-  { id: 'pos_app', label: 'Another App / POS', emoji: '💻' },
-  { id: 'whatsapp', label: 'WhatsApp', emoji: '💬' },
-  { id: 'memory', label: 'Mostly from memory', emoji: '🧠' },
-  { id: 'none', label: "I don't currently keep records", emoji: '○' },
+  { id: 'notebook_paper', label: 'Notebook / Paper', icon: 'notebook' },
+  { id: 'spreadsheet', label: 'Excel / Google Sheets', icon: 'spreadsheet' },
+  { id: 'pos_app', label: 'Another App / POS', icon: 'pos_app' },
+  { id: 'whatsapp', label: 'WhatsApp', icon: 'whatsapp' },
+  { id: 'memory', label: 'Mostly from memory', icon: 'memory' },
+  { id: 'none', label: "I don't currently keep records", icon: 'none' },
 ]
+
+// Same flat, single-color line-icon convention as entryIntents.jsx's
+// EntryIntentIcon (24x24 viewBox, stroke only, no fill, 1.6 stroke width) -
+// this screen used emoji before, which read as a visibly different, less
+// polished style right next to Setup Selection's flat icons in the same flow.
+function RecordsMethodIcon({ id, color = 'currentColor', size = 26 }) {
+  const common = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: color, strokeWidth: 1.6, strokeLinecap: 'round', strokeLinejoin: 'round' }
+  switch (id) {
+    case 'notebook':
+      return (
+        <svg {...common}>
+          <rect x="5" y="3" width="14" height="18" rx="1.5" />
+          <path d="M5 7h3M9 11h6M9 15h6" />
+        </svg>
+      )
+    case 'spreadsheet':
+      return (
+        <svg {...common}>
+          <rect x="4" y="4" width="16" height="16" rx="1.5" />
+          <path d="M4 9h16M9 9v11" />
+        </svg>
+      )
+    case 'pos_app':
+      return (
+        <svg {...common}>
+          <rect x="5" y="3" width="14" height="18" rx="2" />
+          <path d="M9 18h6" />
+          <path d="M8 7h8v5H8z" />
+        </svg>
+      )
+    case 'whatsapp':
+      return (
+        <svg {...common}>
+          <path d="M12 21c-1.4 0-2.7-.35-3.9-1L4 21l1.05-4a8 8 0 1 1 6.95 4Z" />
+          <path d="M8.5 10.2c0 3 2.3 5.3 5.3 5.3" />
+        </svg>
+      )
+    case 'memory':
+      return (
+        <svg {...common}>
+          <path d="M9 3a4 4 0 0 0-3.9 5A4 4 0 0 0 6 15.6V19a2 2 0 0 0 2 2h1v-3" />
+          <path d="M15 3a4 4 0 0 1 3.9 5A4 4 0 0 1 18 15.6V19a2 2 0 0 1-2 2h-1v-3" />
+          <path d="M9 8h6M9 12h6" />
+        </svg>
+      )
+    default: // 'none'
+      return <svg {...common}><circle cx="12" cy="12" r="8" /></svg>
+  }
+}
 
 export default function RecordsMethodPrompt({ value, onChange, onContinue }) {
   return (
@@ -52,7 +101,7 @@ export default function RecordsMethodPrompt({ value, onChange, onContinue }) {
                   ✓
                 </span>
               )}
-              <span style={{ fontSize: '1.6rem', lineHeight: 1 }}>{method.emoji}</span>
+              <RecordsMethodIcon id={method.icon} color={active ? 'var(--color-primary)' : 'var(--color-text)'} />
               <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>{method.label}</span>
             </button>
           )
