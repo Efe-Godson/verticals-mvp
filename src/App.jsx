@@ -32,7 +32,8 @@ import QuizPointHistory from './QuizPointHistory'
 import AlertsPage from './AlertsPage'
 import EmailMonitorPage from './EmailMonitorPage'
 import OnboardingPrototype from './lab/onboarding/OnboardingPrototype'
-import DemoShell, { DemoHome, DemoRecords, DemoReport } from './lab/demo/DemoExperience'
+import DemoSetupPage from './lab/DemoSetupPage'
+import DemoDataManagerPage from './lab/DemoDataManagerPage'
 import OnboardingPage from './onboarding/OnboardingPage'
 import PayrollShell from './payroll/PayrollShell'
 import PayrollEmployees from './payroll/PayrollEmployees'
@@ -129,10 +130,7 @@ function AppShell() {
   // Expenses books (src/expenses/) are the same kind of contained environment,
   // navigated via PosSidePanel's expense links - no app NavBar.
   const isExpenseEnv = /^\/form\/[^/]+\/expenses(\/|$)/.test(location.pathname)
-  // /lab/demo is a contained environment with its own top bar + Home/Records/
-  // Report tabs (see src/lab/demo/DemoExperience.jsx) - no app NavBar.
-  const isDemoEnv = location.pathname.startsWith('/lab/demo')
-  const showNavBar = !isPublicForm && !isShortLink && !isQuizPlayer && !isLogin && !isSignUp && !isOnboarding && !isConfirmEmail && !isResetPassword && !isFocusMode && !isReportBuilder && !isPayrollEnv && !isExpenseEnv && !isSharedReport && !isDemoEnv
+  const showNavBar = !isPublicForm && !isShortLink && !isQuizPlayer && !isLogin && !isSignUp && !isOnboarding && !isConfirmEmail && !isResetPassword && !isFocusMode && !isReportBuilder && !isPayrollEnv && !isExpenseEnv && !isSharedReport
 
   // The POS side panel is mounted here (not inside each focus-mode page) so
   // it stays put across navigation between Records / Reports / Settings /
@@ -184,11 +182,10 @@ function AppShell() {
         <Route path="/lab/alerts" element={<PrivateRoute><StaffScopedRoute><AdminOnlyRoute><AlertsPage /></AdminOnlyRoute></StaffScopedRoute></PrivateRoute>} />
         <Route path="/lab/email-monitor" element={<PrivateRoute><StaffScopedRoute><AdminOnlyRoute><EmailMonitorPage /></AdminOnlyRoute></StaffScopedRoute></PrivateRoute>} />
         <Route path="/lab/onboarding" element={<PrivateRoute><StaffScopedRoute><AdminOnlyRoute><OnboardingPrototype /></AdminOnlyRoute></StaffScopedRoute></PrivateRoute>} />
-        <Route path="/lab/demo" element={<PrivateRoute><StaffScopedRoute><AdminOnlyRoute><DemoShell /></AdminOnlyRoute></StaffScopedRoute></PrivateRoute>}>
-          <Route index element={<DemoHome />} />
-          <Route path="records" element={<DemoRecords />} />
-          <Route path="report" element={<DemoReport />} />
-        </Route>
+        {/* Demo Setup / Demo Data supersede the old single-toggle "/lab/demo"
+            page - see the Lab: Demo & Onboarding Controls plan. */}
+        <Route path="/lab/demo-setup" element={<PrivateRoute><StaffScopedRoute><AdminOnlyRoute><DemoSetupPage /></AdminOnlyRoute></StaffScopedRoute></PrivateRoute>} />
+        <Route path="/lab/demo-data" element={<PrivateRoute><StaffScopedRoute><AdminOnlyRoute><DemoDataManagerPage /></AdminOnlyRoute></StaffScopedRoute></PrivateRoute>} />
         <Route path="/reports" element={<PrivateRoute><StaffScopedRoute><Reports /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/records" element={<PrivateRoute><StaffScopedRoute><RecordsHome /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/templates" element={<PrivateRoute><StaffScopedRoute><Templates /></StaffScopedRoute></PrivateRoute>} />

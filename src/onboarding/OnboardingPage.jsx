@@ -1,21 +1,25 @@
 // Place at: src/onboarding/OnboardingPage.jsx
 // The public, first-time entry flow shown to a new visitor before they
-// create an account. Rebuilt from a multi-screen questionnaire into a short
-// routing experience per the design brief this was built from: Welcome ->
-// Setup Selection -> (a follow-up question, only for Workflow/Other) ->
-// straight into a working experience (a real demo, or a preview of the
-// real template they'd get) -> Sign up only once they've seen it. No step
-// counters, no progress bar, no Back/Next form-navigation feel.
+// create an account. A short routing experience, not a questionnaire:
+// Welcome -> Setup Selection -> (a follow-up question, only for Workflow/
+// Other) -> straight into a working experience (real demo data, or a
+// preview of the real template they'd get) -> Sign up only once they've
+// seen it. No step counters, no progress bar, no Back/Next form-navigation
+// feel.
+//
+// Where each intent actually goes (template/dataset/screen/CTA) is admin-
+// configurable via the Lab's Demo Setup page - see entryIntents.jsx's
+// loadActiveDemoRoutes() and demo_routes. Only Workflow/Other's follow-up
+// question is fixed shape, not admin-configurable (see needsTextPrompt).
 import { useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { markVisited } from '../firstVisit'
 import { track } from '../lib/onboardingEvents'
-import { getEntryIntent } from './entryIntents'
+import { ENTRY_INTENTS, getEntryIntent, needsTextPrompt, loadActiveDemoRoutes } from './entryIntents'
 import WelcomeScreen from './WelcomeScreen'
 import SetupSelection from './SetupSelection'
 import IntentTextPrompt from './IntentTextPrompt'
-import PublicDemo from './PublicDemo'
-import RealTemplatePreview from './RealTemplatePreview'
+import IntentDestination from './IntentDestination'
 
 export const ONBOARDING_STORAGE_KEY = 'verticals_onboarding'
 
@@ -28,40 +32,45 @@ export default function OnboardingPage() {
   const [stage, setStage] = useState('welcome') // welcome | selection | text_prompt | destination
   const [selectedId, setSelectedId] = useState(null)
   const [customText, setCustomText] = useState('')
+  // null while loading, then either the fetched map or 'all' meaning "show
+  // every intent" (the fetch failed - see loadActiveDemoRoutes's own note).
+  const [routesById, setRoutesById] = useState(null)
 
-  useEffect(() => { track('started_onboarding') }, [])
+  useEffect(() => {
+    track('started_onboarding')
+    loadActiveDemoRoutes().then(result => setRoutesById(result || 'all'))
+  }, [])
 
   const intent = getEntryIntent(selectedId)
+  const route = routesById && routesById !== 'all' ? routesById[selectedId] : null
+  const visibleIntents = routesById === 'all' || !routesById
+    ? ENTRY_INTENTS
+    : ENTRY_INTENTS.filter(i => routesById[i.id])
 
-  function enterDestination(chosenIntent, text) {
-    track('opened_demo', { entryIntent: chosenIntent.id, customIntentText: text || undefined })
+  function enterDestination(chosenIntentId, text) {
+    track('opened_demo', { entryIntent: chosenIntentId, customIntentText: text || undefined })
     setStage('destination')
   }
 
   function handleContinueFromSelection() {
-    const chosen = getEntryIntent(selectedId)
-    if (!chosen) return
-    track('selected_intent', { entryIntent: chosen.id })
-    if (chosen.kind === 'text-prompt') setStage('text_prompt')
-    else enterDestination(chosen, null)
+    if (!selectedId) return
+    track('selected_intent', { entryIntent: selectedId })
+    if (needsTextPrompt(selectedId)) setStage('text_prompt')
+    else enterDestination(selectedId, null)
   }
 
   function handleContinueFromTextPrompt() {
-    if (!intent || !customText.trim()) return
-    enterDestination(intent, customText.trim())
+    if (!selectedId || !customText.trim()) return
+    enterDestination(selectedId, customText.trim())
   }
 
   function handleCreateWorkspace() {
-    if (!intent) return
-    saveIntent({ entry_intent: intent.id, custom_intent_text: customText.trim() || undefined })
+    if (!selectedId) return
+    saveIntent({ entry_intent: selectedId, custom_intent_text: customText.trim() || undefined })
     markVisited()
     navigate('/signup')
   }
 
-  // "Skip for now" - straight to signup with no chosen intent at all,
-  // rather than forcing a pick. Still counts as "been through onboarding"
-  // (markVisited), same as actually finishing it - a second visit should
-  // land on Login, not show this again.
   function handleSkip() {
     markVisited()
     navigate('/signup')
@@ -87,17 +96,15 @@ export default function OnboardingPage() {
       )}
 
       {stage === 'selection' && (
-        <SetupSelection value={selectedId} onChange={setSelectedId} onContinue={handleContinueFromSelection} onSkip={handleSkip} />
+        <SetupSelection intents={visibleIntents} value={selectedId} onChange={setSelectedId} onContinue={handleContinueFromSelection} onSkip={handleSkip} />
       )}
 
       {stage === 'text_prompt' && intent && (
         <IntentTextPrompt intent={intent} value={customText} onChange={setCustomText} onContinue={handleContinueFromTextPrompt} />
       )}
 
-      {stage === 'destination' && intent && (
-        intent.kind === 'demo'
-          ? <PublicDemo onCreateWorkspace={handleCreateWorkspace} />
-          : <RealTemplatePreview intent={intent} customIntentText={customText.trim()} onCreateWorkspace={handleCreateWorkspace} />
+      {stage === 'destination' && (
+        <IntentDestination route={route} customIntentText={customText.trim()} onCreateWorkspace={handleCreateWorkspace} />
       )}
     </div>
   )

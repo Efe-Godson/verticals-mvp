@@ -227,33 +227,6 @@ body.compact-topbar .pf-order-title {
   display: none;
 }
 
-/* Lab demo environment (src/lab/demo/DemoExperience.jsx): its own top bar +
-   Home / Records / Report tabs, no app NavBar. */
-.demo-tabs {
-  display: flex;
-  gap: 0.15rem;
-  padding: 0 clamp(1rem, 4vw, 2rem);
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-bg);
-  overflow-x: auto;
-}
-.demo-tab {
-  padding: 0.7rem 0.9rem;
-  font-size: 0.92rem;
-  font-weight: 500;
-  color: var(--color-muted);
-  text-decoration: none;
-  white-space: nowrap;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-}
-.demo-tab:hover { color: var(--color-text); }
-.demo-tab.is-active {
-  color: var(--color-primary);
-  font-weight: 700;
-  border-bottom-color: var(--color-primary);
-}
-
 /* Card-grid selector (src/components/CardChoice.jsx) - the "stepped" form
    display style and the Lab onboarding flow. Translucent-free, theme-driven,
    readable in light and dark. */

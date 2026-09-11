@@ -54,7 +54,7 @@ export default function OnboardingPrototype() {
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
           <h1 style={{ margin: '0 0 0.2rem' }}>Onboarding prototype</h1>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <Link to="/lab/demo"><button type="button" className="secondary" style={{ fontSize: '0.85rem' }}>🎬 See the demo</button></Link>
+            <Link to="/lab/demo-data"><button type="button" className="secondary" style={{ fontSize: '0.85rem' }}>🎬 See demo data</button></Link>
             <button type="button" onClick={openSim} style={{ fontSize: '0.85rem' }}>▶ Simulate</button>
             <button type="button" className="secondary" onClick={startOver} style={{ fontSize: '0.85rem' }}>Start over</button>
           </div>
@@ -109,7 +109,7 @@ export default function OnboardingPrototype() {
                 recommended workflows are configured.
               </p>
               <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'center', marginTop: '1.2rem', flexWrap: 'wrap' }}>
-                <Link to="/lab/demo"><button type="button">See it with data →</button></Link>
+                <Link to="/lab/demo-data"><button type="button">See demo data →</button></Link>
                 <button type="button" className="secondary" onClick={() => { setSimDone(false); setSimRunId((n) => n + 1) }}>Run again</button>
                 <button type="button" className="secondary" onClick={() => setSimOpen(false)}>Close</button>
               </div>

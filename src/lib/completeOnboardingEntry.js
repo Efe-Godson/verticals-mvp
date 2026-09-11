@@ -9,10 +9,11 @@
 //      path has no equivalent, so this is the only place that path's
 //      account ever gets it.
 //   2. fires the completed_signup funnel event.
-//   3. for a real-template/workflow intent, actually creates the workspace
-//      RealTemplatePreview.jsx could only preview before now, and returns
-//      where to send them (their new form's builder, or a bundle's
-//      dashboard) instead of the normal Businesses home.
+//   3. for an intent connected to a real template (see demo_routes -
+//      IntentDestination.jsx could only preview it before now), actually
+//      creates the workspace and returns where to send them (their new
+//      form's builder, or a bundle's dashboard) instead of the normal
+//      Businesses home.
 //
 // Reads the pending intent from sessionStorage first, but falls back to
 // user_metadata.entry_intent (set directly at signUp() time) if that's
@@ -22,8 +23,13 @@
 // for most email/password signups. user_metadata.entry_workspace_done then
 // guards against ever repeating this (workspace created, or nothing to
 // create) on a later login, regardless of which tab/device that is on.
+//
+// The intent's actual template comes from demo_routes (Lab-editable, see
+// entryIntents.jsx's loadActiveDemoRoutes), not any static config here -
+// whatever the admin has it pointed at *right now* is what gets created,
+// even if that changed between when this person went through onboarding
+// and when they finished confirming their email.
 import { supabase } from '../supabaseClient'
-import { getEntryIntent } from '../onboarding/entryIntents'
 import { createLocationForm, createBundleTemplateForms, locationDestination, bundleDestination } from '../locations'
 import { track } from './onboardingEvents'
 import { ONBOARDING_STORAGE_KEY } from '../onboarding/OnboardingPage'
@@ -58,9 +64,9 @@ export async function completeOnboardingEntry(session) {
   track('completed_signup', { entryIntent: payload.entry_intent, customIntentText: payload.custom_intent_text })
 
   let destination = null
-  const intent = getEntryIntent(payload.entry_intent)
-  if (intent && intent.kind !== 'demo' && intent.templateSlug) {
-    const { data: template } = await supabase.from('templates').select('*').eq('slug', intent.templateSlug).single()
+  const { data: route } = await supabase.from('demo_routes').select('*').eq('entry_intent', payload.entry_intent).maybeSingle()
+  if (route?.template_slug) {
+    const { data: template } = await supabase.from('templates').select('*').eq('slug', route.template_slug).single()
     if (template) {
       try {
         if (template.bundle?.length > 0) {

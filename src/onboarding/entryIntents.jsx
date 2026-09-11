@@ -1,80 +1,58 @@
-// Place at: src/onboarding/entryIntents.js
-// The 7 choices on the new Setup Selection screen, and - for this first
-// (Phase 1) pass, before the Lab gets a "Demo Setup" config screen to make
-// this admin-editable - where each one hardcodes to. See the plan this was
-// built from: sales/reporting share the one seeded is_demo restaurant
-// (there's no per-intent dataset yet, that's Phase 2's Demo Data Manager),
-// everything else previews a real template's own field shape rather than a
-// fabricated dataset, and workflow/other ask one follow-up question first.
-//
-// `kind`:
-//   'demo'          -> PublicDemo.jsx: the seeded is_demo business's stats
-//                      + Report view (read-only, real data, real component).
-//   'real-template' -> RealTemplatePreview.jsx: a non-submitting preview of
-//                      that template's real fields (FormPreviewModal), the
-//                      actual workspace is created for real right after
-//                      signup (see the deferred-creation effect).
-//   'text-prompt'   -> IntentTextPrompt.jsx first, then the same
-//                      real-template flow once they've answered (workflow
-//                      routes to the blank "Forms" template so their answer
-//                      becomes the new form's starting name).
+// Place at: src/onboarding/entryIntents.jsx
+// The 7 choices on the Setup Selection screen. id/label/icon/prompt here are
+// visual/UX identity (not in the Lab's "Demo Setup" admin-configurable field
+// list - see the design brief: Template/Demo Data/Starting Screen/CTA/Active
+// only) and stay static. Everything about *where an intent actually goes* -
+// template, demo dataset, starting screen, CTA text, whether it's shown at
+// all - lives in the demo_routes table instead (see supabase/migrations/
+// 20260911140000_demo_setup_and_demo_data.sql) so the Lab's Demo Setup page
+// can change it without a redeploy. loadActiveDemoRoutes() is the one fetch
+// that resolves all of that; OnboardingPage.jsx calls it once and threads
+// the result through everything downstream.
+import { supabase } from '../supabaseClient'
+
 export const ENTRY_INTENTS = [
+  { id: 'sales', label: 'Sales', icon: 'sales' },
+  { id: 'expenses', label: 'Expenses', icon: 'expenses' },
+  { id: 'payroll', label: 'Staff & Payroll', icon: 'payroll' },
+  { id: 'data_collection', label: 'Data Collection', icon: 'data_collection' },
+  { id: 'reporting', label: 'Reporting', icon: 'reporting' },
   {
-    id: 'sales',
-    label: 'Sales',
-    kind: 'demo',
-    icon: 'sales',
-  },
-  {
-    id: 'expenses',
-    label: 'Expenses',
-    kind: 'real-template',
-    templateSlug: 'expenses',
-    icon: 'expenses',
-  },
-  {
-    id: 'payroll',
-    label: 'Staff & Payroll',
-    kind: 'real-template',
-    templateSlug: 'payroll',
-    icon: 'payroll',
-  },
-  {
-    id: 'data_collection',
-    label: 'Data Collection',
-    kind: 'real-template',
-    templateSlug: 'forms',
-    icon: 'data_collection',
-  },
-  {
-    id: 'reporting',
-    label: 'Reporting',
-    kind: 'demo',
-    icon: 'reporting',
-  },
-  {
-    id: 'workflow',
-    label: 'A Workflow',
-    kind: 'text-prompt',
+    id: 'workflow', label: 'A Workflow', icon: 'workflow',
     prompt: 'What do you want to manage?',
     placeholderExamples: ['Inventory', 'Customer follow-ups', 'Staff attendance', 'Equipment maintenance'],
-    // Answering routes into the blank Forms template, named after the answer.
-    templateSlug: 'forms',
-    icon: 'workflow',
   },
   {
-    id: 'other',
-    label: 'Something Else',
-    kind: 'text-prompt',
+    id: 'other', label: 'Something Else', icon: 'other',
     prompt: 'What would you like to do?',
     placeholderExamples: [],
-    templateSlug: 'forms',
-    icon: 'other',
   },
 ]
 
+// 'workflow'/'other' ask their one follow-up question before showing
+// anything - a fixed part of the flow's shape, not something Demo Setup
+// toggles per-route.
+export function needsTextPrompt(intentId) {
+  return intentId === 'workflow' || intentId === 'other'
+}
+
 export function getEntryIntent(id) {
   return ENTRY_INTENTS.find(i => i.id === id) || null
+}
+
+// One fetch, resolves every active intent's real destination. Falls back to
+// null on error rather than throwing - OnboardingPage.jsx shows every intent
+// (not admin-curated) if this fails, so a transient network hiccup never
+// blanks Setup Selection entirely.
+export async function loadActiveDemoRoutes() {
+  const { data, error } = await supabase
+    .from('demo_routes')
+    .select('*, demo_datasets(form_id)')
+    .eq('active', true)
+  if (error || !data) return null
+  const byIntent = {}
+  data.forEach(route => { byIntent[route.entry_intent] = route })
+  return byIntent
 }
 
 // Flat, single-color line icons, same visual language as

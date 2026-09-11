@@ -4,9 +4,9 @@
 // title should be enough on their own, per the design brief this was built
 // from). Max 2 columns on mobile even though there are 7 cards - the grid
 // just runs to 4 rows there rather than shrinking tiles to fit more per row.
-import { ENTRY_INTENTS, EntryIntentIcon } from './entryIntents'
+import { EntryIntentIcon } from './entryIntents'
 
-export default function SetupSelection({ value, onChange, onContinue, onSkip }) {
+export default function SetupSelection({ intents, value, onChange, onContinue, onSkip }) {
   return (
     <div style={{ maxWidth: 640, margin: '0 auto', padding: 'clamp(1.5rem, 5vw, 3rem) 1.1rem 3rem' }}>
       <style>{`
@@ -19,7 +19,7 @@ export default function SetupSelection({ value, onChange, onContinue, onSkip }) 
       </h1>
 
       <div className="entry-intent-grid">
-        {ENTRY_INTENTS.map(intent => {
+        {intents.map(intent => {
           const active = value === intent.id
           return (
             <button

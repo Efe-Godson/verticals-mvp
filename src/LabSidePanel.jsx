@@ -15,7 +15,8 @@ const ENTRIES = [
   { label: '🚨 Alerts', to: '/lab/alerts' },
   { label: '📧 Email Monitor', to: '/lab/email-monitor' },
   { label: '🧭 Onboarding', to: '/lab/onboarding' },
-  { label: '🎬 Demo', to: '/lab/demo' },
+  { label: '🧩 Demo Setup', to: '/lab/demo-setup' },
+  { label: '🗂️ Demo Data', to: '/lab/demo-data' },
 ]
 
 function LabSidePanel() {
