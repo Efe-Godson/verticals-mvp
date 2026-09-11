@@ -41,8 +41,17 @@ function NavItem({ as: As = Link, active, label, ariaLabel, icon, ...rest }) {
       aria-label={ariaLabel || label}
       aria-current={active ? 'page' : undefined}
       style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.2rem',
-        flex: '1 1 0', minWidth: 0, height: '100%', padding: '0.3rem 0.2rem',
+        // justifyContent: flex-end, not center: the bar's own height already
+        // reserves env(safe-area-inset-bottom) below this item as an
+        // untappable buffer (the phone's home-indicator/gesture strip) - on
+        // top of that, centering the icon+label within the item's *full*
+        // height (bar height, safe-area included) left a second, empty-
+        // looking gap between the label and that buffer, doubling how far
+        // the row sat from the true bottom edge. Anchoring to the bottom
+        // instead means only the actual safe-area buffer separates the
+        // label from the edge.
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', gap: '0.2rem',
+        flex: '1 1 0', minWidth: 0, height: '100%', padding: '0.3rem 0.2rem 0.5rem',
         color: active ? 'var(--color-primary)' : 'var(--color-muted)',
         background: 'transparent', border: 'none', textDecoration: 'none', cursor: 'pointer',
       }}
