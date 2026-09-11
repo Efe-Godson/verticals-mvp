@@ -1,9 +1,9 @@
 // Place at: src/expenses/ExpenseOverview.jsx
 // The Expenses home: this month's spend at a glance, a big Add button, the
-// period breakdown, where the money went, and the last few expenses.
-// Anything deeper lives in Reports (/form/:id/report).
+// period breakdown, and the last few expenses. Anything deeper lives in
+// Reports (/form/:id/report).
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import { useExpenses } from './ExpenseShell'
 import QuickAddExpense from './QuickAddExpense'
@@ -86,12 +86,9 @@ export default function ExpenseOverview() {
   if (error) return <ErrorState message={error} onRetry={load} />
   if (!stats) return <div style={{ padding: '2rem 0' }}><InlineLoader label="Loading expenses…" /></div>
 
-  const recordsHref = `/form/${formId}/records?focus=1`
-
   return (
     <div>
-      <h1 style={{ margin: '0 0 0.2rem' }}>{form.name}</h1>
-      <p style={{ color: 'var(--color-muted)', margin: '0 0 1.4rem' }}>Record, understand and control where your money goes.</p>
+      <h1 style={{ margin: '0 0 1.4rem' }}>{form.name}</h1>
 
       {/* Hero: this month */}
       <div className="card pay-stat accent" style={{ padding: '1.2rem 1.3rem', marginBottom: '1rem' }}>
@@ -122,31 +119,8 @@ export default function ExpenseOverview() {
         ))}
       </div>
 
-      {/* Where the money went */}
-      <h2 style={{ fontSize: '1rem', margin: '0 0 0.7rem' }}>Where your money went</h2>
-      {stats.categories.length === 0 ? (
-        <p style={{ color: 'var(--color-muted)', fontSize: '0.9rem' }}>Nothing recorded this month yet.</p>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginBottom: '1.8rem' }}>
-          {stats.categories.map(c => (
-            <div key={c.label}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', marginBottom: '0.2rem' }}>
-                <span>{c.label}</span>
-                <span style={{ fontVariantNumeric: 'tabular-nums' }}>{formatNaira(c.total)} <span style={{ color: 'var(--color-muted)' }}>· {c.pct}%</span></span>
-              </div>
-              <div style={{ height: 6, borderRadius: 999, background: 'var(--color-primary-soft)', overflow: 'hidden' }}>
-                <div style={{ width: `${Math.max(c.pct, 2)}%`, height: '100%', background: 'var(--color-primary)' }} />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
       {/* Recent */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.6rem' }}>
-        <h2 style={{ fontSize: '1rem', margin: 0 }}>Recent expenses</h2>
-        <Link to={recordsHref} style={{ fontSize: '0.85rem', color: 'var(--color-primary)' }}>View all records →</Link>
-      </div>
+      <h2 style={{ fontSize: '1rem', margin: '0 0 0.6rem' }}>Recent expenses</h2>
       {stats.recent.length === 0 ? (
         <p style={{ color: 'var(--color-muted)', fontSize: '0.9rem' }}>No expenses recorded yet.</p>
       ) : (

@@ -97,6 +97,12 @@ function NavBar() {
   const match = location.pathname.match(/^\/form\/([^/]+)/)
   const id = match ? match[1] : null
   const isFormContext = !!id
+  // Home's own title would just read "Home" again right under the same
+  // word in the bottom tab bar - the account circle (same avatar the
+  // desktop row's dropdown uses) is a more useful thing to put there
+  // instead, one tap from Profile without detouring through the hamburger
+  // sheet.
+  const isHome = location.pathname === '/'
 
   // Every page reachable from the bottom bar's Records/Reports tabs - both
   // the picker (/records, /reports, no form in context yet) and the actual
@@ -342,12 +348,26 @@ function NavBar() {
             left edge of that leftover space) - grouping them removes that
             gap outright instead of just repositioning around it. */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0, marginLeft: 'auto' }}>
-          <span style={{
-            fontWeight: 'bold', fontSize: '1rem', minWidth: 0,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}>
-            {mobileBrand}
-          </span>
+          {isHome ? (
+            <Link
+              to="/account"
+              aria-label="Account"
+              style={{
+                width: '30px', height: '30px', borderRadius: '50%', background: 'var(--color-primary)',
+                color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '0.8rem', fontWeight: 700, flexShrink: 0, textDecoration: 'none',
+              }}
+            >
+              {initials}
+            </Link>
+          ) : (
+            <span style={{
+              fontWeight: 'bold', fontSize: '1rem', minWidth: 0,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {mobileBrand}
+            </span>
+          )}
           {pageBack && (
             <Link
               to={pageBack.to}
