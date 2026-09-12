@@ -254,6 +254,22 @@ body.compact-topbar .pf-order-title {
   border-bottom-color: var(--color-primary);
 }
 
+/* A record just completed through the demo's Build tab (src/demoBuild/) -
+   a subtle temporary highlight, not a redesign of the row itself. */
+.records-row.is-just-added { background: var(--color-primary-soft); }
+.just-added-pill {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+  border: 1px solid var(--color-primary);
+  border-radius: 999px;
+  padding: 2px 7px;
+  white-space: nowrap;
+}
+
 /* Demo Home's Records/Report link cards - a brand-tinted, liftable CTA so
    they read as the two things to actually click, distinct from the plain
    stat tiles above them. */

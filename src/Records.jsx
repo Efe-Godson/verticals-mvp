@@ -42,7 +42,7 @@ const META_COLUMNS = [
   { id: '__submissionId', label: 'Submission ID' },
 ]
 
-function Records({ formId: formIdProp, defaultToAllTime = false } = {}) {
+function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmissions = [], justAddedId = null } = {}) {
   const params = useParams()
   const id = formIdProp || params.id
   const [searchParams] = useSearchParams()
@@ -203,6 +203,23 @@ function Records({ formId: formIdProp, defaultToAllTime = false } = {}) {
       loadData(false)
     }
   }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Demo "Build" tab only (see PublicDemoExperience.jsx): folds in session-
+  // only records created through Launch, additively, without touching the
+  // Supabase-backed fetch/cache above - they never leave this browser tab.
+  // Also re-runs whenever `submissions` itself changes: the fetch above is
+  // async and can resolve (or silently refresh) after this has already run
+  // once, overwriting `submissions` wholesale and dropping the merged-in
+  // extras - re-applying on every `submissions` change re-adds them, and is
+  // a no-op (same array reference, no re-render) once they're already in.
+  useEffect(() => {
+    if (!extraSubmissions.length) return
+    setSubmissions(current => {
+      const have = new Set(current.map(s => s.id))
+      const fresh = extraSubmissions.filter(s => !have.has(s.id))
+      return fresh.length ? [...fresh, ...current] : current
+    })
+  }, [extraSubmissions, submissions])
 
   const formRef = useRef(form)
   useEffect(() => { formRef.current = form }, [form])
@@ -1214,6 +1231,7 @@ function Records({ formId: formIdProp, defaultToAllTime = false } = {}) {
                 key={sub.id}
                 title={recordCardTitle(sub)}
                 subtitle={new Date(sub.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                status={sub.id === justAddedId ? <span className="just-added-pill">JUST ADDED</span> : undefined}
                 selected={selectedIds.includes(sub.id)}
                 onToggle={() => toggleSelectRow(sub.id)}
                 onOpen={() => setSelectedRecord(sub)}
@@ -1376,18 +1394,21 @@ function Records({ formId: formIdProp, defaultToAllTime = false } = {}) {
                 {pageRows.map(sub => (
                   <tr
                     key={sub.id}
-                    className="records-row"
+                    className={sub.id === justAddedId ? 'records-row is-just-added' : 'records-row'}
                     onClick={() => setSelectedRecord(sub)}
                   >
                     <td
                       style={{ borderBottom: '1px solid var(--color-border)', padding: '0.75rem 0.9rem' }}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.includes(sub.id)}
-                        onChange={() => toggleSelectRow(sub.id)}
-                      />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(sub.id)}
+                          onChange={() => toggleSelectRow(sub.id)}
+                        />
+                        {sub.id === justAddedId && <span className="just-added-pill">JUST ADDED</span>}
+                      </div>
                     </td>
                     {hasCartField && dateCell(sub)}
                     {hasCartField && !hiddenFieldIds.includes('__orderId') && orderIdCell(sub)}

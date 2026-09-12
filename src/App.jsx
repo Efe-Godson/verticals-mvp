@@ -55,6 +55,7 @@ const PublicDemoShell = lazy(() => import('./PublicDemoExperience'))
 const PublicDemoHome = lazy(() => import('./PublicDemoExperience').then(m => ({ default: m.PublicDemoHome })))
 const PublicDemoRecords = lazy(() => import('./PublicDemoExperience').then(m => ({ default: m.PublicDemoRecords })))
 const PublicDemoReport = lazy(() => import('./PublicDemoExperience').then(m => ({ default: m.PublicDemoReport })))
+const PublicDemoBuild = lazy(() => import('./PublicDemoExperience').then(m => ({ default: m.PublicDemoBuild })))
 const OnboardingPage = lazy(() => import('./onboarding/OnboardingPage'))
 const PayrollShell = lazy(() => import('./payroll/PayrollShell'))
 const PayrollEmployees = lazy(() => import('./payroll/PayrollEmployees'))
@@ -257,6 +258,7 @@ function AppShell() {
             the app. See src/PublicDemoExperience.jsx. */}
         <Route path="/demo" element={<PublicDemoShell />}>
           <Route index element={<PublicDemoHome />} />
+          <Route path="build" element={<PublicDemoBuild />} />
           <Route path="records" element={<PublicDemoRecords />} />
           <Route path="report" element={<PublicDemoReport />} />
         </Route>
@@ -266,6 +268,7 @@ function AppShell() {
             optional-segment syntax for this shape. */}
         <Route path="/demo/:datasetId" element={<PublicDemoShell />}>
           <Route index element={<PublicDemoHome />} />
+          <Route path="build" element={<PublicDemoBuild />} />
           <Route path="records" element={<PublicDemoRecords />} />
           <Route path="report" element={<PublicDemoReport />} />
         </Route>

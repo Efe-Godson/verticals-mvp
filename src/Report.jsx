@@ -144,7 +144,7 @@ function locationCountTile({ locationField, submissions, noun }) {
   return [{ id: `loc-${locationField.id}-count`, title: `${noun.plural} by ${locationField.label}`, node: <HorizontalBarChart data={rows} bare /> }]
 }
 
-function Report({ formId: formIdProp, headerExtra } = {}) {
+function Report({ formId: formIdProp, headerExtra, extraSubmissions = [] } = {}) {
   const params = useParams()
   const id = formIdProp || params.id
   const [searchParams] = useSearchParams()
@@ -235,6 +235,20 @@ function Report({ formId: formIdProp, headerExtra } = {}) {
       loadData(false)
     }
   }, [id, staffFormId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Demo "Build" tab only (see PublicDemoExperience.jsx): folds in session-
+  // only records created through Launch so report totals/charts include
+  // them, without touching the Supabase-backed fetch/cache above. Re-runs
+  // on `submissions` changes too, since the async fetch above can resolve
+  // after this already ran once and would otherwise overwrite the merge.
+  useEffect(() => {
+    if (!extraSubmissions.length) return
+    setSubmissions(current => {
+      const have = new Set(current.map(s => s.id))
+      const fresh = extraSubmissions.filter(s => !have.has(s.id))
+      return fresh.length ? [...fresh, ...current] : current
+    })
+  }, [extraSubmissions, submissions])
 
   // Only shows the compact bar's "⋯" button once there's an actual report
   // (and Options menu) to open - not during loading/error/empty-state,

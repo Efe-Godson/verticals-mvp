@@ -19,6 +19,7 @@ import { supabase } from './supabaseClient'
 import PageSkeleton from './components/PageSkeleton'
 import Records from './Records'
 import Report from './Report'
+import DemoBuild from './demoBuild/DemoBuild'
 
 export function usePublicDemo() {
   return useOutletContext()
@@ -27,9 +28,67 @@ export function usePublicDemo() {
 function tabsFor(basePath) {
   return [
     { to: basePath, end: true, label: 'Home' },
+    { to: `${basePath}/build`, label: 'Build' },
     { to: `${basePath}/records`, label: 'Records' },
     { to: `${basePath}/report`, label: 'Report' },
   ]
+}
+
+// Build's session-only state (per formId, so switching between datasets and
+// back keeps what was built): any field/product edits made in Build, plus
+// any records completed through Launch. Backed by sessionStorage rather
+// than plain useState: App.jsx wraps <Routes> in an
+// <ErrorBoundary key={location.pathname}>, so PublicDemoShell - and any
+// React state living in it - fully unmounts and remounts on every tab
+// navigation (Build -> Records is a pathname change). sessionStorage
+// survives that; it's read back in on each fresh mount and still clears
+// itself when the tab/window closes, so a new visitor still starts from
+// the original seeded data.
+const EMPTY_SESSION = { extraSubmissions: [], justAddedId: null, fieldsOverride: null, productsOverride: null }
+const SESSION_STORAGE_KEY = 'verticals_demo_build_session'
+
+function loadStoredSession() {
+  try {
+    const raw = sessionStorage.getItem(SESSION_STORAGE_KEY)
+    return raw ? JSON.parse(raw) : {}
+  } catch {
+    return {}
+  }
+}
+
+function useDemoBuildSession() {
+  const [byForm, setByForm] = useState(loadStoredSession)
+
+  // Written synchronously inside each updater (not a useEffect reacting to
+  // `byForm`) so the write can never lose a race against the remount above -
+  // a useEffect's write is scheduled after commit/paint, and a fast
+  // click-through to another tab could unmount this instance before it
+  // fires, silently dropping whatever was just added.
+  // `patch` is either a plain object or (existingSession) => object, so
+  // callers that need the current session (addSubmission, appending to
+  // extraSubmissions) always read it from the functional updater's
+  // `current`, not a possibly-stale outer closure.
+  function update(formId, patch) {
+    setByForm(current => {
+      const existing = current[formId] || EMPTY_SESSION
+      const resolvedPatch = typeof patch === 'function' ? patch(existing) : patch
+      const next = { ...current, [formId]: { ...existing, ...resolvedPatch } }
+      try { sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(next)) } catch { /* private mode etc - session state just won't survive the remount */ }
+      return next
+    })
+  }
+
+  function get(formId) { return byForm[formId] || EMPTY_SESSION }
+
+  function addSubmission(formId, submission) {
+    update(formId, existing => ({ extraSubmissions: [...existing.extraSubmissions, submission], justAddedId: submission.id }))
+  }
+
+  function setFieldsOverride(formId, fields) { update(formId, { fieldsOverride: fields }) }
+
+  function setProductsOverride(formId, products) { update(formId, { productsOverride: products }) }
+
+  return { get, addSubmission, setFieldsOverride, setProductsOverride }
 }
 
 function TopBar() {
@@ -86,6 +145,7 @@ export default function PublicDemoShell() {
   const { datasetId } = useParams()
   const [state, setState] = useState({ status: 'loading' })
   const [allDatasets, setAllDatasets] = useState([])
+  const buildSession = useDemoBuildSession()
 
   useEffect(() => {
     let cancelled = false
@@ -165,7 +225,7 @@ export default function PublicDemoShell() {
           Sample: <strong style={{ color: 'var(--color-text)' }}>{state.formName}</strong>
         </span>
       </nav>
-      <Outlet context={{ formId: state.formId, formName: state.formName, basePath }} />
+      <Outlet context={{ formId: state.formId, formName: state.formName, basePath, buildSession }} />
     </div>
   )
 }
@@ -179,13 +239,40 @@ export default function PublicDemoShell() {
 // existing instance in place instead of remounting it, so a filter or
 // metric picked on one dataset could still be showing on the next.
 export function PublicDemoRecords() {
-  const { formId } = usePublicDemo()
-  return <Records key={formId} formId={formId} defaultToAllTime />
+  const { formId, buildSession } = usePublicDemo()
+  const session = buildSession.get(formId)
+  return (
+    <Records
+      key={formId}
+      formId={formId}
+      defaultToAllTime
+      extraSubmissions={session.extraSubmissions}
+      justAddedId={session.justAddedId}
+    />
+  )
 }
 
 export function PublicDemoReport() {
-  const { formId } = usePublicDemo()
-  return <Report key={formId} formId={formId} />
+  const { formId, buildSession } = usePublicDemo()
+  const session = buildSession.get(formId)
+  return <Report key={formId} formId={formId} extraSubmissions={session.extraSubmissions} />
+}
+
+export function PublicDemoBuild() {
+  const { formId, formName, basePath, buildSession } = usePublicDemo()
+  const session = buildSession.get(formId)
+  return (
+    <DemoBuild
+      key={formId}
+      formId={formId}
+      formName={formName}
+      basePath={basePath}
+      session={session}
+      addSubmission={buildSession.addSubmission}
+      setFieldsOverride={buildSession.setFieldsOverride}
+      setProductsOverride={buildSession.setProductsOverride}
+    />
+  )
 }
 
 export function PublicDemoHome() {
