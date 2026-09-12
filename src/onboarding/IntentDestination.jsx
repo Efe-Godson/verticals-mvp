@@ -178,25 +178,24 @@ function RecordsReportFunnel({ form: initialForm, initialView, isFallback }) {
   return (
     <div style={{ paddingBottom: otherDatasets.length > 1 ? '5rem' : 0 }}>
       <style>{`
-        .onboarding-embedded-view .report-header { display: none; }
         .onboarding-samples-scroll::-webkit-scrollbar { display: none; }
         .onboarding-samples-scroll { scrollbar-width: none; -ms-overflow-style: none; }
         .onboarding-title-row {
           display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
           padding: 0.8rem clamp(1rem, 4vw, 2rem) 0;
         }
-        /* Report's own filter bar has room for the title+tabs on the same
-           line as Date range/Options, but only on desktop (see .report-
-           header-extra in Report.jsx) - on the Records view there's no such
-           bar to share, so this row always shows there regardless of width. */
-        @media (min-width: 641px) {
-          .onboarding-title-row--mergeable { display: none; }
-        }
       `}</style>
 
-      <div className={`onboarding-title-row${view === 'report' ? ' onboarding-title-row--mergeable' : ''}`}>
-        {titleTabs}
-      </div>
+      {/* Report's own filter bar has room for the title+tabs on the same
+          line as Date range/Options at every width now (see .report-header-
+          extra in Report.jsx), so the report view relies on that entirely
+          instead of rendering a second copy here - Records/Build have no
+          such bar to share, so they still get this row. */}
+      {view !== 'report' && (
+        <div className="onboarding-title-row">
+          {titleTabs}
+        </div>
+      )}
 
       {isFallback && (
         <div style={{ padding: '0.6rem clamp(1rem, 4vw, 2rem) 0' }}>

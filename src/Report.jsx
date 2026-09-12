@@ -556,7 +556,11 @@ function Report({ formId: formIdProp, headerExtra, extraSubmissions = [] } = {})
            eats most of a 320-360px width, so a chart ends up ~250px. Pull it
            in hard below 640. */
         .report-tile-card { padding: 1.75rem; }
-        .report-header-extra { display: flex; align-items: center; gap: 0.6rem; }
+        /* The title (default "Report", or a caller's headerExtra) and the
+           Date range/Options group, at every width - see the filter bar
+           below. flex-wrap on the bar itself lets the two halves stack if a
+           narrow phone genuinely can't fit both on one line. */
+        .report-header-extra { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
         @media (max-width: 640px) {
           /* padding pulled in, and a hard clip as a backstop so a chart's
              internals can never paint past the card / page edge on a phone
@@ -567,35 +571,31 @@ function Report({ formId: formIdProp, headerExtra, extraSubmissions = [] } = {})
             backdrop-filter: blur(10px); border: 1px solid var(--color-border); border-radius: var(--radius);
             padding: 0.85rem; margin-bottom: 1rem;
           }
-          /* headerExtra (see the prop) shares this line with Date range only
-             on desktop - too tight to add a third thing to this bar on a
-             phone, so its caller renders its own copy above instead. */
-          .report-header-extra { display: none; }
         }
       `}</style>
-
-      <header className="report-header" data-html2canvas-ignore="true">
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.7rem', flexWrap: 'wrap' }}>
-          {/* Report.jsx is generic across every vertical (Expenses, Data
-              Collection, Inventory, Survey, ...) - "Sales Report" was a
-              leftover from when this only served Retail/Restaurant, and read
-              as wrong (and inconsistent from demo to demo) everywhere else. */}
-          <h1 className="report-title">Report</h1>
-          <RefreshingIndicator show={refreshing && !loading} />
-        </div>
-      </header>
 
       <div className="report-filter-bar" data-html2canvas-ignore="true" style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap',
         gap: '0.8rem', padding: '0.5rem 0.7rem', border: '1px solid var(--color-border)',
         borderRadius: 'var(--radius)', marginBottom: '0.75rem', background: 'rgba(255,255,255,0.95)'
       }}>
-        {/* Desktop-only slot a caller can use to put its own title/tabs on the
-            same line as Date range/Options (see .report-header-extra below) -
-            IntentDestination.jsx's demo preview is the only caller that passes
-            this today. Hidden on mobile - too tight to add a third thing to
-            this bar there, so its caller renders its own copy above instead. */}
-        {headerExtra && <div className="report-header-extra">{headerExtra}</div>}
+        {/* The title (or, for IntentDestination.jsx's demo preview, its own
+            title+tabs - see the headerExtra prop) shares this same tile/row
+            with Date range/Options at every width, instead of sitting in its
+            own header block above. */}
+        <div className="report-header-extra">
+          {headerExtra || (
+            <>
+              {/* Report.jsx is generic across every vertical (Expenses, Data
+                  Collection, Inventory, Survey, ...) - "Sales Report" was a
+                  leftover from when this only served Retail/Restaurant, and
+                  read as wrong (and inconsistent from demo to demo)
+                  everywhere else. */}
+              <h1 className="report-title" style={{ margin: 0, fontSize: '1.3rem' }}>Report</h1>
+              <RefreshingIndicator show={refreshing && !loading} />
+            </>
+          )}
+        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap' }}>
           <div className="report-filter-group" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <label htmlFor="report-date-range" style={{ fontSize: '0.85rem', color: 'var(--color-text)', fontWeight: 600 }}>Date range</label>
