@@ -556,7 +556,7 @@ function Report({ formId: formIdProp, headerExtra, extraSubmissions = [] } = {})
            eats most of a 320-360px width, so a chart ends up ~250px. Pull it
            in hard below 640. */
         .report-tile-card { padding: 1.75rem; }
-        .report-header-extra { display: flex; align-items: center; }
+        .report-header-extra { display: flex; align-items: center; gap: 0.6rem; }
         @media (max-width: 640px) {
           /* padding pulled in, and a hard clip as a backstop so a chart's
              internals can never paint past the card / page edge on a phone
@@ -585,21 +585,20 @@ function Report({ formId: formIdProp, headerExtra, extraSubmissions = [] } = {})
         </div>
       </header>
 
-      {/* Desktop-only slot a caller can use to put its own title/tabs on their
-          own line above the filter bar (see .report-header-extra below) -
-          IntentDestination.jsx's demo preview is the only caller that passes
-          this today. Kept on its own row, clear of Date range/Options, so the
-          title has room to breathe instead of being crowded by the bar. */}
-      {headerExtra && <div className="report-header-extra" style={{ marginBottom: '1.4rem' }}>{headerExtra}</div>}
-
       <div className="report-filter-bar" data-html2canvas-ignore="true" style={{
-        display: 'flex', justifyContent: headerExtra ? 'flex-end' : 'space-between', alignItems: 'center', flexWrap: 'wrap',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap',
         gap: '0.8rem', padding: '0.5rem 0.7rem', border: '1px solid var(--color-border)',
         borderRadius: 'var(--radius)', marginBottom: '0.75rem', background: 'rgba(255,255,255,0.95)'
       }}>
+        {/* Desktop-only slot a caller can use to put its own title/tabs on the
+            same line as Date range/Options (see .report-header-extra below) -
+            IntentDestination.jsx's demo preview is the only caller that passes
+            this today. Hidden on mobile - too tight to add a third thing to
+            this bar there, so its caller renders its own copy above instead. */}
+        {headerExtra && <div className="report-header-extra">{headerExtra}</div>}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap' }}>
           <div className="report-filter-group" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <label htmlFor="report-date-range" style={{ fontSize: '0.85rem' }}>Date range</label>
+          <label htmlFor="report-date-range" style={{ fontSize: '0.85rem', color: 'var(--color-text)', fontWeight: 600 }}>Date range</label>
           {isStaffView ? (
             <span
               title="Set by the owner in Settings > Staff Access"

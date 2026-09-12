@@ -598,8 +598,8 @@ function ProductManager({ products, onChange, onClose, inline = false, hideAiImp
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(p => (
-                  <tr key={p.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                {filtered.map((p, i) => (
+                  <tr key={p.id} style={{ borderBottom: '1px solid var(--color-border)', background: i % 2 === 1 ? 'var(--color-bg)' : 'var(--color-surface)' }}>
                     <td style={{ padding: '0.85rem 1rem', fontWeight: 600 }}>
                       {p.name}
                       {p.isPackage && (

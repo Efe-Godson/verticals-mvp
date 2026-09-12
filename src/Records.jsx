@@ -1049,11 +1049,9 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
         </div>
       )}
 
-      {/* Search and the date filter live in their own wrapping row; Options
-          sits on its own line below instead of being one more thing that
-          row can wrap - the date filter's own dropdown+input already wrap
-          as a unit when space is tight, and Options jumping up onto that
-          same line (ahead of a wrapped date input) read as misaligned. */}
+      {/* Search, the date filter and Options all share one wrapping row -
+          each wraps as its own unit when space is tight rather than Options
+          being pushed to a separate line underneath. */}
       <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem', marginTop: '0.8rem' }}>
         <RefreshingIndicator show={refreshing} />
         {/* Always visible now, no click-to-reveal icon step - same "🔍
@@ -1133,9 +1131,7 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
             </div>
           )}
         </div>
-      </div>
 
-      <div className="options-menu-row" style={{ marginTop: '0.6rem' }}>
         {/* Desktop only (see .page-options-panel-desktop in index.css) - a
             dropdown anchored under this button. Below 768px this whole
             thing hides in favor of the portaled version further down (see

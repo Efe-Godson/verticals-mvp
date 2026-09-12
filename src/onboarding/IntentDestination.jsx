@@ -158,6 +158,7 @@ function RecordsReportFunnel({ form: initialForm, initialView, isFallback }) {
   const titleTabs = (
     <>
       <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800 }}>{view === 'report' ? 'Report' : view === 'build' ? 'Build' : 'Records'}</h1>
+      <span style={{ width: 1, alignSelf: 'stretch', minHeight: '1.4rem', background: 'var(--color-border)', flexShrink: 0 }} />
       <div style={{ display: 'flex', gap: '0.3rem' }}>
         {FUNNEL_TABS.map(tab => (
           <button
