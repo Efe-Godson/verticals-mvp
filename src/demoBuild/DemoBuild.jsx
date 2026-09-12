@@ -76,7 +76,7 @@ function FieldListEditor({ fields, onChange }) {
   )
 }
 
-export default function DemoBuild({ formId, formName, basePath, session, addSubmission, setFieldsOverride, setProductsOverride }) {
+export default function DemoBuild({ formId, formName, basePath, session, addSubmission, setFieldsOverride, setProductsOverride, hideTitle = false, onViewRecords }) {
   const [form, setForm] = useState(null)
   const [loading, setLoading] = useState(true)
   const [mode, setMode] = useState('build') // 'build' | 'preview' | 'launch' | 'success'
@@ -112,7 +112,7 @@ export default function DemoBuild({ formId, formName, basePath, session, addSubm
 
   return (
     <div className="page" style={{ maxWidth: 720 }}>
-      <h1 style={{ marginBottom: '0.2rem' }}>Build</h1>
+      {!hideTitle && <h1 style={{ marginBottom: '0.2rem' }}>Build</h1>}
       <p style={{ marginTop: 0, color: 'var(--color-muted)' }}>
         This is how {formName} collects its information. Change something, preview it, or launch it as it is.
       </p>
@@ -122,7 +122,11 @@ export default function DemoBuild({ formId, formName, basePath, session, addSubm
           <div className="demo-cta-title">✓ {config.successTitle}</div>
           <div className="demo-cta-desc">{config.successBody}</div>
           <div style={{ marginTop: '0.9rem', display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-            <Link to={`${basePath}/records`}><button type="button">View in Records →</button></Link>
+            {onViewRecords ? (
+              <button type="button" onClick={onViewRecords}>View in Records →</button>
+            ) : (
+              <Link to={`${basePath}/records`}><button type="button">View in Records →</button></Link>
+            )}
             <button type="button" className="secondary" onClick={() => setMode('build')}>Back to Build</button>
           </div>
         </div>

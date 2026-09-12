@@ -37,6 +37,7 @@ import FormPreviewModal from '../FormPreview'
 import { InlineLoader } from '../components/InlineLoader'
 import { ErrorState } from '../ErrorState'
 import { resolveFallbackDataset } from './entryIntents'
+import DemoBuild from '../demoBuild/DemoBuild'
 
 async function loadFallback() {
   const dataset = await resolveFallbackDataset()
@@ -99,12 +100,21 @@ export default function IntentDestination({ route, state: providedState, customI
   return <RecordsReportFunnel key={state.form.id} form={state.form} initialView={state.view} isFallback={state.isFallback} />
 }
 
-const FUNNEL_TABS = [{ id: 'records', label: 'Records' }, { id: 'report', label: 'Report' }]
+const FUNNEL_TABS = [{ id: 'build', label: 'Build' }, { id: 'records', label: 'Records' }, { id: 'report', label: 'Report' }]
 
-// Tabs between Records/Report for whichever dataset is currently shown, plus
-// a bottom slider to jump to any *other* seeded dataset - both entirely
-// local (no re-entering the onboarding flow), so exploring a few different
-// sample businesses is just a couple of taps.
+// Build's session-only state (per formId, so switching between "other
+// datasets" below and back keeps what was built): any field/product edits
+// made in Build, plus any records completed through Launch. Plain local
+// state is fine here (unlike PublicDemoExperience.jsx's /demo, which
+// backs this with sessionStorage) - switching Records/Report/Build or
+// switching sample datasets never navigates (no pathname change), so this
+// component never remounts and never loses it.
+const EMPTY_BUILD_SESSION = { extraSubmissions: [], justAddedId: null, fieldsOverride: null, productsOverride: null }
+
+// Tabs between Build/Records/Report for whichever dataset is currently
+// shown, plus a bottom slider to jump to any *other* seeded dataset - both
+// entirely local (no re-entering the onboarding flow), so exploring a few
+// different sample businesses is just a couple of taps.
 //
 // The tabs sit inline right after this screen's own title (small, quiet
 // styling - they're a secondary control next to the title, not nav-level
@@ -114,6 +124,19 @@ function RecordsReportFunnel({ form: initialForm, initialView, isFallback }) {
   const [view, setView] = useState(initialView)
   const [otherDatasets, setOtherDatasets] = useState([])
   const samplesScrollRef = useRef(null)
+  const [buildSessionByForm, setBuildSessionByForm] = useState({})
+  const buildSession = buildSessionByForm[form.id] || EMPTY_BUILD_SESSION
+
+  function updateBuildSession(formId, patch) {
+    setBuildSessionByForm(current => {
+      const existing = current[formId] || EMPTY_BUILD_SESSION
+      const resolved = typeof patch === 'function' ? patch(existing) : patch
+      return { ...current, [formId]: { ...existing, ...resolved } }
+    })
+  }
+  function addBuildSubmission(formId, submission) {
+    updateBuildSession(formId, existing => ({ extraSubmissions: [...existing.extraSubmissions, submission], justAddedId: submission.id }))
+  }
 
   function scrollSamples(direction) {
     samplesScrollRef.current?.scrollBy({ left: direction * 220, behavior: 'smooth' })
@@ -134,7 +157,7 @@ function RecordsReportFunnel({ form: initialForm, initialView, isFallback }) {
 
   const titleTabs = (
     <>
-      <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800 }}>{view === 'report' ? 'Report' : 'Records'}</h1>
+      <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800 }}>{view === 'report' ? 'Report' : view === 'build' ? 'Build' : 'Records'}</h1>
       <div style={{ display: 'flex', gap: '0.3rem' }}>
         {FUNNEL_TABS.map(tab => (
           <button
@@ -183,29 +206,59 @@ function RecordsReportFunnel({ form: initialForm, initialView, isFallback }) {
       )}
 
       <div className="onboarding-embedded-view" style={{ padding: '0 clamp(1rem, 4vw, 2rem)' }}>
-        {view === 'records'
-          ? <Records key={form.id} formId={form.id} defaultToAllTime />
-          : <Report key={form.id} formId={form.id} headerExtra={titleTabs} />}
+        {view === 'records' ? (
+          <Records key={form.id} formId={form.id} defaultToAllTime extraSubmissions={buildSession.extraSubmissions} justAddedId={buildSession.justAddedId} />
+        ) : view === 'report' ? (
+          <Report key={form.id} formId={form.id} headerExtra={titleTabs} extraSubmissions={buildSession.extraSubmissions} />
+        ) : (
+          <DemoBuild
+            formId={form.id}
+            formName={form.name}
+            hideTitle
+            session={buildSession}
+            addSubmission={addBuildSubmission}
+            setFieldsOverride={(formId, fields) => updateBuildSession(formId, { fieldsOverride: fields })}
+            setProductsOverride={(formId, products) => updateBuildSession(formId, { productsOverride: products })}
+            onViewRecords={() => setView('records')}
+          />
+        )}
       </div>
 
       {otherDatasets.length > 1 && (
         <div style={{
           position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 240,
-          display: 'flex', alignItems: 'center', gap: '0.5rem',
-          padding: '0.6rem clamp(1rem, 4vw, 2rem) calc(0.6rem + env(safe-area-inset-bottom))',
+          display: 'flex', alignItems: 'center', gap: '0.75rem',
+          background: 'var(--color-surface)', borderTop: '1px solid var(--color-border)',
+          boxShadow: '0 -2px 10px rgba(0,0,0,0.08)',
+          padding: '0.7rem clamp(1rem, 4vw, 2rem) calc(0.7rem + env(safe-area-inset-bottom))',
         }}>
           <span style={{
-            fontSize: '0.7rem', fontWeight: 700, color: 'var(--color-text)', whiteSpace: 'nowrap', flexShrink: 0,
-            background: '#fff', border: '1px solid var(--color-border)', borderRadius: 999,
-            padding: '0.35rem 0.65rem', boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
+            fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-muted)', whiteSpace: 'nowrap', flexShrink: 0,
           }}>
             Samples
           </span>
-          <div style={{ flex: 1, position: 'relative', minWidth: 0 }}>
+          <div style={{ flex: 1, position: 'relative', minWidth: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            {/* Solid, unmistakably clickable circular buttons - not a fading
+                overlay hinting there's more, an actual visible control. Sit
+                inline (not absolutely overlapping the scroll strip), so
+                they're always fully visible and never clip past the bar. */}
+            <button
+              type="button"
+              onClick={() => scrollSamples(-1)}
+              aria-label="Show previous samples"
+              style={{
+                width: '2.2rem', height: '2.2rem', borderRadius: '50%', flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
+                background: 'var(--color-surface)', border: '1px solid var(--color-border)',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.15)', color: 'var(--color-primary)', cursor: 'pointer',
+              }}
+            >
+              <ChevronLeft size={18} color="var(--color-primary)" strokeWidth={2.5} style={{ width: 18, height: 18, flexShrink: 0 }} />
+            </button>
             <div
               ref={samplesScrollRef}
               className="onboarding-samples-scroll"
-              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', overflowX: 'auto', touchAction: 'pan-x', padding: '0.3rem 1.7rem' }}
+              style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.5rem', overflowX: 'auto', touchAction: 'pan-x', padding: '0.2rem 0' }}
             >
               {otherDatasets.map(d => {
                 const active = d.form_id === form.id
@@ -215,12 +268,12 @@ function RecordsReportFunnel({ form: initialForm, initialView, isFallback }) {
                     type="button"
                     onClick={() => switchToDataset(d.form_id)}
                     style={{
-                      fontSize: '0.68rem', fontWeight: 600, padding: '0.4rem 0.7rem', borderRadius: 999,
+                      fontSize: '0.82rem', fontWeight: 600, padding: '0.55rem 0.95rem', borderRadius: 999,
                       whiteSpace: 'nowrap', flexShrink: 0,
-                      border: active ? '2px solid var(--color-primary)' : 'none',
-                      background: active ? '#fff' : 'var(--color-primary)',
+                      border: active ? '2px solid var(--color-primary)' : '1px solid transparent',
+                      background: active ? 'var(--color-primary-soft)' : 'var(--color-primary)',
                       color: active ? 'var(--color-primary)' : '#fff',
-                      boxShadow: active ? '0 2px 8px rgba(0,0,0,0.25)' : '0 2px 6px rgba(0,0,0,0.2)',
+                      boxShadow: active ? 'none' : '0 2px 6px rgba(0,0,0,0.15)',
                     }}
                   >
                     {d.name}
@@ -228,35 +281,18 @@ function RecordsReportFunnel({ form: initialForm, initialView, isFallback }) {
                 )
               })}
             </div>
-            {/* Solid, unmistakably clickable circular buttons - not a fading
-                overlay hinting there's more, an actual visible control. */}
-            <button
-              type="button"
-              onClick={() => scrollSamples(-1)}
-              aria-label="Show previous samples"
-              style={{
-                position: 'absolute', left: '-0.3rem', top: '50%', transform: 'translateY(-50%)',
-                width: '1.7rem', height: '1.7rem', borderRadius: '50%', zIndex: 2,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: '#fff', border: '1px solid var(--color-border)',
-                boxShadow: '0 2px 6px rgba(0,0,0,0.3)', color: 'var(--color-primary)', cursor: 'pointer',
-              }}
-            >
-              <ChevronLeft size={15} color="var(--color-primary)" strokeWidth={2.5} style={{ width: 15, height: 15, flexShrink: 0 }} />
-            </button>
             <button
               type="button"
               onClick={() => scrollSamples(1)}
               aria-label="Show more samples"
               style={{
-                position: 'absolute', right: '-0.3rem', top: '50%', transform: 'translateY(-50%)',
-                width: '1.7rem', height: '1.7rem', borderRadius: '50%', zIndex: 2,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: '#fff', border: '1px solid var(--color-border)',
-                boxShadow: '0 2px 6px rgba(0,0,0,0.3)', color: 'var(--color-primary)', cursor: 'pointer',
+                width: '2.2rem', height: '2.2rem', borderRadius: '50%', flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
+                background: 'var(--color-surface)', border: '1px solid var(--color-border)',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.15)', color: 'var(--color-primary)', cursor: 'pointer',
               }}
             >
-              <ChevronRight size={15} color="var(--color-primary)" strokeWidth={2.5} style={{ width: 15, height: 15, flexShrink: 0 }} />
+              <ChevronRight size={18} color="var(--color-primary)" strokeWidth={2.5} style={{ width: 18, height: 18, flexShrink: 0 }} />
             </button>
           </div>
         </div>
