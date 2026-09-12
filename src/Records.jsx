@@ -1005,7 +1005,7 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
           just the top reserve stays. Only rendered/needed in focus mode,
           the same condition PosSidePanel itself renders under below. */}
       {hasCartField && (
-        <div style={{ position: 'relative', margin: '1rem 0' }}>
+        <div style={{ position: 'relative', margin: '1rem 0 0.4rem' }}>
           {showRevealHint && (
             <div style={{
               position: 'absolute', top: '-1.9rem', left: 0, fontSize: '0.78rem', color: 'var(--color-primary)',
@@ -1052,7 +1052,7 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
       {/* Search, the date filter and Options all share one wrapping row -
           each wraps as its own unit when space is tight rather than Options
           being pushed to a separate line underneath. */}
-      <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem', marginTop: '0.8rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem', marginTop: '0.5rem' }}>
         <RefreshingIndicator show={refreshing} />
         {/* Always visible now, no click-to-reveal icon step - same "🔍
             Search..." placeholder-as-icon convention ProductManager.jsx's
