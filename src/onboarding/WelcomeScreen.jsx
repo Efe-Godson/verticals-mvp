@@ -1,14 +1,11 @@
 // Place at: src/onboarding/WelcomeScreen.jsx
-// The very first screen a new visitor sees. Deliberately bare - see the
-// entry/onboarding design brief this was built from: no feature copy, no
-// testimonials, just the two places a visitor could be trying to go. No
-// logo here - the wordmark already showing in OnboardingPage.jsx's own
-// header (on every stage after this one) made a second, larger copy here
-// redundant rather than reinforcing.
-// "Sign in" is a full button, not a small link under Get Started, so a
-// returning user's eye lands on it just as fast as a new one's does on
-// Get Started.
-export default function WelcomeScreen({ onGetStarted, onSignIn }) {
+// The very first screen a new visitor sees, reached only via the marketing
+// landing page's "Try free demo" - a returning user signs in from there
+// instead, so this stays a single, bare Get Started prompt. No logo here -
+// the wordmark already showing in OnboardingPage.jsx's own header (on every
+// stage after this one) made a second, larger copy here redundant rather
+// than reinforcing.
+export default function WelcomeScreen({ onGetStarted }) {
   return (
     <div style={{
       minHeight: '100dvh', display: 'flex', flexDirection: 'column',
@@ -25,9 +22,6 @@ export default function WelcomeScreen({ onGetStarted, onSignIn }) {
       <div style={{ width: '100%', maxWidth: 360, display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
         <button type="button" onClick={onGetStarted} style={{ width: '100%', padding: '0.9rem', fontSize: '1rem', fontWeight: 600 }}>
           Get started
-        </button>
-        <button type="button" className="secondary" onClick={onSignIn} style={{ width: '100%', padding: '0.9rem', fontSize: '1rem', fontWeight: 600 }}>
-          Sign in
         </button>
       </div>
     </div>

@@ -63,6 +63,7 @@ const PayrollEntries = lazy(() => import('./payroll/PayrollEntries'))
 const PayrollMonthly = lazy(() => import('./payroll/PayrollMonthly'))
 const ExpenseShell = lazy(() => import('./expenses/ExpenseShell'))
 const ExpenseOverview = lazy(() => import('./expenses/ExpenseOverview'))
+const LandingPage = lazy(() => import('./marketing/LandingPage'))
 const Login = lazy(() => import('./Login'))
 const SignUp = lazy(() => import('./SignUp'))
 const ConfirmEmail = lazy(() => import('./ConfirmEmail'))
@@ -113,8 +114,32 @@ function PublicOnlyRoute({ children }) {
   return children
 }
 
+// "/" itself: the public marketing landing page for a signed-out visitor,
+// BusinessesHome (as before) for a signed-in one. Every other private route
+// still bounces a signed-out visitor into /onboarding or /login via
+// PrivateRoute/isFirstVisit() - this only changes what a bare "/" shows.
+function RootRoute() {
+  const { session, loading } = useAuth()
+  if (loading) return <LoadingState />
+  if (!session) return <LandingPage />
+  return (
+    <StaffScopedRoute>
+      <BusinessesHome />
+    </StaffScopedRoute>
+  )
+}
+
 function AppShell() {
   const location = useLocation()
+  const { session } = useAuth()
+  // RootRoute renders the public marketing LandingPage at "/" for a signed-
+  // out visitor - same reasoning as isPublicDemo below, no app NavBar/
+  // DarkModeToggle behind it.
+  const isLandingRoot = location.pathname === '/' && !session
+  // /lab/landing (see LabSidePanel.jsx) previews the same marketing page
+  // while signed in, for reviewing it without logging out - same reasoning
+  // as isLandingRoot, no app NavBar behind it either.
+  const isLandingPreview = location.pathname === '/lab/landing'
   const isPublicForm = /^\/form\/[^/]+(\/response\/[^/]+)?$/.test(location.pathname)
   // /s/:code (see ShortLinkRedirect.jsx) is just a brief hop through to the
   // above before the real /form/:id replaces it in history - same reason to
@@ -150,7 +175,7 @@ function AppShell() {
   // Records/Report tabs (see src/PublicDemoExperience.jsx) - no app NavBar,
   // same reasoning as isPublicForm above.
   const isPublicDemo = location.pathname.startsWith('/demo')
-  const showNavBar = !isPublicForm && !isShortLink && !isQuizPlayer && !isLogin && !isSignUp && !isOnboarding && !isConfirmEmail && !isResetPassword && !isFocusMode && !isReportBuilder && !isPayrollEnv && !isExpenseEnv && !isSharedReport && !isPublicDemo
+  const showNavBar = !isPublicForm && !isShortLink && !isQuizPlayer && !isLogin && !isSignUp && !isOnboarding && !isConfirmEmail && !isResetPassword && !isFocusMode && !isReportBuilder && !isPayrollEnv && !isExpenseEnv && !isSharedReport && !isPublicDemo && !isLandingRoot && !isLandingPreview
 
   // The POS side panel is mounted here (not inside each focus-mode page) so
   // it stays put across navigation between Records / Reports / Settings /
@@ -184,8 +209,12 @@ function AppShell() {
         {/* No auth guard here: Supabase's reset link creates a temporary session
             on its own, and PublicOnlyRoute would incorrectly redirect it away. */}
         <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/" element={<PrivateRoute><StaffScopedRoute><BusinessesHome /></StaffScopedRoute></PrivateRoute>} />
+        <Route path="/" element={<RootRoute />} />
         <Route path="/lab" element={<PrivateRoute><StaffScopedRoute><AdminOnlyRoute><Home /></AdminOnlyRoute></StaffScopedRoute></PrivateRoute>} />
+        {/* Preview-only: the same public LandingPage RootRoute shows a
+            signed-out visitor at "/", reachable here while signed in so it
+            can be reviewed without logging out. */}
+        <Route path="/lab/landing" element={<PrivateRoute><StaffScopedRoute><AdminOnlyRoute><LandingPage /></AdminOnlyRoute></StaffScopedRoute></PrivateRoute>} />
         {/* Quiz: real-time multiplayer AI quiz game. Hosting (create/admin/
             history) stays Lab-only - still an admin-curated MVP tool, same
             as the rest of /lab. Joining and playing are deliberately NOT

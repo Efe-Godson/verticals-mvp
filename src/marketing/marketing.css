@@ -1,0 +1,811 @@
+/* Verticals marketing landing page. Extends the app's existing tokens
+   (src/index.css :root / dark-mode blocks) rather than defining new colors -
+   the app's real accent is blue (--color-primary, #0070F3, matching the
+   logo mark and PWA theme_color) even though early drafts of this page's
+   brief called for "green"; every accent reference below uses the real
+   token instead.
+
+   One 1440px container is reused everywhere so every section's content
+   lines up to the same vertical lines (see .mkt-container) instead of each
+   section picking its own width. The page is organised into "chapters" -
+   groups of sections sharing one background (see the Chapters block near
+   the bottom) - rather than each section alternating its own stripe, so
+   backgrounds read as one continuous canvas.
+
+   Font sizes and paragraph line-heights come from a type scale built on
+   quarter-powers of the golden ratio (phi ~= 1.618, so every 4th step is
+   exactly one phi jump); spacing comes from a Fibonacci scale (which
+   converges on phi: 144/89 = 1.618) for consistent vertical rhythm. */
+.mkt {
+  background: var(--color-bg);
+  color: var(--color-text);
+
+  --mkt-fs-2xs: 0.8125rem; /* 13px  - eyebrows, badges, footnotes, small labels */
+  --mkt-fs-xs:  0.9rem;    /* 14.4px - nav links, small copy */
+  --mkt-fs-sm:  1rem;      /* 16px   - body baseline */
+  --mkt-fs-md:  1.127rem;  /* 18px   - card titles */
+  --mkt-fs-body: clamp(1.0625rem, 1.1vw, 1.1875rem); /* 17-19px body copy */
+  --mkt-fs-h3:  clamp(1.375rem, 2.2vw, 1.875rem);    /* 22-30px */
+  --mkt-fs-h2:  clamp(1.875rem, 3.6vw, 3.25rem);     /* 30-52px */
+  --mkt-fs-h1:  clamp(2.125rem, 6vw, 4.25rem);       /* 34-68px */
+
+  --mkt-lh-tight: 1.1;     /* headings */
+  --mkt-lh-body: 1.6;      /* paragraph copy - readable measure over golden ratio */
+
+  --mkt-sp-1: 8px;
+  --mkt-sp-2: 13px;
+  --mkt-sp-3: 21px;
+  --mkt-sp-4: 34px;
+  --mkt-sp-5: 55px;
+  --mkt-sp-6: 89px;
+  --mkt-sp-7: 144px;
+
+  /* Section vertical rhythm - major/normal/compact instead of one identical
+     padding everywhere, so the page reads large -> compact -> large ->
+     immersive rather than a flat stack of equal sections. */
+  --mkt-pad-major: clamp(40px, 5vw, 88px);
+  --mkt-pad-normal: clamp(28px, 3.5vw, 56px);
+  --mkt-pad-compact: clamp(20px, 2.5vw, 36px);
+
+  /* Content-column widths shared across sections so text columns align. */
+  --mkt-w-content: 850px;
+  --mkt-w-narrow: 620px;
+}
+
+.mkt-container {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding-inline: clamp(20px, 5vw, 64px);
+}
+
+.mkt-section {
+  padding-block: var(--mkt-pad-normal);
+}
+.mkt-section--major { padding-block: var(--mkt-pad-major); }
+.mkt-section--compact { padding-block: var(--mkt-pad-compact); }
+
+.mkt-eyebrow {
+  font-size: var(--mkt-fs-2xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+  margin: 0 0 var(--mkt-sp-2);
+}
+
+/* Hero eyebrow only - spread edge-to-edge across the text column (the same
+   width the headline wraps to) instead of sitting left-aligned, with a dark
+   green square marking each beat instead of a plain middle-dot. */
+/* Plain text with a typographic middle-dot, not a colored graphical
+   separator - lighter weight and more tracking than the headline below it
+   so it reads as a label, not a competing line of copy. */
+.mkt-hero-eyebrow {
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+  opacity: 0.85;
+  font-size: var(--mkt-fs-2xs);
+  margin: 0 0 var(--mkt-sp-2);
+}
+
+.mkt-heading {
+  font-size: var(--mkt-fs-h2);
+  line-height: var(--mkt-lh-tight);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin: 0 0 var(--mkt-sp-3);
+  color: var(--color-text);
+}
+/* Hero H1 only - one deliberate step larger than every section's H2, so the
+   hero keeps its own visual weight instead of matching the rest. */
+.mkt-hero-heading { font-size: var(--mkt-fs-h1); line-height: 1.03; }
+
+.mkt-subheading {
+  font-size: var(--mkt-fs-body);
+  line-height: var(--mkt-lh-body);
+  color: var(--color-muted);
+  max-width: var(--mkt-w-narrow);
+  margin: 0;
+}
+
+.mkt-section-head {
+  text-align: center;
+  max-width: var(--mkt-w-content);
+  margin: 0 auto var(--mkt-sp-3);
+}
+.mkt-section-head .mkt-subheading { margin-inline: auto; }
+
+.mkt-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--mkt-sp-1);
+  min-height: 48px;
+  padding: 0 var(--mkt-sp-3);
+  border-radius: 10px;
+  font-size: var(--mkt-fs-sm);
+  font-weight: 700;
+  text-decoration: none;
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition: background 150ms ease, transform 150ms ease;
+}
+.mkt-btn:hover { background: var(--color-primary-hover); }
+.mkt-btn--secondary {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+.mkt-btn--secondary:hover { background: var(--color-bg); }
+.mkt-btn--ghost {
+  background: transparent;
+  color: var(--color-text);
+  border: 1px solid transparent;
+  padding: 0 var(--mkt-sp-2);
+}
+.mkt-btn--ghost:hover { background: var(--color-surface); }
+.mkt-btn--lg { min-height: 56px; padding: 0 var(--mkt-sp-4); font-size: var(--mkt-fs-md); }
+.mkt-btn--block { width: 100%; }
+
+/* Plain-text nav link, used only for "Sign in" - the one action that
+   shouldn't visually compete with Sign up / Try free demo (see section 5 of
+   the brief: one obvious primary action, not three buttons of equal weight). */
+.mkt-nav-signin {
+  color: var(--color-text);
+  text-decoration: none;
+  font-size: var(--mkt-fs-xs);
+  font-weight: 600;
+  padding: 0 var(--mkt-sp-2);
+}
+.mkt-nav-signin:hover { color: var(--color-primary); }
+
+.mkt-hint {
+  font-size: var(--mkt-fs-2xs);
+  color: var(--color-muted);
+}
+
+/* ---------- Nav ---------- */
+.mkt-nav {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  background: transparent;
+  border-bottom: 1px solid transparent;
+  transition: background 200ms ease, backdrop-filter 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
+}
+.mkt-nav.is-scrolled {
+  background: color-mix(in srgb, var(--color-bg) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom-color: var(--color-border);
+  box-shadow: 0 1px 0 rgba(0,0,0,0.02);
+}
+.mkt-nav-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mkt-sp-3);
+  height: 68px;
+  transition: height 200ms ease;
+}
+.mkt-nav.is-scrolled .mkt-nav-inner { height: 58px; }
+.mkt-logo {
+  display: flex;
+  align-items: center;
+  gap: var(--mkt-sp-1);
+  text-decoration: none;
+  color: var(--color-text);
+  font-weight: 800;
+  font-size: var(--mkt-fs-md);
+  letter-spacing: 0.01em;
+  flex-shrink: 0;
+}
+.mkt-nav-links {
+  display: none;
+  align-items: center;
+  gap: var(--mkt-sp-4);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.mkt-nav-links a {
+  color: var(--color-text);
+  text-decoration: none;
+  font-size: var(--mkt-fs-xs);
+  font-weight: 500;
+}
+.mkt-nav-links a:hover { color: var(--color-primary); }
+.mkt-nav-auth {
+  display: none;
+  align-items: center;
+  gap: var(--mkt-sp-2);
+  flex-shrink: 0;
+}
+.mkt-nav-burger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  flex-shrink: 0;
+}
+@media (min-width: 900px) {
+  .mkt-nav-links { display: flex; }
+  .mkt-nav-auth { display: flex; }
+  .mkt-nav-burger { display: none; }
+}
+
+.mkt-mobile-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: var(--color-bg);
+  display: flex;
+  flex-direction: column;
+  padding: var(--mkt-sp-3) clamp(20px, 5vw, 40px) var(--mkt-sp-4);
+}
+.mkt-mobile-menu-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--mkt-sp-4);
+}
+.mkt-mobile-menu-close {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.mkt-mobile-menu-links {
+  list-style: none;
+  margin: 0 0 var(--mkt-sp-4);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.mkt-mobile-menu-links a {
+  display: block;
+  padding: var(--mkt-sp-2) 4px;
+  font-size: var(--mkt-fs-h3);
+  font-weight: 600;
+  color: var(--color-text);
+  text-decoration: none;
+  border-bottom: 1px solid var(--color-border);
+  min-height: 44px;
+}
+.mkt-mobile-menu-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mkt-sp-2);
+  margin-top: auto;
+}
+
+/* ---------- Scroll reveal (see ScrollReveal.jsx) ---------- */
+.mkt-reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 550ms ease, transform 550ms ease;
+}
+.mkt-reveal--visible { opacity: 1; transform: translateY(0); }
+
+/* ---------- Hero ---------- */
+.mkt-hero-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--mkt-sp-5);
+  align-items: center;
+  padding-block: clamp(var(--mkt-sp-4), 6vw, var(--mkt-sp-5));
+}
+@media (min-width: 1024px) {
+  /* Roughly equal columns (~5 : 1 gap : 5) - the asymmetric-but-balanced
+     split that makes the hero feel composed. Kept as-is deliberately: this
+     is the visual benchmark the rest of the page builds from. */
+  .mkt-hero-grid { grid-template-columns: 1.05fr 1fr; gap: var(--mkt-sp-6); }
+}
+/* Grid items default to min-width:auto, which lets a non-wrapping child's
+   intrinsic width (the eyebrow row below) force this column wider than its
+   track - overflowing the viewport at narrow widths without ever showing a
+   scrollbar (see body's overflow-x:clip in index.css). min-width:0 lets the
+   column actually shrink to the space it's given. */
+.mkt-hero-text { min-width: 0; }
+.mkt-hero-text h1 { margin-bottom: var(--mkt-sp-3); }
+.mkt-hero-cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--mkt-sp-2);
+  margin: var(--mkt-sp-4) 0 var(--mkt-sp-2);
+}
+.mkt-hero-hint {
+  font-size: var(--mkt-fs-sm);
+  font-weight: 600;
+  font-style: italic;
+  color: var(--color-text);
+}
+/* Sign up/Sign in sit as two quiet, equal-width actions under the button -
+   a soft tinted pill each (never a hard border) so they read as slightly
+   more tappable than plain text, without competing with "Try a free demo". */
+.mkt-hero-secondary-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--mkt-sp-2);
+  margin: 0 0 var(--mkt-sp-2);
+}
+.mkt-hero-secondary-actions a {
+  flex: 1;
+  text-align: center;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--color-primary-soft);
+  font-weight: 600;
+}
+
+/* Scale the whole hero down on mobile: drop the explanatory paragraph (the
+   headline already carries it), shrink the eyebrow and the CTA button so
+   the fold isn't dominated by oversized chrome on a small screen. */
+@media (max-width: 640px) {
+  .mkt-hero-grid { padding-block: var(--mkt-sp-2) var(--mkt-sp-4); gap: var(--mkt-sp-2); }
+  .mkt-hero-eyebrow { font-size: 0.7rem; }
+  .mkt-hero-heading { font-size: 1.5rem; }
+  .mkt-hero-text .mkt-subheading { display: none; }
+  .mkt-hero-hint { display: none; }
+  .mkt-hero-cta-row { margin: var(--mkt-sp-3) 0 var(--mkt-sp-1); }
+  .mkt-hero-cta-row .mkt-btn--lg { width: 100%; min-height: 44px; padding: 0 var(--mkt-sp-3); font-size: var(--mkt-fs-sm); }
+}
+
+.mkt-preview-card {
+  min-width: 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.08);
+  padding: var(--mkt-sp-3);
+}
+.mkt-preview-title {
+  font-size: var(--mkt-fs-md);
+  font-weight: 700;
+  margin: 0 0 var(--mkt-sp-2);
+}
+.mkt-preview-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  gap: var(--mkt-sp-1);
+  margin-bottom: var(--mkt-sp-3);
+}
+/* Soft enough that the eye lands on the numbers, not on the tile - this is
+   a glimpse of the product, not a UI component sample. */
+.mkt-preview-stat-tile {
+  min-width: 0;
+  background: color-mix(in srgb, var(--color-bg) 55%, transparent);
+  border-radius: 10px;
+  padding: 8px;
+}
+.mkt-preview-stat-value {
+  font-size: var(--mkt-fs-h3);
+  font-weight: 800;
+  line-height: var(--mkt-lh-tight);
+  overflow-wrap: anywhere;
+}
+@media (max-width: 480px) {
+  .mkt-preview-stats { gap: 6px; }
+  .mkt-preview-stat-tile { padding: 6px; border-radius: 6px; }
+  .mkt-preview-stat-value { font-size: 1rem; }
+  .mkt-preview-stat-label, .mkt-preview-stat-delta { font-size: 0.65rem; }
+}
+.mkt-preview-stat-label-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 2px;
+  flex-wrap: wrap;
+}
+.mkt-preview-stat-label {
+  font-size: var(--mkt-fs-2xs);
+  color: var(--color-muted);
+}
+.mkt-preview-stat-delta {
+  font-size: var(--mkt-fs-2xs);
+  font-weight: 700;
+  color: var(--status-good);
+}
+.mkt-preview-stat-delta--negative { color: var(--status-critical); }
+.mkt-preview-chart {
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: var(--mkt-sp-2) var(--mkt-sp-2) 4px;
+  margin-bottom: var(--mkt-sp-3);
+}
+.mkt-preview-chart-label {
+  font-size: var(--mkt-fs-2xs);
+  font-weight: 700;
+  color: var(--color-muted);
+  margin-bottom: var(--mkt-sp-1);
+}
+.mkt-preview-rows { display: flex; flex-direction: column; gap: var(--mkt-sp-1); }
+.mkt-preview-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: var(--mkt-fs-xs);
+}
+.mkt-preview-row-name { color: var(--color-text); font-weight: 500; }
+.mkt-preview-row-value { color: var(--color-text); font-weight: 700; }
+
+/* ---------- Product walkthrough ("how it works") ---------- */
+.mkt-walk-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--mkt-sp-4);
+  align-items: center;
+  padding-block: var(--mkt-sp-4);
+  border-top: 1px solid var(--color-border);
+}
+.mkt-walk-row:first-child { border-top: none; }
+.mkt-walk-text, .mkt-walk-visual-wrap { min-width: 0; }
+@media (min-width: 1024px) {
+  .mkt-walk-row { grid-template-columns: 1fr 1fr; gap: var(--mkt-sp-5); }
+  .mkt-walk-row--reverse .mkt-walk-text { order: 2; }
+  .mkt-walk-row--reverse .mkt-walk-visual-wrap { order: 1; }
+}
+.mkt-walk-step {
+  display: block;
+  font-size: var(--mkt-fs-xs);
+  font-weight: 700;
+  color: var(--color-primary);
+  margin-bottom: var(--mkt-sp-1);
+}
+.mkt-walk-heading { font-size: var(--mkt-fs-h3); font-weight: 700; margin: 0 0 var(--mkt-sp-2); }
+.mkt-walk-desc { color: var(--color-muted); line-height: var(--mkt-lh-body); margin: 0 0 var(--mkt-sp-3); font-size: var(--mkt-fs-body); }
+.mkt-walk-tags { display: flex; flex-wrap: wrap; gap: var(--mkt-sp-1) var(--mkt-sp-2); }
+.mkt-walk-tag {
+  font-size: var(--mkt-fs-2xs);
+  font-weight: 600;
+  color: var(--color-muted);
+}
+.mkt-walk-tag:not(:last-child)::after { content: '•'; margin-left: var(--mkt-sp-2); }
+.mkt-walk-visual {
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow);
+  padding: var(--mkt-sp-3);
+  min-height: 180px;
+}
+.mkt-walk-visual--shaded { background: var(--color-primary-soft); }
+.mkt-walk-field { margin-bottom: 12px; }
+.mkt-walk-field-label { font-size: 0.78rem; color: var(--color-muted); margin-bottom: 4px; }
+.mkt-walk-field-input { height: 40px; border-radius: 8px; border: 1px solid var(--color-border); background: var(--color-surface); }
+
+/* Scale the whole "how it works" story down on mobile: drop the paragraph
+   copy (the heading + tags already carry the point), and shrink the
+   heading and visual card so the row doesn't dominate a small screen. */
+@media (max-width: 640px) {
+  .mkt-walk-heading { font-size: 1.15rem; }
+  .mkt-walk-desc { display: none; }
+  .mkt-walk-tags { display: none; }
+  .mkt-walk-visual { padding: var(--mkt-sp-2); min-height: 0; }
+  .mkt-walk-field { margin-bottom: 8px; }
+  .mkt-walk-field-input { height: 32px; border-radius: 6px; }
+}
+.mkt-walk-ai-question {
+  min-height: 1.4em;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .mkt-walk-ai-question { transition: opacity 300ms ease; }
+}
+
+/* ---------- Outcome examples (bento) ---------- */
+.mkt-outcome-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--mkt-sp-3);
+}
+@media (min-width: 900px) {
+  /* Asymmetric 2-up bento instead of three identical cards: two stacked
+     cards on the left, one taller card (with more visual content) spanning
+     the right column - different dimensions read as more editorial than a
+     repeated grid. */
+  .mkt-outcome-grid {
+    grid-template-columns: 1.3fr 1fr;
+    grid-template-areas: "a c" "b c";
+  }
+  .mkt-outcome-card:nth-child(1) { grid-area: a; }
+  .mkt-outcome-card:nth-child(2) { grid-area: b; }
+  .mkt-outcome-card:nth-child(3) { grid-area: c; display: flex; flex-direction: column; justify-content: center; }
+}
+.mkt-outcome-card {
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface);
+  padding: var(--mkt-sp-3);
+}
+.mkt-outcome-question {
+  font-size: var(--mkt-fs-md);
+  font-weight: 700;
+  margin: 0 0 var(--mkt-sp-2);
+}
+.mkt-outcome-panel-label {
+  font-size: var(--mkt-fs-2xs);
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  margin-bottom: var(--mkt-sp-1);
+}
+.mkt-outcome-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: var(--mkt-sp-1) 0;
+  border-top: 1px solid var(--color-border);
+  font-size: var(--mkt-fs-xs);
+}
+.mkt-outcome-row:first-of-type { border-top: none; }
+.mkt-outcome-row-value { font-weight: 700; }
+.mkt-outcome-bar-track {
+  height: var(--mkt-sp-1);
+  border-radius: 4px;
+  background: var(--color-bg);
+  overflow: hidden;
+  margin-top: var(--mkt-sp-1);
+}
+.mkt-outcome-bar-fill { height: 100%; background: var(--color-primary); border-radius: 4px; }
+
+/* Shrink the bento cards on mobile - tighter padding and smaller type so
+   three cards don't each demand a full screen of scroll. */
+@media (max-width: 640px) {
+  .mkt-outcome-grid { gap: var(--mkt-sp-2); }
+  .mkt-outcome-card { padding: var(--mkt-sp-2); }
+  .mkt-outcome-question { font-size: 1rem; margin-bottom: var(--mkt-sp-1); }
+  .mkt-outcome-panel-label { font-size: 0.68rem; }
+  .mkt-outcome-row { padding: 6px 0; font-size: 0.82rem; }
+}
+
+/* ---------- Bridge statement ---------- */
+.mkt-bridge { text-align: center; max-width: var(--mkt-w-narrow); margin: 0 auto; }
+.mkt-bridge .mkt-subheading { margin: 0 auto; }
+
+/* ---------- Connecting canvas ("everything connects") ---------- */
+.mkt-canvas { display: flex; flex-direction: column; align-items: center; gap: var(--mkt-sp-2); max-width: 460px; margin: 0 auto; }
+@media (min-width: 768px) {
+  .mkt-canvas { flex-direction: row; align-items: stretch; gap: var(--mkt-sp-4); max-width: var(--mkt-w-content); }
+}
+.mkt-canvas-stage { display: flex; flex-direction: column; align-items: center; width: 100%; min-width: 0; }
+@media (min-width: 768px) {
+  .mkt-canvas-stage { width: auto; flex: 1; }
+}
+.mkt-canvas-panel {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-primary-soft);
+  box-shadow: var(--shadow);
+  padding: var(--mkt-sp-3);
+}
+.mkt-canvas-connector {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-primary);
+  flex-shrink: 0;
+}
+@media (min-width: 768px) {
+  .mkt-canvas-connector { flex-direction: row; align-self: center; }
+  .mkt-canvas-connector svg { transform: rotate(-90deg); }
+}
+/* Same shrink treatment as the bento cards above - these three panels are
+   stacked full-height on mobile, so tighter padding and smaller type saves
+   real scroll distance. */
+@media (max-width: 640px) {
+  .mkt-canvas { gap: var(--mkt-sp-1); }
+  .mkt-canvas-panel { padding: var(--mkt-sp-2); }
+  .mkt-canvas-panel .mkt-outcome-panel-label { font-size: 0.68rem; margin-bottom: 4px; }
+  .mkt-canvas-panel .mkt-outcome-row { padding: 4px 0; font-size: 0.8rem; }
+}
+.mkt-canvas-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-primary); flex-shrink: 0; }
+
+/* ---------- Demo conversion (major visual moment) ---------- */
+.mkt-demo-cta-card {
+  text-align: center;
+  max-width: var(--mkt-w-narrow);
+  margin: 0 auto;
+}
+.mkt-demo-cta-card .mkt-btn { margin-top: var(--mkt-sp-3); }
+.mkt-demo-cta-card .mkt-hint { display: block; margin-top: var(--mkt-sp-2); }
+
+/* ---------- Trust ----------
+   Deliberately one editorial column at every width, never three cards - no
+   borders/boxes/dividers, just heading -> icon+title -> paragraph, repeated,
+   with the same left edge for the heading and every paragraph. */
+.mkt-trust-wrap { max-width: var(--mkt-w-narrow); }
+.mkt-trust-heading {
+  text-align: left;
+  font-size: 1.6rem;
+  line-height: 1.15;
+  margin: 0;
+}
+@media (min-width: 768px) {
+  .mkt-trust-heading { font-size: var(--mkt-fs-h2); }
+}
+.mkt-trust-list {
+  display: flex;
+  flex-direction: column;
+  gap: 34px;
+  margin-top: 30px;
+}
+.mkt-trust-title {
+  font-weight: 700;
+  font-size: clamp(1.25rem, 2vw, 1.375rem);
+  line-height: 1.2;
+  margin: 0 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+/* Fixed-width icon slot (not just an inline gap) so all three headings -
+   whatever the icon's own glyph shape - start at exactly the same x
+   position. */
+.mkt-trust-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  flex-shrink: 0;
+  color: var(--color-primary);
+}
+.mkt-trust-desc {
+  color: var(--color-muted);
+  font-size: var(--mkt-fs-body);
+  line-height: var(--mkt-lh-body);
+  margin: 0;
+}
+
+/* ---------- Pricing ---------- */
+.mkt-pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--mkt-sp-3);
+  max-width: var(--mkt-w-content);
+  margin: 0 auto;
+}
+.mkt-pricing-card {
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: var(--color-surface);
+  padding: var(--mkt-sp-4);
+  display: flex;
+  flex-direction: column;
+}
+.mkt-pricing-card--sponsored { border-color: var(--color-primary); }
+.mkt-pricing-badge {
+  align-self: flex-start;
+  font-size: var(--mkt-fs-2xs);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  border-radius: 999px;
+  padding: 4px var(--mkt-sp-1);
+  margin-bottom: var(--mkt-sp-2);
+}
+.mkt-pricing-name { font-weight: 700; font-size: var(--mkt-fs-sm); margin: 0 0 4px; }
+.mkt-pricing-price { font-size: var(--mkt-fs-h3); font-weight: 800; margin: 0 0 var(--mkt-sp-2); }
+.mkt-pricing-price span { font-size: var(--mkt-fs-md); font-weight: 500; color: var(--color-muted); }
+.mkt-pricing-desc { color: var(--color-muted); font-size: var(--mkt-fs-xs); line-height: var(--mkt-lh-body); margin: 0 0 var(--mkt-sp-3); flex: 1; }
+
+/* Compact, side-by-side on mobile too instead of two full-height stacked
+   cards - a shorter card saves far more vertical space than it costs in
+   per-card width. */
+@media (max-width: 640px) {
+  .mkt-pricing-card { padding: var(--mkt-sp-2); border-radius: 12px; }
+  .mkt-pricing-name { font-size: var(--mkt-fs-xs); }
+  .mkt-pricing-desc { font-size: 0.72rem; margin-bottom: var(--mkt-sp-2); }
+  .mkt-pricing-badge { font-size: 0.62rem; padding: 3px 6px; margin-bottom: var(--mkt-sp-1); }
+  .mkt-pricing-card .mkt-btn { min-height: 38px; font-size: 0.8rem; padding: 0 var(--mkt-sp-2); }
+}
+
+/* ---------- FAQ ---------- */
+.mkt-faq { max-width: var(--mkt-w-content); margin: 0 auto; }
+.mkt-faq-item {
+  border-top: 1px solid var(--color-border);
+  padding: 4px 0;
+}
+.mkt-faq-item:last-child { border-bottom: 1px solid var(--color-border); }
+.mkt-faq-item summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mkt-sp-2);
+  padding: var(--mkt-sp-2) 4px;
+  font-weight: 600;
+  font-size: var(--mkt-fs-sm);
+  min-height: 44px;
+}
+.mkt-faq-item summary::-webkit-details-marker { display: none; }
+.mkt-faq-icon { flex-shrink: 0; color: var(--color-muted); transition: transform 150ms ease; }
+.mkt-faq-item[open] .mkt-faq-icon { transform: rotate(45deg); }
+.mkt-faq-answer { color: var(--color-muted); line-height: var(--mkt-lh-body); padding: 0 4px var(--mkt-sp-3); margin: 0; }
+
+/* ---------- Footer ---------- */
+.mkt-footer { padding-block: var(--mkt-sp-5) var(--mkt-sp-4); }
+.mkt-footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--mkt-sp-3);
+  padding-bottom: var(--mkt-sp-3);
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: var(--mkt-sp-3);
+}
+/* Reuses .mkt-hero-cta-row's flex/wrap/gap layout - this override just
+   drops the margin that made sense stacked under a hero headline but not
+   sitting on its own in the footer. */
+.mkt-footer-cta { margin: 0; }
+/* Same mobile shape as the hero's CTA row (full-width primary on its own
+   line, the other two spread evenly below it) - not reusing
+   .mkt-hero-mobile-auth here since that hides at 900px+, and the footer
+   needs Sign up/Sign in visible at every width. */
+@media (max-width: 640px) {
+  .mkt-footer-cta .mkt-btn--lg { flex-basis: 100%; min-height: 44px; padding: 0 var(--mkt-sp-3); font-size: var(--mkt-fs-sm); }
+  .mkt-footer-cta .mkt-btn--secondary,
+  .mkt-footer-cta .mkt-nav-signin { flex: 1; text-align: center; }
+}
+.mkt-footer-bottom { display: flex; flex-direction: column; gap: 4px; color: var(--color-muted); font-size: var(--mkt-fs-2xs); }
+.mkt-footer-bottom a { color: inherit; }
+.mkt-footer-bottom a:hover { color: var(--color-primary); }
+
+/* ---------- Chapters ----------
+   Each chapter groups a few sections under one background so the page
+   reads as continuous chapters rather than a stripe per section. Adjacent
+   chapters deliberately use close values (--color-bg vs --color-surface)
+   so most boundaries need no visible divider at all. */
+.mkt-chapter--discover { background: var(--color-bg); }
+.mkt-chapter--how { background: var(--color-surface); }
+.mkt-chapter--understanding { background: color-mix(in srgb, var(--color-primary) 4%, var(--color-bg) 96%); }
+.mkt-chapter--connects { background: var(--color-surface); }
+/* The one bold visual break on the page - full accent-color surface. A
+   fixed-height fade strip (.mkt-chapter-fade, placed right after this
+   chapter in LandingPage.jsx) eases it into --trust below, independent of
+   how tall this chapter's own content happens to be. */
+.mkt-chapter--conversion {
+  background: var(--color-primary);
+  color: #fff;
+}
+.mkt-chapter--conversion .mkt-eyebrow { color: rgba(255,255,255,0.85); }
+.mkt-chapter--conversion .mkt-heading { color: #fff; }
+.mkt-chapter--conversion .mkt-subheading,
+.mkt-chapter--conversion .mkt-hint { color: rgba(255,255,255,0.78); }
+.mkt-chapter--conversion .mkt-btn:not(.mkt-btn--secondary):not(.mkt-btn--ghost) { background: #fff; color: var(--color-primary); }
+.mkt-chapter--conversion .mkt-btn:not(.mkt-btn--secondary):not(.mkt-btn--ghost):hover { background: rgba(255,255,255,0.9); }
+.mkt-chapter-fade--conversion-trust {
+  height: clamp(40px, 6vw, 72px);
+  background: linear-gradient(to bottom, var(--color-primary), var(--color-surface));
+}
+.mkt-chapter--trust { background: var(--color-surface); }
+.mkt-chapter--faq { background: var(--color-bg); }
+.mkt-chapter--closing { background: var(--color-surface); }
+
+@media (prefers-reduced-motion: reduce) {
+  .mkt * { transition: none !important; animation: none !important; }
+  .mkt-reveal { opacity: 1; transform: none; }
+}

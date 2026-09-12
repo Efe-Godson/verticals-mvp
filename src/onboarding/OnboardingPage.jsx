@@ -72,21 +72,11 @@ export default function OnboardingPage() {
   // selection so a stale match from a previous attempt never leaks in.
   const [matchedRoute, setMatchedRoute] = useState(null)
   const dataPromiseRef = useRef(null) // in-flight loadDestinationData() call, kicked off from the records-method step
-  // A second, harder-to-miss nudge toward Create account once they've had a
-  // moment to actually look at the destination screen - the persistent
-  // header button is easy to tune out entirely on a first look.
-  const [showNudge, setShowNudge] = useState(false)
 
   useEffect(() => {
     track('started_onboarding')
     loadActiveDemoRoutes().then(result => setRoutesById(result || 'all'))
   }, [])
-
-  useEffect(() => {
-    if (stage !== 'destination') { setShowNudge(false); return }
-    const timer = setTimeout(() => setShowNudge(true), 4500)
-    return () => clearTimeout(timer)
-  }, [stage])
 
   const intent = getEntryIntent(selectedId)
   const route = routesById && routesById !== 'all' ? routesById[selectedId] : null
@@ -146,7 +136,7 @@ export default function OnboardingPage() {
       )}
 
       {stage === 'welcome' && (
-        <WelcomeScreen onGetStarted={() => setStage('selection')} onSignIn={() => navigate('/login')} />
+        <WelcomeScreen onGetStarted={() => setStage('selection')} />
       )}
 
       {stage === 'selection' && (
@@ -166,37 +156,7 @@ export default function OnboardingPage() {
       )}
 
       {stage === 'destination' && (
-        <>
-          <IntentDestination state={destinationState} customIntentText={customText.trim()} />
-          {showNudge && (
-            <div style={{
-              position: 'fixed', left: '50%', bottom: '1.1rem', transform: 'translateX(-50%)', zIndex: 280,
-              display: 'flex', alignItems: 'center', gap: '0.8rem', maxWidth: 'calc(100vw - 2rem)',
-              background: 'var(--color-text)', color: 'var(--color-bg)', borderRadius: 999,
-              padding: '0.6rem 0.6rem 0.6rem 1.1rem', boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
-            }}>
-              <span style={{ fontSize: '0.85rem', fontWeight: 600, whiteSpace: 'nowrap' }}>Like what you see? Make it yours.</span>
-              <button
-                type="button"
-                onClick={handleCreateWorkspace}
-                style={{ fontSize: '0.85rem', padding: '0.45rem 1rem', fontWeight: 700, whiteSpace: 'nowrap' }}
-              >
-                Create account
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowNudge(false)}
-                aria-label="Dismiss"
-                style={{
-                  background: 'transparent', border: 'none', color: 'inherit', opacity: 0.6, cursor: 'pointer',
-                  fontSize: '1.1rem', lineHeight: 1, padding: '0 0.3rem',
-                }}
-              >
-                ×
-              </button>
-            </div>
-          )}
-        </>
+        <IntentDestination state={destinationState} customIntentText={customText.trim()} />
       )}
     </div>
   )

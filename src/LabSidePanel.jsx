@@ -11,6 +11,7 @@ import { Link, useLocation } from 'react-router-dom'
 const ENTRIES = [
   { label: 'Lab Dashboard', to: '/lab' },
   { label: 'Templates', to: '/templates' },
+  { label: '🚀 Landing Page', to: '/lab/landing' },
   { label: '🎲 Quiz', to: '/lab/quiz' },
   { label: '🚨 Alerts', to: '/lab/alerts' },
   { label: '📧 Email Monitor', to: '/lab/email-monitor' },
