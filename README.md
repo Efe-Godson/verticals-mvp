@@ -31,23 +31,23 @@ These are safe to expose client-side (they're the public anon key, scoped by Sup
 
 ### Google Sheets export
 
-"Open in Google Sheets" on Records uses Supabase's Google OAuth session rather than a separate client-side flow. Login (`supabase.auth.signInWithOAuth`) only ever requests `openid email profile`. The first time someone clicks "Open in Google Sheets" without a Google session that's already granted Sheets/Drive access, `recordsExport.js` triggers its own `signInWithOAuth` call requesting `spreadsheets` and `drive.file` scopes and redirects back to the page; once that grant exists, `session.provider_token` is used directly as the Sheets API bearer token on every subsequent export. This needs Google configured as an OAuth provider in the Supabase dashboard (Authentication → Providers → Google) with the Sheets and Drive APIs enabled on the underlying Google Cloud project — no separate `VITE_GOOGLE_CLIENT_ID` is used.
+"Open in Google Sheets" on Records uses Supabase's Google OAuth session rather than a separate client-side flow. Login (`supabase.auth.signInWithOAuth`) only ever requests `openid email profile`. The first time someone clicks "Open in Google Sheets" without a Google session that's already granted Sheets/Drive access, `recordsExport.js` triggers its own `signInWithOAuth` call requesting `spreadsheets` and `drive.file` scopes and redirects back to the page; once that grant exists, `session.provider_token` is used directly as the Sheets API bearer token on every subsequent export. This needs Google configured as an OAuth provider in the Supabase dashboard (Authentication → Providers → Google) with the Sheets and Drive APIs enabled on the underlying Google Cloud project - no separate `VITE_GOOGLE_CLIENT_ID` is used.
 
 ## Scripts
 
-- `npm run dev` — start the Vite dev server
-- `npm run build` — production build to `dist/`
-- `npm run preview` — preview the production build locally
-- `npm run lint` — run oxlint
-- `npm test` — run the vitest suite
+- `npm run dev` - start the Vite dev server
+- `npm run build` - production build to `dist/`
+- `npm run preview` - preview the production build locally
+- `npm run lint` - run oxlint
+- `npm test` - run the vitest suite
 
 ## Supabase Edge Functions
 
 The AI analysis features live in `supabase/functions/`:
 
-- `ai-analyst` — generates a structured business analysis (summary, insights, recommendations, anomalies, forecasts) for a form's submissions
-- `ai-ask` — answers ad-hoc questions about a form's submissions
-- `_shared/stats.ts` — shared stats-building helpers used by both functions
+- `ai-analyst` - generates a structured business analysis (summary, insights, recommendations, anomalies, forecasts) for a form's submissions
+- `ai-ask` - answers ad-hoc questions about a form's submissions
+- `_shared/stats.ts` - shared stats-building helpers used by both functions
 
 To deploy a function:
 
@@ -62,9 +62,9 @@ Both functions need a `GEMINI_API_KEY` secret:
 supabase secrets set GEMINI_API_KEY=your_key
 ```
 
-Optionally, `OPENROUTER_API_KEY` and `AI_GATEWAY_API_KEY` add a second and third fallback tier if Gemini (then OpenRouter) is rate-limited or unavailable — see `_shared/aiProvider.ts`. Neither is required; without them, that tier is just skipped.
+Optionally, `OPENROUTER_API_KEY` and `AI_GATEWAY_API_KEY` add a second and third fallback tier if Gemini (then OpenRouter) is rate-limited or unavailable - see `_shared/aiProvider.ts`. Neither is required; without them, that tier is just skipped.
 
-`SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected automatically into every Edge Function — no need to set them yourself.
+`SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected automatically into every Edge Function - no need to set them yourself.
 
 ## Deployment
 

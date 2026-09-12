@@ -146,14 +146,14 @@ function DemoSetupPage() {
                 <div>
                   <label style={{ fontSize: '0.78rem', color: 'var(--color-muted)', display: 'block', marginBottom: '0.25rem' }}>Template</label>
                   <select value={row.template_slug} onChange={(e) => updateRow(intent.id, { template_slug: e.target.value })} style={{ width: '100%', padding: '0.4rem' }}>
-                    <option value="">— None —</option>
+                    <option value="">None</option>
                     {templates.map(t => <option key={t.slug} value={t.slug}>{t.name}</option>)}
                   </select>
                 </div>
                 <div>
                   <label style={{ fontSize: '0.78rem', color: 'var(--color-muted)', display: 'block', marginBottom: '0.25rem' }}>Demo Data</label>
                   <select value={row.demo_dataset_id} onChange={(e) => updateRow(intent.id, { demo_dataset_id: e.target.value })} style={{ width: '100%', padding: '0.4rem' }}>
-                    <option value="">— None —</option>
+                    <option value="">None</option>
                     {datasets.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                   </select>
                 </div>
