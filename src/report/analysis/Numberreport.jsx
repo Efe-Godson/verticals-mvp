@@ -14,7 +14,7 @@ function NumberReport({ field, answered }) {
 
   return (
     <div style={{ marginTop: '0.8rem' }}>
-      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+      <div className="kpi-grid">
         <StatTile label="Total" value={total.toLocaleString()} />
         <StatTile label="Average" value={Math.round(avg).toLocaleString()} />
         <StatTile label="Median" value={med.toLocaleString()} />

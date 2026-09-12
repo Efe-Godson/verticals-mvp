@@ -196,7 +196,7 @@
   align-items: center;
   gap: var(--mkt-sp-1);
   text-decoration: none;
-  color: var(--color-text);
+  color: var(--color-primary);
   font-weight: 800;
   font-size: var(--mkt-fs-md);
   letter-spacing: 0.01em;
@@ -328,12 +328,10 @@
   gap: var(--mkt-sp-2);
   margin: var(--mkt-sp-4) 0 var(--mkt-sp-2);
 }
-.mkt-hero-hint {
-  font-size: var(--mkt-fs-sm);
-  font-weight: 600;
-  font-style: italic;
-  color: var(--color-text);
-}
+/* Full width at every breakpoint, matching the two secondary actions below
+   it so the whole CTA stack reads as one deliberate column, not a narrow
+   button sitting above a wider row. */
+.mkt-hero-primary-cta { width: 100%; }
 /* Sign up/Sign in sit as two quiet, equal-width actions under the button -
    a soft tinted pill each (never a hard border) so they read as slightly
    more tappable than plain text, without competing with "Try a free demo". */
@@ -360,9 +358,8 @@
   .mkt-hero-eyebrow { font-size: 0.7rem; }
   .mkt-hero-heading { font-size: 1.5rem; }
   .mkt-hero-text .mkt-subheading { display: none; }
-  .mkt-hero-hint { display: none; }
   .mkt-hero-cta-row { margin: var(--mkt-sp-3) 0 var(--mkt-sp-1); }
-  .mkt-hero-cta-row .mkt-btn--lg { width: 100%; min-height: 44px; padding: 0 var(--mkt-sp-3); font-size: var(--mkt-fs-sm); }
+  .mkt-hero-cta-row .mkt-btn--lg { min-height: 44px; padding: 0 var(--mkt-sp-3); font-size: var(--mkt-fs-sm); }
 }
 
 .mkt-preview-card {
@@ -629,12 +626,23 @@
 .mkt-demo-cta-card .mkt-hint { display: block; margin-top: var(--mkt-sp-2); }
 
 /* ---------- Trust ----------
-   Deliberately one editorial column at every width, never three cards - no
-   borders/boxes/dividers, just heading -> icon+title -> paragraph, repeated,
-   with the same left edge for the heading and every paragraph. */
-.mkt-trust-wrap { max-width: var(--mkt-w-narrow); }
+   One centered column on mobile - no borders/boxes/dividers, just heading ->
+   icon+title -> paragraph, repeated. On desktop the three items sit side by
+   side as their own horizontal sections instead of stacking. */
+.mkt-trust-wrap { max-width: var(--mkt-w-narrow); margin: 0 auto; text-align: center; }
+@media (min-width: 768px) {
+  .mkt-trust-wrap { max-width: var(--mkt-w-content); }
+}
+/* The row layout below needs enough width per column for the longest
+   heading ("Export when you need to") to sit on one line - narrower than
+   that and it's better to stay stacked (where wrapping is harmless) than
+   to force a row that's too tight to align. 1024px is where three columns
+   at --mkt-w-trust actually have that room; below it the block stays in
+   the single centered column from the base rule above. */
+@media (min-width: 1024px) {
+  .mkt-trust-wrap { max-width: var(--mkt-w-trust); }
+}
 .mkt-trust-heading {
-  text-align: left;
   font-size: 1.6rem;
   line-height: 1.15;
   margin: 0;
@@ -648,6 +656,10 @@
   gap: 34px;
   margin-top: 30px;
 }
+@media (min-width: 1024px) {
+  .mkt-trust-list { flex-direction: row; align-items: flex-start; gap: var(--mkt-sp-4); }
+  .mkt-trust-item { flex: 1; }
+}
 .mkt-trust-title {
   font-weight: 700;
   font-size: clamp(1.25rem, 2vw, 1.375rem);
@@ -655,7 +667,15 @@
   margin: 0 0 8px;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 11px;
+}
+/* Same-line headings only once the row layout above has room for them -
+   forcing nowrap any earlier would just overflow a too-narrow column. Equal
+   single-line heights across all three items is also what keeps every
+   description starting on the same row underneath. */
+@media (min-width: 1024px) {
+  .mkt-trust-title { white-space: nowrap; }
 }
 /* Fixed-width icon slot (not just an inline gap) so all three headings -
    whatever the icon's own glyph shape - start at exactly the same x
@@ -745,34 +765,44 @@
 .mkt-faq-item[open] .mkt-faq-icon { transform: rotate(45deg); }
 .mkt-faq-answer { color: var(--color-muted); line-height: var(--mkt-lh-body); padding: 0 4px var(--mkt-sp-3); margin: 0; }
 
-/* ---------- Footer ---------- */
-.mkt-footer { padding-block: var(--mkt-sp-5) var(--mkt-sp-4); }
+/* ---------- Footer ----------
+   No top padding - the chapter above (FAQ) already carries its own bottom
+   padding via .mkt-section, so stacking a second block of space here just
+   to separate "footer" as a concept pushed the CTA button needlessly far
+   down. Bottom padding stays, since nothing below it provides that gap. */
+.mkt-footer { padding-block: 0 var(--mkt-sp-4); }
 .mkt-footer-inner {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  align-items: center;
-  gap: var(--mkt-sp-3);
+  justify-content: center;
   padding-bottom: var(--mkt-sp-3);
   border-bottom: 1px solid var(--color-border);
   margin-bottom: var(--mkt-sp-3);
 }
-/* Reuses .mkt-hero-cta-row's flex/wrap/gap layout - this override just
-   drops the margin that made sense stacked under a hero headline but not
-   sitting on its own in the footer. */
-.mkt-footer-cta { margin: 0; }
-/* Same mobile shape as the hero's CTA row (full-width primary on its own
-   line, the other two spread evenly below it) - not reusing
-   .mkt-hero-mobile-auth here since that hides at 900px+, and the footer
-   needs Sign up/Sign in visible at every width. */
-@media (max-width: 640px) {
-  .mkt-footer-cta .mkt-btn--lg { flex-basis: 100%; min-height: 44px; padding: 0 var(--mkt-sp-3); font-size: var(--mkt-fs-sm); }
-  .mkt-footer-cta .mkt-btn--secondary,
-  .mkt-footer-cta .mkt-nav-signin { flex: 1; text-align: center; }
+/* Same "Try a free demo" + Sign up/Sign in shape as the hero (reusing its
+   classes directly), just centered and width-capped for its own context
+   here in the footer instead of sitting in a hero text column. */
+.mkt-footer-cta { width: 100%; max-width: var(--mkt-w-narrow); margin: 0 auto; }
+/* A 5-column grid rather than a single inline line, so whatever gets added
+   here later (link groups, social, extra legal text) drops in as its own
+   .mkt-footer-col and lines up with everything else automatically instead
+   of needing manual spacing each time. Today only the copyright column is
+   populated - the other four tracks just sit empty until something fills
+   them. Collapses to one stacked, centered column on mobile since a 5-up
+   grid has no room to be anything but cramped there. */
+.mkt-footer-bottom {
+  display: grid;
+  grid-template-columns: repeat(5, max-content);
+  justify-content: space-between;
+  gap: var(--mkt-sp-3);
+  color: var(--color-muted);
+  font-size: var(--mkt-fs-2xs);
 }
-.mkt-footer-bottom { display: flex; flex-direction: column; gap: 4px; color: var(--color-muted); font-size: var(--mkt-fs-2xs); }
+.mkt-footer-col { min-width: 0; }
 .mkt-footer-bottom a { color: inherit; }
 .mkt-footer-bottom a:hover { color: var(--color-primary); }
+@media (max-width: 640px) {
+  .mkt-footer-bottom { grid-template-columns: 1fr; justify-content: start; text-align: center; gap: var(--mkt-sp-2); }
+}
 
 /* ---------- Chapters ----------
    Each chapter groups a few sections under one background so the page

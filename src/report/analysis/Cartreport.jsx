@@ -52,7 +52,7 @@ function CartReport({ field, answered, showStats = true }) {
   return (
     <div style={{ marginTop: showStats ? '0.8rem' : 0 }}>
       {showStats && (
-        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
+        <div className="kpi-grid" style={{ marginBottom: '1.5rem' }}>
           <StatTile label="Total Revenue" value={formatNaira(totalRevenue)} />
           <StatTile label="Orders" value={answered.length.toLocaleString()} />
           <StatTile label="Average Order" value={formatNaira(avgOrder)} />

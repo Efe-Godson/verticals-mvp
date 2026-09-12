@@ -766,6 +766,21 @@ textarea.pf-control {
   box-shadow: var(--shadow);
 }
 
+/* Shared stat-tile grid (KPI rows, analytics summaries, etc). Two columns
+   on mobile; if the last tile is left alone in the final row (an odd total
+   count) it spans both columns instead of leaving a gap. Above 500px the
+   grid switches to auto-fit columns, where a lone leftover reads fine at
+   its own width, so the span is turned back off. */
+.kpi-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.8rem; }
+.kpi-grid > *:last-child:nth-child(odd) { grid-column: span 2; }
+@media (min-width: 500px) {
+  .kpi-grid { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+  .kpi-grid > *:last-child:nth-child(odd) { grid-column: auto; }
+}
+@media (max-width: 640px) {
+  .kpi-grid { gap: 0.6rem; }
+}
+
 .toggle {
   position: relative;
   display: inline-block;

@@ -346,7 +346,7 @@ function AIAnalystPage() {
               </p>
             )}
 
-            <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap', marginTop: '1.2rem' }}>
+            <div className="kpi-grid" style={{ marginTop: '1.2rem' }}>
               <StatTile label="Responses" value={filtered.length.toLocaleString()} />
               <FlaggedStatTile
                 label="Key Insights" value={insights.length}

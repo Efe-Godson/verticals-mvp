@@ -32,7 +32,7 @@ function DateReport({ field, answered }) {
 
   return (
     <div style={{ marginTop: '0.8rem' }}>
-      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.2rem' }}>
+      <div className="kpi-grid" style={{ marginBottom: '1.2rem' }}>
         <StatTile label="Peak Day" value={peakDay ? peakDay[0] : '-'} />
         <StatTile label="Peak Month" value={peakMonth ? peakMonth[0] : '-'} />
       </div>

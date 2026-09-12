@@ -9,16 +9,17 @@ function StatTile({ label, value, trend }) {
   return (
     <div className="card" style={{ padding: '1rem 1.25rem', minWidth: 0, transition: 'box-shadow 0.15s ease' }}>
       <div style={{
-        fontSize: '0.78rem', color: 'var(--color-muted)', marginBottom: '0.3rem',
-        textTransform: 'uppercase', letterSpacing: '0.04em'
-      }}>
-        {label}
-      </div>
-      <div style={{
         fontSize: 'clamp(1.05rem, 4.5vw, 1.35rem)', fontWeight: 800, fontVariantNumeric: 'tabular-nums',
         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
       }}>
         {value}
+      </div>
+      <div style={{
+        fontSize: '0.78rem', color: 'var(--color-text)', marginTop: '0.3rem', fontWeight: 600,
+        textTransform: 'uppercase', letterSpacing: '0.04em',
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}>
+        {label}
       </div>
       {trend && (
         <div

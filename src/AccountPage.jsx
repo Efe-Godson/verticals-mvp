@@ -302,7 +302,7 @@ function AccountPage() {
           <p style={{ color: 'var(--color-muted)' }}>Create your first form to start seeing usage stats here.</p>
         ) : (
           <>
-            <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap', marginBottom: '1.2rem' }}>
+            <div className="kpi-grid" style={{ marginBottom: '1.2rem' }}>
               <StatTile label="Total Forms" value={forms.length} />
               <StatTile label="Published" value={publishedCount} />
               <StatTile label="Total Submissions" value={totalSubmissions.toLocaleString()} />
