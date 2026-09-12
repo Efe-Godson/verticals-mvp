@@ -53,14 +53,46 @@ export function categoryCountTiles({ categoryField, submissions, amountField, no
   const { countData, sumData } = aggregate({ categoryField, submissions, amountField })
   if (countData.length === 0) return []
   const base = `catcount-${categoryField.id}`
+  const unitLabel = `${categoryField.label.toLowerCase()}s`
+
+  // Focus Mode drill-down (brief §15): the records behind one category value.
+  function getRecords(val) {
+    return submissions
+      .filter(sub => getFieldValues(sub, categoryField).includes(val))
+      .map(sub => ({
+        date: new Date(sub.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+        ...(amountField ? { amount: Number(sub.data[amountField.id]) || 0 } : {}),
+      }))
+  }
+  const recordColumns = [
+    { key: 'date', label: 'Date', align: 'left', sortable: true },
+    ...(amountField ? [{ key: 'amount', label: amountField.label, align: 'right', sortable: true, format: r => formatNaira(r.amount) }] : []),
+  ]
+
+  const countTitle = `${noun.plural} by ${categoryField.label}`
   const tiles = [
-    { id: `${base}-count`, title: `${noun.plural} by ${categoryField.label}`, node: <HorizontalBarChart data={countData} bare /> },
+    {
+      id: `${base}-count`,
+      title: countTitle,
+      node: (
+        <HorizontalBarChart
+          data={countData} bare focusTitle={countTitle} unitLabel={categoryField.label.toLowerCase() + ' values'}
+          sourceLabel={noun.plural} getRecords={getRecords} recordColumns={recordColumns}
+        />
+      ),
+    },
   ]
   if (sumData.length > 0) {
+    const sumTitle = `${amountField.label} by ${categoryField.label}`
     tiles.unshift({
       id: `${base}-sum`,
-      title: `${amountField.label} by ${categoryField.label}`,
-      node: <HorizontalBarChart data={sumData} formatValue={(v) => formatNaira(v)} bare />,
+      title: sumTitle,
+      node: (
+        <HorizontalBarChart
+          data={sumData} formatValue={(v) => formatNaira(v)} bare focusTitle={sumTitle} unitLabel={categoryField.label.toLowerCase() + ' values'}
+          sourceLabel={noun.plural} getRecords={getRecords} recordColumns={recordColumns}
+        />
+      ),
     })
   }
   return tiles

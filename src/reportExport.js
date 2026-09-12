@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf'
-import pptxgen from 'pptxgenjs'
 import html2canvas from 'html2canvas'
+import { pageFormatMm } from './report/builder/print/printConstants'
 
 function median(values) {
   if (values.length === 0) return 0
@@ -288,110 +288,37 @@ export async function exportReportToPDF(element, fileName, { variant = 'standard
 }
 
 // ---------------------------------------------------------------------------
-// POWERPOINT DOWNLOAD (pptxgenjs): real, editable native bar charts, one
-// slide per chart-friendly field. Text-heavy fields are skipped here since
-// they don't translate well to slides.
+// PRINT LAYOUT DOWNLOAD: one authored page (see report/builder/print/) is
+// already rendered on screen at the exact page aspect ratio (a PPT-style
+// 16:9 slide by default, or A4) - captured full-bleed as one image per PDF
+// page, same html2canvas -> jsPDF mechanic as exportReportToPDF above, just
+// without that function's "fit inside a margin" math, since a print-layout
+// page already *is* page-shaped.
 // ---------------------------------------------------------------------------
 
-export function exportReportToPPTX(form, submissions, filterSummary) {
-  const pptx = new pptxgen()
-  const totalResponses = submissions.length
-  const generatedStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+export async function exportPrintLayoutToPDF(pageSize, orientation, pageNodes, fileName, { onProgress } = {}) {
+  const nodes = (pageNodes || []).filter(Boolean)
+  if (nodes.length === 0) {
+    alert('Add at least one page before exporting.')
+    return
+  }
 
-  const titleSlide = pptx.addSlide()
-  titleSlide.addText(form.name, { x: 0.5, y: 1.4, w: 9, h: 1, fontSize: 32, bold: true })
-  titleSlide.addText('Report', { x: 0.5, y: 2.2, w: 9, h: 0.6, fontSize: 18, color: '666666' })
-  titleSlide.addText(
-    `${totalResponses} response${totalResponses !== 1 ? 's' : ''}${filterSummary ? ' · ' + filterSummary : ''} · Generated ${generatedStr}`,
-    { x: 0.5, y: 2.9, w: 9, h: 0.5, fontSize: 12, color: '999999' }
-  )
+  const [w, h] = pageFormatMm(pageSize, orientation)
+  const format = [w, h]
+  const jsPdfOrientation = w >= h ? 'l' : 'p'
+  const pdf = new jsPDF({ orientation: jsPdfOrientation, unit: 'mm', format })
+  const pageW = pdf.internal.pageSize.getWidth()
+  const pageH = pdf.internal.pageSize.getHeight()
 
-  const overviewSlide = pptx.addSlide()
-  overviewSlide.addText('Overview', { x: 0.5, y: 0.4, w: 9, h: 0.6, fontSize: 24, bold: true })
-  overviewSlide.addText(`Total Responses: ${totalResponses}`, { x: 0.5, y: 1.3, w: 9, h: 0.5, fontSize: 16 })
+  for (let i = 0; i < nodes.length; i++) {
+    onProgress?.(i, nodes.length, `Page ${i + 1}`)
+    await new Promise(r => setTimeout(r, 0))
+    const canvas = await html2canvas(nodes[i], { scale: 2, backgroundColor: '#ffffff', useCORS: true })
+    if (i > 0) pdf.addPage(format, jsPdfOrientation)
+    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pageW, pageH)
+  }
 
-  const orderedFields = orderFieldsCartFirst(form.fields.filter(f => f.type !== 'section'))
-
-  orderedFields.forEach(field => {
-    const answered = getAnsweredFor(field, submissions)
-    if (answered.length === 0) return
-
-    if (['dropdown', 'multiplechoice', 'checkbox'].includes(field.type)) {
-      const countMap = {}
-      answered.forEach(s => {
-        getFieldValues(s, field).forEach(v => { countMap[v] = (countMap[v] || 0) + 1 })
-      })
-      const labels = Object.keys(countMap)
-      const values = Object.values(countMap)
-      if (labels.length === 0) return
-
-      const slide = pptx.addSlide()
-      slide.addText(field.label, { x: 0.5, y: 0.3, w: 9, h: 0.5, fontSize: 22, bold: true })
-      slide.addChart(pptx.ChartType.bar, [{ name: field.label, labels, values }], {
-        x: 0.5, y: 1.0, w: 9, h: 4.5, barDir: 'col',
-        showValue: true, showLegend: false, chartColors: ['0070F3']
-      })
-    } else if (field.type === 'cart') {
-      const itemQty = {}
-      const itemRevenue = {}
-      answered.forEach(s => {
-        s.data[field.id].items.forEach(item => {
-          itemQty[item.name] = (itemQty[item.name] || 0) + item.quantity
-          itemRevenue[item.name] = (itemRevenue[item.name] || 0) + item.price * item.quantity
-        })
-      })
-
-      const qtyLabels = Object.keys(itemQty)
-      if (qtyLabels.length > 0) {
-        const slideQty = pptx.addSlide()
-        slideQty.addText(`${field.label}: Quantity Sold`, { x: 0.5, y: 0.3, w: 9, h: 0.5, fontSize: 22, bold: true })
-        slideQty.addChart(pptx.ChartType.bar, [{ name: 'Quantity', labels: qtyLabels, values: Object.values(itemQty) }], {
-          x: 0.5, y: 1.0, w: 9, h: 4.5, barDir: 'col',
-          showValue: true, showLegend: false, chartColors: ['22C55E']
-        })
-      }
-
-      const revLabels = Object.keys(itemRevenue)
-      if (revLabels.length > 0) {
-        const slideRev = pptx.addSlide()
-        slideRev.addText(`${field.label}: Revenue`, { x: 0.5, y: 0.3, w: 9, h: 0.5, fontSize: 22, bold: true })
-        slideRev.addChart(pptx.ChartType.bar, [{ name: 'Revenue', labels: revLabels, values: Object.values(itemRevenue) }], {
-          x: 0.5, y: 1.0, w: 9, h: 4.5, barDir: 'col',
-          showValue: true, showLegend: false, chartColors: ['F59E0B']
-        })
-      }
-    } else if (field.type === 'number' || field.type === 'rating' || field.type === 'linearscale') {
-      const values = answered.map(s => Number(s.data[field.id])).filter(v => !isNaN(v))
-      if (values.length === 0) return
-      const total = values.reduce((a, b) => a + b, 0)
-
-      const slide = pptx.addSlide()
-      slide.addText(field.label, { x: 0.5, y: 0.3, w: 9, h: 0.5, fontSize: 22, bold: true })
-      slide.addText(
-        `Total: ${total.toLocaleString()}\nAverage: ${(total / values.length).toLocaleString(undefined, { maximumFractionDigits: 2 })}\nMin: ${Math.min(...values).toLocaleString()}   Max: ${Math.max(...values).toLocaleString()}`,
-        { x: 0.5, y: 1.3, w: 9, h: 2, fontSize: 16, lineSpacingMultiple: 1.4 }
-      )
-    } else if (field.type === 'date') {
-      const dayCounts = {}
-      answered.forEach(s => {
-        const d = new Date(s.data[field.id])
-        if (isNaN(d)) return
-        const dn = d.toLocaleDateString('en-GB', { weekday: 'long' })
-        dayCounts[dn] = (dayCounts[dn] || 0) + 1
-      })
-      const labels = Object.keys(dayCounts)
-      if (labels.length === 0) return
-
-      const slide = pptx.addSlide()
-      slide.addText(`${field.label}: By Day of Week`, { x: 0.5, y: 0.3, w: 9, h: 0.5, fontSize: 22, bold: true })
-      slide.addChart(pptx.ChartType.bar, [{ name: 'Responses', labels, values: Object.values(dayCounts) }], {
-        x: 0.5, y: 1.0, w: 9, h: 4.5, barDir: 'col',
-        showValue: true, showLegend: false, chartColors: ['8B5CF6']
-      })
-    }
-    // Text-like fields (text, longtext, email, phone, fileupload, time, grids)
-    // are intentionally skipped, they don't translate into chart slides.
-  })
-
-  pptx.writeFile({ fileName: `${safeFileName(form.name)}.pptx` })
+  onProgress?.(nodes.length, nodes.length, 'Saving…')
+  pdf.save(`${safeFileName(fileName)}.pdf`)
 }
+

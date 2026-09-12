@@ -9,11 +9,31 @@ import { getDateRangeBounds } from '../helpers/dateRange'
 import { buildDatasets } from '../engine'
 import { makeVisual } from './catalogue'
 
-const EMPTY_STATE = { visuals: [], builderFilters: { dateRange: 'all', customStart: '', customEnd: '', dimensionFilters: [] } }
+const EMPTY_PRINT_LAYOUT = {
+  pageSize: 'slide', orientation: 'landscape', pages: [],
+  showLogo: true, showDate: true, showPageNumber: true, showWatermark: true,
+}
+
+const EMPTY_STATE = {
+  visuals: [],
+  builderFilters: { dateRange: 'all', customStart: '', customEnd: '', dimensionFilters: [] },
+  printLayout: EMPTY_PRINT_LAYOUT,
+}
 
 function nextSlot(visuals, w, h) {
   // stack new visuals below everything currently placed
   const maxY = visuals.reduce((m, v) => Math.max(m, (v.layout?.y || 0) + (v.layout?.h || 0)), 0)
+  return { x: 0, y: maxY, w, h }
+}
+
+let printSeq = 0
+function newPrintId(prefix) {
+  printSeq += 1
+  return `${prefix}_${Date.now().toString(36)}_${printSeq}`
+}
+
+function nextElementSlot(elements, w, h) {
+  const maxY = elements.reduce((m, el) => Math.max(m, (el.layout?.y || 0) + (el.layout?.h || 0)), 0)
   return { x: 0, y: maxY, w, h }
 }
 
@@ -39,7 +59,11 @@ export function useReportBuilder(formId) {
       setForm(formData)
       const rb = formData.settings?.reportBuilder
       setState(rb && Array.isArray(rb.visuals)
-        ? { visuals: rb.visuals, builderFilters: { ...EMPTY_STATE.builderFilters, ...(rb.builderFilters || {}) } }
+        ? {
+            visuals: rb.visuals,
+            builderFilters: { ...EMPTY_STATE.builderFilters, ...(rb.builderFilters || {}) },
+            printLayout: { ...EMPTY_PRINT_LAYOUT, ...(rb.printLayout || {}), pages: rb.printLayout?.pages || [] },
+          }
         : EMPTY_STATE)
 
       const { data: subs } = await supabase.from('submissions').select('*')
@@ -186,6 +210,127 @@ export function useReportBuilder(formId) {
     mutate(prev => ({ ...prev, builderFilters: { ...prev.builderFilters, ...patch } }))
   }, [mutate])
 
+  // ---- print layout (brief §22-45) ----
+  // Same read-modify-write shape as the visual CRUD above, scoped to
+  // printLayout.pages instead of the top-level visuals array. Kept on this
+  // hook (not a separate one) so a print-layout write and a visuals write
+  // can never race each other over the same settings JSONB column.
+  const mutatePrint = useCallback((updater) => {
+    mutate(prev => ({ ...prev, printLayout: typeof updater === 'function' ? updater(prev.printLayout) : updater }))
+  }, [mutate])
+
+  const addPrintPage = useCallback((afterId) => {
+    let created
+    mutatePrint(prev => {
+      created = { id: newPrintId('page'), elements: [] }
+      const pages = [...prev.pages]
+      const idx = afterId ? pages.findIndex(p => p.id === afterId) : pages.length - 1
+      pages.splice(idx + 1, 0, created)
+      return { ...prev, pages }
+    })
+    return created?.id
+  }, [mutatePrint])
+
+  const duplicatePrintPage = useCallback((pageId) => {
+    mutatePrint(prev => {
+      const idx = prev.pages.findIndex(p => p.id === pageId)
+      if (idx === -1) return prev
+      const src = prev.pages[idx]
+      const copy = {
+        id: newPrintId('page'),
+        elements: src.elements.map(el => ({ ...el, id: newPrintId('el') })),
+      }
+      const pages = [...prev.pages]
+      pages.splice(idx + 1, 0, copy)
+      return { ...prev, pages }
+    })
+  }, [mutatePrint])
+
+  const removePrintPage = useCallback((pageId) => {
+    mutatePrint(prev => ({ ...prev, pages: prev.pages.filter(p => p.id !== pageId) }))
+  }, [mutatePrint])
+
+  const reorderPrintPages = useCallback((orderedIds) => {
+    mutatePrint(prev => ({
+      ...prev,
+      pages: orderedIds.map(id => prev.pages.find(p => p.id === id)).filter(Boolean),
+    }))
+  }, [mutatePrint])
+
+  const addPrintElement = useCallback((pageId, element) => {
+    let created
+    mutatePrint(prev => ({
+      ...prev,
+      pages: prev.pages.map(p => {
+        if (p.id !== pageId) return p
+        const w = element.layout?.w ?? 12
+        const h = element.layout?.h ?? 4
+        const slot = nextElementSlot(p.elements, w, h)
+        created = { id: newPrintId('el'), ...element, layout: { ...slot, ...element.layout } }
+        return { ...p, elements: [...p.elements, created] }
+      }),
+    }))
+    return created?.id
+  }, [mutatePrint])
+
+  const updatePrintElement = useCallback((pageId, elementId, patch) => {
+    mutatePrint(prev => ({
+      ...prev,
+      pages: prev.pages.map(p => p.id !== pageId ? p : {
+        ...p,
+        elements: p.elements.map(el => el.id === elementId ? { ...el, ...(typeof patch === 'function' ? patch(el) : patch) } : el),
+      }),
+    }))
+  }, [mutatePrint])
+
+  const removePrintElement = useCallback((pageId, elementId) => {
+    mutatePrint(prev => ({
+      ...prev,
+      pages: prev.pages.map(p => p.id !== pageId ? p : { ...p, elements: p.elements.filter(el => el.id !== elementId) }),
+    }))
+  }, [mutatePrint])
+
+  // react-grid-layout fires onLayoutChange on mount with the layout it was
+  // already given - same no-op guard as setCanvasLayout above, so opening a
+  // print page doesn't immediately flip on the unsaved-changes indicator.
+  const setPrintPageLayout = useCallback((pageId, layouts) => {
+    setState(prev => {
+      let changed = false
+      const pages = prev.printLayout.pages.map(p => {
+        if (p.id !== pageId) return p
+        const elements = p.elements.map(el => {
+          const l = layouts.find(x => x.i === el.id)
+          if (!l) return el
+          const cur = el.layout || {}
+          if (cur.x === l.x && cur.y === l.y && cur.w === l.w && cur.h === l.h) return el
+          changed = true
+          return { ...el, layout: { x: l.x, y: l.y, w: l.w, h: l.h } }
+        })
+        return { ...p, elements }
+      })
+      if (!changed) return prev
+      setDirty(true)
+      return { ...prev, printLayout: { ...prev.printLayout, pages } }
+    })
+  }, [])
+
+  const updatePrintSettings = useCallback((patch) => {
+    mutatePrint(prev => ({ ...prev, ...patch }))
+  }, [mutatePrint])
+
+  // Bulk-create pages from plain content (see report/builder/print/
+  // replicateDashboard.js) - ids are assigned here so every call produces
+  // fresh, unique ones. `append: true` adds after the existing pages instead
+  // of replacing them (used for a manual "Replicate dashboard" re-run so it
+  // never destroys pages the user already built by hand).
+  const seedPrintPages = useCallback((pageContents, { append = false } = {}) => {
+    const newPages = pageContents.map(p => ({
+      id: newPrintId('page'),
+      elements: p.elements.map(el => ({ ...el, id: newPrintId('el') })),
+    }))
+    mutatePrint(prev => ({ ...prev, pages: append ? [...prev.pages, ...newPages] : newPages }))
+  }, [mutatePrint])
+
   // ---- filtered submissions for the whole workspace ----
   const scopedSubmissions = useMemo(() => {
     const bf = state.builderFilters || {}
@@ -232,8 +377,12 @@ export function useReportBuilder(formId) {
     form, loading, error, saving, dirty,
     visuals: state.visuals,
     builderFilters: state.builderFilters,
+    printLayout: state.printLayout,
     submissions, scopedSubmissions, previousSubmissions, datasets,
     addVisual, updateVisual, updateVisualQuery, duplicateVisual, removeVisual,
     setCanvasLayout, promote, demote, setBuilderFilters, save, saveFormSetting,
+    addPrintPage, duplicatePrintPage, removePrintPage, reorderPrintPages,
+    addPrintElement, updatePrintElement, removePrintElement, setPrintPageLayout, updatePrintSettings,
+    seedPrintPages,
   }
 }

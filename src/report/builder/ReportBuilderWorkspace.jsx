@@ -178,6 +178,7 @@ export default function ReportBuilderWorkspace() {
             {syncing ? 'Syncing…' : rb.form?.settings?.datasetsSheetId ? 'Sync Sheet ↻' : 'Link Google Sheet'}
           </button>
           <button className="secondary" onClick={() => setPreview(p => !p)} style={{ fontSize: '0.8rem' }}>{preview ? 'Edit' : 'Preview'}</button>
+          <button className="secondary" onClick={() => navigate(`/form/${id}/report/builder/print`)} style={{ fontSize: '0.8rem' }}>Print / PDF View</button>
           <button onClick={handleSave} disabled={rb.saving} style={{ fontSize: '0.8rem' }}>
             {rb.saving ? 'Saving…' : rb.dirty ? 'Save*' : 'Save'}
           </button>
@@ -253,6 +254,7 @@ export default function ReportBuilderWorkspace() {
             form={ds.form}
             submissions={ds.submissions}
             onClose={() => setViewDataId(null)}
+            onApplyQuery={patch => rb.updateVisualQuery(viewDataId, patch)}
           />
         )
       })()}

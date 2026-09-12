@@ -11,6 +11,7 @@ import { supabase } from '../supabaseClient'
 import useIsMobile from '../hooks/useIsMobile'
 import { runQuery } from './engine'
 import VisualRenderer from './builder/visuals/VisualRenderer'
+import ViewDataModal from './builder/ViewDataModal'
 
 const Grid = WidthProvider(RGL)
 
@@ -23,6 +24,7 @@ function defaultReportLayout(v, i) {
 export default function PromotedVisuals({ form, submissions }) {
   const [visuals, setVisuals] = useState(() => (form?.settings?.reportBuilder?.visuals || []).filter(v => v.reportVisibility))
   const [editing, setEditing] = useState(false)
+  const [focusId, setFocusId] = useState(null)
   const settingsRef = useRef(form?.settings || {})
   const isMobile = useIsMobile(720)
 
@@ -86,6 +88,14 @@ export default function PromotedVisuals({ form, submissions }) {
     persist(demoted)
   }
 
+  // Focus Mode's "Apply to report" (brief §21): only ranking/sort changes
+  // made from the dashboard card are ever written back here.
+  function applyQueryPatch(id, patch) {
+    const updated = visuals.map(v => v.id === id ? { ...v, query: { ...v.query, ...patch } } : v)
+    setVisuals(updated)
+    persist(updated)
+  }
+
   return (
     <div id="report-builder-visuals" style={{ marginTop: '2rem' }}>
       <style>{`
@@ -116,6 +126,14 @@ export default function PromotedVisuals({ form, submissions }) {
           <div key={v.id} className="card" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.45rem 0.7rem', borderBottom: '1px solid var(--color-border)', flexWrap: 'wrap' }}>
               <span style={{ fontWeight: 600, fontSize: '0.85rem', flex: '1 1 120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.title}</span>
+              {!editing && (
+                <button
+                  className="secondary rb-promoted-btn" style={btn} title="Focus mode - explore the complete result"
+                  onClick={() => setFocusId(v.id)}
+                >
+                  ⤢
+                </button>
+              )}
               {editing && (
                 <>
                   <button className="secondary rb-promoted-btn" style={btn} title="Wider" onClick={() => resize(v.id, 2, 0)}>＋W</button>
@@ -132,6 +150,21 @@ export default function PromotedVisuals({ form, submissions }) {
           </div>
         ))}
       </Grid>
+
+      {focusId && (() => {
+        const v = visuals.find(x => x.id === focusId)
+        if (!v) return null
+        return (
+          <ViewDataModal
+            visual={v}
+            result={results[focusId]}
+            form={form}
+            submissions={submissions}
+            onClose={() => setFocusId(null)}
+            onApplyQuery={patch => applyQueryPatch(focusId, patch)}
+          />
+        )
+      })()}
     </div>
   )
 }

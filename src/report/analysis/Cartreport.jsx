@@ -134,31 +134,107 @@ export function cartReportTiles({ field, answered }) {
   const catQty = toSorted(categoryQty)
   const hasCategoryBreakdown = Object.keys(categoryRevenue).length > 1
 
+  // Focus Mode drill-down (brief §15): the line items behind one product or
+  // category, traced back to the orders that contain them.
+  function productRecords(productName) {
+    const rows = []
+    answered.forEach(s => {
+      ;(s.data[field.id]?.items || []).forEach(item => {
+        if (item.name !== productName) return
+        rows.push({
+          date: new Date(s.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+          order: s.order_number ? `#${s.order_number}` : s.id,
+          quantity: item.quantity,
+          amount: item.price * item.quantity,
+        })
+      })
+    })
+    return rows
+  }
+  function categoryRecords(categoryName) {
+    const rows = []
+    answered.forEach(s => {
+      ;(s.data[field.id]?.items || []).forEach(item => {
+        const cat = item.category?.trim() || 'Uncategorized'
+        if (cat !== categoryName) return
+        rows.push({
+          date: new Date(s.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+          order: s.order_number ? `#${s.order_number}` : s.id,
+          product: item.name,
+          quantity: item.quantity,
+          amount: item.price * item.quantity,
+        })
+      })
+    })
+    return rows
+  }
+  const productRecordColumns = [
+    { key: 'date', label: 'Date', align: 'left', sortable: true },
+    { key: 'order', label: 'Order', align: 'left', sortable: true },
+    { key: 'quantity', label: 'Qty', align: 'right', sortable: true },
+    { key: 'amount', label: 'Amount', align: 'right', sortable: true, format: r => formatNaira(r.amount) },
+  ]
+  const categoryRecordColumns = [
+    { key: 'date', label: 'Date', align: 'left', sortable: true },
+    { key: 'order', label: 'Order', align: 'left', sortable: true },
+    { key: 'product', label: 'Product', align: 'left', sortable: true },
+    { key: 'quantity', label: 'Qty', align: 'right', sortable: true },
+    { key: 'amount', label: 'Amount', align: 'right', sortable: true, format: r => formatNaira(r.amount) },
+  ]
+
   const tiles = []
   if (byRev.length > 0) {
     tiles.push({
       id: `cart-${field.id}-rev`,
       title: `Revenue by Product${byRev.length > 10 ? ' (top 10)' : ''}`,
-      node: <HorizontalBarChart data={byRev} formatValue={(v) => formatNaira(v)} bare />,
+      node: (
+        <HorizontalBarChart
+          data={byRev} formatValue={(v) => formatNaira(v)} bare
+          focusTitle="Revenue by Product" unitLabel="products"
+          getRecords={productRecords} recordColumns={productRecordColumns}
+          description="Revenue by Product sums each order's line items, grouped by product name, sorted from highest to lowest revenue."
+        />
+      ),
     })
   }
   if (byQty.length > 0) {
     tiles.push({
       id: `cart-${field.id}-qty`,
       title: `Units Sold by Product${byQty.length > 10 ? ' (top 10)' : ''}`,
-      node: <HorizontalBarChart data={byQty} bare />,
+      node: (
+        <HorizontalBarChart
+          data={byQty} bare
+          focusTitle="Units Sold by Product" unitLabel="products"
+          getRecords={productRecords} recordColumns={productRecordColumns}
+          description="Units Sold by Product sums each order's line item quantities, grouped by product name."
+        />
+      ),
     })
   }
   if (hasCategoryBreakdown) {
     tiles.push({
       id: `cart-${field.id}-catrev`,
       title: 'Revenue by Category',
-      node: <HorizontalBarChart data={catRev} formatValue={(v) => formatNaira(v)} bare />,
+      node: (
+        <HorizontalBarChart
+          data={catRev} formatValue={(v) => formatNaira(v)} bare
+          focusTitle="Revenue by Category" unitLabel="categories"
+          getRecords={categoryRecords} recordColumns={categoryRecordColumns}
+          description="Revenue by Category sums each order's line items, grouped by the category set on each product."
+        />
+      ),
     })
     tiles.push({
       id: `cart-${field.id}-catqty`,
       title: 'Units Sold by Category',
-      node: <HorizontalBarChart data={catQty} bare />,
+      node: (
+        <HorizontalBarChart
+          data={catQty} bare
+          focusTitle="Units Sold by Category" unitLabel="categories"
+          getRecords={categoryRecords} recordColumns={categoryRecordColumns}
+          description="Units Sold by Category sums each order's line item quantities, grouped by category."
+        />
+      ),
     })
   }
   return tiles

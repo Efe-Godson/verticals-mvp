@@ -1,10 +1,14 @@
 // Place at: src/report/components/HorizontalBarChart.jsx
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import ChartTooltip, { useChartTooltip } from './ChartTooltip'
 import useIsMobile from '../../hooks/useIsMobile'
 import { compactNumber } from '../helpers/analysisUtils'
 import PieChart from './PieChart'
+import FocusModeModal from '../focus/FocusModeModal'
+import FocusRankingControl from '../focus/FocusRankingControl'
+import FocusResultsTable from '../focus/FocusResultsTable'
+import AboutThisVisual from '../focus/AboutThisVisual'
 
 // Category chart.
 //  - Desktop: vertical columns for <=5 categories, a horizontal bar list past
@@ -37,12 +41,35 @@ function HorizontalBarChart({
     bare = false,
     formatValue = (v) => v.toLocaleString(),
     maxBars = 10,
+    focusTitle,
+    sourceLabel,
+    unitLabel = 'items',
+    getRecords,
+    recordColumns,
+    embedded = false,
+    description,
 }) {
 
     const all = data || []
     const shown = all.slice(0, maxBars)
     const maxValue = Math.max(...shown.map(d => d.count), 1)
     const isMobile = useIsMobile(768)
+
+    // Focus Mode (redesign brief §5-16): the chart above only ever shows
+    // `maxBars` rows, but `all` already holds the complete breakdown - see
+    // Cartreport.jsx / CategoryCountChart.jsx, which pass the full sorted
+    // array in, not a pre-limited one. Focus Mode just exposes what's
+    // already there; it never re-queries.
+    const [focusOpen, setFocusOpen] = useState(false)
+    const [rankMode, setRankMode] = useState('top')
+    const [rankN, setRankN] = useState(maxBars)
+    const [drillRow, setDrillRow] = useState(null)
+
+    const focusChartRows = useMemo(() => {
+        const num = (d) => Number(d.count) || 0
+        const sorted = [...all].sort((a, b) => rankMode === 'bottom' ? num(a) - num(b) : num(b) - num(a))
+        return rankN ? sorted.slice(0, rankN) : sorted
+    }, [all, rankMode, rankN])
 
     // Vertical columns need room for a label under each bar. Desktop can give
     // that up to 5 across; a phone only for 2-3 before the labels start
@@ -166,6 +193,22 @@ function HorizontalBarChart({
                             </button>
                         )}
                     </div>
+                )}
+
+                {!embedded && shown.length > 0 && (
+                    <button
+                        type="button"
+                        data-html2canvas-ignore="true"
+                        onClick={() => setFocusOpen(true)}
+                        title="Focus mode - explore the complete result"
+                        style={{
+                            border: "1px solid var(--color-border)", borderRadius: "6px",
+                            padding: ".2rem .5rem", fontSize: ".78rem", lineHeight: 1,
+                            background: "var(--color-surface)", color: "var(--color-muted)", cursor: "pointer",
+                        }}
+                    >
+                        ⤢
+                    </button>
                 )}
             </div>
         </div>
@@ -453,34 +496,142 @@ function HorizontalBarChart({
 
     }
 
+    const focusModal = focusOpen && (
+        <FocusModal
+            title={focusTitle || title || 'Breakdown'}
+            sourceLabel={sourceLabel}
+            unitLabel={unitLabel}
+            all={all}
+            formatValue={formatValue}
+            rankMode={rankMode}
+            rankN={rankN}
+            onRank={(m, n) => { setRankMode(m); setRankN(n) }}
+            focusChartRows={focusChartRows}
+            getRecords={getRecords}
+            recordColumns={recordColumns}
+            drillRow={drillRow}
+            onDrill={setDrillRow}
+            description={description}
+            onClose={() => { setFocusOpen(false); setDrillRow(null) }}
+        />
+    )
+
     if (bare) {
 
         return (
-            <div>
-                {header}
-                {content}
-                <ChartTooltip tooltip={tooltip} />
-            </div>
+            <>
+                <div>
+                    {header}
+                    {content}
+                    <ChartTooltip tooltip={tooltip} />
+                </div>
+                {focusModal}
+            </>
         )
 
     }
 
     return (
 
-        <div
-            style={{
-                border: "1px solid var(--color-border)",
-                borderRadius: "10px",
-                padding: isMobile ? "1rem" : "1.3rem",
-            }}
-        >
-            {header}
-            {content}
-            <ChartTooltip tooltip={tooltip} />
-        </div>
+        <>
+            <div
+                style={{
+                    border: "1px solid var(--color-border)",
+                    borderRadius: "10px",
+                    padding: isMobile ? "1rem" : "1.3rem",
+                }}
+            >
+                {header}
+                {content}
+                <ChartTooltip tooltip={tooltip} />
+            </div>
+            {focusModal}
+        </>
 
     )
 
+}
+
+// Focus Mode for a bar/category breakdown (brief §5-16). Kept in this file
+// since it exists only to expose data HorizontalBarChart already holds -
+// see the `all` array above, which is never limited to `maxBars`.
+function FocusModal({
+    title, sourceLabel, unitLabel, all, formatValue,
+    rankMode, rankN, onRank, focusChartRows,
+    getRecords, recordColumns, drillRow, onDrill,
+    description, onClose,
+}) {
+    const focusTotal = all.reduce((s, d) => s + (Number(d.count) || 0), 0)
+    const rows = all.map(d => ({ key: d.label, label: d.label, value: Number(d.count) || 0 }))
+
+    const columns = [
+        { key: 'label', label: unitLabel.charAt(0).toUpperCase() + unitLabel.slice(1), align: 'left', sortable: true },
+        { key: 'value', label: 'Value', align: 'right', sortable: true, defaultDir: 'desc', format: r => formatValue(r.value) },
+        {
+            key: 'pct', label: '% of total', align: 'right', sortable: true, searchable: false,
+            sortValue: r => r.value,
+            format: r => `${focusTotal > 0 ? Math.round((r.value / focusTotal) * 100) : 0}%`,
+        },
+    ]
+
+    const records = drillRow && getRecords ? getRecords(drillRow.label) || [] : null
+    const derivedRecordColumns = records && records.length > 0
+        ? (recordColumns || Object.keys(records[0]).map(k => ({
+            key: k,
+            label: k.charAt(0).toUpperCase() + k.slice(1).replace(/_/g, ' '),
+            align: typeof records[0][k] === 'number' ? 'right' : 'left',
+            sortable: true,
+        })))
+        : []
+
+    return (
+        <FocusModeModal
+            onClose={onClose}
+            title={title}
+            subtitle={sourceLabel ? `${sourceLabel} • ${all.length} ${unitLabel}` : `${all.length} ${unitLabel}`}
+            breadcrumbLabel={drillRow ? drillRow.label : null}
+            onBreadcrumbBack={() => onDrill(null)}
+            controls={!drillRow && (
+                <FocusRankingControl mode={rankMode} n={rankN} onChange={onRank} />
+            )}
+            chart={!drillRow && (
+                <HorizontalBarChart data={focusChartRows} formatValue={formatValue} maxBars={focusChartRows.length} bare embedded />
+            )}
+            table={drillRow ? (
+                records && records.length > 0 ? (
+                    <FocusResultsTable
+                        columns={derivedRecordColumns}
+                        rows={records}
+                        rowKey={(r, i) => r.id || i}
+                        countLabel={`${records.length} record${records.length === 1 ? '' : 's'}`}
+                        searchPlaceholder="Search records..."
+                    />
+                ) : (
+                    <div style={{ padding: '1.5rem 0', color: 'var(--color-muted)', fontSize: '0.85rem' }}>
+                        No underlying records found for this item.
+                    </div>
+                )
+            ) : (
+                <FocusResultsTable
+                    columns={columns}
+                    rows={rows}
+                    countLabel={`All ${unitLabel} · ${rows.length}`}
+                    searchPlaceholder={`Search ${unitLabel}...`}
+                    defaultSort={{ key: 'value', dir: 'desc' }}
+                    onRowClick={getRecords ? (row) => onDrill(row) : undefined}
+                />
+            )}
+            footer={
+                <AboutThisVisual
+                    description={description || `${title} is calculated from the complete result behind this chart, sorted from highest to lowest.`}
+                    meta={[
+                        { label: 'Chart display', value: rankN ? `${rankMode === 'bottom' ? 'Bottom' : 'Top'} ${rankN}` : 'All' },
+                        { label: 'Full result', value: `${rows.length} ${unitLabel}` },
+                    ]}
+                />
+            }
+        />
+    )
 }
 
 export default HorizontalBarChart

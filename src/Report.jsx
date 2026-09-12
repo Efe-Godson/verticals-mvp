@@ -4,23 +4,16 @@ import { createPortal } from 'react-dom'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
-import { printReport, exportReportToPDF, exportReportToPPTX } from './reportExport'
+import { printReport, exportReportToPDF } from './reportExport'
 
 import StatTile from './report/components/StatTile'
-import { cartReportTiles } from './report/analysis/Cartreport'
-import { cartCategoryTiles } from './report/analysis/components/CartCategoryChart'
-import { categoryCountTiles } from './report/analysis/components/CategoryCountChart'
+import { buildChartTiles } from './report/analysis/buildDashboardTiles'
 import AIRecommendationsModal from './report/ai/AIRecommendationsModal'
-import HorizontalBarChart from './report/components/HorizontalBarChart'
-import PieChart from './report/components/PieChart'
-import PivotTable from './report/components/PivotTable'
 import PromotedVisuals from './report/PromotedVisuals'
-import TrendLineChart from './report/components/TrendLineChart'
 import Modal from './components/Modal'
 import { LoadingSpinner } from './LoadingState'
 import { RefreshingIndicator } from './components/InlineLoader'
 import { getPageCache, setPageCache } from './hooks/pageCache'
-import { getGroupableFields, getMeasureOptions, computePivot, toChartData } from './report/helpers/pivotEngine'
 import { formatNaira, median, getEntryNoun } from './report/helpers/analysisUtils'
 import { DATE_RANGE_OPTIONS, getDateRangeBounds, getDateRangeLabel } from './report/helpers/dateRange'
 import PageSkeleton from './components/PageSkeleton'
@@ -65,84 +58,6 @@ function getCompletionRate(form, submissions) {
 const CATEGORICAL_TYPES = ['dropdown', 'multiplechoice', 'checkbox', 'autocomplete']
 const NUMERIC_TYPES = ['number', 'rating', 'linearscale']
 const DEMOGRAPHIC_TYPES = ['email', 'phone']
-
-// Fields whose values are worth breaking cart revenue down by first,
-// e.g. "Sales Rep", "Salesperson", or a "Name" field, before the rest.
-function isPriorityCategoryField(field) {
-  const label = (field.label || '').toLowerCase()
-  return /\bname\b/.test(label) ||
-    /sales\s*-?\s*rep/.test(label) ||
-    /sales\s*-?\s*person/.test(label) ||
-    /salesperson/.test(label) ||
-    /\bemployee\b/.test(label) ||
-    /\bstaff\b/.test(label)
-}
-
-// Fields that represent how a sale reached the customer, surfaced in their
-// own "Sales Channel" section rather than lumped in with generic breakdowns.
-function isChannelField(field) {
-  const label = (field.label || '').toLowerCase()
-  return /channel/.test(label) || /\bplatform\b/.test(label) || /\bsource\b/.test(label)
-}
-
-// A 'location' field stores { country, state, city } - collapse it to one
-// readable grouping key (city + state, else state/country).
-function locationLabel(v) {
-  if (v && typeof v === 'object') {
-    const parts = [v.city, v.state].filter(Boolean)
-    return parts.join(', ') || v.country || ''
-  }
-  return typeof v === 'string' ? v.trim() : ''
-}
-
-// "Sales by <location>" + "Orders by <location>" tiles for a location field
-// crossed with a cart field. Mirrors cartCategoryTiles but resolves the
-// location object first.
-function locationCartTiles({ locationField, cartField, submissions }) {
-  const revenue = {}
-  const orders = {}
-  let totalRevenue = 0
-  let totalOrders = 0
-  submissions.forEach(s => {
-    const cart = s.data[cartField.id]
-    if (!cart || !cart.items || cart.items.length === 0) return
-    const label = locationLabel(s.data[locationField.id])
-    if (!label) return
-    const grand = cart.total + (cart.deliveryFee || 0)
-    totalRevenue += grand
-    totalOrders += 1
-    revenue[label] = (revenue[label] || 0) + grand
-    orders[label] = (orders[label] || 0) + 1
-  })
-  const toRows = (obj, total) => Object.entries(obj)
-    .map(([label, count]) => ({ label, count, percent: total > 0 ? Math.round((count / total) * 100) : 0 }))
-    .sort((a, b) => b.count - a.count)
-  const rev = toRows(revenue, totalRevenue)
-  if (rev.length === 0) return []
-  const ord = toRows(orders, totalOrders)
-  const base = `loc-${locationField.id}-${cartField.id}`
-  return [
-    { id: `${base}-rev`, title: `Sales by ${locationField.label}`, node: <HorizontalBarChart data={rev} formatValue={(v) => formatNaira(v)} bare /> },
-    { id: `${base}-ord`, title: `Orders by ${locationField.label}`, node: <HorizontalBarChart data={ord} bare /> },
-  ]
-}
-
-// Plain response-count breakdown by location, for forms with no cart field.
-function locationCountTile({ locationField, submissions, noun }) {
-  const counts = {}
-  let total = 0
-  submissions.forEach(s => {
-    const label = locationLabel(s.data[locationField.id])
-    if (!label) return
-    counts[label] = (counts[label] || 0) + 1
-    total += 1
-  })
-  const rows = Object.entries(counts)
-    .map(([label, count]) => ({ label, count, percent: total > 0 ? Math.round((count / total) * 100) : 0 }))
-    .sort((a, b) => b.count - a.count)
-  if (rows.length === 0) return []
-  return [{ id: `loc-${locationField.id}-count`, title: `${noun.plural} by ${locationField.label}`, node: <HorizontalBarChart data={rows} bare /> }]
-}
 
 function Report({ formId: formIdProp, headerExtra, extraSubmissions = [] } = {}) {
   const params = useParams()
@@ -308,126 +223,10 @@ function Report({ formId: formIdProp, headerExtra, extraSubmissions = [] } = {})
   const totalResponses = filteredSubmissions.length
   const dateRangeLabel = getDateRangeLabel(dateRange, customStart, customEnd)
 
-  const cartFields = form.fields.filter(f => f.type === 'cart')
-  const categoryFields = form.fields.filter(f => CATEGORICAL_TYPES.includes(f.type))
-  const locationFields = form.fields.filter(f => f.type === 'location')
-  const entryNoun = getEntryNoun(form, cartFields.length > 0)
-
-  const salesByCategoryPairs = []
-  cartFields.forEach(cartField => {
-    categoryFields.forEach(catField => {
-      salesByCategoryPairs.push({ cartField, catField, priority: isPriorityCategoryField(catField) })
-    })
-  })
-  // "Operations" pairs (sales rep / staff / name) surface separately from
-  // "Products" pairs (channel, other category breakdowns); see isPriorityCategoryField.
-  const nonOperationsPairs = salesByCategoryPairs.filter(p => !p.priority)
-  const channelCategoryPairs = nonOperationsPairs.filter(p => isChannelField(p.catField))
-  const otherCategoryPairs = nonOperationsPairs.filter(p => !isChannelField(p.catField))
-  const operationsCategoryPairs = salesByCategoryPairs.filter(p => p.priority)
-
-  // Time series over the record date. Raw dated points are handed to
-  // TrendLineChart, which buckets them by the granularity the D/W/M/Q/Y
-  // toggle is set to. The default just picks something sensible for the span.
-  const trendTiles = (() => {
-    if (filteredSubmissions.length < 2) return []
-    const times = filteredSubmissions.map(s => recordDate(s).getTime()).filter(t => !isNaN(t))
-    if (times.length < 2) return []
-    const spanDays = (Math.max(...times) - Math.min(...times)) / 86400000
-    // Tightened from the original 62/550/1500 thresholds: those gave a full
-    // year of data (the seeded demo datasets' actual span) a *weekly*
-    // default, which is a lot of noisy points for a trend line meant to
-    // show shape at a glance - a year now defaults to monthly instead.
-    const defaultGran = spanDays <= 45 ? 'day' : spanDays <= 120 ? 'week' : spanDays <= 900 ? 'month' : 'quarter'
-
-    const orderPoints = []
-    const revenuePoints = []
-    const amountPoints = []
-    filteredSubmissions.forEach(s => {
-      const d = recordDate(s)
-      orderPoints.push({ date: d, value: 1 })
-      let rev = 0
-      cartFields.forEach(cf => {
-        const v = s.data[cf.id]
-        if (v && v.items && v.items.length > 0) rev += v.total + (v.deliveryFee || 0)
-      })
-      if (rev > 0) revenuePoints.push({ date: d, value: rev })
-      if (reportAmountField) {
-        const amt = Number(s.data[reportAmountField.id])
-        if (!isNaN(amt) && amt !== 0) amountPoints.push({ date: d, value: amt })
-      }
-    })
-
-    const byLabel = reportDateField ? ` (by ${reportDateField.label})` : ''
-    const countTile = {
-      id: 'trend-orders',
-      title: `${entryNoun.plural} over time${byLabel}`,
-      node: <TrendLineChart points={orderPoints} defaultGranularity={defaultGran} />,
-    }
-    const tiles = []
-    // Lead with a money/amount trend where one exists - a plain count of
-    // records is the least interesting way to open a report when there's an
-    // actual result (revenue, or an Expenses book's own amount field) to
-    // show instead. Same ordering KPIGrid already gives Revenue over Orders.
-    if (revenuePoints.length > 0) {
-      tiles.push({
-        id: 'trend-revenue',
-        title: `Revenue over time${byLabel}`,
-        node: <TrendLineChart points={revenuePoints} defaultGranularity={defaultGran} formatValue={formatNaira} currency />,
-      })
-    } else if (amountPoints.length > 0) {
-      tiles.push({
-        id: 'trend-amount',
-        title: `${reportAmountField.label} over time${byLabel}`,
-        node: <TrendLineChart points={amountPoints} defaultGranularity={defaultGran} formatValue={formatNaira} currency />,
-      })
-    }
-    tiles.push(countTile)
-    return tiles
-  })()
-
-  // One flat, ordered list of chart tiles - the unit the owner can pair up
-  // (see toggleChartPair / ChartTileGrid). Each needs a stable id.
-  const chartTiles = [
-    ...trendTiles,
-    ...cartFields.flatMap(field => {
-      const answered = filteredSubmissions.filter(s => {
-        const v = s.data[field.id]
-        return v && v.items && v.items.length > 0
-      })
-      return cartReportTiles({ field, answered })
-    }),
-    ...[...channelCategoryPairs, ...operationsCategoryPairs, ...otherCategoryPairs].flatMap(({ cartField, catField }) =>
-      cartCategoryTiles({ categoryField: catField, cartField, submissions: filteredSubmissions }),
-    ),
-    // No cart field means salesByCategoryPairs above is empty (it's built
-    // as a cart x category cartesian product) - without this, a non-cart
-    // form never got a single category breakdown chart no matter how much
-    // data it had. Counts responses per value, or sums reportAmountField
-    // per value when the form has one (e.g. Expenses' own "amount").
-    ...(cartFields.length === 0
-      ? categoryFields.flatMap(catField =>
-          categoryCountTiles({ categoryField: catField, submissions: filteredSubmissions, amountField: reportAmountField, noun: entryNoun }),
-        )
-      : []),
-    ...locationFields.flatMap(lf =>
-      cartFields.length > 0
-        ? cartFields.flatMap(cf => locationCartTiles({ locationField: lf, cartField: cf, submissions: filteredSubmissions }))
-        : locationCountTile({ locationField: lf, submissions: filteredSubmissions, noun: entryNoun }),
-    ),
-    ...(form.settings?.reportWidgets || []).map(widget => ({
-      id: `widget-${widget.id}`,
-      title: widget.title,
-      node: <CustomReportWidget form={form} widget={widget} submissions={filteredSubmissions} />,
-    })),
-  ]
-
-  // Apply the owner's saved tile order (reportChartOrder is a list of ids);
-  // any tile not in the list keeps its natural position after the ranked ones.
-  const orderRank = new Map((form?.settings?.reportChartOrder || []).map((tid, i) => [tid, i]))
-  const orderedChartTiles = [...chartTiles].sort(
-    (a, b) => (orderRank.has(a.id) ? orderRank.get(a.id) : 1e9) - (orderRank.has(b.id) ? orderRank.get(b.id) : 1e9),
-  )
+  // Every chart tile the dashboard shows, built by the exact same function
+  // the Print/PDF builder calls (see report/analysis/buildDashboardTiles.js)
+  // so the two can never drift apart.
+  const { tiles: orderedChartTiles, entryNoun } = buildChartTiles(form, filteredSubmissions)
 
   function moveChartTile(tileId, where) {
     const ids = orderedChartTiles.map(t => t.id)
@@ -477,10 +276,6 @@ function Report({ formId: formIdProp, headerExtra, extraSubmissions = [] } = {})
     }
   }
 
-  function handleDownloadPPTX() {
-    exportReportToPPTX(form, filteredSubmissions, buildFilterSummary())
-  }
-
   // Shared between the desktop-anchored dropdown and the mobile portal
   // version below, so the two don't drift out of sync with each other.
   const optionsMenuItemStyle = { display: 'block', width: '100%', textAlign: 'left', border: 'none', background: 'transparent', padding: '0.45rem 0.3rem', fontSize: '0.85rem' }
@@ -502,9 +297,6 @@ function Report({ formId: formIdProp, headerExtra, extraSubmissions = [] } = {})
       </button>
       <button className="secondary" onClick={() => { setOptionsMenuOpen(false); handleDownloadPDF('mobile') }} style={optionsMenuItemStyle}>
         Download PDF (mobile size)
-      </button>
-      <button className="secondary" onClick={() => { handleDownloadPPTX(); setOptionsMenuOpen(false) }} style={optionsMenuItemStyle}>
-        Download PowerPoint
       </button>
       {!isSharedViewer && (
         <>

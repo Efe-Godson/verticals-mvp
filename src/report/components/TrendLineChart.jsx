@@ -7,6 +7,9 @@ import { useMemo, useState } from 'react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, LabelList, ResponsiveContainer } from 'recharts'
 import { bucketDate } from '../engine/dateBuckets'
 import useIsMobile from '../../hooks/useIsMobile'
+import FocusModeModal from '../focus/FocusModeModal'
+import FocusResultsTable from '../focus/FocusResultsTable'
+import AboutThisVisual from '../focus/AboutThisVisual'
 
 const GRANULARITIES = [
   ['day', 'D'],
@@ -44,11 +47,19 @@ export default function TrendLineChart({
   formatValue = (v) => v.toLocaleString(),
   currency = false,
   height,
+  focusTitle,
+  sourceLabel,
+  getRecords,
+  recordColumns,
+  description,
+  embedded = false,
 }) {
   // Off by default: labels on every point crowd a chart with more than a
   // few - the toggle still exists for anyone who wants them.
   const [showLabels, setShowLabels] = useState(false)
   const [gran, setGran] = useState(defaultGranularity)
+  const [focusOpen, setFocusOpen] = useState(false)
+  const [drillBucket, setDrillBucket] = useState(null)
   const isMobile = useIsMobile()
   const chartHeight = height ?? (isMobile ? 210 : 260)
 
@@ -69,7 +80,7 @@ export default function TrendLineChart({
 
   const axisFmt = (v) => (currency ? `₦${compact(v)}` : compact(v))
 
-  return (
+  const chartBody = (
     <div>
       <div
         data-html2canvas-ignore="true"
@@ -99,6 +110,21 @@ export default function TrendLineChart({
           <button type="button" onClick={() => setShowLabels(false)} style={{ ...toggleBtnStyle(!showLabels), ...(isMobile ? { flex: 1 } : null) }}>Hide labels</button>
           <button type="button" onClick={() => setShowLabels(true)} style={{ ...toggleBtnStyle(showLabels), ...(isMobile ? { flex: 1 } : null) }}>Show labels</button>
         </div>
+        {!embedded && (
+          <button
+            type="button"
+            data-html2canvas-ignore="true"
+            onClick={() => setFocusOpen(true)}
+            title="Focus mode - explore the complete result"
+            style={{
+              border: '1px solid var(--color-border)', borderRadius: '6px',
+              padding: '.2rem .5rem', fontSize: '.78rem', lineHeight: 1,
+              background: 'var(--color-surface)', color: 'var(--color-muted)', cursor: 'pointer',
+            }}
+          >
+            ⤢
+          </button>
+        )}
       </div>
 
       <div style={{ width: '100%', height: chartHeight }}>
@@ -152,5 +178,95 @@ export default function TrendLineChart({
         </ResponsiveContainer>
       </div>
     </div>
+  )
+
+  return (
+    <>
+      {chartBody}
+      {focusOpen && (
+        <TrendFocusModal
+          title={focusTitle || 'Trend'}
+          sourceLabel={sourceLabel}
+          data={data}
+          gran={gran}
+          formatValue={formatValue}
+          currency={currency}
+          points={points}
+          getRecords={getRecords}
+          recordColumns={recordColumns}
+          drillBucket={drillBucket}
+          onDrill={setDrillBucket}
+          description={description}
+          onClose={() => { setFocusOpen(false); setDrillBucket(null) }}
+        />
+      )}
+    </>
+  )
+}
+
+// Focus Mode for a time series (brief §18): every bucket already renders on
+// the chart above (there's no "top N" to hide here) - the value-add is a
+// precise, searchable table of the same buckets, plus drilling into the
+// records behind any one of them.
+function TrendFocusModal({
+  title, sourceLabel, data, gran, formatValue, currency, points,
+  getRecords, recordColumns, drillBucket, onDrill, description, onClose,
+}) {
+  const columns = [
+    { key: 'label', label: 'Date', align: 'left', sortable: true, defaultDir: 'asc' },
+    { key: 'value', label: 'Value', align: 'right', sortable: true, defaultDir: 'desc', format: r => formatValue(r.value) },
+  ]
+
+  const records = drillBucket && getRecords ? getRecords(drillBucket) || [] : null
+  const derivedRecordColumns = records && records.length > 0
+    ? (recordColumns || Object.keys(records[0]).map(k => ({
+        key: k,
+        label: k.charAt(0).toUpperCase() + k.slice(1).replace(/_/g, ' '),
+        align: typeof records[0][k] === 'number' ? 'right' : 'left',
+        sortable: true,
+      })))
+    : []
+
+  return (
+    <FocusModeModal
+      onClose={onClose}
+      title={title}
+      subtitle={sourceLabel ? `${sourceLabel} • ${data.length} ${gran} periods` : `${data.length} ${gran} periods`}
+      breadcrumbLabel={drillBucket ? drillBucket.label : null}
+      onBreadcrumbBack={() => onDrill(null)}
+      chart={!drillBucket && (
+        <TrendLineChart points={points} defaultGranularity={gran} formatValue={formatValue} currency={currency} embedded />
+      )}
+      table={drillBucket ? (
+        records && records.length > 0 ? (
+          <FocusResultsTable
+            columns={derivedRecordColumns}
+            rows={records}
+            rowKey={(r, i) => r.id || i}
+            countLabel={`${records.length} record${records.length === 1 ? '' : 's'}`}
+            searchPlaceholder="Search records..."
+          />
+        ) : (
+          <div style={{ padding: '1.5rem 0', color: 'var(--color-muted)', fontSize: '0.85rem' }}>
+            No underlying records found for this period.
+          </div>
+        )
+      ) : (
+        <FocusResultsTable
+          columns={columns}
+          rows={data}
+          countLabel={`All periods · ${data.length}`}
+          searchPlaceholder="Search dates..."
+          defaultSort={{ key: 'label', dir: 'asc' }}
+          onRowClick={getRecords ? (row) => onDrill(row) : undefined}
+        />
+      )}
+      footer={
+        <AboutThisVisual
+          description={description || `${title} sums each record's value into ${gran} buckets.`}
+          meta={[{ label: 'Granularity', value: gran }]}
+        />
+      }
+    />
   )
 }
