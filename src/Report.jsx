@@ -576,7 +576,7 @@ function Report({ formId: formIdProp, headerExtra } = {}) {
           IntentDestination.jsx's demo preview is the only caller that passes
           this today. Kept on its own row, clear of Date range/Options, so the
           title has room to breathe instead of being crowded by the bar. */}
-      {headerExtra && <div className="report-header-extra" style={{ marginBottom: '0.6rem' }}>{headerExtra}</div>}
+      {headerExtra && <div className="report-header-extra" style={{ marginBottom: '1.4rem' }}>{headerExtra}</div>}
 
       <div className="report-filter-bar" data-html2canvas-ignore="true" style={{
         display: 'flex', justifyContent: headerExtra ? 'flex-end' : 'space-between', alignItems: 'center', flexWrap: 'wrap',
