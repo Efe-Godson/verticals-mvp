@@ -964,14 +964,14 @@ function OverviewCard({ form, submissions }) {
 
       {insights.length > 0 && (
         <div className="card" style={{ padding: '1.5rem' }}>
-          <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.6rem' }}>
+          <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-text)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.6rem' }}>
             Key highlights
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             {insights.map((text, i) => (
               <div key={i} style={{ display: 'flex', gap: '0.6rem', alignItems: 'flex-start' }}>
                 <span style={{ color: 'var(--color-primary)', fontSize: '1rem', lineHeight: 1.4, fontWeight: 700 }}>•</span>
-                <span style={{ fontSize: '0.92rem', lineHeight: 1.5 }}>{text}</span>
+                <span style={{ fontSize: '1rem', lineHeight: 1.5 }}>{text}</span>
               </div>
             ))}
           </div>
