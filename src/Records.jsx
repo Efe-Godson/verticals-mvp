@@ -42,7 +42,7 @@ const META_COLUMNS = [
   { id: '__submissionId', label: 'Submission ID' },
 ]
 
-function Records({ formId: formIdProp } = {}) {
+function Records({ formId: formIdProp, defaultToAllTime = false } = {}) {
   const params = useParams()
   const id = formIdProp || params.id
   const [searchParams] = useSearchParams()
@@ -67,6 +67,10 @@ function Records({ formId: formIdProp } = {}) {
   const [openRecordEditing, setOpenRecordEditing] = useState(false)
   const [selectedIds, setSelectedIds] = useState([])
   const [hiddenFieldIds, setHiddenFieldIds] = useState([])
+  // Mobile only - the table used to be desktop-exclusive there (cards
+  // instead), but the table itself scrolls fine on a phone and some people
+  // just want it, so it's a toggle now, defaulting to table.
+  const [mobileViewMode, setMobileViewMode] = useState('table')
   const [columnsExpanded, setColumnsExpanded] = useState(false)
   const [tilesRevealed, setTilesRevealed] = useState(false)
   const [showRevealHint, setShowRevealHint] = useState(true)
@@ -117,8 +121,10 @@ function Records({ formId: formIdProp } = {}) {
       setHiddenFieldIds(effectiveHidden)
       // A POS/order form (Restaurant, Retail, ...) is almost always opened
       // to check today's sales, not the full history - other form types
-      // (surveys, registrations, ...) keep the "All time" default.
-      if (isCartForm) setDateRange('today')
+      // (surveys, registrations, ...) keep the "All time" default. Seeded
+      // demo/preview data has fixed historical dates rather than today's,
+      // so callers showing it to a visitor (see defaultToAllTime) skip this.
+      if (isCartForm && !defaultToAllTime) setDateRange('today')
 
       const { data: subsData, error: subsError } = await supabase
         .from('submissions').select('*').eq('form_id', id)
@@ -1046,15 +1052,39 @@ function Records({ formId: formIdProp } = {}) {
         />
 
         <div className="date-range-row">
-          <select
-            value={dateRange}
-            onChange={(e) => { setDateRange(e.target.value); setCurrentPage(1) }}
-            style={{ padding: '0.5rem' }}
-          >
-            {DATE_RANGE_OPTIONS.map(opt => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', width: isMobile ? '100%' : 'auto' }}>
+            {isMobile && (
+              <div style={{ display: 'flex', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)', overflow: 'hidden', flexShrink: 0 }}>
+                <button
+                  type="button"
+                  onClick={() => setMobileViewMode('table')}
+                  className={mobileViewMode === 'table' ? '' : 'secondary'}
+                  title="Table view"
+                  style={{ padding: '0.4rem 0.55rem', borderRadius: 0, border: 'none' }}
+                >
+                  ☰
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMobileViewMode('cards')}
+                  className={mobileViewMode === 'cards' ? '' : 'secondary'}
+                  title="Card view"
+                  style={{ padding: '0.4rem 0.55rem', borderRadius: 0, border: 'none' }}
+                >
+                  ▦
+                </button>
+              </div>
+            )}
+            <select
+              value={dateRange}
+              onChange={(e) => { setDateRange(e.target.value); setCurrentPage(1) }}
+              style={{ padding: '0.5rem', flex: 1, minWidth: 0, width: 'auto' }}
+            >
+              {DATE_RANGE_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
 
           {dateRange === 'specific' && (
             <div className="date-range-group">
@@ -1165,7 +1195,7 @@ function Records({ formId: formIdProp } = {}) {
             </div>
           }
         />
-      ) : isMobile ? (
+      ) : isMobile && mobileViewMode === 'cards' ? (
         <>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', margin: '0.9rem 0 0.6rem', fontSize: '0.82rem', color: 'var(--color-muted)' }}>
             <button

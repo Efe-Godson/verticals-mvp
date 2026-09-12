@@ -144,7 +144,7 @@ function locationCountTile({ locationField, submissions, noun }) {
   return [{ id: `loc-${locationField.id}-count`, title: `${noun.plural} by ${locationField.label}`, node: <HorizontalBarChart data={rows} bare /> }]
 }
 
-function Report({ formId: formIdProp } = {}) {
+function Report({ formId: formIdProp, headerExtra } = {}) {
   const params = useParams()
   const id = formIdProp || params.id
   const [searchParams] = useSearchParams()
@@ -536,18 +536,14 @@ function Report({ formId: formIdProp } = {}) {
           fixed. A momentary, partial letter overlap while scrolling past a
           floating button is normal FAB behavior (see Gmail/WhatsApp etc.),
           not worth trading real content width for. */}      <style>{`
-        .kpi-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.8rem; }
         .kpi-add-tile { transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease; }
         .kpi-add-tile:hover { border-color: var(--color-primary); color: var(--color-primary); background: #f8fbff; }
-        @media (min-width: 500px) {
-          .kpi-grid { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
-        }
         /* Chart-tile cards carry generous padding on desktop; on a phone that
            eats most of a 320-360px width, so a chart ends up ~250px. Pull it
            in hard below 640. */
         .report-tile-card { padding: 1.75rem; }
+        .report-header-extra { display: flex; align-items: center; }
         @media (max-width: 640px) {
-          .kpi-grid { gap: 0.6rem; }
           /* padding pulled in, and a hard clip as a backstop so a chart's
              internals can never paint past the card / page edge on a phone
              (hover tooltips are desktop-only anyway - see ChartTooltip). */
@@ -557,6 +553,10 @@ function Report({ formId: formIdProp } = {}) {
             backdrop-filter: blur(10px); border: 1px solid var(--color-border); border-radius: var(--radius);
             padding: 0.85rem; margin-bottom: 1rem;
           }
+          /* headerExtra (see the prop) shares this line with Date range only
+             on desktop - too tight to add a third thing to this bar on a
+             phone, so its caller renders its own copy above instead. */
+          .report-header-extra { display: none; }
         }
       `}</style>
 
@@ -571,47 +571,56 @@ function Report({ formId: formIdProp } = {}) {
         </div>
       </header>
 
+      {/* Desktop-only slot a caller can use to put its own title/tabs on their
+          own line above the filter bar (see .report-header-extra below) -
+          IntentDestination.jsx's demo preview is the only caller that passes
+          this today. Kept on its own row, clear of Date range/Options, so the
+          title has room to breathe instead of being crowded by the bar. */}
+      {headerExtra && <div className="report-header-extra" style={{ marginBottom: '0.6rem' }}>{headerExtra}</div>}
+
       <div className="report-filter-bar" data-html2canvas-ignore="true" style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap',
-        gap: '0.8rem', padding: '0.9rem 1rem', border: '1px solid var(--color-border)',
-        borderRadius: 'var(--radius)', marginBottom: '1rem', background: 'rgba(255,255,255,0.95)'
+        display: 'flex', justifyContent: headerExtra ? 'flex-end' : 'space-between', alignItems: 'center', flexWrap: 'wrap',
+        gap: '0.8rem', padding: '0.5rem 0.7rem', border: '1px solid var(--color-border)',
+        borderRadius: 'var(--radius)', marginBottom: '0.75rem', background: 'rgba(255,255,255,0.95)'
       }}>
-        <div className="report-filter-group" style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <label htmlFor="report-date-range">Date range</label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap' }}>
+          <div className="report-filter-group" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <label htmlFor="report-date-range" style={{ fontSize: '0.85rem' }}>Date range</label>
           {isStaffView ? (
             <span
               title="Set by the owner in Settings > Staff Access"
               style={{
-                padding: '0.5rem 0.8rem', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
-                fontSize: '0.9rem', color: 'var(--color-muted)', background: 'var(--color-bg)'
+                padding: '0.35rem 0.6rem', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
+                fontSize: '0.85rem', color: 'var(--color-muted)', background: 'var(--color-bg)'
               }}
             >
               {getDateRangeLabel(dateRange, customStart, customEnd)}
             </span>
           ) : (
             <>
-              <select id="report-date-range" value={dateRange} onChange={(e) => setDateRange(e.target.value)} style={{ padding: '0.5rem' }}>
+              <select id="report-date-range" value={dateRange} onChange={(e) => setDateRange(e.target.value)} style={{ padding: '0.3rem 0.4rem', fontSize: '0.85rem' }}>
                 {DATE_RANGE_OPTIONS.map(opt => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
               {dateRange === 'specific' && (
                 <div className="date-range-group">
-                  <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} style={{ padding: '0.5rem' }} />
+                  <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} style={{ padding: '0.3rem 0.4rem', fontSize: '0.85rem' }} />
                 </div>
               )}
               {dateRange === 'custom' && (
                 <div className="date-range-group">
-                  <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} style={{ padding: '0.5rem' }} />
-                  <span style={{ color: 'var(--color-muted)', fontSize: '0.9rem' }}>to</span>
+                  <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} style={{ padding: '0.3rem 0.4rem', fontSize: '0.85rem' }} />
+                  <span style={{ color: 'var(--color-muted)', fontSize: '0.85rem' }}>to</span>
                   <input
                     type="date" value={customEnd} title="Leave blank to filter to just the start date"
-                    onChange={(e) => setCustomEnd(e.target.value)} style={{ padding: '0.5rem' }}
+                    onChange={(e) => setCustomEnd(e.target.value)} style={{ padding: '0.3rem 0.4rem', fontSize: '0.85rem' }}
                   />
                 </div>
               )}
             </>
           )}
+          </div>
         </div>
 
         <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -683,7 +692,7 @@ function Report({ formId: formIdProp } = {}) {
             <OverviewCard form={form} submissions={filteredSubmissions} />
           </div>
 
-          <div id="report-performance" data-report-block style={{ marginTop: '2rem' }}>
+          <div id="report-performance" data-report-block>
             <KPIGrid
               form={form}
               submissions={filteredSubmissions}
@@ -992,9 +1001,32 @@ function computeTrend(current, previous) {
   return { direction: current >= previous ? 'up' : 'down', percent }
 }
 
+// One decimal place with a K/M/B suffix above 10,000 (17299 -> "17.3K",
+// 16782200 -> "16.8M") - below that a plain number is already short enough.
+function abbreviateNumber(n) {
+  const abs = Math.abs(n)
+  const sign = n < 0 ? '-' : ''
+  if (abs >= 1e9) return `${sign}${(abs / 1e9).toFixed(1)}B`
+  if (abs >= 1e6) return `${sign}${(abs / 1e6).toFixed(1)}M`
+  if (abs >= 1e4) return `${sign}${(abs / 1e3).toFixed(1)}K`
+  return n.toLocaleString()
+}
+
+// 'auto' abbreviates large values (see abbreviateNumber) so a stat tile
+// never has to truncate its own value; 'full' spells out the exact number.
+// Only currency/count metrics respond to this - percentages, ratios and
+// text metrics (e.g. "1.5", "62%", "Friday") are already short and stay
+// exactly as computed either way.
+function formatKpiValue(raw, kind, mode) {
+  const n = Number(raw) || 0
+  if (mode === 'full') return kind === 'currency' ? formatNaira(n) : n.toLocaleString()
+  return kind === 'currency' ? `₦${abbreviateNumber(n)}` : abbreviateNumber(n)
+}
+
 function KPIGrid({ form, submissions, previousSubmissions = [], totalResponses, moreMenuOpen, setMoreMenuOpen }) {
   const [selectedMore, setSelectedMore] = useState([])
   const [metricSearch, setMetricSearch] = useState('')
+  const [valueFormat, setValueFormat] = useState('auto')
   const cartFields = form.fields.filter(f => f.type === 'cart')
   const numericFields = form.fields.filter(f => NUMERIC_TYPES.includes(f.type))
   const categoryFields = form.fields.filter(f => CATEGORICAL_TYPES.includes(f.type))
@@ -1016,27 +1048,27 @@ function KPIGrid({ form, submissions, previousSubmissions = [], totalResponses, 
 
   if (cartFields.length > 0) {
     primaryKpis.push({
-      label: 'Revenue', value: formatNaira(totalRevenue),
+      label: 'Revenue', raw: totalRevenue, kind: 'currency',
       trend: computeTrend(totalRevenue, previousCart?.totalRevenue)
     })
     primaryKpis.push({
-      label: 'Orders', value: totalOrders.toLocaleString(),
+      label: 'Orders', raw: totalOrders, kind: 'count',
       trend: computeTrend(totalOrders, previousCart?.totalOrders)
     })
     primaryKpis.push({
-      label: 'Average Order Value', value: formatNaira(avgOrderValue),
+      label: 'Average Order Value', raw: avgOrderValue, kind: 'currency',
       trend: computeTrend(avgOrderValue, previousCart?.totalOrders > 0 ? previousCart.totalRevenue / previousCart.totalOrders : undefined)
     })
 
     moreKpis.push({
       label: 'Median Order Value',
-      value: formatNaira(median(orderTotals))
+      raw: median(orderTotals), kind: 'currency'
     })
     moreKpis.push({
       label: 'Highest Order Value',
-      value: formatNaira(orderTotals.length > 0 ? Math.max(...orderTotals) : 0)
+      raw: orderTotals.length > 0 ? Math.max(...orderTotals) : 0, kind: 'currency'
     })
-    moreKpis.push({ label: 'Total Items Sold', value: totalItems.toLocaleString() })
+    moreKpis.push({ label: 'Total Items Sold', raw: totalItems, kind: 'count' })
     moreKpis.push({
       label: 'Average Items per Order',
       value: totalOrders > 0 ? (totalItems / totalOrders).toFixed(1) : '0'
@@ -1044,7 +1076,7 @@ function KPIGrid({ form, submissions, previousSubmissions = [], totalResponses, 
   }
 
   moreKpis.push({
-    label: `Total ${noun.plural}`, value: totalResponses.toLocaleString(),
+    label: `Total ${noun.plural}`, raw: totalResponses, kind: 'count',
     trend: computeTrend(totalResponses, hasPreviousPeriod ? previousSubmissions.length : undefined)
   })
 
@@ -1067,10 +1099,10 @@ function KPIGrid({ form, submissions, previousSubmissions = [], totalResponses, 
     const values = submissions.map(s => Number(s.data[field.id])).filter(v => !isNaN(v))
     if (values.length === 0) return
     const avg = values.reduce((a, b) => a + b, 0) / values.length
-    moreKpis.push({ label: `Average ${field.label}`, value: Math.round(avg).toLocaleString() })
-    moreKpis.push({ label: `Median ${field.label}`, value: median(values).toLocaleString() })
-    moreKpis.push({ label: `Highest ${field.label}`, value: Math.max(...values).toLocaleString() })
-    moreKpis.push({ label: `Lowest ${field.label}`, value: Math.min(...values).toLocaleString() })
+    moreKpis.push({ label: `Average ${field.label}`, raw: Math.round(avg), kind: 'count' })
+    moreKpis.push({ label: `Median ${field.label}`, raw: median(values), kind: 'count' })
+    moreKpis.push({ label: `Highest ${field.label}`, raw: Math.max(...values), kind: 'count' })
+    moreKpis.push({ label: `Lowest ${field.label}`, raw: Math.min(...values), kind: 'count' })
   })
 
   // ---- Category fields (top value + variety) ----
@@ -1092,7 +1124,7 @@ function KPIGrid({ form, submissions, previousSubmissions = [], totalResponses, 
       const percent = Math.round((top[1] / answered.length) * 100)
       moreKpis.push({ label: `Top ${field.label}`, value: `${top[0]} (${percent}%)` })
     }
-    moreKpis.push({ label: `Distinct ${field.label} values`, value: entries.length.toLocaleString() })
+    moreKpis.push({ label: `Distinct ${field.label} values`, raw: entries.length, kind: 'count' })
   })
 
   // ---- Demographic coverage ----
@@ -1133,13 +1165,39 @@ function KPIGrid({ form, submissions, previousSubmissions = [], totalResponses, 
   return (
     <>
       <div className="kpi-grid">
-        {primaryKpis.map(k => <StatTile key={k.label} label={k.label} value={k.value} trend={k.trend} />)}
-        {visibleMoreKpis.map(k => <StatTile key={k.label} label={k.label} value={k.value} />)}
+        {primaryKpis.map(k => (
+          <StatTile key={k.label} label={k.label} value={k.kind ? formatKpiValue(k.raw, k.kind, valueFormat) : k.value} trend={k.trend} />
+        ))}
+        {visibleMoreKpis.map(k => (
+          <StatTile key={k.label} label={k.label} value={k.kind ? formatKpiValue(k.raw, k.kind, valueFormat) : k.value} />
+        ))}
       </div>
 
       {moreMenuOpen && (
         <Modal size="sm" onClose={() => setMoreMenuOpen(false)} title="Add Metric">
           <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.6rem' }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Value format</span>
+              <div style={{ display: 'flex', gap: '2px', background: 'var(--color-bg)', borderRadius: '6px', padding: '2px' }}>
+                {[['auto', 'Auto'], ['full', 'Full']].map(([mode, label]) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setValueFormat(mode)}
+                    title={mode === 'auto' ? 'Round large numbers, e.g. ₦2.1M' : 'Show the exact number'}
+                    style={{
+                      border: 'none', borderRadius: '5px', padding: '0.25rem 0.65rem', fontSize: '0.75rem', fontWeight: 600,
+                      cursor: 'pointer',
+                      background: valueFormat === mode ? 'var(--color-surface)' : 'transparent',
+                      color: valueFormat === mode ? 'var(--color-text)' : '#4b5563',
+                      boxShadow: valueFormat === mode ? '0 1px 2px rgba(0,0,0,0.08)' : 'none',
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <input
               type="text"
               autoFocus

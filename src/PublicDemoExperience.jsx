@@ -180,7 +180,7 @@ export default function PublicDemoShell() {
 // metric picked on one dataset could still be showing on the next.
 export function PublicDemoRecords() {
   const { formId } = usePublicDemo()
-  return <Records key={formId} formId={formId} />
+  return <Records key={formId} formId={formId} defaultToAllTime />
 }
 
 export function PublicDemoReport() {

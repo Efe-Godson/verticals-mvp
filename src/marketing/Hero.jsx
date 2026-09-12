@@ -12,13 +12,12 @@ export default function Hero() {
           through clear reports and insights.
         </p>
         <div className="mkt-hero-cta-row">
-          <Link to="/onboarding" className="mkt-btn mkt-btn--lg">Try a free demo</Link>
+          <Link to="/onboarding" className="mkt-btn mkt-btn--lg mkt-hero-primary-cta">Try a free demo</Link>
         </div>
         <div className="mkt-hero-secondary-actions">
           <Link to="/signup" className="mkt-nav-signin">Sign up</Link>
           <Link to="/login" className="mkt-nav-signin">Sign in</Link>
         </div>
-        <p className="mkt-hero-hint">No account required.</p>
       </div>
       <HeroPreview />
     </div>

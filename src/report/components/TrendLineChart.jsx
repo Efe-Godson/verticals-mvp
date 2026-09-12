@@ -45,10 +45,9 @@ export default function TrendLineChart({
   currency = false,
   height,
 }) {
-  // On by default: a trend line with no visible values makes a visitor
-  // hunt with their cursor to know what they're looking at - the toggle
-  // still exists for anyone who wants the plain shape instead.
-  const [showLabels, setShowLabels] = useState(true)
+  // Off by default: labels on every point crowd a chart with more than a
+  // few - the toggle still exists for anyone who wants them.
+  const [showLabels, setShowLabels] = useState(false)
   const [gran, setGran] = useState(defaultGranularity)
   const isMobile = useIsMobile()
   const chartHeight = height ?? (isMobile ? 210 : 260)

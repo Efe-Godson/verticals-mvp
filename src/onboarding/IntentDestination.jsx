@@ -28,7 +28,8 @@
 // finishes too - real network time and the screen a visitor actually sees
 // happen in parallel instead of a second fetch (and a second spinner)
 // starting only once they land here.
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import Report from '../Report'
 import Records from '../Records'
@@ -98,14 +99,25 @@ export default function IntentDestination({ route, state: providedState, customI
   return <RecordsReportFunnel key={state.form.id} form={state.form} initialView={state.view} isFallback={state.isFallback} />
 }
 
+const FUNNEL_TABS = [{ id: 'records', label: 'Records' }, { id: 'report', label: 'Report' }]
+
 // Tabs between Records/Report for whichever dataset is currently shown, plus
 // a bottom slider to jump to any *other* seeded dataset - both entirely
 // local (no re-entering the onboarding flow), so exploring a few different
 // sample businesses is just a couple of taps.
+//
+// The tabs sit inline right after this screen's own title (small, quiet
+// styling - they're a secondary control next to the title, not nav-level
+// buttons) at every width, rather than living in the header bar.
 function RecordsReportFunnel({ form: initialForm, initialView, isFallback }) {
   const [form, setForm] = useState(initialForm)
   const [view, setView] = useState(initialView)
   const [otherDatasets, setOtherDatasets] = useState([])
+  const samplesScrollRef = useRef(null)
+
+  function scrollSamples(direction) {
+    samplesScrollRef.current?.scrollBy({ left: direction * 220, behavior: 'smooth' })
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -120,52 +132,132 @@ function RecordsReportFunnel({ form: initialForm, initialView, isFallback }) {
     if (data) setForm(data)
   }
 
+  const titleTabs = (
+    <>
+      <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800 }}>{view === 'report' ? 'Report' : 'Records'}</h1>
+      <div style={{ display: 'flex', gap: '0.3rem' }}>
+        {FUNNEL_TABS.map(tab => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setView(tab.id)}
+            className={view === tab.id ? '' : 'secondary'}
+            style={{ fontSize: '0.72rem', padding: '0.25rem 0.65rem', borderRadius: 999 }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+    </>
+  )
+
   return (
-    <div style={{ paddingBottom: otherDatasets.length > 1 ? '5.5rem' : 0 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap', padding: '0.8rem clamp(1rem, 4vw, 2rem) 0' }}>
-        <div style={{ display: 'flex', gap: '0.4rem' }}>
-          {[{ id: 'records', label: 'Records' }, { id: 'report', label: 'Report' }].map(tab => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setView(tab.id)}
-              className={view === tab.id ? '' : 'secondary'}
-              style={{ fontSize: '0.85rem', padding: '0.4rem 1rem', borderRadius: 999 }}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-        {isFallback && (
+    <div style={{ paddingBottom: otherDatasets.length > 1 ? '5rem' : 0 }}>
+      <style>{`
+        .onboarding-embedded-view .report-header { display: none; }
+        .onboarding-samples-scroll::-webkit-scrollbar { display: none; }
+        .onboarding-samples-scroll { scrollbar-width: none; -ms-overflow-style: none; }
+        .onboarding-title-row {
+          display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+          padding: 0.8rem clamp(1rem, 4vw, 2rem) 0;
+        }
+        /* Report's own filter bar has room for the title+tabs on the same
+           line as Date range/Options, but only on desktop (see .report-
+           header-extra in Report.jsx) - on the Records view there's no such
+           bar to share, so this row always shows there regardless of width. */
+        @media (min-width: 641px) {
+          .onboarding-title-row--mergeable { display: none; }
+        }
+      `}</style>
+
+      <div className={`onboarding-title-row${view === 'report' ? ' onboarding-title-row--mergeable' : ''}`}>
+        {titleTabs}
+      </div>
+
+      {isFallback && (
+        <div style={{ padding: '0.6rem clamp(1rem, 4vw, 2rem) 0' }}>
           <span style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>
             That one's not set up yet - here's a live sample instead.
           </span>
-        )}
-      </div>
+        </div>
+      )}
 
-      {view === 'records' ? <Records key={form.id} formId={form.id} /> : <Report key={form.id} formId={form.id} />}
+      <div className="onboarding-embedded-view" style={{ padding: '0 clamp(1rem, 4vw, 2rem)' }}>
+        {view === 'records'
+          ? <Records key={form.id} formId={form.id} defaultToAllTime />
+          : <Report key={form.id} formId={form.id} headerExtra={titleTabs} />}
+      </div>
 
       {otherDatasets.length > 1 && (
         <div style={{
           position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 240,
-          background: 'var(--color-surface)', borderTop: '1px solid var(--color-border)',
-          padding: '0.7rem 0 calc(0.7rem + env(safe-area-inset-bottom))',
+          display: 'flex', alignItems: 'center', gap: '0.5rem',
+          padding: '0.6rem clamp(1rem, 4vw, 2rem) calc(0.6rem + env(safe-area-inset-bottom))',
         }}>
-          <div style={{ fontSize: '0.72rem', color: 'var(--color-muted)', padding: '0 clamp(1rem, 4vw, 2rem)', marginBottom: '0.4rem' }}>
-            See other samples
-          </div>
-          <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', padding: '0 clamp(1rem, 4vw, 2rem)' }}>
-            {otherDatasets.map(d => (
-              <button
-                key={d.id}
-                type="button"
-                onClick={() => switchToDataset(d.form_id)}
-                className={d.form_id === form.id ? '' : 'secondary'}
-                style={{ fontSize: '0.82rem', padding: '0.4rem 0.9rem', borderRadius: 999, whiteSpace: 'nowrap', flexShrink: 0 }}
-              >
-                {d.name}
-              </button>
-            ))}
+          <span style={{
+            fontSize: '0.7rem', fontWeight: 700, color: 'var(--color-text)', whiteSpace: 'nowrap', flexShrink: 0,
+            background: '#fff', border: '1px solid var(--color-border)', borderRadius: 999,
+            padding: '0.35rem 0.65rem', boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
+          }}>
+            Samples
+          </span>
+          <div style={{ flex: 1, position: 'relative', minWidth: 0 }}>
+            <div
+              ref={samplesScrollRef}
+              className="onboarding-samples-scroll"
+              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', overflowX: 'auto', touchAction: 'pan-x', padding: '0.3rem 1.7rem' }}
+            >
+              {otherDatasets.map(d => {
+                const active = d.form_id === form.id
+                return (
+                  <button
+                    key={d.id}
+                    type="button"
+                    onClick={() => switchToDataset(d.form_id)}
+                    style={{
+                      fontSize: '0.68rem', fontWeight: 600, padding: '0.4rem 0.7rem', borderRadius: 999,
+                      whiteSpace: 'nowrap', flexShrink: 0,
+                      border: active ? '2px solid var(--color-primary)' : 'none',
+                      background: active ? '#fff' : 'var(--color-primary)',
+                      color: active ? 'var(--color-primary)' : '#fff',
+                      boxShadow: active ? '0 2px 8px rgba(0,0,0,0.25)' : '0 2px 6px rgba(0,0,0,0.2)',
+                    }}
+                  >
+                    {d.name}
+                  </button>
+                )
+              })}
+            </div>
+            {/* Solid, unmistakably clickable circular buttons - not a fading
+                overlay hinting there's more, an actual visible control. */}
+            <button
+              type="button"
+              onClick={() => scrollSamples(-1)}
+              aria-label="Show previous samples"
+              style={{
+                position: 'absolute', left: '-0.3rem', top: '50%', transform: 'translateY(-50%)',
+                width: '1.7rem', height: '1.7rem', borderRadius: '50%', zIndex: 2,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: '#fff', border: '1px solid var(--color-border)',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.3)', color: 'var(--color-primary)', cursor: 'pointer',
+              }}
+            >
+              <ChevronLeft size={15} color="var(--color-primary)" strokeWidth={2.5} style={{ width: 15, height: 15, flexShrink: 0 }} />
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollSamples(1)}
+              aria-label="Show more samples"
+              style={{
+                position: 'absolute', right: '-0.3rem', top: '50%', transform: 'translateY(-50%)',
+                width: '1.7rem', height: '1.7rem', borderRadius: '50%', zIndex: 2,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: '#fff', border: '1px solid var(--color-border)',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.3)', color: 'var(--color-primary)', cursor: 'pointer',
+              }}
+            >
+              <ChevronRight size={15} color="var(--color-primary)" strokeWidth={2.5} style={{ width: 15, height: 15, flexShrink: 0 }} />
+            </button>
           </div>
         </div>
       )}
