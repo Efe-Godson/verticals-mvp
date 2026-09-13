@@ -32,9 +32,11 @@ function StarPicker({ value, max = 5, onChange, disabled }) {
 }
 
 // One input, typed by field.type - shared by the cart flow's extra fields
-// (order type, customer name, ...) and the plain-form flow.
+// (order type, customer name, ...) and the plain-form flow. Same .pf-control
+// look as the real public form (PublicForm.jsx) so the demo reads as one
+// coherent design language rather than a rougher stand-in.
 function FieldInput({ field, value, onChange, disabled }) {
-  const commonProps = { disabled, style: { width: '100%' } }
+  const commonProps = { disabled, className: 'pf-control' }
   switch (field.type) {
     case 'longtext':
       return <textarea rows={3} value={value || ''} onChange={e => onChange(e.target.value)} {...commonProps} />
@@ -68,9 +70,9 @@ function FieldInput({ field, value, onChange, disabled }) {
 
 function fieldRow(field, value, onChange, disabled) {
   return (
-    <div key={field.id} style={{ marginBottom: '0.9rem' }}>
-      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.3rem' }}>
-        {field.label}{field.required && <span style={{ color: 'var(--color-danger, #c0392b)' }}> *</span>}
+    <div key={field.id} className="pf-tile">
+      <label className="pf-label">
+        {field.label}{field.required && <span className="field-required-mark"> *</span>}
       </label>
       <FieldInput field={field} value={value} onChange={v => onChange(field.id, v)} disabled={disabled} />
     </div>
@@ -81,7 +83,11 @@ function isMissingRequired(fields, answers) {
   return fields.some(f => f.required && f.type !== 'cart' && !answers[f.id] && answers[f.id] !== 0)
 }
 
-// Restaurant / retail: a shopper-facing product grid + cart + checkout.
+// Restaurant / retail: a shopper-facing product grid + cart + checkout,
+// styled after the real POS order screen (PublicForm.jsx's cart layout) -
+// same category pills, Add-then-stepper product cards, and pf-section/
+// pf-tile field cards - so the demo previews the actual look a launched
+// order form will have, not a rougher stand-in.
 export function CartCapture({ fields, config, readOnly, onComplete }) {
   const cartField = fields.find(f => f.type === 'cart')
   const otherFields = fields.filter(f => f.type !== 'cart')
@@ -90,6 +96,7 @@ export function CartCapture({ fields, config, readOnly, onComplete }) {
   const [answers, setAnswers] = useState({})
   const [paymentMethod, setPaymentMethod] = useState('')
   const [activeCategory, setActiveCategory] = useState('All')
+  const [addedFlash, setAddedFlash] = useState({})
 
   const categories = ['All', ...Array.from(new Set(products.map(p => p.category).filter(Boolean)))]
   const visibleProducts = activeCategory === 'All' ? products : products.filter(p => p.category === activeCategory)
@@ -102,6 +109,12 @@ export function CartCapture({ fields, config, readOnly, onComplete }) {
   function setQty(productId, qty) {
     if (readOnly) return
     setQuantities(current => ({ ...current, [productId]: Math.max(0, qty) }))
+  }
+
+  function addToCart(productId) {
+    setQty(productId, (quantities[productId] || 0) + 1)
+    setAddedFlash(current => ({ ...current, [productId]: true }))
+    setTimeout(() => setAddedFlash(current => ({ ...current, [productId]: false })), 500)
   }
 
   function setAnswer(fieldId, value) {
@@ -122,13 +135,16 @@ export function CartCapture({ fields, config, readOnly, onComplete }) {
   return (
     <div>
       {categories.length > 2 && (
-        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.9rem' }}>
+        <div
+          className="category-scroll"
+          style={{ display: 'flex', gap: '0.4rem', flexWrap: 'nowrap', overflowX: 'auto', paddingBottom: '0.9rem' }}
+        >
           {categories.map(c => (
             <button
               key={c}
               type="button"
               className={c === activeCategory ? '' : 'secondary'}
-              style={{ fontSize: '0.78rem', padding: '0.3rem 0.7rem', borderRadius: 999 }}
+              style={{ fontSize: '0.8rem', padding: '0.35rem 0.8rem', borderRadius: '20px', whiteSpace: 'nowrap', flexShrink: 0 }}
               onClick={() => setActiveCategory(c)}
             >
               {c}
@@ -137,41 +153,49 @@ export function CartCapture({ fields, config, readOnly, onComplete }) {
         </div>
       )}
 
-      <div style={{ display: 'grid', gap: '0.6rem', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', marginBottom: '1.2rem' }}>
+      <div style={{ display: 'grid', gap: '0.6rem', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', marginBottom: '1.4rem' }}>
         {visibleProducts.map(p => {
           const qty = quantities[p.id] || 0
           return (
-            <div key={p.id} style={{ border: '1px solid var(--color-border)', borderRadius: 12, padding: '0.7rem', background: 'var(--color-surface)' }}>
-              <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{p.name}</div>
-              <div style={{ color: 'var(--color-muted)', fontSize: '0.82rem', marginBottom: '0.5rem' }}>₦{Number(p.price || 0).toLocaleString()}</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <button type="button" className="secondary" disabled={readOnly || qty === 0} onClick={() => setQty(p.id, qty - 1)} style={{ padding: '0.2rem 0.6rem' }}>−</button>
-                <span style={{ minWidth: '1.2rem', textAlign: 'center' }}>{qty}</span>
-                <button type="button" className="secondary" disabled={readOnly} onClick={() => setQty(p.id, qty + 1)} style={{ padding: '0.2rem 0.6rem' }}>+</button>
-              </div>
+            <div key={p.id} className="card" style={{ padding: '0.7rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 600, lineHeight: 1.3 }}>{p.name}</div>
+              <div style={{ fontSize: '0.92rem', color: 'var(--color-primary)', fontWeight: 700 }}>₦{Number(p.price || 0).toLocaleString()}</div>
+              {qty === 0 ? (
+                <button
+                  type="button"
+                  disabled={readOnly}
+                  onClick={() => addToCart(p.id)}
+                  style={{ fontSize: '0.8rem', padding: '0.4rem 0.5rem', marginTop: '0.2rem' }}
+                >
+                  {addedFlash[p.id] ? '✓ Added' : 'Add'}
+                </button>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.2rem' }}>
+                  <button type="button" className="secondary" disabled={readOnly} onClick={() => setQty(p.id, qty - 1)} style={{ padding: '0.25rem 0.6rem', fontSize: '0.85rem' }}>−</button>
+                  <span style={{ fontSize: '0.85rem' }}>{qty}</span>
+                  <button type="button" className="secondary" disabled={readOnly} onClick={() => setQty(p.id, qty + 1)} style={{ padding: '0.25rem 0.6rem', fontSize: '0.85rem' }}>+</button>
+                </div>
+              )}
             </div>
           )
         })}
       </div>
 
-      {otherFields.length > 0 && (
-        <div style={{ marginBottom: '1.2rem' }}>
-          {otherFields.map(f => fieldRow(f, answers[f.id], setAnswer, readOnly))}
-        </div>
-      )}
+      {otherFields.map(f => fieldRow(f, answers[f.id], setAnswer, readOnly))}
 
-      <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, marginBottom: '0.8rem' }}>
+      <div className="pf-section">
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: '1.05rem', marginBottom: '0.9rem' }}>
           <span>Total</span>
           <span>₦{total.toLocaleString()}</span>
         </div>
-        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.4rem' }}>Payment method</label>
+        <label className="pf-label">Payment method</label>
         <CardChoice options={PAYMENT_METHODS} value={paymentMethod} onChange={readOnly ? () => {} : setPaymentMethod} />
         <button
           type="button"
+          className="pf-submit"
           disabled={!canComplete}
           onClick={complete}
-          style={{ marginTop: '1rem', width: '100%', padding: '0.8rem', fontSize: '0.95rem' }}
+          style={{ marginTop: '1rem', width: '100%' }}
         >
           {config.submitLabel}
         </button>
@@ -208,9 +232,10 @@ export function GenericCapture({ fields, config, readOnly, onComplete }) {
       {fields.map(f => fieldRow(f, answers[f.id], setAnswer, readOnly))}
       <button
         type="button"
+        className="pf-submit"
         disabled={!canComplete}
         onClick={complete}
-        style={{ marginTop: '0.5rem', width: '100%', padding: '0.8rem', fontSize: '0.95rem' }}
+        style={{ width: '100%' }}
       >
         {config.submitLabel}
       </button>
