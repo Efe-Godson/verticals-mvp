@@ -1,8 +1,11 @@
 // Place at: src/report/builder/print/PrintWorkspace.jsx
 // Route: /form/:id/report/builder/print. The Print/PDF report builder
-// (redesign brief §22-36): arrange existing Report Builder visuals onto A4
+// (redesign brief §22-36): arrange existing Report Builder visuals onto
 // pages for export, entirely separate from the interactive dashboard and
 // the Builder canvas - editing this never touches either of those.
+// DesignerCanvas.jsx's freeform canvas is the only renderer as of Designer
+// 2.0 Phase 1's cutover (plan step 13) - the earlier react-grid-layout
+// renderer and its experimental-toggle checkbox are gone.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useToast } from '../../../Toast'
@@ -19,7 +22,6 @@ import PageThumbnail from './PageThumbnail'
 import { useAutosave } from './useAutosave'
 import { TEXT_VARIANTS, defaultElementSize, PAGE_SIZES, PAGE_NUMBER_FORMATS } from './printConstants'
 import { buildDashboardReplicaPages } from './replicateDashboard'
-import { withGridLayout } from './gridAdapter'
 import { makeShapeElement, makeImageElement, SHAPE_TYPES } from './elementModel'
 import { CATALOGUE_BY_TYPE } from '../catalogue'
 
@@ -42,11 +44,6 @@ export default function PrintWorkspace() {
   const [exportProgress, setExportProgress] = useState(null)
   const [tileSearch, setTileSearch] = useState('')
   const [visualSearch, setVisualSearch] = useState('')
-  // Designer 2.0 Phase 1 rollout flag (step 4) - off by default so the
-  // proven GridLayout renderer stays what every user sees until the
-  // freeform canvas (DesignerCanvas.jsx) covers everything it needs to.
-  // Remove this toggle at cutover (plan step 13).
-  const [useFreeformCanvas, setUseFreeformCanvas] = useState(false)
   // Selection lives here (not inside DesignerCanvas) because there's one
   // DesignerCanvas per page but only one Format Inspector, and keyboard
   // delete needs to know the current selection regardless of which page's
@@ -78,18 +75,16 @@ export default function PrintWorkspace() {
     if (activePageId && !pages.some(p => p.id === activePageId)) setActivePageId(pages[0]?.id || null)
   }, [pages, activePageId])
 
-  // Clear a stale selection (its page got deleted, or the freeform canvas
-  // got switched off) rather than leave the Inspector pointed at nothing.
+  // Clear a stale selection - its page got deleted - rather than leave the
+  // Inspector pointed at nothing.
   useEffect(() => {
-    if (!useFreeformCanvas && selection.ids.length > 0) { setSelection({ pageId: null, ids: [] }); return }
     if (selection.pageId && !pages.some(p => p.id === selection.pageId)) setSelection({ pageId: null, ids: [] })
-  }, [useFreeformCanvas, pages, selection.pageId, selection.ids.length]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pages, selection.pageId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Delete/Backspace removes the current selection - guarded against firing
   // while the user is typing (a text element's contentEditable, or any
   // plain input/textarea/select in the sidebar).
   useEffect(() => {
-    if (!useFreeformCanvas) return
     function onKeyDown(e) {
       if (e.key !== 'Delete' && e.key !== 'Backspace') return
       if (!selection.pageId || selection.ids.length === 0) return
@@ -101,13 +96,11 @@ export default function PrintWorkspace() {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [useFreeformCanvas, selection]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selection]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z - not gated on useFreeformCanvas (unlike
-  // Delete above): undo/redo tracks every printLayout edit, including page
-  // add/remove and page settings, which apply in legacy GridLayout mode too.
-  // Same typing guard as Delete/Backspace so it doesn't fight a field's own
-  // native undo while actively editing text or a number input.
+  // Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z. Same typing guard as Delete/Backspace
+  // above so it doesn't fight a field's own native undo while actively
+  // editing text or a number input.
   useEffect(() => {
     function onKeyDown(e) {
       if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'z') return
@@ -327,22 +320,20 @@ export default function PrintWorkspace() {
         <button className="secondary" style={sideBtn} onClick={addImageToActivePage}>+ Add image</button>
       </div>
 
-      {useFreeformCanvas && (
-        <div style={{ marginBottom: '1.2rem' }}>
-          <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-muted)', marginBottom: '0.5rem' }}>
-            Layers
-          </div>
-          <LayersPanel
-            page={activePage}
-            visualsById={visualsById}
-            tilesById={tilesById}
-            selectedIds={selection.pageId === activePageId ? selection.ids : []}
-            onSelect={ids => activePageId && selectPage(activePageId, ids)}
-            onUpdateElement={rb.updatePrintElement}
-            onReorder={ids => activePageId && rb.reorderPrintElementsZ(activePageId, ids)}
-          />
+      <div style={{ marginBottom: '1.2rem' }}>
+        <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-muted)', marginBottom: '0.5rem' }}>
+          Layers
         </div>
-      )}
+        <LayersPanel
+          page={activePage}
+          visualsById={visualsById}
+          tilesById={tilesById}
+          selectedIds={selection.pageId === activePageId ? selection.ids : []}
+          onSelect={ids => activePageId && selectPage(activePageId, ids)}
+          onUpdateElement={rb.updatePrintElement}
+          onReorder={ids => activePageId && rb.reorderPrintElementsZ(activePageId, ids)}
+        />
+      </div>
 
       <div style={{ marginBottom: '1.2rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
@@ -400,10 +391,6 @@ export default function PrintWorkspace() {
             </select>
           </label>
         )}
-        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', marginBottom: '0.25rem' }}>
-          <input type="checkbox" checked={useFreeformCanvas} onChange={e => setUseFreeformCanvas(e.target.checked)} />
-          Freeform canvas (experimental)
-        </label>
         {[
           ['showLogo', 'Show logo'],
           ['showDate', 'Show date'],
@@ -486,13 +473,13 @@ export default function PrintWorkspace() {
         </div>
       </div>
 
-      <div className={`pw-cols${useFreeformCanvas && !preview ? ' pw-cols-inspector' : ''}`}>
+      <div className={`pw-cols${!preview ? ' pw-cols-inspector' : ''}`}>
         {!preview && <div className="pw-side">{sidebar}</div>}
         <div className="pw-canvas">
           {pages.map((p, i) => (
             <div key={p.id} onClick={() => setActivePageId(p.id)}>
               <PrintPage
-                page={{ ...p, elements: p.elements.map(withGridLayout) }}
+                page={p}
                 pageSize={pageSize}
                 orientation={orientation}
                 visualsById={visualsById}
@@ -504,18 +491,16 @@ export default function PrintWorkspace() {
                 pageNumber={i + 1}
                 totalPages={pages.length}
                 pageRef={node => { pageRefs.current[p.id] = node }}
-                onLayoutChange={rb.setPrintPageLayout}
                 onRemoveElement={rb.removePrintElement}
                 onUpdateElement={rb.updatePrintElement}
                 onUpdateElements={rb.updatePrintElements}
-                useFreeformCanvas={useFreeformCanvas}
                 selectedIds={selection.pageId === p.id ? selection.ids : []}
                 onSelect={ids => selectPage(p.id, ids)}
               />
             </div>
           ))}
         </div>
-        {useFreeformCanvas && !preview && (
+        {!preview && (
           <div className="pw-inspector">
             <FormatInspector
               page={selectedPage}

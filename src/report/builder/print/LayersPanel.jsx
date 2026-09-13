@@ -1,9 +1,7 @@
 // Place at: src/report/builder/print/LayersPanel.jsx
 // Per-page element list ordered front-to-back by zIndex (Designer 2.0
 // Phase 1, step 9) - drag to restack, click to select, toggle
-// visibility/lock inline. Only meaningful once elements carry a real
-// zIndex (the freeform canvas), so PrintWorkspace only renders this when
-// the freeform canvas toggle is on.
+// visibility/lock inline.
 import { useState } from 'react'
 
 function labelForElement(el, visualsById, tilesById) {

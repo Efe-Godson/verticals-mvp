@@ -10,7 +10,7 @@ import { buildDatasets } from '../engine'
 import { makeVisual } from './catalogue'
 import { CURRENT_SCHEMA_VERSION } from './print/elementModel'
 import { migratePrintLayout } from './print/migratePrintLayout'
-import { fromGridCells, toGridCells, resolveElementSize } from './print/gridAdapter'
+import { fromGridCells, resolveElementSize } from './print/gridAdapter'
 import { nextZIndex, stepSwap, reindexFromOrder } from './print/zOrder'
 import { useHistory } from './print/useHistory'
 
@@ -444,35 +444,6 @@ export function useReportBuilder(formId) {
     }))
   }, [mutatePrint])
 
-  // react-grid-layout fires onLayoutChange on mount with the layout it was
-  // already given - same no-op guard as setCanvasLayout above, so opening a
-  // print page doesn't immediately flip on the unsaved-changes indicator.
-  // `layouts` arrives in grid cells (react-grid-layout's own coordinate
-  // system, via gridAdapter's withGridLayout - see PrintWorkspace.jsx);
-  // elements are stored in percentage space, so convert on the way in and
-  // compare in grid-cell space (matching the granularity the guard already
-  // relied on, avoiding false "changed" positives from rounding drift).
-  const setPrintPageLayout = useCallback((pageId, layouts) => {
-    setState(prev => {
-      let changed = false
-      const pages = prev.printLayout.pages.map(p => {
-        if (p.id !== pageId) return p
-        const elements = p.elements.map(el => {
-          const l = layouts.find(x => x.i === el.id)
-          if (!l) return el
-          const cur = toGridCells(el)
-          if (cur.x === l.x && cur.y === l.y && cur.w === l.w && cur.h === l.h) return el
-          changed = true
-          return { ...el, ...fromGridCells(l) }
-        })
-        return { ...p, elements }
-      })
-      if (!changed) return prev
-      setDirty(true)
-      return { ...prev, printLayout: { ...prev.printLayout, pages } }
-    })
-  }, [])
-
   const updatePrintSettings = useCallback((patch) => {
     mutatePrint(prev => ({ ...prev, ...patch }))
   }, [mutatePrint])
@@ -553,7 +524,7 @@ export function useReportBuilder(formId) {
     addPrintPage, duplicatePrintPage, removePrintPage, reorderPrintPages,
     addPrintElement, updatePrintElement, updatePrintElements, removePrintElement, removePrintElements,
     setPrintElementZ, setPrintElementsZ, reorderPrintElementsZ,
-    setPrintPageLayout, updatePrintSettings,
+    updatePrintSettings,
     seedPrintPages,
     undoPrint, redoPrint, canUndoPrint: printHistory.canUndo, canRedoPrint: printHistory.canRedo,
     beginPrintBatch, commitPrintBatch,

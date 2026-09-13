@@ -1,25 +1,25 @@
 // Place at: src/report/builder/print/PrintPage.jsx
-// One authored A4 page (brief §24-28). A fixed-aspect-ratio white canvas -
+// One authored page (brief §24-28). A fixed-aspect-ratio white canvas -
 // exported by rasterizing exactly this DOM node, so whatever fits on screen
-// is what ends up on the PDF page. Not wrapped in WidthProvider: rowHeight
-// has to be derived from the *measured* width together with the page's
-// aspect ratio (so the grid always spans exactly one page's height), which
-// WidthProvider's own width-only plumbing doesn't expose.
+// is what ends up on the PDF page. Renders via DesignerCanvas (Designer 2.0
+// Phase 1's freeform canvas) - the earlier react-grid-layout renderer was
+// removed at cutover (plan step 13); gridAdapter.js's fromGridCells/
+// resolveElementSize stay only as a units adapter for default-size inputs
+// (printConstants.js's defaultElementSize, replicateDashboard.js's output),
+// unrelated to which component renders a page.
 import { useEffect, useRef, useState } from 'react'
-import GridLayout from 'react-grid-layout/legacy'
-import 'react-grid-layout/css/styles.css'
 import DesignerCanvas from './DesignerCanvas'
 import PrintVisualElement from './PrintVisualElement'
 import PrintTextElement from './PrintTextElement'
 import PrintTileElement from './PrintTileElement'
 import ShapeElement from './elements/ShapeElement'
 import ImageElement from './elements/ImageElement'
-import { pageFormatMm, pageAspectRatio, GRID_COLS, ROWS_PER_PAGE, PAGE_SIZES, formatPageNumber } from './printConstants'
+import { pageFormatMm, pageAspectRatio, PAGE_SIZES, formatPageNumber } from './printConstants'
 
 export default function PrintPage({
   page, pageSize, orientation, visualsById, tilesById, form, submissions, editing, settings,
-  pageNumber, totalPages, onLayoutChange, onRemoveElement, onUpdateElement, onUpdateElements, pageRef,
-  useFreeformCanvas, selectedIds, onSelect,
+  pageNumber, totalPages, onRemoveElement, onUpdateElement, onUpdateElements, pageRef,
+  selectedIds, onSelect,
 }) {
   const containerRef = useRef(null)
   const [width, setWidth] = useState(0)
@@ -37,26 +37,12 @@ export default function PrintPage({
 
   const [wMm, hMm] = pageFormatMm(pageSize, orientation)
   const heightPx = width ? width * (hMm / wMm) : 0
-  const rowHeight = heightPx ? heightPx / ROWS_PER_PAGE : 20
   const maxWidthPx = (PAGE_SIZES[pageSize] || PAGE_SIZES.slide).orientable
     ? (orientation === 'landscape' ? '1000px' : '780px')
     : '1000px'
 
-  const layout = page.elements.map(el => ({
-    i: el.id,
-    x: el.layout?.x ?? 0, y: el.layout?.y ?? 0,
-    w: el.layout?.w ?? 12, h: el.layout?.h ?? 4,
-    minW: 2, minH: 2,
-  }))
+  const overflowing = page.elements.some(el => (el.y || 0) + (el.height || 0) > 100)
 
-  const overflowing = page.elements.some(el => (el.layout?.y || 0) + (el.layout?.h || 0) > ROWS_PER_PAGE)
-
-  // Shared between both the legacy GridLayout branch and the freeform
-  // DesignerCanvas branch below, so an element renders identically either
-  // way - only the positioning mechanism differs. `canvasHelpers` is only
-  // passed by DesignerCanvas (undefined in GridLayout mode, preserving its
-  // original always-editable text behavior exactly) - see PrintTextElement's
-  // directEdit prop for why freeform mode needs double-click-to-edit.
   function renderElementContent(el, canvasHelpers) {
     // Shapes/images own their entire visual boundary (fill, image edges) -
     // wrapping them in the generic card would double up the border/padding.
@@ -76,7 +62,7 @@ export default function PrintPage({
         {el.kind === 'text' ? (
           <PrintTextElement
             element={el} editing={editing}
-            directEdit={!canvasHelpers}
+            directEdit={false}
             onEditingChange={canvasHelpers?.onEditingChange}
             onChange={patch => onUpdateElement(page.id, el.id, patch)}
             onRemove={() => onRemoveElement(page.id, el.id)}
@@ -114,7 +100,7 @@ export default function PrintPage({
           overflow: 'hidden', position: 'relative', margin: '0 auto',
         }}
       >
-        {width > 0 && useFreeformCanvas && (
+        {width > 0 && (
           <DesignerCanvas
             page={page}
             width={width}
@@ -126,28 +112,6 @@ export default function PrintPage({
             selectedIds={selectedIds}
             onSelect={onSelect}
           />
-        )}
-        {width > 0 && !useFreeformCanvas && (
-          <GridLayout
-            width={width}
-            cols={GRID_COLS}
-            rowHeight={rowHeight}
-            margin={[10, 10]}
-            containerPadding={[20, 34]}
-            layout={layout}
-            compactType="vertical"
-            preventCollision={false}
-            isDraggable={editing}
-            isResizable={editing}
-            resizeHandles={['se']}
-            onLayoutChange={editing ? (l) => onLayoutChange(page.id, l) : undefined}
-          >
-            {page.elements.map(el => (
-              <div key={el.id} style={{ height: '100%' }}>
-                {renderElementContent(el)}
-              </div>
-            ))}
-          </GridLayout>
         )}
 
         {settings?.showLogo && (
