@@ -33,6 +33,11 @@ export default function PrintWorkspace() {
   const [exportProgress, setExportProgress] = useState(null)
   const [tileSearch, setTileSearch] = useState('')
   const [visualSearch, setVisualSearch] = useState('')
+  // Designer 2.0 Phase 1 rollout flag (step 4) - off by default so the
+  // proven GridLayout renderer stays what every user sees until the
+  // freeform canvas (DesignerCanvas.jsx) covers everything it needs to.
+  // Remove this toggle at cutover (plan step 13).
+  const [useFreeformCanvas, setUseFreeformCanvas] = useState(false)
   const pageRefs = useRef({})
 
   const pages = rb.printLayout?.pages || []
@@ -279,6 +284,10 @@ export default function PrintWorkspace() {
             </select>
           </label>
         )}
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', marginBottom: '0.25rem' }}>
+          <input type="checkbox" checked={useFreeformCanvas} onChange={e => setUseFreeformCanvas(e.target.checked)} />
+          Freeform canvas (experimental)
+        </label>
         {[
           ['showLogo', 'Show logo'],
           ['showDate', 'Show date'],
@@ -368,6 +377,7 @@ export default function PrintWorkspace() {
                 onLayoutChange={rb.setPrintPageLayout}
                 onRemoveElement={rb.removePrintElement}
                 onUpdateElement={rb.updatePrintElement}
+                useFreeformCanvas={useFreeformCanvas}
               />
             </div>
           ))}

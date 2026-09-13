@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState } from 'react'
 import GridLayout from 'react-grid-layout/legacy'
 import 'react-grid-layout/css/styles.css'
+import DesignerCanvas from './DesignerCanvas'
 import PrintVisualElement from './PrintVisualElement'
 import PrintTextElement from './PrintTextElement'
 import PrintTileElement from './PrintTileElement'
@@ -16,6 +17,7 @@ import { pageFormatMm, pageAspectRatio, GRID_COLS, ROWS_PER_PAGE, PAGE_SIZES, fo
 export default function PrintPage({
   page, pageSize, orientation, visualsById, tilesById, form, submissions, editing, settings,
   pageNumber, totalPages, onLayoutChange, onRemoveElement, onUpdateElement, pageRef,
+  useFreeformCanvas,
 }) {
   const containerRef = useRef(null)
   const [width, setWidth] = useState(0)
@@ -47,6 +49,43 @@ export default function PrintPage({
 
   const overflowing = page.elements.some(el => (el.layout?.y || 0) + (el.layout?.h || 0) > ROWS_PER_PAGE)
 
+  // Shared between both the legacy GridLayout branch and the freeform
+  // DesignerCanvas branch below, so an element renders identically either
+  // way - only the positioning mechanism differs.
+  function renderElementContent(el) {
+    const boxed = !(el.kind === 'text' && (el.text?.variant || 'body') === 'title')
+    return (
+      <div
+        style={{
+          height: '100%', boxSizing: 'border-box', overflow: 'hidden',
+          ...(boxed
+            ? { border: '1px solid #ddd', borderRadius: '8px', background: '#fff', padding: '1rem' }
+            : { padding: '0.2rem 0' }),
+        }}
+      >
+        {el.kind === 'text' ? (
+          <PrintTextElement
+            element={el} editing={editing}
+            onChange={patch => onUpdateElement(page.id, el.id, patch)}
+            onRemove={() => onRemoveElement(page.id, el.id)}
+          />
+        ) : el.kind === 'tile' ? (
+          <PrintTileElement
+            tile={tilesById?.[el.tileId]} editing={editing}
+            onRemove={() => onRemoveElement(page.id, el.id)}
+          />
+        ) : (
+          <PrintVisualElement
+            visual={visualsById[el.visualId]} form={form} submissions={submissions}
+            override={el.override} editing={editing}
+            onChangeOverride={ov => onUpdateElement(page.id, el.id, { override: ov })}
+            onRemove={() => onRemoveElement(page.id, el.id)}
+          />
+        )}
+      </div>
+    )
+  }
+
   return (
     <div style={{ marginBottom: '1.5rem' }}>
       <div
@@ -59,7 +98,17 @@ export default function PrintPage({
           overflow: 'hidden', position: 'relative', margin: '0 auto',
         }}
       >
-        {width > 0 && (
+        {width > 0 && useFreeformCanvas && (
+          <DesignerCanvas
+            page={page}
+            width={width}
+            height={heightPx}
+            editing={editing}
+            onUpdateElement={onUpdateElement}
+            renderElement={renderElementContent}
+          />
+        )}
+        {width > 0 && !useFreeformCanvas && (
           <GridLayout
             width={width}
             cols={GRID_COLS}
@@ -74,44 +123,11 @@ export default function PrintPage({
             resizeHandles={['se']}
             onLayoutChange={editing ? (l) => onLayoutChange(page.id, l) : undefined}
           >
-            {page.elements.map(el => {
-              // Every element gets a visible card boundary except a Title
-              // block - it already reads fine spanning the page's full width
-              // unboxed, the way a document's own title would.
-              const boxed = !(el.kind === 'text' && (el.text?.variant || 'body') === 'title')
-              return (
-                <div key={el.id} style={{ height: '100%' }}>
-                  <div
-                    style={{
-                      height: '100%', boxSizing: 'border-box', overflow: 'hidden',
-                      ...(boxed
-                        ? { border: '1px solid #ddd', borderRadius: '8px', background: '#fff', padding: '1rem' }
-                        : { padding: '0.2rem 0' }),
-                    }}
-                  >
-                    {el.kind === 'text' ? (
-                      <PrintTextElement
-                        element={el} editing={editing}
-                        onChange={patch => onUpdateElement(page.id, el.id, patch)}
-                        onRemove={() => onRemoveElement(page.id, el.id)}
-                      />
-                    ) : el.kind === 'tile' ? (
-                      <PrintTileElement
-                        tile={tilesById?.[el.tileId]} editing={editing}
-                        onRemove={() => onRemoveElement(page.id, el.id)}
-                      />
-                    ) : (
-                      <PrintVisualElement
-                        visual={visualsById[el.visualId]} form={form} submissions={submissions}
-                        override={el.override} editing={editing}
-                        onChangeOverride={ov => onUpdateElement(page.id, el.id, { override: ov })}
-                        onRemove={() => onRemoveElement(page.id, el.id)}
-                      />
-                    )}
-                  </div>
-                </div>
-              )
-            })}
+            {page.elements.map(el => (
+              <div key={el.id} style={{ height: '100%' }}>
+                {renderElementContent(el)}
+              </div>
+            ))}
           </GridLayout>
         )}
 
