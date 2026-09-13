@@ -10,8 +10,7 @@ import { buildDatasets } from '../engine'
 import { makeVisual } from './catalogue'
 import { CURRENT_SCHEMA_VERSION } from './print/elementModel'
 import { migratePrintLayout } from './print/migratePrintLayout'
-import { fromGridCells, toGridCells } from './print/gridAdapter'
-import { GRID_COLS } from './print/printConstants'
+import { fromGridCells, toGridCells, resolveElementSize } from './print/gridAdapter'
 import { nextZIndex, stepSwap } from './print/zOrder'
 
 const EMPTY_PRINT_LAYOUT = {
@@ -270,21 +269,27 @@ export function useReportBuilder(formId) {
   }, [mutatePrint])
 
   // `element.layout` (when passed by a caller) is still grid-cell {w,h} -
-  // every call site (PrintWorkspace.jsx's sidebar buttons) uses
-  // defaultElementSize()'s grid units, so convert to percentage width/height
-  // here rather than changing every caller.
+  // most call sites (PrintWorkspace.jsx's visual/tile/text sidebar buttons)
+  // use defaultElementSize()'s grid units; the shape/image "add" buttons
+  // instead pass elementModel.js's makeShapeElement()/makeImageElement()
+  // factory output, which already carries percentage width/height directly.
+  // resolveElementSize() reconciles both conventions.
   const addPrintElement = useCallback((pageId, element) => {
     let created
     mutatePrint(prev => ({
       ...prev,
       pages: prev.pages.map(p => {
         if (p.id !== pageId) return p
-        const { layout, ...rest } = element
-        const { width, height } = fromGridCells({ w: layout?.w ?? GRID_COLS, h: layout?.h ?? 4 })
+        // Strip any id the caller's object already carries (e.g.
+        // elementModel.js's makeShapeElement()/makeImageElement() factories
+        // assign their own) - addPrintElement is always the sole authority
+        // on ids for elements it creates.
+        const { layout: _layout, id: _id, ...rest } = element
+        const { width, height } = resolveElementSize(element)
         const slot = nextElementSlotPct(p.elements, width, height)
         created = {
           id: newPrintId('el'), ...rest, ...slot,
-          rotation: 0, zIndex: p.elements.length + 1, locked: false, visible: true,
+          rotation: rest.rotation ?? 0, zIndex: p.elements.length + 1, locked: false, visible: true,
         }
         return { ...p, elements: [...p.elements, created] }
       }),

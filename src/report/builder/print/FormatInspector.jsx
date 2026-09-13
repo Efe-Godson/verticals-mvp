@@ -50,6 +50,53 @@ function LayerButtons({ onSetZ }) {
   )
 }
 
+function ShapeStyleFields({ page, el, onUpdateElement }) {
+  const canRadius = el.shape === 'rectangle' || el.shape === 'rounded-rectangle'
+  return (
+    <>
+      <SectionLabel>Style</SectionLabel>
+      <FieldRow label="Fill">
+        <input type="color" value={el.fill || '#e5e7eb'} onChange={e => onUpdateElement(page.id, el.id, { fill: e.target.value })} />
+      </FieldRow>
+      <FieldRow label="Stroke">
+        <input type="color" value={el.stroke || '#111827'} onChange={e => onUpdateElement(page.id, el.id, { stroke: e.target.value })} />
+      </FieldRow>
+      <FieldRow label="Stroke width">
+        <NumberInput value={el.strokeWidth ?? 1} step={1} onChange={v => onUpdateElement(page.id, el.id, { strokeWidth: Math.max(0, v) })} />
+      </FieldRow>
+      {canRadius && (
+        <FieldRow label="Corner radius">
+          <NumberInput value={el.radius ?? 0} step={1} onChange={v => onUpdateElement(page.id, el.id, { radius: Math.max(0, v) })} />
+        </FieldRow>
+      )}
+      <FieldRow label="Opacity">
+        <NumberInput value={el.opacity ?? 1} step={0.1} onChange={v => onUpdateElement(page.id, el.id, { opacity: Math.min(1, Math.max(0, v)) })} />
+      </FieldRow>
+    </>
+  )
+}
+
+function ImageStyleFields({ page, el, onUpdateElement }) {
+  return (
+    <>
+      <SectionLabel>Style</SectionLabel>
+      <FieldRow label="Fit">
+        <select value={el.fit || 'cover'} onChange={e => onUpdateElement(page.id, el.id, { fit: e.target.value })} style={{ fontSize: '0.8rem' }}>
+          <option value="cover">Cover</option>
+          <option value="contain">Contain</option>
+          <option value="fill">Stretch</option>
+        </select>
+      </FieldRow>
+      <FieldRow label="Corner radius">
+        <NumberInput value={el.radius ?? 0} step={1} onChange={v => onUpdateElement(page.id, el.id, { radius: Math.max(0, v) })} />
+      </FieldRow>
+      <FieldRow label="Opacity">
+        <NumberInput value={el.opacity ?? 1} step={0.1} onChange={v => onUpdateElement(page.id, el.id, { opacity: Math.min(1, Math.max(0, v)) })} />
+      </FieldRow>
+    </>
+  )
+}
+
 function labelForKind(kind) {
   if (kind === 'visual') return 'Chart'
   if (kind === 'tile') return 'Dashboard tile'
@@ -88,6 +135,10 @@ export default function FormatInspector({ page, selectedElements, onUpdateElemen
     <div style={panelStyle}>
       <SectionLabel>{labelForKind(el.kind)}</SectionLabel>
 
+      {el.kind === 'shape' && <ShapeStyleFields page={page} el={el} onUpdateElement={onUpdateElement} />}
+      {el.kind === 'image' && <ImageStyleFields page={page} el={el} onUpdateElement={onUpdateElement} />}
+
+      <SectionLabel>Position</SectionLabel>
       <FieldRow label="X %"><NumberInput value={el.x} onChange={v => onUpdateElement(page.id, el.id, { x: v })} /></FieldRow>
       <FieldRow label="Y %"><NumberInput value={el.y} onChange={v => onUpdateElement(page.id, el.id, { y: v })} /></FieldRow>
       <FieldRow label="Width %"><NumberInput value={el.width} onChange={v => onUpdateElement(page.id, el.id, { width: v })} /></FieldRow>

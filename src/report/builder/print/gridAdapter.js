@@ -31,3 +31,18 @@ export function fromGridCells({ x = 0, y = 0, w = GRID_COLS, h = 4 } = {}) {
 export function withGridLayout(element) {
   return { ...element, layout: toGridCells(element) }
 }
+
+// Resolves a candidate new element's width/height in percentage terms:
+// prefers explicit width/height (already in percent - e.g. from
+// elementModel.js's makeShapeElement/makeImageElement factories) and falls
+// back to a legacy grid-cell layout.{w,h} otherwise (the sidebar's existing
+// visual/tile/text "add" handlers in PrintWorkspace.jsx). Kept here since
+// this is the one place that reconciles the two sizing conventions during
+// the Phase 1 transition - see useReportBuilder.js's addPrintElement.
+export function resolveElementSize(element) {
+  if (Number.isFinite(element.width) && Number.isFinite(element.height)) {
+    return { width: element.width, height: element.height }
+  }
+  const { width, height } = fromGridCells({ w: element.layout?.w ?? GRID_COLS, h: element.layout?.h ?? 4 })
+  return { width, height }
+}

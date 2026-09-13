@@ -17,6 +17,7 @@ import FormatInspector from './FormatInspector'
 import { TEXT_VARIANTS, defaultElementSize, PAGE_SIZES, PAGE_NUMBER_FORMATS } from './printConstants'
 import { buildDashboardReplicaPages } from './replicateDashboard'
 import { withGridLayout } from './gridAdapter'
+import { makeShapeElement, makeImageElement, SHAPE_TYPES } from './elementModel'
 
 const sideBtn = { fontSize: '0.78rem', padding: '0.3rem 0.5rem' }
 
@@ -132,6 +133,16 @@ export default function PrintWorkspace() {
       text: { variant, content: '', align: variant === 'divider' ? 'left' : 'left', bold: false },
       layout: { ...defaultElementSize('text', variant) },
     })
+  }
+  function addShapeToActivePage(shape) {
+    const pageId = activePageId || pages[0]?.id
+    if (!pageId) return
+    rb.addPrintElement(pageId, makeShapeElement({ shape }))
+  }
+  function addImageToActivePage() {
+    const pageId = activePageId || pages[0]?.id
+    if (!pageId) return
+    rb.addPrintElement(pageId, makeImageElement())
   }
 
   async function handleSave() {
@@ -264,6 +275,26 @@ export default function PrintWorkspace() {
           ))}
           <button className="secondary" style={sideBtn} onClick={() => addTextToActivePage('divider')}>Divider</button>
         </div>
+      </div>
+
+      <div style={{ marginBottom: '1.2rem' }}>
+        <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-muted)', marginBottom: '0.5rem' }}>
+          Shapes
+        </div>
+        <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
+          {SHAPE_TYPES.map(shape => (
+            <button key={shape} className="secondary" style={sideBtn} onClick={() => addShapeToActivePage(shape)}>
+              {shape.replace('-', ' ')}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ marginBottom: '1.2rem' }}>
+        <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-muted)', marginBottom: '0.5rem' }}>
+          Media
+        </div>
+        <button className="secondary" style={sideBtn} onClick={addImageToActivePage}>+ Add image</button>
       </div>
 
       <div style={{ marginBottom: '1.2rem' }}>

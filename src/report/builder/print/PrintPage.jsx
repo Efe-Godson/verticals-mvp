@@ -12,6 +12,8 @@ import DesignerCanvas from './DesignerCanvas'
 import PrintVisualElement from './PrintVisualElement'
 import PrintTextElement from './PrintTextElement'
 import PrintTileElement from './PrintTileElement'
+import ShapeElement from './elements/ShapeElement'
+import ImageElement from './elements/ImageElement'
 import { pageFormatMm, pageAspectRatio, GRID_COLS, ROWS_PER_PAGE, PAGE_SIZES, formatPageNumber } from './printConstants'
 
 export default function PrintPage({
@@ -56,7 +58,12 @@ export default function PrintPage({
   // original always-editable text behavior exactly) - see PrintTextElement's
   // directEdit prop for why freeform mode needs double-click-to-edit.
   function renderElementContent(el, canvasHelpers) {
-    const boxed = !(el.kind === 'text' && ['title', 'big-number'].includes(el.text?.variant || 'body'))
+    // Shapes/images own their entire visual boundary (fill, image edges) -
+    // wrapping them in the generic card would double up the border/padding.
+    const boxed = !(
+      (el.kind === 'text' && ['title', 'big-number'].includes(el.text?.variant || 'body'))
+      || el.kind === 'shape' || el.kind === 'image'
+    )
     return (
       <div
         style={{
@@ -79,6 +86,10 @@ export default function PrintPage({
             tile={tilesById?.[el.tileId]} editing={editing}
             onRemove={() => onRemoveElement(page.id, el.id)}
           />
+        ) : el.kind === 'shape' ? (
+          <ShapeElement element={el} />
+        ) : el.kind === 'image' ? (
+          <ImageElement element={el} editing={editing} onChange={patch => onUpdateElement(page.id, el.id, patch)} />
         ) : (
           <PrintVisualElement
             visual={visualsById[el.visualId]} form={form} submissions={submissions}

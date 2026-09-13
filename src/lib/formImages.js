@@ -25,3 +25,25 @@ export async function uploadBannerImage(file, session) {
   if (error) throw new Error('Could not upload the image: ' + error.message)
   return supabase.storage.from('form-uploads').getPublicUrl(path).data.publicUrl
 }
+
+// Same validation/upload path as uploadBannerImage, for an image placed
+// directly onto a Designer canvas page (src/report/builder/print/) instead
+// of a form's banner - separate function (not a shared `folder` param on
+// uploadBannerImage) so neither call site's behavior can be affected by a
+// change made for the other.
+export async function uploadDesignerImage(file, session) {
+  if (!file.type || !file.type.startsWith('image/')) {
+    throw new Error('Please choose an image file (PNG, JPG, GIF, ...).')
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    throw new Error('Image must be under 5MB.')
+  }
+  const ext = (file.type.split('/')[1] || 'png').replace('jpeg', 'jpg')
+  const rawName = file.name ? file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_') : `image.${ext}`
+  const path = `designer/${session.user.id}/${Date.now()}-${rawName}`
+  const { error } = await supabase.storage
+    .from('form-uploads')
+    .upload(path, file, { contentType: file.type, upsert: false })
+  if (error) throw new Error('Could not upload the image: ' + error.message)
+  return supabase.storage.from('form-uploads').getPublicUrl(path).data.publicUrl
+}
