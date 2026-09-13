@@ -14,6 +14,7 @@ import { buildChartTiles } from '../../analysis/buildDashboardTiles'
 import { exportPrintLayoutToPDF } from '../../../reportExport'
 import PrintPage from './PrintPage'
 import FormatInspector from './FormatInspector'
+import LayersPanel from './LayersPanel'
 import { TEXT_VARIANTS, defaultElementSize, PAGE_SIZES, PAGE_NUMBER_FORMATS } from './printConstants'
 import { buildDashboardReplicaPages } from './replicateDashboard'
 import { withGridLayout } from './gridAdapter'
@@ -181,6 +182,7 @@ export default function PrintWorkspace() {
   const filteredVisuals = (rb.visuals || []).filter(v => v.title?.toLowerCase().includes(visualSearch.trim().toLowerCase()))
 
   const selectedPage = pages.find(p => p.id === selection.pageId) || null
+  const activePage = pages.find(p => p.id === activePageId) || null
   const selectedElements = selectedPage ? selectedPage.elements.filter(el => selection.ids.includes(el.id)) : []
 
   const sidebar = (
@@ -296,6 +298,23 @@ export default function PrintWorkspace() {
         </div>
         <button className="secondary" style={sideBtn} onClick={addImageToActivePage}>+ Add image</button>
       </div>
+
+      {useFreeformCanvas && (
+        <div style={{ marginBottom: '1.2rem' }}>
+          <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-muted)', marginBottom: '0.5rem' }}>
+            Layers
+          </div>
+          <LayersPanel
+            page={activePage}
+            visualsById={visualsById}
+            tilesById={tilesById}
+            selectedIds={selection.pageId === activePageId ? selection.ids : []}
+            onSelect={ids => activePageId && selectPage(activePageId, ids)}
+            onUpdateElement={rb.updatePrintElement}
+            onReorder={ids => activePageId && rb.reorderPrintElementsZ(activePageId, ids)}
+          />
+        </div>
+      )}
 
       <div style={{ marginBottom: '1.2rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>

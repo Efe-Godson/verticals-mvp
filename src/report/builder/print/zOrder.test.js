@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { nextZIndex, stepSwap } from './zOrder'
+import { nextZIndex, stepSwap, reindexFromOrder } from './zOrder'
 
 const elements = [
   { id: 'a', zIndex: 1 },
@@ -55,5 +55,19 @@ describe('stepSwap', () => {
     const [p1, p2] = stepSwap(withMissing, 'x', 1)
     expect(p1).toEqual({ id: 'x', zIndex: 1 })
     expect(p2).toEqual({ id: 'y', zIndex: 0 })
+  })
+})
+
+describe('reindexFromOrder', () => {
+  it('assigns the highest zIndex to the front-most id', () => {
+    expect(reindexFromOrder(['a', 'b', 'c'])).toEqual({ a: 3, b: 2, c: 1 })
+  })
+
+  it('handles a single element', () => {
+    expect(reindexFromOrder(['only'])).toEqual({ only: 1 })
+  })
+
+  it('handles an empty list', () => {
+    expect(reindexFromOrder([])).toEqual({})
   })
 })

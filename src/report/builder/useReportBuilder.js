@@ -11,7 +11,7 @@ import { makeVisual } from './catalogue'
 import { CURRENT_SCHEMA_VERSION } from './print/elementModel'
 import { migratePrintLayout } from './print/migratePrintLayout'
 import { fromGridCells, toGridCells, resolveElementSize } from './print/gridAdapter'
-import { nextZIndex, stepSwap } from './print/zOrder'
+import { nextZIndex, stepSwap, reindexFromOrder } from './print/zOrder'
 
 const EMPTY_PRINT_LAYOUT = {
   schemaVersion: CURRENT_SCHEMA_VERSION,
@@ -340,6 +340,18 @@ export function useReportBuilder(formId) {
     }))
   }, [mutatePrint])
 
+  // Full front-to-back restack, from the Layers panel's drag-to-reorder.
+  const reorderPrintElementsZ = useCallback((pageId, orderedIdsFrontToBack) => {
+    mutatePrint(prev => ({
+      ...prev,
+      pages: prev.pages.map(p => {
+        if (p.id !== pageId) return p
+        const zById = reindexFromOrder(orderedIdsFrontToBack)
+        return { ...p, elements: p.elements.map(el => el.id in zById ? { ...el, zIndex: zById[el.id] } : el) }
+      }),
+    }))
+  }, [mutatePrint])
+
   // react-grid-layout fires onLayoutChange on mount with the layout it was
   // already given - same no-op guard as setCanvasLayout above, so opening a
   // print page doesn't immediately flip on the unsaved-changes indicator.
@@ -448,6 +460,7 @@ export function useReportBuilder(formId) {
     setCanvasLayout, promote, demote, setBuilderFilters, save, saveFormSetting,
     addPrintPage, duplicatePrintPage, removePrintPage, reorderPrintPages,
     addPrintElement, updatePrintElement, removePrintElement, removePrintElements, setPrintElementZ,
+    reorderPrintElementsZ,
     setPrintPageLayout, updatePrintSettings,
     seedPrintPages,
   }

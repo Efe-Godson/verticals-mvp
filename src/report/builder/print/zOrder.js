@@ -10,6 +10,14 @@ export function nextZIndex(elements, mode) {
   return null
 }
 
+// Given a full front-to-back ordering of element ids (as dragged into place
+// in the Layers panel), returns a {id: zIndex} map - the front-most id gets
+// the highest zIndex. Ids not in the list are left untouched by the caller.
+export function reindexFromOrder(orderedIdsFrontToBack) {
+  const total = orderedIdsFrontToBack.length
+  return Object.fromEntries(orderedIdsFrontToBack.map((id, i) => [id, total - i]))
+}
+
 // "Forward"/"backward" swap zIndex with whichever element is next in the
 // page's current stacking order, so repeated presses walk one step at a
 // time instead of jumping straight to front/back. Returns the two
