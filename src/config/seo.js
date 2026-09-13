@@ -117,6 +117,29 @@ export const seoPages = {
     title: 'Terms of Service | Verticals',
     description: 'The terms that apply to using Verticals.',
   },
+  // trust/security/cookies/subprocessors: fallback metadata only, used
+  // until a page's own published seo_title/seo_description (set in Lab ->
+  // Trust & Legal) overrides it - see LegalPage.jsx/SubprocessorsPage.jsx.
+  trust: {
+    canonical: '/trust',
+    title: 'Trust Center | Verticals',
+    description: 'How Verticals approaches trust, data and security.',
+  },
+  security: {
+    canonical: '/security',
+    title: 'Security | Verticals',
+    description: 'How Verticals protects your data.',
+  },
+  cookies: {
+    canonical: '/cookies',
+    title: 'Cookie Policy | Verticals',
+    description: 'How Verticals uses cookies and browser storage.',
+  },
+  subprocessors: {
+    canonical: '/subprocessors',
+    title: 'Subprocessors | Verticals',
+    description: 'Third-party providers Verticals uses to run the product.',
+  },
   notFound: {
     title: 'Page not found | Verticals',
     description: "The page you're looking for doesn't exist.",
@@ -169,11 +192,23 @@ export const PUBLIC_ROUTES = [
   { seoKey: 'forRestaurants', path: '/for-restaurants', priority: '0.7', changefreq: 'monthly', prerender: true },
   { seoKey: 'forRetail', path: '/for-retail', priority: '0.7', changefreq: 'monthly', prerender: true },
   { seoKey: 'templateGallery', path: '/template-gallery', priority: '0.6', changefreq: 'monthly', prerender: true },
-  { seoKey: 'resources', path: '/resources', priority: '0.4', changefreq: 'monthly', prerender: true },
+  // Now also DB-driven (its article grid fetches from Supabase, same as
+  // privacy/terms/trust/security/cookies/subprocessors below) - dropped
+  // from prerendering for the same reason, see that comment.
+  { seoKey: 'resources', path: '/resources', priority: '0.4', changefreq: 'monthly', prerender: false },
   { seoKey: 'about', path: '/about', priority: '0.5', changefreq: 'monthly', prerender: true },
   { seoKey: 'contact', path: '/contact', priority: '0.5', changefreq: 'monthly', prerender: true },
-  { seoKey: 'privacy', path: '/privacy', priority: '0.3', changefreq: 'yearly', prerender: true },
-  { seoKey: 'terms', path: '/terms', priority: '0.3', changefreq: 'yearly', prerender: true },
+  // Content is DB-driven (Lab -> Trust & Legal), so these are client-
+  // rendered rather than build-time prerendered - same treatment /demo
+  // already gets below. See the Trust & Legal CMS plan's prerendering
+  // decision for why (a build-time DB fetch + deploy-hook pipeline was
+  // judged more infra than this "lightweight internal CMS" should carry).
+  { seoKey: 'privacy', path: '/privacy', priority: '0.3', changefreq: 'yearly', prerender: false },
+  { seoKey: 'terms', path: '/terms', priority: '0.3', changefreq: 'yearly', prerender: false },
+  { seoKey: 'trust', path: '/trust', priority: '0.3', changefreq: 'monthly', prerender: false },
+  { seoKey: 'security', path: '/security', priority: '0.3', changefreq: 'monthly', prerender: false },
+  { seoKey: 'cookies', path: '/cookies', priority: '0.3', changefreq: 'yearly', prerender: false },
+  { seoKey: 'subprocessors', path: '/subprocessors', priority: '0.3', changefreq: 'monthly', prerender: false },
   { path: '/demo', priority: '0.6', changefreq: 'monthly', prerender: false },
 ]
 

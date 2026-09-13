@@ -109,6 +109,30 @@
     <priority>0.3</priority>
   </url>
   <url>
+    <loc>https://www.verticalsapp.com/trust</loc>
+    <lastmod>2026-09-13</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://www.verticalsapp.com/security</loc>
+    <lastmod>2026-09-13</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://www.verticalsapp.com/cookies</loc>
+    <lastmod>2026-09-13</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://www.verticalsapp.com/subprocessors</loc>
+    <lastmod>2026-09-13</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
     <loc>https://www.verticalsapp.com/demo</loc>
     <lastmod>2026-09-13</lastmod>
     <changefreq>monthly</changefreq>

@@ -87,11 +87,8 @@ const SCHEMAS_BY_SEO_KEY = {
     buildBreadcrumbList([{ name: 'Home', path: '/' }, { name: 'Templates' }]),
     buildFAQPage(TEMPLATES_FAQS),
   ],
-  resources: () => [buildBreadcrumbList([{ name: 'Home', path: '/' }, { name: 'Resources' }])],
   about: () => [buildBreadcrumbList([{ name: 'Home', path: '/' }, { name: 'About' }])],
   contact: () => [buildBreadcrumbList([{ name: 'Home', path: '/' }, { name: 'Contact' }])],
-  privacy: () => [buildBreadcrumbList([{ name: 'Home', path: '/' }, { name: 'Privacy Policy' }])],
-  terms: () => [buildBreadcrumbList([{ name: 'Home', path: '/' }, { name: 'Terms of Service' }])],
 }
 
 // SEO.jsx renders its own <title>/<meta>/<link>/<script type="application/

@@ -54,6 +54,7 @@ const EmailMonitorPage = lazy(() => import('./EmailMonitorPage'))
 const OnboardingPrototype = lazy(() => import('./lab/onboarding/OnboardingPrototype'))
 const DemoSetupPage = lazy(() => import('./lab/DemoSetupPage'))
 const DemoDataManagerPage = lazy(() => import('./lab/DemoDataManagerPage'))
+const TrustLegalManagerPage = lazy(() => import('./lab/TrustLegalManagerPage'))
 const PublicDemoShell = lazy(() => import('./PublicDemoExperience'))
 const PublicDemoHome = lazy(() => import('./PublicDemoExperience').then(m => ({ default: m.PublicDemoHome })))
 const PublicDemoRecords = lazy(() => import('./PublicDemoExperience').then(m => ({ default: m.PublicDemoRecords })))
@@ -82,8 +83,9 @@ const SalesTrackingPage = lazy(() => import('./marketing/pages/SalesTrackingPage
 const ExpenseTrackingPage = lazy(() => import('./marketing/pages/ExpenseTrackingPage'))
 const AboutPage = lazy(() => import('./marketing/pages/AboutPage'))
 const ContactPage = lazy(() => import('./marketing/pages/ContactPage'))
-const PrivacyPage = lazy(() => import('./marketing/pages/PrivacyPage'))
-const TermsPage = lazy(() => import('./marketing/pages/TermsPage'))
+const LegalPage = lazy(() => import('./marketing/pages/LegalPage'))
+const SubprocessorsPage = lazy(() => import('./marketing/pages/SubprocessorsPage'))
+const ResourceArticlePage = lazy(() => import('./marketing/pages/ResourceArticlePage'))
 const InventoryManagementPage = lazy(() => import('./marketing/pages/InventoryManagementPage'))
 const PayrollPage = lazy(() => import('./marketing/pages/PayrollPage'))
 const ForSmallBusinessesPage = lazy(() => import('./marketing/pages/ForSmallBusinessesPage'))
@@ -175,7 +177,8 @@ function AppShell() {
   const isLandingPreview = location.pathname === '/lab/landing'
   // Public marketing sub-pages (see src/marketing/pages/) bring their own
   // MarketingNav/MarketingFooter, same reasoning as isLandingRoot above.
-  const isMarketingSubpage = ['/product', '/forms', '/product/records', '/product/reports', '/sales-tracking', '/expense-tracking', '/inventory-management', '/payroll', '/for-small-businesses', '/for-restaurants', '/for-retail', '/resources', '/template-gallery', '/about', '/contact', '/privacy', '/terms'].includes(location.pathname)
+  const isMarketingSubpage = ['/product', '/forms', '/product/records', '/product/reports', '/sales-tracking', '/expense-tracking', '/inventory-management', '/payroll', '/for-small-businesses', '/for-restaurants', '/for-retail', '/resources', '/template-gallery', '/about', '/contact', '/privacy', '/terms', '/trust', '/security', '/cookies', '/subprocessors'].includes(location.pathname)
+    || location.pathname.startsWith('/resources/')
   const isPublicForm = /^\/form\/[^/]+(\/response\/[^/]+)?$/.test(location.pathname)
   // /s/:code (see ShortLinkRedirect.jsx) is just a brief hop through to the
   // above before the real /form/:id replaces it in history - same reason to
@@ -256,8 +259,13 @@ function AppShell() {
         <Route path="/expense-tracking" element={<ExpenseTrackingPage />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/contact" element={<ContactPage />} />
-        <Route path="/privacy" element={<PrivacyPage />} />
-        <Route path="/terms" element={<TermsPage />} />
+        <Route path="/trust" element={<LegalPage slug="trust" />} />
+        <Route path="/security" element={<LegalPage slug="security" />} />
+        <Route path="/privacy" element={<LegalPage slug="privacy" />} />
+        <Route path="/terms" element={<LegalPage slug="terms" />} />
+        <Route path="/cookies" element={<LegalPage slug="cookies" />} />
+        <Route path="/subprocessors" element={<SubprocessorsPage />} />
+        <Route path="/resources/:slug" element={<ResourceArticlePage />} />
         <Route path="/inventory-management" element={<InventoryManagementPage />} />
         <Route path="/payroll" element={<PayrollPage />} />
         <Route path="/for-small-businesses" element={<ForSmallBusinessesPage />} />
@@ -291,6 +299,7 @@ function AppShell() {
             page - see the Lab: Demo & Onboarding Controls plan. */}
         <Route path="/lab/demo-setup" element={<PrivateRoute><StaffScopedRoute><AdminOnlyRoute><DemoSetupPage /></AdminOnlyRoute></StaffScopedRoute></PrivateRoute>} />
         <Route path="/lab/demo-data" element={<PrivateRoute><StaffScopedRoute><AdminOnlyRoute><DemoDataManagerPage /></AdminOnlyRoute></StaffScopedRoute></PrivateRoute>} />
+        <Route path="/lab/trust-legal" element={<PrivateRoute><StaffScopedRoute><AdminOnlyRoute><TrustLegalManagerPage /></AdminOnlyRoute></StaffScopedRoute></PrivateRoute>} />
         <Route path="/reports" element={<PrivateRoute><StaffScopedRoute><Reports /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/records" element={<PrivateRoute><StaffScopedRoute><RecordsHome /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/templates" element={<PrivateRoute><StaffScopedRoute><Templates /></StaffScopedRoute></PrivateRoute>} />

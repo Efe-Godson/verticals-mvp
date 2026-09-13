@@ -140,3 +140,9 @@ enabled = true
 verify_jwt = true
 import_map = "./functions/list-email-events/deno.json"
 entrypoint = "./functions/list-email-events/index.ts"
+
+[functions.public-content]
+enabled = true
+verify_jwt = false
+import_map = "./functions/public-content/deno.json"
+entrypoint = "./functions/public-content/index.ts"

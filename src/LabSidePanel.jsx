@@ -18,6 +18,7 @@ const ENTRIES = [
   { label: '🧭 Onboarding', to: '/lab/onboarding' },
   { label: '🧩 Demo Setup', to: '/lab/demo-setup' },
   { label: '🗂️ Demo Data', to: '/lab/demo-data' },
+  { label: '⚖️ Trust & Legal', to: '/lab/trust-legal' },
   { label: '🌐 Public Demo', to: '/demo' },
 ]
 

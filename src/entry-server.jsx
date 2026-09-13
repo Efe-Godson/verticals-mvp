@@ -20,14 +20,11 @@ import SalesTrackingPage from './marketing/pages/SalesTrackingPage'
 import ExpenseTrackingPage from './marketing/pages/ExpenseTrackingPage'
 import AboutPage from './marketing/pages/AboutPage'
 import ContactPage from './marketing/pages/ContactPage'
-import PrivacyPage from './marketing/pages/PrivacyPage'
-import TermsPage from './marketing/pages/TermsPage'
 import InventoryManagementPage from './marketing/pages/InventoryManagementPage'
 import PayrollPage from './marketing/pages/PayrollPage'
 import ForSmallBusinessesPage from './marketing/pages/ForSmallBusinessesPage'
 import ForRestaurantsPage from './marketing/pages/ForRestaurantsPage'
 import ForRetailPage from './marketing/pages/ForRetailPage'
-import ResourcesPage from './marketing/pages/ResourcesPage'
 import TemplateGalleryPage from './marketing/pages/TemplateGalleryPage'
 
 const PAGES_BY_SEO_KEY = {
@@ -40,14 +37,11 @@ const PAGES_BY_SEO_KEY = {
   expenseTracking: ExpenseTrackingPage,
   about: AboutPage,
   contact: ContactPage,
-  privacy: PrivacyPage,
-  terms: TermsPage,
   inventoryManagement: InventoryManagementPage,
   payroll: PayrollPage,
   forSmallBusinesses: ForSmallBusinessesPage,
   forRestaurants: ForRestaurantsPage,
   forRetail: ForRetailPage,
-  resources: ResourcesPage,
   templateGallery: TemplateGalleryPage,
 }
 
