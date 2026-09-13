@@ -73,15 +73,16 @@ Deno.serve(async req => {
         .from('quiz_questions').select('id').eq('room_id', room_id).order('idx')
       if (listError) throw listError
 
-      // Fire the per-question renumbering updates concurrently instead of
-      // awaiting them one at a time - see the matching comment in
-      // advance-quiz-room's finalizeRoom for why this (rather than a single
-      // bulk statement) is the stopgap here.
-      await Promise.all(
-        questions.map((q: any, i: number) =>
-          supabase.from('quiz_questions').update({ idx: i }).eq('id', q.id)
-        )
-      )
+      // Single bulk UPDATE (via a Postgres function over unnest'd arrays)
+      // instead of one UPDATE per row - see the matching migration for why.
+      if (questions.length) {
+        const { error: reorderError } = await supabase.rpc('reorder_quiz_questions', {
+          p_room_id: room_id,
+          p_question_ids: questions.map((q: any) => q.id),
+          p_idxs: questions.map((_: any, i: number) => i),
+        })
+        if (reorderError) throw reorderError
+      }
       await supabase.from('quiz_rooms').update({ question_count: questions.length }).eq('id', room_id)
 
       return jsonResponse({ ok: true, question_count: questions.length })
@@ -91,15 +92,13 @@ Deno.serve(async req => {
       const { order } = body
       if (!Array.isArray(order) || order.length === 0) return jsonResponse({ error: 'order is required' }, 400)
 
-      // Concurrent instead of sequential, same stopgap as the delete branch
-      // above - each row is independent so firing them together is safe.
-      const results = await Promise.all(
-        order.map((id: string, i: number) =>
-          supabase.from('quiz_questions').update({ idx: i }).eq('id', id).eq('room_id', room_id)
-        )
-      )
-      const failed = results.find(r => r.error)
-      if (failed?.error) throw failed.error
+      // Single bulk UPDATE, same helper the delete branch above uses.
+      const { error: reorderError } = await supabase.rpc('reorder_quiz_questions', {
+        p_room_id: room_id,
+        p_question_ids: order,
+        p_idxs: order.map((_: string, i: number) => i),
+      })
+      if (reorderError) throw reorderError
 
       const { data: questions, error: listError } = await supabase
         .from('quiz_questions').select('*').eq('room_id', room_id).order('idx')

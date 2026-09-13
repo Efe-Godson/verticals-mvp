@@ -1,0 +1,47 @@
+-- Perf audit follow-up: check whether the EXISTS(subquery) RLS policies in
+-- 20260808100000_form_staff.sql and 20260830120000_report_shared_viewers.sql
+-- have index coverage on the columns they filter/join on. No policy logic
+-- changes here - this migration only documents the finding, and adds an
+-- index only where coverage was actually missing.
+--
+-- form_staff EXISTS subqueries ("Staff can view/update their assigned
+-- form", "Staff can view/update submissions of their assigned form") all
+-- filter with:
+--   where form_staff.form_id = <outer>.id/form_id and form_staff.user_id = auth.uid()
+-- `form_staff` already has `unique (form_id, user_id)` from its `create
+-- table` in 20260808100000_form_staff.sql, which is a composite btree index
+-- leading with (form_id, user_id) in that exact order - the same order and
+-- columns these subqueries filter on. Postgres can satisfy an
+-- "form_id = X and user_id = Y" lookup directly from that index, so a
+-- separate single- or two-column index here would just duplicate it (see
+-- the same reasoning already written up in
+-- 20260912100000_add_missing_perf_indexes.sql for the quiz_/payroll_
+-- tables). Nothing to add.
+--
+-- report_shared_viewers EXISTS subquery ("Shared viewers can read
+-- submissions") filters with:
+--   where forms.id = submissions.form_id and public.email_in_report_share_list(forms.settings)
+-- `forms.id` is the table's primary key, already indexed. The join/filter
+-- column here is fully covered. Nothing to add.
+--
+-- The one place in report_shared_viewers.sql that is NOT index-backed is
+-- the other policy, "Shared viewers can read the form" on `forms`, which
+-- calls public.email_in_report_share_list(settings) directly (not via
+-- EXISTS - it's evaluated per row of `forms` itself whenever a query isn't
+-- already narrowed to a single row by `forms.id`). That function expands
+-- `settings -> 'reportSharedEmails'` with jsonb_array_elements_text and
+-- compares each element with lower(btrim(...)) against auth.jwt() ->>
+-- 'email'. This is NOT a sargable predicate: it doesn't use the `@>` /
+-- `?` / `?|` containment or existence operators that a GIN index on
+-- `settings` (or on the `reportSharedEmails` path) can accelerate, so
+-- adding a GIN index here would not let Postgres avoid evaluating the
+-- function per candidate row - it would add write overhead for no read
+-- benefit. Per the task instructions, skipping this rather than guessing.
+--
+-- Flagged for a bigger structural fix (not attempted here): move
+-- reportSharedEmails out of the `forms.settings` jsonb blob into a real
+-- table, e.g. `report_shared_viewers (form_id, email)` with a unique
+-- index on (form_id, lower(email)) - mirroring how `form_staff` already
+-- does assignment lookups for the staff feature. That would make the
+-- "Shared viewers can read the form" check a plain indexed EXISTS instead
+-- of a per-row JSON scan.

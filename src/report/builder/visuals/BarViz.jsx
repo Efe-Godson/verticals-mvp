@@ -3,7 +3,8 @@
 // all off one StandardResult. Grouped & stacked read result.seriesLabels +
 // row.bySeries; the plain bars read row.value.
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell } from 'recharts'
-import { VizBox, EmptyViz, axisTick, gridStroke } from './ChartFrame'
+import { VizBox } from './ChartCanvas'
+import { EmptyViz, axisTick, gridStroke } from './ChartFrame'
 import { seriesColor } from '../palette'
 import { valueFormatter } from '../format'
 

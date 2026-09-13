@@ -101,7 +101,7 @@ function TopBar() {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', minWidth: 0 }}>
-        <img src="/verticals-logo.png" alt="Verticals" style={{ height: 20, width: 'auto' }} />
+        <img src="/verticals-logo-sm.png" alt="Verticals" width={59} height={20} style={{ height: 20, width: 'auto' }} />
         <span style={{
           fontSize: '0.64rem', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase',
           color: 'var(--color-primary)', border: '1px solid var(--color-primary)', borderRadius: 999, padding: '2px 8px',

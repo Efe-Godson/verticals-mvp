@@ -15,6 +15,7 @@ import { exportPrintLayoutToPDF } from '../../../reportExport'
 import PrintPage from './PrintPage'
 import { TEXT_VARIANTS, defaultElementSize, PAGE_SIZES, PAGE_NUMBER_FORMATS } from './printConstants'
 import { buildDashboardReplicaPages } from './replicateDashboard'
+import { withGridLayout } from './gridAdapter'
 
 const sideBtn = { fontSize: '0.78rem', padding: '0.3rem 0.5rem' }
 
@@ -352,7 +353,7 @@ export default function PrintWorkspace() {
           {pages.map((p, i) => (
             <div key={p.id} onClick={() => setActivePageId(p.id)}>
               <PrintPage
-                page={p}
+                page={{ ...p, elements: p.elements.map(withGridLayout) }}
                 pageSize={pageSize}
                 orientation={orientation}
                 visualsById={visualsById}

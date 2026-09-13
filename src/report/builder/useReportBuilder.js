@@ -8,8 +8,13 @@ import { supabase } from '../../supabaseClient'
 import { getDateRangeBounds } from '../helpers/dateRange'
 import { buildDatasets } from '../engine'
 import { makeVisual } from './catalogue'
+import { CURRENT_SCHEMA_VERSION } from './print/elementModel'
+import { migratePrintLayout } from './print/migratePrintLayout'
+import { fromGridCells, toGridCells } from './print/gridAdapter'
+import { GRID_COLS } from './print/printConstants'
 
 const EMPTY_PRINT_LAYOUT = {
+  schemaVersion: CURRENT_SCHEMA_VERSION,
   pageSize: 'slide', orientation: 'landscape', pages: [],
   showLogo: true, showDate: true, showPageNumber: true, showWatermark: true,
   pageNumberFormat: 'page-x-of-y', numberTitlePage: false,
@@ -33,9 +38,13 @@ function newPrintId(prefix) {
   return `${prefix}_${Date.now().toString(36)}_${printSeq}`
 }
 
-function nextElementSlot(elements, w, h) {
-  const maxY = elements.reduce((m, el) => Math.max(m, (el.layout?.y || 0) + (el.layout?.h || 0)), 0)
-  return { x: 0, y: maxY, w, h }
+// Elements are stored in percentage space (elementModel.js) - stack a new
+// one below everything already on the page, same idea as nextSlot() above
+// for Report Builder's own visuals, just in width/height percentages
+// instead of grid cells.
+function nextElementSlotPct(elements, width, height) {
+  const maxY = elements.reduce((m, el) => Math.max(m, (el.y || 0) + (el.height || 0)), 0)
+  return { x: 0, y: maxY, width, height }
 }
 
 export function useReportBuilder(formId) {
@@ -63,7 +72,7 @@ export function useReportBuilder(formId) {
         ? {
             visuals: rb.visuals,
             builderFilters: { ...EMPTY_STATE.builderFilters, ...(rb.builderFilters || {}) },
-            printLayout: { ...EMPTY_PRINT_LAYOUT, ...(rb.printLayout || {}), pages: rb.printLayout?.pages || [] },
+            printLayout: migratePrintLayout({ ...EMPTY_PRINT_LAYOUT, ...(rb.printLayout || {}), pages: rb.printLayout?.pages || [] }),
           }
         : EMPTY_STATE)
 
@@ -259,16 +268,23 @@ export function useReportBuilder(formId) {
     }))
   }, [mutatePrint])
 
+  // `element.layout` (when passed by a caller) is still grid-cell {w,h} -
+  // every call site (PrintWorkspace.jsx's sidebar buttons) uses
+  // defaultElementSize()'s grid units, so convert to percentage width/height
+  // here rather than changing every caller.
   const addPrintElement = useCallback((pageId, element) => {
     let created
     mutatePrint(prev => ({
       ...prev,
       pages: prev.pages.map(p => {
         if (p.id !== pageId) return p
-        const w = element.layout?.w ?? 12
-        const h = element.layout?.h ?? 4
-        const slot = nextElementSlot(p.elements, w, h)
-        created = { id: newPrintId('el'), ...element, layout: { ...slot, ...element.layout } }
+        const { layout, ...rest } = element
+        const { width, height } = fromGridCells({ w: layout?.w ?? GRID_COLS, h: layout?.h ?? 4 })
+        const slot = nextElementSlotPct(p.elements, width, height)
+        created = {
+          id: newPrintId('el'), ...rest, ...slot,
+          rotation: 0, zIndex: p.elements.length + 1, locked: false, visible: true,
+        }
         return { ...p, elements: [...p.elements, created] }
       }),
     }))
@@ -295,6 +311,11 @@ export function useReportBuilder(formId) {
   // react-grid-layout fires onLayoutChange on mount with the layout it was
   // already given - same no-op guard as setCanvasLayout above, so opening a
   // print page doesn't immediately flip on the unsaved-changes indicator.
+  // `layouts` arrives in grid cells (react-grid-layout's own coordinate
+  // system, via gridAdapter's withGridLayout - see PrintWorkspace.jsx);
+  // elements are stored in percentage space, so convert on the way in and
+  // compare in grid-cell space (matching the granularity the guard already
+  // relied on, avoiding false "changed" positives from rounding drift).
   const setPrintPageLayout = useCallback((pageId, layouts) => {
     setState(prev => {
       let changed = false
@@ -303,10 +324,10 @@ export function useReportBuilder(formId) {
         const elements = p.elements.map(el => {
           const l = layouts.find(x => x.i === el.id)
           if (!l) return el
-          const cur = el.layout || {}
+          const cur = toGridCells(el)
           if (cur.x === l.x && cur.y === l.y && cur.w === l.w && cur.h === l.h) return el
           changed = true
-          return { ...el, layout: { x: l.x, y: l.y, w: l.w, h: l.h } }
+          return { ...el, ...fromGridCells(l) }
         })
         return { ...p, elements }
       })
@@ -324,12 +345,21 @@ export function useReportBuilder(formId) {
   // replicateDashboard.js) - ids are assigned here so every call produces
   // fresh, unique ones. `append: true` adds after the existing pages instead
   // of replacing them (used for a manual "Replicate dashboard" re-run so it
-  // never destroys pages the user already built by hand).
+  // never destroys pages the user already built by hand). replicateDashboard
+  // still emits elements with a grid-cell `layout: {x,y,w,h}` (unchanged) -
+  // converted to the canonical percentage fields right here, so that file
+  // never needs to know the storage model changed.
   const seedPrintPages = useCallback((pageContents, { append = false } = {}) => {
     const newPages = pageContents.map(p => ({
       ...p,
       id: newPrintId('page'),
-      elements: p.elements.map(el => ({ ...el, id: newPrintId('el') })),
+      elements: p.elements.map((el, i) => {
+        const { layout, ...rest } = el
+        return {
+          id: newPrintId('el'), ...rest, ...fromGridCells(layout),
+          rotation: 0, zIndex: i + 1, locked: false, visible: true,
+        }
+      }),
     }))
     mutatePrint(prev => ({ ...prev, pages: append ? [...prev.pages, ...newPages] : newPages }))
   }, [mutatePrint])

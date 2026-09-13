@@ -10,7 +10,11 @@
 // than introducing a second one.
 export const SITE_URL = 'https://verticalsapp.com'
 export const SITE_NAME = 'Verticals'
-export const DEFAULT_OG_IMAGE = `${SITE_URL}/verticals-mark.png`
+// Dedicated 1200x630 Open Graph/Twitter image (brief section 18) rather
+// than reusing the square verticals-mark.png directly - see
+// scripts/resize-brand-assets.ps1 for how it was generated (the same mark,
+// composited onto the correct canvas size, 83% smaller as a bonus).
+export const DEFAULT_OG_IMAGE = `${SITE_URL}/verticals-og.png`
 
 // Every entry that has a `canonical` and isn't `noindex` is a real,
 // crawlable public page - see PUBLIC_ROUTES below (a separate `path` field,

@@ -1,6 +1,7 @@
 // Place at: src/report/builder/visuals/ScatterViz.jsx
 import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ZAxis } from 'recharts'
-import { VizBox, EmptyViz, axisTick, gridStroke } from './ChartFrame'
+import { VizBox } from './ChartCanvas'
+import { EmptyViz, axisTick, gridStroke } from './ChartFrame'
 import { seriesColor } from '../palette'
 import { formatNumber } from '../format'
 

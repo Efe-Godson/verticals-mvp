@@ -2,7 +2,8 @@
 // Pie / donut (donut = inner radius). Caps to 8 slices + "Other", matching
 // the hand-rolled src/report/components/PieChart.jsx behaviour.
 import { PieChart, Pie, Cell, Tooltip, Legend } from 'recharts'
-import { VizBox, EmptyViz } from './ChartFrame'
+import { VizBox } from './ChartCanvas'
+import { EmptyViz } from './ChartFrame'
 import { seriesColor } from '../palette'
 import { chartPalette } from '../palette'
 import { valueFormatter } from '../format'
