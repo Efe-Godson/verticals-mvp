@@ -1,4 +1,5 @@
 // Place at: src/report/builder/print/FormatInspector.jsx
+import { CHART_PRESETS, CHART_PRESETS_BY_ID } from './chartPresets'
 // Right-hand contextual panel (Designer 2.0 Phase 1, step 5) - shows
 // properties for whatever's currently selected on the freeform canvas.
 // Deliberately kind-agnostic for now: Shape/Image/Chart-specific panels
@@ -155,6 +156,29 @@ function TableStyleFields({ page, el, onUpdateElement, visual, form }) {
   )
 }
 
+// Chart presentation-style presets (Phase 3, chartPresets.js) - only for
+// chart types (BAR_VARIANTS/LINE_VARIANTS/pie/donut), not table/pivot/KPI
+// visuals, which TableStyleFields or nothing covers instead.
+function ChartStyleFields({ page, el, onUpdateElement }) {
+  const currentId = Object.entries(CHART_PRESETS_BY_ID).find(([, p]) =>
+    p.display === null ? !el.override?.chartStyle : JSON.stringify(p.display) === JSON.stringify(el.override?.chartStyle),
+  )?.[0] || 'default'
+  return (
+    <>
+      <SectionLabel>Chart style</SectionLabel>
+      <select
+        style={{ fontSize: '0.8rem', width: '100%' }} value={currentId}
+        onChange={e => {
+          const preset = CHART_PRESETS_BY_ID[e.target.value]
+          onUpdateElement(page.id, el.id, { override: { ...(el.override || {}), chartStyle: preset?.display || undefined } })
+        }}
+      >
+        {CHART_PRESETS.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+      </select>
+    </>
+  )
+}
+
 function ImageStyleFields({ page, el, onUpdateElement, onBeginBatch, onCommitBatch }) {
   return (
     <>
@@ -276,6 +300,7 @@ export default function FormatInspector({
   const el = selectedElements[0]
   const visual = el.kind === 'visual' ? visualsById?.[el.visualId] : null
   const isTableVisual = visual && ['table', 'summaryTable'].includes(visual.type)
+  const isChartVisual = visual && !isTableVisual && !['pivot', 'kpi', 'number', 'comparison', 'progress'].includes(visual.type)
   return (
     <div style={panelStyle}>
       <SectionLabel>{labelForKind(el.kind)}</SectionLabel>
@@ -290,6 +315,7 @@ export default function FormatInspector({
         <ImageStyleFields page={page} el={el} onUpdateElement={onUpdateElement} onBeginBatch={onBeginBatch} onCommitBatch={onCommitBatch} />
       )}
       {isTableVisual && <TableStyleFields page={page} el={el} onUpdateElement={onUpdateElement} visual={visual} form={form} />}
+      {isChartVisual && <ChartStyleFields page={page} el={el} onUpdateElement={onUpdateElement} />}
 
       {['text', 'shape', 'image'].includes(el.kind) && (
         <StylePicker

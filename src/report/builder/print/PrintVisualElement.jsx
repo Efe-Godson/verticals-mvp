@@ -47,7 +47,7 @@ export default function PrintVisualElement({ visual, form, submissions, override
         {editing && <button style={iconBtn} onClick={onRemove} title="Remove">✕</button>}
       </div>
       <div style={{ flex: 1, minHeight: 0 }}>
-        <VisualRenderer visual={visual} result={result} form={form} tableStyle={override?.tableStyle} />
+        <VisualRenderer visual={visual} result={result} form={form} tableStyle={override?.tableStyle} displayOverride={override?.chartStyle} />
       </div>
     </div>
   )

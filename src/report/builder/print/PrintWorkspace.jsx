@@ -27,6 +27,9 @@ import { CATALOGUE_BY_TYPE } from '../catalogue'
 import { THEMES } from './theme'
 import { PAGE_LAYOUTS, PAGE_LAYOUTS_BY_ID } from './pageLayouts'
 import { buildTokenContext, AVAILABLE_TOKENS } from './dynamicTokens'
+import { analyzeReport, scoreReport } from './designQuality'
+import { tidyPage } from './tidyUp'
+import PresentationMode from './PresentationMode'
 
 const sideBtn = { fontSize: '0.78rem', padding: '0.3rem 0.5rem' }
 
@@ -42,6 +45,8 @@ export default function PrintWorkspace() {
 
   const [activePageId, setActivePageId] = useState(null)
   const [preview, setPreview] = useState(false)
+  const [presenting, setPresenting] = useState(false)
+  const [qualityPanelOpen, setQualityPanelOpen] = useState(false)
   const [mobilePane, setMobilePane] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [exportProgress, setExportProgress] = useState(null)
@@ -134,6 +139,15 @@ export default function PrintWorkspace() {
     [rb.form, rb.scopedSubmissions],
   )
 
+  // Design Quality (Phase 3) - re-analyzed on every printLayout edit; cheap
+  // geometry-only checks (designQuality.js), not a DOM measurement, so this
+  // is fine to run on every render rather than debouncing.
+  const qualityIssues = useMemo(
+    () => analyzeReport(rb.printLayout, { visualsById, tilesById }),
+    [rb.printLayout, visualsById, tilesById],
+  )
+  const qualityScore = useMemo(() => scoreReport(qualityIssues), [qualityIssues])
+
   if (rb.loading) return <PageSkeleton variant="report" />
   if (rb.error && !rb.form) return <ErrorState message={rb.error} />
 
@@ -177,7 +191,19 @@ export default function PrintWorkspace() {
     showToast(error ? 'Could not save print layout.' : 'Print layout saved.', error ? 'error' : 'success')
   }
 
+  // Export preflight (Phase 3) - errors (broken references, content off
+  // the page) get a confirm-or-cancel; warnings/info don't block export,
+  // the Design Quality panel covers browsing those at leisure.
+  function passesPreflight() {
+    const blocking = qualityIssues.filter(i => i.severity === 'error')
+    if (blocking.length === 0) return true
+    const list = blocking.slice(0, 8).map(i => `• ${i.message}`).join('\n')
+    const more = blocking.length > 8 ? `\n…and ${blocking.length - 8} more.` : ''
+    return window.confirm(`This report has ${blocking.length} issue${blocking.length === 1 ? '' : 's'} that may affect the export:\n\n${list}${more}\n\nExport anyway?`)
+  }
+
   async function handleDownload() {
+    if (!passesPreflight()) return
     if (rb.dirty) await rb.save()
     setExporting(true)
     setExportProgress({ done: 0, total: pages.length, label: 'Starting…' })
@@ -205,6 +231,7 @@ export default function PrintWorkspace() {
   }
 
   async function handleDownloadPptx() {
+    if (!passesPreflight()) return
     if (rb.dirty) await rb.save()
     setExporting(true)
     setExportProgress({ done: 0, total: pages.length, label: 'Starting…' })
@@ -229,6 +256,16 @@ export default function PrintWorkspace() {
       setExportProgress(null)
       if (!wasPreview) setPreview(false)
     }
+  }
+
+  // Tidy Up (Phase 3) - one bulk updatePrintElements call, so the whole
+  // clean-up is a single undo step (tidyUp.js's own header comment explains
+  // why this couldn't safely be a loop of single-element updates instead).
+  function handleTidyUp() {
+    if (!activePage) return
+    const patches = tidyPage(activePage)
+    if (Object.keys(patches).length === 0) { showToast('Nothing to tidy on this page.', 'success'); return }
+    rb.updatePrintElements(activePage.id, patches)
   }
 
   const filteredTiles = dashboardTiles.filter(t => t.title?.toLowerCase().includes(tileSearch.trim().toLowerCase()))
@@ -565,6 +602,14 @@ export default function PrintWorkspace() {
         <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
           <button className="secondary" onClick={rb.undoPrint} disabled={!rb.canUndoPrint} title="Undo (Ctrl+Z)" style={{ fontSize: '0.8rem' }}>↶ Undo</button>
           <button className="secondary" onClick={rb.redoPrint} disabled={!rb.canRedoPrint} title="Redo (Ctrl+Shift+Z)" style={{ fontSize: '0.8rem' }}>↷ Redo</button>
+          <button className="secondary" onClick={handleTidyUp} title="Snap this page's elements to a grid and pull anything off-page back in" style={{ fontSize: '0.8rem' }}>✨ Tidy Up</button>
+          <button
+            className="secondary" onClick={() => setQualityPanelOpen(o => !o)} title="Design Quality"
+            style={{ fontSize: '0.8rem', color: qualityIssues.some(i => i.severity === 'error') ? '#b91c1c' : undefined }}
+          >
+            Quality: {qualityScore}
+          </button>
+          <button className="secondary" onClick={() => setPresenting(true)} disabled={pages.length === 0} style={{ fontSize: '0.8rem' }}>▶ Present</button>
           <button className="secondary" onClick={() => setPreview(p => !p)} style={{ fontSize: '0.8rem' }}>{preview ? 'Edit' : 'Preview'}</button>
           <button className="secondary" onClick={handleSave} disabled={rb.saving} style={{ fontSize: '0.8rem' }}>
             {rb.saving ? 'Saving…' : rb.dirty ? 'Save*' : 'Save'}
@@ -647,6 +692,53 @@ export default function PrintWorkspace() {
             <div style={{ overflowY: 'auto' }}>{sidebar}</div>
           </div>
         </>
+      )}
+
+      {qualityPanelOpen && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 129 }} onClick={() => setQualityPanelOpen(false)} />
+          <div style={{
+            position: 'fixed', top: 48, right: 12, width: '320px', maxHeight: '70vh', overflowY: 'auto',
+            background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '8px',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 130, padding: '0.8rem',
+          }}>
+            <strong style={{ fontSize: '0.85rem' }}>Design Quality: {qualityScore}/100</strong>
+            {qualityIssues.length === 0 ? (
+              <p style={{ fontSize: '0.8rem', color: 'var(--color-muted)', marginTop: '0.5rem' }}>No issues found.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.6rem' }}>
+                {qualityIssues.map((issue, i) => (
+                  <button
+                    key={i} className="secondary"
+                    style={{
+                      fontSize: '0.78rem', textAlign: 'left', padding: '0.4rem 0.5rem',
+                      borderLeft: `3px solid ${issue.severity === 'error' ? '#b91c1c' : issue.severity === 'warning' ? '#b45309' : 'var(--color-muted)'}`,
+                    }}
+                    onClick={() => {
+                      setActivePageId(issue.pageId)
+                      if (issue.elementId) selectPage(issue.pageId, [issue.elementId])
+                      setQualityPanelOpen(false)
+                    }}
+                  >
+                    {issue.message}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {presenting && (
+        <PresentationMode
+          printLayout={rb.printLayout}
+          visualsById={visualsById}
+          tilesById={tilesById}
+          form={rb.form}
+          submissions={rb.scopedSubmissions}
+          tokenContext={tokenContext}
+          onClose={() => setPresenting(false)}
+        />
       )}
     </div>
   )
