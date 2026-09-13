@@ -7,27 +7,37 @@ import { EmptyViz } from './ChartFrame'
 
 const th = { textAlign: 'left', padding: '0.5rem 0.7rem', fontSize: '0.78rem', color: 'var(--color-muted)', borderBottom: '2px solid var(--color-border)', position: 'sticky', top: 0, background: 'var(--color-surface)', whiteSpace: 'nowrap' }
 const td = { padding: '0.45rem 0.7rem', borderBottom: '1px solid var(--color-border)', fontVariantNumeric: 'tabular-nums' }
+const stripedBg = 'var(--color-bg, #f8fafc)'
 
-export function SummaryTableViz({ result }) {
+// Table publishing controls (Designer 2.0 Phase 2, FormatInspector.jsx's
+// TableStyleFields) - striped/showHeader/hiddenFieldIds. Undefined
+// tableStyle (every caller outside the Designer print placement, e.g. the
+// interactive Report Builder canvas) means the defaults below, unchanged
+// from pre-Phase-2 behavior.
+export function SummaryTableViz({ result, tableStyle }) {
   const rows = result?.perRow || result?.rows || []
   if (!rows.length) return <EmptyViz />
   const fmt = valueFormatter(result)
   const dimName = 'Group'
+  const striped = tableStyle?.striped !== false
+  const showHeader = tableStyle?.showHeader !== false
   return (
     <div className="table-wrap" style={{ marginTop: 0, maxHeight: '100%' }}>
       <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '0.86rem' }}>
-        <thead>
-          <tr>
-            <th style={th}>{dimName}</th>
-            <th style={{ ...th, textAlign: 'right' }}>Value</th>
-            <th style={{ ...th, textAlign: 'right' }}>% Total</th>
-            <th style={{ ...th, textAlign: 'right' }}>vs Mean</th>
-            <th style={{ ...th, textAlign: 'right' }}>Rank</th>
-          </tr>
-        </thead>
+        {showHeader && (
+          <thead>
+            <tr>
+              <th style={th}>{dimName}</th>
+              <th style={{ ...th, textAlign: 'right' }}>Value</th>
+              <th style={{ ...th, textAlign: 'right' }}>% Total</th>
+              <th style={{ ...th, textAlign: 'right' }}>vs Mean</th>
+              <th style={{ ...th, textAlign: 'right' }}>Rank</th>
+            </tr>
+          </thead>
+        )}
         <tbody>
           {rows.map((r, i) => (
-            <tr key={r.key || i}>
+            <tr key={r.key || i} style={striped && i % 2 === 1 ? { background: stripedBg } : undefined}>
               <td style={td}>{r.label}</td>
               <td style={{ ...td, textAlign: 'right', fontWeight: 600 }}>{fmt(r.value)}</td>
               <td style={{ ...td, textAlign: 'right' }}>{formatPercent(r.percentOfTotal || 0)}</td>
@@ -50,22 +60,29 @@ export function SummaryTableViz({ result }) {
   )
 }
 
-export function DataTableViz({ result, form }) {
+export function DataTableViz({ result, form, tableStyle }) {
   const records = result?.records || []
   if (!records.length) return <EmptyViz message="No records match." />
-  const fields = (form?.fields || []).filter(f => f.type !== 'section' && f.type !== 'fileupload').slice(0, 12)
+  const hidden = tableStyle?.hiddenFieldIds || []
+  const fields = (form?.fields || [])
+    .filter(f => f.type !== 'section' && f.type !== 'fileupload' && !hidden.includes(f.id))
+    .slice(0, 12)
+  const striped = tableStyle?.striped !== false
+  const showHeader = tableStyle?.showHeader !== false
   return (
     <div className="table-wrap" style={{ marginTop: 0, maxHeight: '100%' }}>
       <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '0.82rem' }}>
-        <thead>
-          <tr>
-            <th style={th}>Submitted</th>
-            {fields.map(f => <th key={f.id} style={th}>{f.label}</th>)}
-          </tr>
-        </thead>
+        {showHeader && (
+          <thead>
+            <tr>
+              <th style={th}>Submitted</th>
+              {fields.map(f => <th key={f.id} style={th}>{f.label}</th>)}
+            </tr>
+          </thead>
+        )}
         <tbody>
-          {records.slice(0, 200).map(rec => (
-            <tr key={rec.id}>
+          {records.slice(0, 200).map((rec, i) => (
+            <tr key={rec.id} style={striped && i % 2 === 1 ? { background: stripedBg } : undefined}>
               <td style={td}>{new Date(rec.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
               {fields.map(f => <td key={f.id} style={td}>{formatCell(rec.data[f.id], f)}</td>)}
             </tr>

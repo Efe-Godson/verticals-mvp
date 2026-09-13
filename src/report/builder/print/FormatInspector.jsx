@@ -96,6 +96,65 @@ function ShapeStyleFields({ page, el, onUpdateElement, onBeginBatch, onCommitBat
   )
 }
 
+function TextStyleFields({ page, el, onUpdateElement, onBeginBatch, onCommitBatch }) {
+  const text = el.text || {}
+  return (
+    <>
+      <SectionLabel>Style</SectionLabel>
+      <FieldRow label="Color">
+        <input
+          type="color" value={text.color || '#111827'} onFocus={onBeginBatch} onBlur={onCommitBatch}
+          onChange={e => onUpdateElement(page.id, el.id, { text: { ...text, color: e.target.value } })}
+        />
+      </FieldRow>
+    </>
+  )
+}
+
+// Table publishing controls (Designer 2.0 Phase 2) - only meaningful for a
+// 'visual' element whose underlying visual is a table type; a chart has
+// nothing here to configure. Stored as el.override.tableStyle, same
+// per-placement-override pattern PrintVisualElement.jsx already uses for
+// ranking (topN/sort) - never written back to the visual itself.
+function TableStyleFields({ page, el, onUpdateElement, visual, form }) {
+  const tableStyle = el.override?.tableStyle || {}
+  const patchTableStyle = (patch) => onUpdateElement(page.id, el.id, {
+    override: { ...(el.override || {}), tableStyle: { ...tableStyle, ...patch } },
+  })
+  const isDataTable = visual?.type === 'table'
+  const fields = isDataTable ? (form?.fields || []).filter(f => f.type !== 'section' && f.type !== 'fileupload').slice(0, 12) : []
+  const hidden = tableStyle.hiddenFieldIds || []
+  return (
+    <>
+      <SectionLabel>Table</SectionLabel>
+      <label style={checkboxLabel}>
+        <input type="checkbox" checked={tableStyle.striped !== false} onChange={e => patchTableStyle({ striped: e.target.checked })} />
+        Striped rows
+      </label>
+      <label style={{ ...checkboxLabel, marginTop: '0.3rem' }}>
+        <input type="checkbox" checked={tableStyle.showHeader !== false} onChange={e => patchTableStyle({ showHeader: e.target.checked })} />
+        Show header row
+      </label>
+      {isDataTable && fields.length > 0 && (
+        <>
+          <div style={{ fontSize: '0.72rem', color: 'var(--color-muted)', marginTop: '0.6rem', marginBottom: '0.3rem' }}>Columns</div>
+          {fields.map(f => (
+            <label key={f.id} style={{ ...checkboxLabel, marginBottom: '0.2rem' }}>
+              <input
+                type="checkbox" checked={!hidden.includes(f.id)}
+                onChange={e => patchTableStyle({
+                  hiddenFieldIds: e.target.checked ? hidden.filter(id => id !== f.id) : [...hidden, f.id],
+                })}
+              />
+              {f.label || f.id}
+            </label>
+          ))}
+        </>
+      )}
+    </>
+  )
+}
+
 function ImageStyleFields({ page, el, onUpdateElement, onBeginBatch, onCommitBatch }) {
   return (
     <>
@@ -126,6 +185,46 @@ function ImageStyleFields({ page, el, onUpdateElement, onBeginBatch, onCommitBat
   )
 }
 
+// Reusable text/shape styles (Phase 2) - "Save as style" captures the
+// element's own kind-specific props (never position/size/rotation - those
+// stay per-placement); the picker below only lists styles saved from the
+// same kind, since a shape style's fill/stroke has no meaning on text.
+const STYLE_PROP_KEYS = {
+  text: ['text'],
+  shape: ['fill', 'stroke', 'strokeWidth', 'radius', 'opacity'],
+  image: ['fit', 'radius', 'opacity'],
+}
+
+function pickStyleProps(el) {
+  const keys = STYLE_PROP_KEYS[el.kind] || []
+  return Object.fromEntries(keys.map(k => [k, el[k]]))
+}
+
+function StylePicker({ el, savedStyles, onApplyStyle, onSaveStyle }) {
+  const eligible = (savedStyles || []).filter(s => s.kind === el.kind)
+  return (
+    <>
+      <SectionLabel>Saved styles</SectionLabel>
+      {eligible.length > 0 && (
+        <select
+          style={{ fontSize: '0.8rem', width: '100%', marginBottom: '0.4rem' }}
+          value={el.styleRef || ''}
+          onChange={e => { const s = eligible.find(x => x.id === e.target.value); if (s) onApplyStyle(s) }}
+        >
+          <option value="">{el.styleRef ? 'Custom (detached)' : 'None applied'}</option>
+          {eligible.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+        </select>
+      )}
+      <button
+        className="secondary" style={{ fontSize: '0.78rem', padding: '0.25rem 0.4rem', width: '100%' }}
+        onClick={() => { const name = window.prompt('Style name?'); if (name) onSaveStyle(name) }}
+      >
+        + Save as style
+      </button>
+    </>
+  )
+}
+
 function labelForKind(kind) {
   if (kind === 'visual') return 'Chart'
   if (kind === 'tile') return 'Dashboard tile'
@@ -137,7 +236,8 @@ function labelForKind(kind) {
 
 export default function FormatInspector({
   page, selectedElements, onUpdateElement, onRemoveElements, onSetZ, onSetZElements,
-  onBeginBatch, onCommitBatch,
+  onBeginBatch, onCommitBatch, onGroup, onUngroup, onSaveComponent,
+  savedStyles, onApplyStyle, onSaveStyle, visualsById, form,
 }) {
   if (!page || selectedElements.length === 0) {
     return (
@@ -151,10 +251,21 @@ export default function FormatInspector({
 
   if (selectedElements.length > 1) {
     const ids = selectedElements.map(e => e.id)
+    const anyGrouped = selectedElements.some(e => e.groupId)
     return (
       <div style={panelStyle}>
         <SectionLabel>{selectedElements.length} elements selected</SectionLabel>
         <LayerButtons onSetZ={mode => onSetZElements(page.id, ids, mode)} />
+        <div style={{ display: 'flex', gap: '0.3rem', marginTop: '0.5rem' }}>
+          <button className="secondary" style={layerBtn} onClick={() => onGroup(page.id, ids)}>Group</button>
+          <button className="secondary" style={layerBtn} disabled={!anyGrouped} onClick={() => onUngroup(page.id, ids)}>Ungroup</button>
+        </div>
+        <button
+          className="secondary" style={{ fontSize: '0.78rem', padding: '0.3rem 0.5rem', width: '100%', marginTop: '0.5rem' }}
+          onClick={() => { const name = window.prompt('Component name?'); if (name) onSaveComponent(name, selectedElements) }}
+        >
+          + Save as component
+        </button>
         <button className="secondary" style={dangerBtn} onClick={() => onRemoveElements(page.id, ids)}>
           Delete {selectedElements.length} elements
         </button>
@@ -163,15 +274,29 @@ export default function FormatInspector({
   }
 
   const el = selectedElements[0]
+  const visual = el.kind === 'visual' ? visualsById?.[el.visualId] : null
+  const isTableVisual = visual && ['table', 'summaryTable'].includes(visual.type)
   return (
     <div style={panelStyle}>
       <SectionLabel>{labelForKind(el.kind)}</SectionLabel>
 
+      {el.kind === 'text' && (
+        <TextStyleFields page={page} el={el} onUpdateElement={onUpdateElement} onBeginBatch={onBeginBatch} onCommitBatch={onCommitBatch} />
+      )}
       {el.kind === 'shape' && (
         <ShapeStyleFields page={page} el={el} onUpdateElement={onUpdateElement} onBeginBatch={onBeginBatch} onCommitBatch={onCommitBatch} />
       )}
       {el.kind === 'image' && (
         <ImageStyleFields page={page} el={el} onUpdateElement={onUpdateElement} onBeginBatch={onBeginBatch} onCommitBatch={onCommitBatch} />
+      )}
+      {isTableVisual && <TableStyleFields page={page} el={el} onUpdateElement={onUpdateElement} visual={visual} form={form} />}
+
+      {['text', 'shape', 'image'].includes(el.kind) && (
+        <StylePicker
+          el={el} savedStyles={savedStyles}
+          onApplyStyle={style => onApplyStyle(page.id, el.id, style)}
+          onSaveStyle={name => onSaveStyle(name, el.kind, pickStyleProps(el))}
+        />
       )}
 
       <SectionLabel>Position</SectionLabel>

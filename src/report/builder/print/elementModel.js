@@ -32,7 +32,11 @@ export const DEFAULT_ELEMENT_SIZE = {
   tile: { width: 50, height: 40 },
 }
 
-const BASE_DEFAULTS = { x: 0, y: 0, rotation: 0, zIndex: 1, locked: false, visible: true }
+// styleRef/groupId are Phase 2 fields, reserved on every kind from the
+// start (elements already on disk before Phase 2 just carry null/absent,
+// which migratePrintLayout.js's schema-version bump doesn't need to touch -
+// both read as "no style applied"/"not grouped").
+const BASE_DEFAULTS = { x: 0, y: 0, rotation: 0, zIndex: 1, locked: false, visible: true, styleRef: null, groupId: null }
 
 function makeBase(kind, overrides = {}) {
   const size = DEFAULT_ELEMENT_SIZE[kind] || { width: 30, height: 20 }

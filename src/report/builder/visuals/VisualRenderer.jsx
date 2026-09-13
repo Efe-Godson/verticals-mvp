@@ -38,7 +38,7 @@ function ChartFallback() {
   return <SkeletonChart style={{ height: '100%', minHeight: 160 }} />
 }
 
-export default function VisualRenderer({ visual, result, form, onSelectDatapoint }) {
+export default function VisualRenderer({ visual, result, form, onSelectDatapoint, tableStyle }) {
   if (!result) return <EmptyViz message="Configure this visual on the right." />
   const type = visual.type
 
@@ -49,10 +49,10 @@ export default function VisualRenderer({ visual, result, form, onSelectDatapoint
     return <PivotViz result={result} />
   }
   if (type === 'summaryTable') {
-    return <SummaryTableViz result={result} />
+    return <SummaryTableViz result={result} tableStyle={tableStyle} />
   }
   if (type === 'table') {
-    return <DataTableViz result={result} form={form} />
+    return <DataTableViz result={result} form={form} tableStyle={tableStyle} />
   }
 
   let chart = null

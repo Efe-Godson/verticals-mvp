@@ -15,11 +15,12 @@ import PrintTileElement from './PrintTileElement'
 import ShapeElement from './elements/ShapeElement'
 import ImageElement from './elements/ImageElement'
 import { pageFormatMm, pageAspectRatio, PAGE_SIZES, formatPageNumber } from './printConstants'
+import { themeCssVars } from './theme'
 
 export default function PrintPage({
   page, pageSize, orientation, visualsById, tilesById, form, submissions, editing, settings,
   pageNumber, totalPages, onRemoveElement, onUpdateElement, onUpdateElements, pageRef,
-  selectedIds, onSelect,
+  selectedIds, onSelect, tokenContext,
 }) {
   const containerRef = useRef(null)
   const [width, setWidth] = useState(0)
@@ -66,6 +67,7 @@ export default function PrintPage({
             onEditingChange={canvasHelpers?.onEditingChange}
             onChange={patch => onUpdateElement(page.id, el.id, patch)}
             onRemove={() => onRemoveElement(page.id, el.id)}
+            tokenContext={tokenContext}
           />
         ) : el.kind === 'tile' ? (
           <PrintTileElement
@@ -96,8 +98,9 @@ export default function PrintPage({
         style={{
           width: '100%', maxWidth: maxWidthPx,
           aspectRatio: pageAspectRatio(pageSize, orientation),
-          background: '#fff', border: '1px solid var(--color-border)', boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+          background: 'var(--designer-bg, #fff)', border: '1px solid var(--color-border)', boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
           overflow: 'hidden', position: 'relative', margin: '0 auto',
+          ...themeCssVars(settings?.theme),
         }}
       >
         {width > 0 && (
@@ -114,21 +117,38 @@ export default function PrintPage({
           />
         )}
 
-        {settings?.showLogo && (
-          <div style={{ position: 'absolute', top: 8, left: 16, fontSize: '0.75rem', fontWeight: 800, color: '#111' }}>VerticalS</div>
-        )}
-        {settings?.showDate && (
-          <div style={{ position: 'absolute', top: 8, right: 16, fontSize: '0.7rem', color: '#666' }}>
-            {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-          </div>
-        )}
-        {settings?.showPageNumber && (page.kind !== 'title' || settings?.numberTitlePage) && (
-          <div style={{ position: 'absolute', bottom: 6, right: 16, fontSize: '0.7rem', color: '#666' }}>
-            {formatPageNumber(settings?.pageNumberFormat, pageNumber, totalPages)}
-          </div>
-        )}
-        {settings?.showWatermark && (
-          <div style={{ position: 'absolute', bottom: 6, left: 16, fontSize: '0.65rem', color: '#aaa' }}>Powered by Verticals</div>
+        {/* Master page overlay (Phase 2) - logo/date/page-number/watermark
+            plus optional header/footer text, all hideable per-page for a
+            full-bleed cover/section page. */}
+        {!page.hideMaster && (
+          <>
+            {settings?.showLogo && (
+              <div style={{ position: 'absolute', top: 8, left: 16, fontSize: '0.75rem', fontWeight: 800, color: '#111' }}>VerticalS</div>
+            )}
+            {settings?.showDate && (
+              <div style={{ position: 'absolute', top: 8, right: 16, fontSize: '0.7rem', color: '#666' }}>
+                {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+              </div>
+            )}
+            {settings?.masterHeaderText && (
+              <div style={{ position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)', fontSize: '0.7rem', color: '#666' }}>
+                {settings.masterHeaderText}
+              </div>
+            )}
+            {settings?.masterFooterText && (
+              <div style={{ position: 'absolute', bottom: 6, left: '50%', transform: 'translateX(-50%)', fontSize: '0.65rem', color: '#888' }}>
+                {settings.masterFooterText}
+              </div>
+            )}
+            {settings?.showPageNumber && (page.kind !== 'title' || settings?.numberTitlePage) && (
+              <div style={{ position: 'absolute', bottom: 6, right: 16, fontSize: '0.7rem', color: '#666' }}>
+                {formatPageNumber(settings?.pageNumberFormat, pageNumber, totalPages)}
+              </div>
+            )}
+            {settings?.showWatermark && (
+              <div style={{ position: 'absolute', bottom: 6, left: 16, fontSize: '0.65rem', color: '#aaa' }}>Powered by Verticals</div>
+            )}
+          </>
         )}
       </div>
 

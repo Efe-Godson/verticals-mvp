@@ -4,6 +4,7 @@
 // and the text itself, edited in place.
 import { useState } from 'react'
 import { TEXT_VARIANTS } from './printConstants'
+import { resolveTokens } from './dynamicTokens'
 
 const selStyle = {
   fontSize: '0.75rem', padding: '0.15rem 0.35rem', borderRadius: '5px',
@@ -22,7 +23,7 @@ const iconBtn = (active) => ({
 // cursor doesn't also start a drag. The legacy GridLayout renderer passes
 // directEdit=true (its default) and keeps the original always-editable
 // behavior unchanged.
-export default function PrintTextElement({ element, editing, onChange, onRemove, directEdit = true, onEditingChange }) {
+export default function PrintTextElement({ element, editing, onChange, onRemove, directEdit = true, onEditingChange, tokenContext }) {
   const [focused, setFocused] = useState(false)
   const [manualEdit, setManualEdit] = useState(false)
   const text = element.text || { variant: 'body', content: '', align: 'left', bold: false }
@@ -74,12 +75,13 @@ export default function PrintTextElement({ element, editing, onChange, onRemove,
         style={{
           flex: 1, outline: focused ? '1px dashed var(--color-border)' : 'none',
           fontSize: spec.fontSize, fontWeight: text.bold ? 800 : spec.fontWeight,
-          textAlign: text.align || 'left', color: '#111',
+          textAlign: text.align || 'left', color: text.color || 'var(--designer-text, #111827)',
+          fontFamily: ['title', 'heading'].includes(text.variant) ? 'var(--designer-heading-font, inherit)' : 'var(--designer-body-font, inherit)',
           cursor: editing ? (canType ? 'text' : 'default') : 'default',
           overflow: 'hidden', wordBreak: 'break-word',
         }}
       >
-        {text.content || (editing ? spec.label + '...' : '')}
+        {(!focused && tokenContext ? resolveTokens(text.content, tokenContext) : text.content) || (editing ? spec.label + '...' : '')}
       </div>
     </div>
   )

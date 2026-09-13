@@ -54,15 +54,24 @@ export default function DesignerCanvas({
     return { x, y, w, h }
   }
 
+  // A grouped element (Phase 2's Group/Ungroup) always selects its whole
+  // group together - clicking one member is clicking the group.
+  function groupSelectionFor(id) {
+    const el = page.elements.find(o => o.id === id)
+    if (!el?.groupId) return [id]
+    return page.elements.filter(o => o.groupId === el.groupId).map(o => o.id)
+  }
+
   function handleSelect(id, e) {
     if (!editing) return
     if (e.shiftKey) {
-      onSelect(selectedIds.includes(id) ? selectedIds.filter(x => x !== id) : [...selectedIds, id])
+      onSelect(selectedIds.includes(id) ? selectedIds.filter(x => x !== id) : [...selectedIds, ...groupSelectionFor(id)])
     } else if (!selectedIds.includes(id)) {
       // Clicking a member already in a multi-selection leaves the group
       // selected (so it can be dragged together) - only a click on an
-      // unselected element collapses the selection down to just that one.
-      onSelect([id])
+      // unselected element collapses the selection down to just that one
+      // (or its whole group, if it's grouped).
+      onSelect(groupSelectionFor(id))
     }
   }
 
@@ -195,6 +204,7 @@ export default function DesignerCanvas({
           >
             <div
               onMouseDown={e => handleSelect(el.id, e)}
+              data-print-el-id={el.id}
               style={{
                 width: '100%', height: '100%', position: 'relative',
                 transform: rotation ? `rotate(${rotation}deg)` : undefined,

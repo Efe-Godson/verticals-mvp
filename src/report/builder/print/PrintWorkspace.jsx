@@ -24,6 +24,9 @@ import { TEXT_VARIANTS, defaultElementSize, PAGE_SIZES, PAGE_NUMBER_FORMATS } fr
 import { buildDashboardReplicaPages } from './replicateDashboard'
 import { makeShapeElement, makeImageElement, SHAPE_TYPES } from './elementModel'
 import { CATALOGUE_BY_TYPE } from '../catalogue'
+import { THEMES } from './theme'
+import { PAGE_LAYOUTS, PAGE_LAYOUTS_BY_ID } from './pageLayouts'
+import { buildTokenContext, AVAILABLE_TOKENS } from './dynamicTokens'
 
 const sideBtn = { fontSize: '0.78rem', padding: '0.3rem 0.5rem' }
 
@@ -124,6 +127,13 @@ export default function PrintWorkspace() {
   )
   const tilesById = useMemo(() => Object.fromEntries(dashboardTiles.map(t => [t.id, t])), [dashboardTiles])
 
+  // Dynamic {{token}} text (Phase 2) - built once per data change, not per
+  // text element, since every element on the page shares the same context.
+  const tokenContext = useMemo(
+    () => buildTokenContext({ form: rb.form, scopedSubmissions: rb.scopedSubmissions }),
+    [rb.form, rb.scopedSubmissions],
+  )
+
   if (rb.loading) return <PageSkeleton variant="report" />
   if (rb.error && !rb.form) return <ErrorState message={rb.error} />
 
@@ -187,6 +197,33 @@ export default function PrintWorkspace() {
       })
     } catch (err) {
       showToast(err.message || 'Could not export PDF.', 'error')
+    } finally {
+      setExporting(false)
+      setExportProgress(null)
+      if (!wasPreview) setPreview(false)
+    }
+  }
+
+  async function handleDownloadPptx() {
+    if (rb.dirty) await rb.save()
+    setExporting(true)
+    setExportProgress({ done: 0, total: pages.length, label: 'Starting…' })
+    const wasPreview = preview
+    if (!wasPreview) {
+      setPreview(true)
+      await new Promise(r => setTimeout(r, 50))
+    }
+    try {
+      // pptxgenjs is a large dependency (see exportPptx.js) - loaded only
+      // when someone actually clicks this button, same reasoning as every
+      // route's own lazy import in App.jsx.
+      const { exportPrintLayoutToPptx } = await import('./exportPptx')
+      const nodes = pages.map(p => pageRefs.current[p.id])
+      await exportPrintLayoutToPptx(rb.printLayout, nodes, rb.form?.name || 'report', {
+        onProgress: (done, total, label) => setExportProgress({ done, total, label }),
+      })
+    } catch (err) {
+      showToast(err.message || 'Could not export PPTX.', 'error')
     } finally {
       setExporting(false)
       setExportProgress(null)
@@ -298,6 +335,9 @@ export default function PrintWorkspace() {
           ))}
           <button className="secondary" style={sideBtn} onClick={() => addTextToActivePage('divider')}>Divider</button>
         </div>
+        <p style={{ fontSize: '0.72rem', color: 'var(--color-muted)', marginTop: '0.4rem', marginBottom: 0 }} title={AVAILABLE_TOKENS.join(', ')}>
+          Tip: type a dynamic value like <code>{'{{metric.totalRevenue}}'}</code> into any text box - it resolves live once you click away.
+        </p>
       </div>
 
       <div style={{ marginBottom: '1.2rem' }}>
@@ -320,6 +360,27 @@ export default function PrintWorkspace() {
         <button className="secondary" style={sideBtn} onClick={addImageToActivePage}>+ Add image</button>
       </div>
 
+      {(rb.printLayout.savedComponents || []).length > 0 && (
+        <div style={{ marginBottom: '1.2rem' }}>
+          <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-muted)', marginBottom: '0.5rem' }}>
+            Components
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+            {rb.printLayout.savedComponents.map(c => (
+              <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                <button
+                  className="secondary" style={{ ...sideBtn, flex: 1, textAlign: 'left' }}
+                  onClick={() => activePageId && rb.insertSavedComponent(activePageId, c.id)}
+                >
+                  {c.name}
+                </button>
+                <button className="secondary" style={{ ...sideBtn, padding: '0 0.3rem' }} title="Delete" onClick={() => rb.removeSavedComponent(c.id)}>✕</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div style={{ marginBottom: '1.2rem' }}>
         <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-muted)', marginBottom: '0.5rem' }}>
           Layers
@@ -338,7 +399,20 @@ export default function PrintWorkspace() {
       <div style={{ marginBottom: '1.2rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
           <span style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-muted)' }}>Pages</span>
-          <button className="secondary" style={sideBtn} onClick={() => setActivePageId(rb.addPrintPage(activePageId))}>+ Add page</button>
+          <select
+            style={{ fontSize: '0.76rem', padding: '0.15rem 0.3rem' }}
+            value=""
+            onChange={e => {
+              const layout = PAGE_LAYOUTS_BY_ID[e.target.value]
+              if (!layout) return
+              const newId = layout.id === 'blank' ? rb.addPrintPage(activePageId) : rb.addPrintPageWithElements(activePageId, layout.make)
+              setActivePageId(newId)
+              e.target.value = ''
+            }}
+          >
+            <option value="" disabled>+ Add page ▾</option>
+            {PAGE_LAYOUTS.map(l => <option key={l.id} value={l.id}>{l.label}</option>)}
+          </select>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
           {pages.map((p, i) => (
@@ -354,6 +428,13 @@ export default function PrintWorkspace() {
                 <PageThumbnail page={p} pageSize={pageSize} orientation={orientation} />
               </div>
               <span style={{ flex: 1 }}>Page {i + 1}</span>
+              <button
+                className="secondary" style={{ ...sideBtn, padding: '0 0.3rem', opacity: p.hideMaster ? 1 : 0.4 }}
+                title={p.hideMaster ? 'Master page hidden on this page - click to show' : 'Hide header/footer/logo/watermark on this page'}
+                onClick={e => { e.stopPropagation(); rb.setPageHideMaster(p.id, !p.hideMaster) }}
+              >
+                ▭
+              </button>
               <button className="secondary" style={{ ...sideBtn, padding: '0 0.3rem' }} title="Duplicate" onClick={e => { e.stopPropagation(); rb.duplicatePrintPage(p.id) }}>⧉</button>
               <button className="secondary" style={{ ...sideBtn, padding: '0 0.3rem' }} title="Move up" disabled={i === 0}
                 onClick={e => { e.stopPropagation(); const ids = pages.map(x => x.id); [ids[i - 1], ids[i]] = [ids[i], ids[i - 1]]; rb.reorderPrintPages(ids) }}>↑</button>
@@ -379,6 +460,15 @@ export default function PrintWorkspace() {
             {Object.entries(PAGE_SIZES).map(([value, spec]) => <option key={value} value={value}>{spec.label}</option>)}
           </select>
         </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', marginBottom: '0.3rem' }}>
+          Theme
+          <select
+            style={{ fontSize: '0.8rem' }} value={settings.theme || 'default'}
+            onChange={e => rb.updatePrintSettings({ theme: e.target.value })}
+          >
+            {Object.entries(THEMES).map(([value, t]) => <option key={value} value={value}>{t.label}</option>)}
+          </select>
+        </label>
         {orientable && (
           <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', marginBottom: '0.3rem' }}>
             Orientation
@@ -402,6 +492,18 @@ export default function PrintWorkspace() {
             {label}
           </label>
         ))}
+        <label style={{ display: 'block', fontSize: '0.82rem', marginTop: '0.5rem', marginBottom: '0.2rem' }}>Header text</label>
+        <input
+          type="text" value={settings.masterHeaderText || ''} placeholder="(none)"
+          onChange={e => rb.updatePrintSettings({ masterHeaderText: e.target.value })}
+          style={{ width: '100%', fontSize: '0.8rem', padding: '0.25rem 0.4rem', boxSizing: 'border-box', marginBottom: '0.4rem' }}
+        />
+        <label style={{ display: 'block', fontSize: '0.82rem', marginBottom: '0.2rem' }}>Footer text</label>
+        <input
+          type="text" value={settings.masterFooterText || ''} placeholder="(none)"
+          onChange={e => rb.updatePrintSettings({ masterFooterText: e.target.value })}
+          style={{ width: '100%', fontSize: '0.8rem', padding: '0.25rem 0.4rem', boxSizing: 'border-box', marginBottom: '0.4rem' }}
+        />
         {settings.showPageNumber && (
           <>
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', margin: '0.3rem 0' }}>
@@ -470,6 +572,9 @@ export default function PrintWorkspace() {
           <button onClick={handleDownload} disabled={exporting} style={{ fontSize: '0.8rem' }}>
             {exporting ? `${exportProgress?.label || 'Exporting…'} (${exportProgress?.done ?? 0}/${exportProgress?.total ?? pages.length})` : 'Download PDF'}
           </button>
+          <button className="secondary" onClick={handleDownloadPptx} disabled={exporting} style={{ fontSize: '0.8rem' }}>
+            Download PPTX
+          </button>
         </div>
       </div>
 
@@ -496,6 +601,7 @@ export default function PrintWorkspace() {
                 onUpdateElements={rb.updatePrintElements}
                 selectedIds={selection.pageId === p.id ? selection.ids : []}
                 onSelect={ids => selectPage(p.id, ids)}
+                tokenContext={tokenContext}
               />
             </div>
           ))}
@@ -511,6 +617,14 @@ export default function PrintWorkspace() {
               onSetZElements={rb.setPrintElementsZ}
               onBeginBatch={rb.beginPrintBatch}
               onCommitBatch={rb.commitPrintBatch}
+              onGroup={rb.groupPrintElements}
+              onUngroup={rb.ungroupPrintElements}
+              onSaveComponent={(name, elements) => rb.addSavedComponent(name, elements)}
+              savedStyles={rb.printLayout.savedStyles}
+              onApplyStyle={rb.applySavedStyle}
+              onSaveStyle={rb.addSavedStyle}
+              visualsById={visualsById}
+              form={rb.form}
             />
           </div>
         )}

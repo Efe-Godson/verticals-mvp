@@ -19,6 +19,13 @@ const EMPTY_PRINT_LAYOUT = {
   pageSize: 'slide', orientation: 'landscape', pages: [],
   showLogo: true, showDate: true, showPageNumber: true, showWatermark: true,
   pageNumberFormat: 'page-x-of-y', numberTitlePage: false,
+  // Phase 2 additions - theme (theme.js), master page header/footer text,
+  // saved text/shape styles, and saved multi-element components. All
+  // additive: a document saved before Phase 2 just has these read as their
+  // defaults below, no migration step needed.
+  theme: 'default',
+  masterHeaderText: '', masterFooterText: '',
+  savedStyles: [], savedComponents: [],
 }
 
 const EMPTY_STATE = {
@@ -46,6 +53,10 @@ function newPrintId(prefix) {
 function nextElementSlotPct(elements, width, height) {
   const maxY = elements.reduce((m, el) => Math.max(m, (el.y || 0) + (el.height || 0)), 0)
   return { x: 0, y: maxY, width, height }
+}
+
+function clampPctLocal(v) {
+  return Math.min(100, Math.max(0, v))
 }
 
 export function useReportBuilder(formId) {
@@ -336,6 +347,7 @@ export function useReportBuilder(formId) {
         created = {
           id: newPrintId('el'), ...rest, ...slot,
           rotation: rest.rotation ?? 0, zIndex: p.elements.length + 1, locked: false, visible: true,
+          styleRef: rest.styleRef ?? null, groupId: rest.groupId ?? null,
         }
         return { ...p, elements: [...p.elements, created] }
       }),
@@ -444,8 +456,135 @@ export function useReportBuilder(formId) {
     }))
   }, [mutatePrint])
 
+  // updatePrintSettings already covers theme/masterHeaderText/
+  // masterFooterText (Phase 2) - they're plain top-level printLayout
+  // fields, same shape as pageSize/showLogo/etc.
   const updatePrintSettings = useCallback((patch) => {
     mutatePrint(prev => ({ ...prev, ...patch }))
+  }, [mutatePrint])
+
+  // Per-page master-page override (Phase 2) - hides the header/footer/logo/
+  // date/page-number/watermark overlay on just this page (e.g. a full-bleed
+  // cover). Separate from the per-report showLogo/etc toggles, which stay
+  // the default every other page inherits.
+  const setPageHideMaster = useCallback((pageId, hide) => {
+    mutatePrint(prev => ({ ...prev, pages: prev.pages.map(p => p.id === pageId ? { ...p, hideMaster: hide } : p) }))
+  }, [mutatePrint])
+
+  // ---- grouping (Phase 2) - one bulk mutatePrint call each, same one-
+  // undo-step reasoning as updatePrintElements/setPrintElementsZ ----
+  const groupPrintElements = useCallback((pageId, elementIds) => {
+    const groupId = newPrintId('grp')
+    mutatePrint(prev => ({
+      ...prev,
+      pages: prev.pages.map(p => p.id !== pageId ? p : {
+        ...p,
+        elements: p.elements.map(el => elementIds.includes(el.id) ? { ...el, groupId } : el),
+      }),
+    }))
+    return groupId
+  }, [mutatePrint])
+
+  const ungroupPrintElements = useCallback((pageId, elementIds) => {
+    mutatePrint(prev => ({
+      ...prev,
+      pages: prev.pages.map(p => p.id !== pageId ? p : {
+        ...p,
+        elements: p.elements.map(el => elementIds.includes(el.id) ? { ...el, groupId: null } : el),
+      }),
+    }))
+  }, [mutatePrint])
+
+  // ---- reusable text/shape styles (Phase 2) ----
+  // A style is just a named bag of the same kind-specific props an element
+  // already carries (fontWeight/align/fill/stroke/etc, never x/y/width/
+  // height/rotation - those stay per-placement). Applying one copies its
+  // props onto the element and stamps styleRef so the picker can show
+  // which style (if any) is currently applied; editing the element after
+  // that doesn't retroactively change the saved style or other elements
+  // using it - "detach" is implicit, there's no live binding to break.
+  const addSavedStyle = useCallback((name, kind, props) => {
+    const style = { id: newPrintId('style'), name, kind, props }
+    mutatePrint(prev => ({ ...prev, savedStyles: [...(prev.savedStyles || []), style] }))
+    return style.id
+  }, [mutatePrint])
+
+  const removeSavedStyle = useCallback((styleId) => {
+    mutatePrint(prev => ({ ...prev, savedStyles: (prev.savedStyles || []).filter(s => s.id !== styleId) }))
+  }, [mutatePrint])
+
+  const applySavedStyle = useCallback((pageId, elementId, style) => {
+    mutatePrint(prev => ({
+      ...prev,
+      pages: prev.pages.map(p => p.id !== pageId ? p : {
+        ...p,
+        elements: p.elements.map(el => el.id === elementId ? { ...el, ...style.props, styleRef: style.id } : el),
+      }),
+    }))
+  }, [mutatePrint])
+
+  // ---- saved components (Phase 2) ----
+  // A component is a named cluster of elements, stored with positions
+  // relative to the cluster's own top-left corner (0-100 within the
+  // cluster's own bounding box) so it can be re-inserted at a fresh slot
+  // on any page/report, not just where it was originally placed.
+  const addSavedComponent = useCallback((name, elements) => {
+    const minX = Math.min(...elements.map(el => el.x || 0))
+    const minY = Math.min(...elements.map(el => el.y || 0))
+    const relative = elements.map(({ id: _id, ...el }) => ({ ...el, x: (el.x || 0) - minX, y: (el.y || 0) - minY }))
+    const component = { id: newPrintId('cmp'), name, elements: relative }
+    mutatePrint(prev => ({ ...prev, savedComponents: [...(prev.savedComponents || []), component] }))
+    return component.id
+  }, [mutatePrint])
+
+  const removeSavedComponent = useCallback((componentId) => {
+    mutatePrint(prev => ({ ...prev, savedComponents: (prev.savedComponents || []).filter(c => c.id !== componentId) }))
+  }, [mutatePrint])
+
+  // Re-creates a saved component's elements (fresh ids, a shared fresh
+  // groupId so they move together, offset onto the next open slot) in one
+  // mutatePrint call - one undo step for the whole insert.
+  const insertSavedComponent = useCallback((pageId, componentId) => {
+    mutatePrint(prev => {
+      const component = (prev.savedComponents || []).find(c => c.id === componentId)
+      if (!component) return prev
+      const groupId = newPrintId('grp')
+      return {
+        ...prev,
+        pages: prev.pages.map(p => {
+          if (p.id !== pageId) return p
+          const slotY = nextElementSlotPct(p.elements, 0, 0).y
+          const newElements = component.elements.map((el, i) => ({
+            ...el, id: newPrintId('el'), groupId,
+            x: el.x, y: clampPctLocal(el.y + slotY),
+            zIndex: p.elements.length + i + 1,
+          }))
+          return { ...p, elements: [...p.elements, ...newElements] }
+        }),
+      }
+    })
+  }, [mutatePrint])
+
+  // ---- page layout presets (Phase 2, pageLayouts.js) ----
+  // Creates a new page already populated with a preset's elements in one
+  // mutatePrint call, so it's one undo step (not "add page" + N "add
+  // element"s). `makeElements` is a pageLayouts.js factory - see its own
+  // comment for why the shape differs slightly from a normal add.
+  const addPrintPageWithElements = useCallback((afterId, makeElements) => {
+    let createdId
+    mutatePrint(prev => {
+      const newPage = { id: newPrintId('page'), elements: [] }
+      createdId = newPage.id
+      newPage.elements = makeElements().map((el, i) => ({
+        id: newPrintId('el'), ...el, zIndex: i + 1, locked: false, visible: true,
+        styleRef: null, groupId: null,
+      }))
+      const pages = [...prev.pages]
+      const idx = afterId ? pages.findIndex(p => p.id === afterId) : pages.length - 1
+      pages.splice(idx + 1, 0, newPage)
+      return { ...prev, pages }
+    })
+    return createdId
   }, [mutatePrint])
 
   // Bulk-create pages from plain content (see report/builder/print/
@@ -524,8 +663,11 @@ export function useReportBuilder(formId) {
     addPrintPage, duplicatePrintPage, removePrintPage, reorderPrintPages,
     addPrintElement, updatePrintElement, updatePrintElements, removePrintElement, removePrintElements,
     setPrintElementZ, setPrintElementsZ, reorderPrintElementsZ,
-    updatePrintSettings,
-    seedPrintPages,
+    updatePrintSettings, setPageHideMaster,
+    seedPrintPages, addPrintPageWithElements,
+    groupPrintElements, ungroupPrintElements,
+    addSavedStyle, removeSavedStyle, applySavedStyle,
+    addSavedComponent, removeSavedComponent, insertSavedComponent,
     undoPrint, redoPrint, canUndoPrint: printHistory.canUndo, canRedoPrint: printHistory.canRedo,
     beginPrintBatch, commitPrintBatch,
   }
