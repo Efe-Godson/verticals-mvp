@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
 import { useRecycleBinTrigger } from './RecycleBinContext'
@@ -50,6 +50,7 @@ function MenuRow({ to, onClick, active, badge, children }) {
 
 function NavBar() {
   const location = useLocation()
+  const navigate = useNavigate()
   const { session } = useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
   const [linkedMenuOpen, setLinkedMenuOpen] = useState(false)
@@ -267,7 +268,7 @@ function NavBar() {
                   <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.3rem 0' }} />
                   <button
                     className="secondary"
-                    onClick={() => { setAccountMenuOpen(false); supabase.auth.signOut() }}
+                    onClick={() => { setAccountMenuOpen(false); supabase.auth.signOut(); navigate('/') }}
                     style={{
                       display: 'block', width: '100%', textAlign: 'left', border: 'none', background: 'transparent',
                       padding: '0.5rem 0.6rem', fontSize: '0.85rem', color: '#c0392b'
@@ -499,7 +500,7 @@ function NavBar() {
           <MenuRow to="/account" onClick={() => setMenuOpen(false)}>Profile</MenuRow>
         </div>
         <button
-          onClick={() => { setMenuOpen(false); supabase.auth.signOut() }}
+          onClick={() => { setMenuOpen(false); supabase.auth.signOut(); navigate('/') }}
           style={{
             background: 'transparent', border: 'none', padding: '0.7rem 0 0', marginTop: '0.3rem',
             textAlign: 'left', color: '#c0392b', fontSize: '0.92rem', fontWeight: 600, cursor: 'pointer',

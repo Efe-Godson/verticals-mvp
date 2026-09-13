@@ -188,7 +188,7 @@ function AccountPage() {
 
   async function handleLogout() {
     await supabase.auth.signOut()
-    navigate('/login')
+    navigate('/')
   }
 
   const totalSubmissions = submissions.length
