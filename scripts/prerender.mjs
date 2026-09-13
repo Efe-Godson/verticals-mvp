@@ -145,11 +145,19 @@ for (const route of PUBLIC_ROUTES) {
 
   const bodyHtml = stripHeadTags(renderPage(route.seoKey, route.path))
 
+  // Swaps the fallback title/description (marked off in index.html by
+  // prerender-seo:start/end comments) for this page's own full head -
+  // same tag set as index.html's default, page-specific values. Anchoring
+  // on these explicit markers (rather than scanning for "<title>") avoids
+  // false matches against incidental "<title>" text inside unrelated
+  // comments elsewhere in <head>.
+  const seoBlock = /<!-- prerender-seo:start -->[\s\S]*?<!-- prerender-seo:end -->/
+  if (!seoBlock.test(template)) {
+    throw new Error('prerender: could not find prerender-seo:start/end markers in dist/index.html')
+  }
+
   const html = template
-    // Swaps the whole static <title>...head content up to </head> for this
-    // page's own - same tag set as index.html's default, page-specific
-    // values.
-    .replace(/<title>[\s\S]*?(?=<\/head>)/, buildHead(route.seoKey, route.path) + '\n  ')
+    .replace(seoBlock, buildHead(route.seoKey, route.path))
     .replace('<div id="root"></div>', `<div id="root">${bodyHtml}</div>`)
 
   const outFile = route.path === '/'

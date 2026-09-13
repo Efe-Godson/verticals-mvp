@@ -17,21 +17,25 @@
     <meta name="apple-mobile-web-app-title" content="Verticals" />
 
     <!-- Generic fallback only - every routed page (public marketing pages,
-         and the noindex auth pages) now supplies its own <title>/
-         description/canonical/OG/Twitter via src/seo/SEO.jsx, which React
-         19 renders as real tags once it mounts. A static canonical/OG/
-         Twitter block here would sit *alongside* those (React doesn't
-         remove markup it didn't render), producing duplicate/conflicting
-         tags - e.g. every page's canonical would coexist with a second one
-         permanently pointing at "/". So this fallback stays deliberately
-         minimal: just a sensible default title/description for the
-         authenticated app pages that don't render their own <SEO> (out of
-         scope here - only the public marketing surface got one), and for
-         the brief instant before JS mounts. See scripts/prerender.mjs for
-         how the public marketing pages' static HTML gets its own complete,
-         non-duplicated head instead of this fallback. -->
+         and the noindex auth pages) now supplies its own title tag,
+         description, canonical and OG/Twitter data via src/seo/SEO.jsx,
+         which React 19 renders as real tags once it mounts. A static
+         canonical/OG/Twitter block here would sit *alongside* those (React
+         doesn't remove markup it didn't render), producing duplicate/
+         conflicting tags - e.g. every page's canonical would coexist with
+         a second one permanently pointing at "/". So this fallback stays
+         deliberately minimal: just a sensible default title/description
+         for the authenticated app pages that don't render their own SEO
+         component (out of scope here - only the public marketing surface
+         got one), and for the brief instant before JS mounts. See
+         scripts/prerender.mjs for how the public marketing pages' static
+         HTML gets its own complete, non-duplicated head instead of this
+         fallback - it replaces everything between the SEO markers below,
+         so keep them exactly as-is. -->
+    <!-- prerender-seo:start -->
     <title>Verticals | Capture, Manage &amp; Understand Your Data</title>
     <meta name="description" content="Collect records, manage workflows and turn your data into clear reports and insights with Verticals." />
+    <!-- prerender-seo:end -->
   </head>
   <body>
     <div id="root"></div>
