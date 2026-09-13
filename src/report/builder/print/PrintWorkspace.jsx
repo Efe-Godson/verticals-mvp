@@ -3,7 +3,7 @@
 // (redesign brief §22-36): arrange existing Report Builder visuals onto A4
 // pages for export, entirely separate from the interactive dashboard and
 // the Builder canvas - editing this never touches either of those.
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useToast } from '../../../Toast'
 import PageSkeleton from '../../../components/PageSkeleton'
@@ -13,6 +13,7 @@ import { useReportBuilder } from '../useReportBuilder'
 import { buildChartTiles } from '../../analysis/buildDashboardTiles'
 import { exportPrintLayoutToPDF } from '../../../reportExport'
 import PrintPage from './PrintPage'
+import FormatInspector from './FormatInspector'
 import { TEXT_VARIANTS, defaultElementSize, PAGE_SIZES, PAGE_NUMBER_FORMATS } from './printConstants'
 import { buildDashboardReplicaPages } from './replicateDashboard'
 import { withGridLayout } from './gridAdapter'
@@ -38,6 +39,12 @@ export default function PrintWorkspace() {
   // freeform canvas (DesignerCanvas.jsx) covers everything it needs to.
   // Remove this toggle at cutover (plan step 13).
   const [useFreeformCanvas, setUseFreeformCanvas] = useState(false)
+  // Selection lives here (not inside DesignerCanvas) because there's one
+  // DesignerCanvas per page but only one Format Inspector, and keyboard
+  // delete needs to know the current selection regardless of which page's
+  // canvas last changed it.
+  const [selection, setSelection] = useState({ pageId: null, ids: [] })
+  const selectPage = useCallback((pageId, ids) => setSelection({ pageId, ids }), [])
   const pageRefs = useRef({})
 
   const pages = rb.printLayout?.pages || []
@@ -62,6 +69,31 @@ export default function PrintWorkspace() {
     if (!activePageId && pages.length > 0) setActivePageId(pages[0].id)
     if (activePageId && !pages.some(p => p.id === activePageId)) setActivePageId(pages[0]?.id || null)
   }, [pages, activePageId])
+
+  // Clear a stale selection (its page got deleted, or the freeform canvas
+  // got switched off) rather than leave the Inspector pointed at nothing.
+  useEffect(() => {
+    if (!useFreeformCanvas && selection.ids.length > 0) { setSelection({ pageId: null, ids: [] }); return }
+    if (selection.pageId && !pages.some(p => p.id === selection.pageId)) setSelection({ pageId: null, ids: [] })
+  }, [useFreeformCanvas, pages, selection.pageId, selection.ids.length]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Delete/Backspace removes the current selection - guarded against firing
+  // while the user is typing (a text element's contentEditable, or any
+  // plain input/textarea/select in the sidebar).
+  useEffect(() => {
+    if (!useFreeformCanvas) return
+    function onKeyDown(e) {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return
+      if (!selection.pageId || selection.ids.length === 0) return
+      const t = e.target
+      if (t?.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t?.tagName)) return
+      e.preventDefault()
+      rb.removePrintElements(selection.pageId, selection.ids)
+      setSelection({ pageId: null, ids: [] })
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [useFreeformCanvas, selection]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const visualsById = useMemo(() => Object.fromEntries((rb.visuals || []).map(v => [v.id, v])), [rb.visuals])
 
@@ -136,6 +168,9 @@ export default function PrintWorkspace() {
 
   const filteredTiles = dashboardTiles.filter(t => t.title?.toLowerCase().includes(tileSearch.trim().toLowerCase()))
   const filteredVisuals = (rb.visuals || []).filter(v => v.title?.toLowerCase().includes(visualSearch.trim().toLowerCase()))
+
+  const selectedPage = pages.find(p => p.id === selection.pageId) || null
+  const selectedElements = selectedPage ? selectedPage.elements.filter(el => selection.ids.includes(el.id)) : []
 
   const sidebar = (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto', padding: '0.8rem' }}>
@@ -327,13 +362,16 @@ export default function PrintWorkspace() {
     <div className="pw-workspace" style={{ position: 'fixed', inset: 0, background: 'var(--color-bg)', display: 'flex', flexDirection: 'column', zIndex: 50 }}>
       <style>{`
         .pw-cols { display: grid; grid-template-columns: 260px 1fr; flex: 1; min-height: 0; }
+        .pw-cols.pw-cols-inspector { grid-template-columns: 260px 1fr 240px; }
         .pw-cols > * { min-height: 0; }
         .pw-side { background: var(--color-surface); border-right: 1px solid var(--color-border); overflow: hidden; }
+        .pw-inspector { background: var(--color-surface); border-left: 1px solid var(--color-border); overflow: hidden; }
         .pw-canvas { overflow-y: auto; padding: 1.5rem; }
         .pw-mobile-bar { display: none; }
         @media (max-width: 900px) {
-          .pw-cols { grid-template-columns: 1fr; }
+          .pw-cols, .pw-cols.pw-cols-inspector { grid-template-columns: 1fr; }
           .pw-side { display: none; }
+          .pw-inspector { display: none; }
           .pw-mobile-bar { display: flex; flex-shrink: 0; border-top: 1px solid var(--color-border); background: var(--color-surface); padding-bottom: env(safe-area-inset-bottom); }
           .pw-mobile-bar button { flex: 1; border-radius: 0; background: var(--color-surface); color: var(--color-text); border: none; font-size: 0.82rem; padding: 0.6rem; }
           .pw-drawer-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 120; }
@@ -356,7 +394,7 @@ export default function PrintWorkspace() {
         </div>
       </div>
 
-      <div className="pw-cols">
+      <div className={`pw-cols${useFreeformCanvas && !preview ? ' pw-cols-inspector' : ''}`}>
         {!preview && <div className="pw-side">{sidebar}</div>}
         <div className="pw-canvas">
           {pages.map((p, i) => (
@@ -378,10 +416,23 @@ export default function PrintWorkspace() {
                 onRemoveElement={rb.removePrintElement}
                 onUpdateElement={rb.updatePrintElement}
                 useFreeformCanvas={useFreeformCanvas}
+                selectedIds={selection.pageId === p.id ? selection.ids : []}
+                onSelect={ids => selectPage(p.id, ids)}
               />
             </div>
           ))}
         </div>
+        {useFreeformCanvas && !preview && (
+          <div className="pw-inspector">
+            <FormatInspector
+              page={selectedPage}
+              selectedElements={selectedElements}
+              onUpdateElement={rb.updatePrintElement}
+              onRemoveElements={(pageId, ids) => { rb.removePrintElements(pageId, ids); setSelection({ pageId: null, ids: [] }) }}
+              onSetZ={rb.setPrintElementZ}
+            />
+          </div>
+        )}
       </div>
 
       {!preview && (

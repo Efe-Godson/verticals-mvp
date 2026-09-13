@@ -17,7 +17,7 @@ import { pageFormatMm, pageAspectRatio, GRID_COLS, ROWS_PER_PAGE, PAGE_SIZES, fo
 export default function PrintPage({
   page, pageSize, orientation, visualsById, tilesById, form, submissions, editing, settings,
   pageNumber, totalPages, onLayoutChange, onRemoveElement, onUpdateElement, pageRef,
-  useFreeformCanvas,
+  useFreeformCanvas, selectedIds, onSelect,
 }) {
   const containerRef = useRef(null)
   const [width, setWidth] = useState(0)
@@ -106,6 +106,8 @@ export default function PrintPage({
             editing={editing}
             onUpdateElement={onUpdateElement}
             renderElement={renderElementContent}
+            selectedIds={selectedIds}
+            onSelect={onSelect}
           />
         )}
         {width > 0 && !useFreeformCanvas && (

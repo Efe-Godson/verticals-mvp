@@ -12,6 +12,7 @@ import { CURRENT_SCHEMA_VERSION } from './print/elementModel'
 import { migratePrintLayout } from './print/migratePrintLayout'
 import { fromGridCells, toGridCells } from './print/gridAdapter'
 import { GRID_COLS } from './print/printConstants'
+import { nextZIndex, stepSwap } from './print/zOrder'
 
 const EMPTY_PRINT_LAYOUT = {
   schemaVersion: CURRENT_SCHEMA_VERSION,
@@ -308,6 +309,32 @@ export function useReportBuilder(formId) {
     }))
   }, [mutatePrint])
 
+  const removePrintElements = useCallback((pageId, elementIds) => {
+    mutatePrint(prev => ({
+      ...prev,
+      pages: prev.pages.map(p => p.id !== pageId ? p : { ...p, elements: p.elements.filter(el => !elementIds.includes(el.id)) }),
+    }))
+  }, [mutatePrint])
+
+  // ---- z-order (brief §13 "Layering") - arithmetic lives in zOrder.js ----
+  const setPrintElementZ = useCallback((pageId, elementId, mode) => {
+    mutatePrint(prev => ({
+      ...prev,
+      pages: prev.pages.map(p => {
+        if (p.id !== pageId) return p
+        if (mode === 'front' || mode === 'back') {
+          const z = nextZIndex(p.elements, mode)
+          return { ...p, elements: p.elements.map(e => e.id === elementId ? { ...e, zIndex: z } : e) }
+        }
+        const swap = stepSwap(p.elements, elementId, mode === 'forward' ? 1 : -1)
+        if (!swap) return p
+        const [a, b] = swap
+        const byId = { [a.id]: a.zIndex, [b.id]: b.zIndex }
+        return { ...p, elements: p.elements.map(e => e.id in byId ? { ...e, zIndex: byId[e.id] } : e) }
+      }),
+    }))
+  }, [mutatePrint])
+
   // react-grid-layout fires onLayoutChange on mount with the layout it was
   // already given - same no-op guard as setCanvasLayout above, so opening a
   // print page doesn't immediately flip on the unsaved-changes indicator.
@@ -415,7 +442,8 @@ export function useReportBuilder(formId) {
     addVisual, updateVisual, updateVisualQuery, duplicateVisual, removeVisual,
     setCanvasLayout, promote, demote, setBuilderFilters, save, saveFormSetting,
     addPrintPage, duplicatePrintPage, removePrintPage, reorderPrintPages,
-    addPrintElement, updatePrintElement, removePrintElement, setPrintPageLayout, updatePrintSettings,
+    addPrintElement, updatePrintElement, removePrintElement, removePrintElements, setPrintElementZ,
+    setPrintPageLayout, updatePrintSettings,
     seedPrintPages,
   }
 }
