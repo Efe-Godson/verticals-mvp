@@ -25,6 +25,7 @@
 // all of them are committed to their real x/y on drag stop.
 import { useRef, useState } from 'react'
 import { Rnd } from 'react-rnd'
+import { computeSnap } from './snapping'
 
 const ROTATE_HANDLE_SIZE = 10
 
@@ -35,7 +36,9 @@ export default function DesignerCanvas({
   const [marquee, setMarquee] = useState(null) // {x0,y0,x1,y1} in px, canvas-local
   const [groupDrag, setGroupDrag] = useState(null) // {activeId, dx, dy} in px
   const [rotating, setRotating] = useState(null) // {id, value} in degrees
+  const [guides, setGuides] = useState(null) // {x, y} - each a computeSnap guide descriptor or null
   const containerRef = useRef(null)
+  const rndRefs = useRef({})
 
   if (!width || !height) return null
 
@@ -137,6 +140,7 @@ export default function DesignerCanvas({
         return (
           <Rnd
             key={el.id}
+            ref={r => { rndRefs.current[el.id] = r }}
             size={{ width: w, height: h }}
             position={{ x, y }}
             bounds="parent"
@@ -146,9 +150,20 @@ export default function DesignerCanvas({
             onDrag={(e, d) => {
               if (isGroupDrag && selectedIds.includes(el.id)) {
                 setGroupDrag({ activeId: el.id, dx: d.x - x, dy: d.y - y })
+                return
               }
+              // Snapping only applies to a single dragged element - which
+              // other box a multi-selection's group move should snap
+              // against is ambiguous, so that's left unsnapped for now.
+              const others = page.elements
+                .filter(o => o.id !== el.id && o.visible !== false)
+                .map(o => { const b = elementBoxPx(o); return { id: o.id, x: b.x, y: b.y, width: b.w, height: b.h } })
+              const snap = computeSnap({ x: d.x, y: d.y, width: w, height: h }, { width, height }, others)
+              setGuides({ x: snap.guideX, y: snap.guideY })
+              if (snap.x !== d.x || snap.y !== d.y) rndRefs.current[el.id]?.updatePosition({ x: snap.x, y: snap.y })
             }}
             onDragStop={(e, d) => {
+              setGuides(null)
               if (isGroupDrag && selectedIds.includes(el.id)) {
                 const dx = d.x - x, dy = d.y - y
                 selectedIds.forEach(id => {
@@ -214,6 +229,13 @@ export default function DesignerCanvas({
             pointerEvents: 'none',
           }}
         />
+      )}
+
+      {guides?.x?.type === 'align' && (
+        <div data-html2canvas-ignore="true" style={{ position: 'absolute', left: guides.x.line, top: 0, width: 1, height: '100%', background: '#f43f5e', pointerEvents: 'none' }} />
+      )}
+      {guides?.y?.type === 'align' && (
+        <div data-html2canvas-ignore="true" style={{ position: 'absolute', top: guides.y.line, left: 0, height: 1, width: '100%', background: '#f43f5e', pointerEvents: 'none' }} />
       )}
     </div>
   )
