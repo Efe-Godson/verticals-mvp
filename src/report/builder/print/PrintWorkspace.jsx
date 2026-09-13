@@ -16,6 +16,7 @@ import PrintPage from './PrintPage'
 import FormatInspector from './FormatInspector'
 import LayersPanel from './LayersPanel'
 import PageThumbnail from './PageThumbnail'
+import { useAutosave } from './useAutosave'
 import { TEXT_VARIANTS, defaultElementSize, PAGE_SIZES, PAGE_NUMBER_FORMATS } from './printConstants'
 import { buildDashboardReplicaPages } from './replicateDashboard'
 import { withGridLayout } from './gridAdapter'
@@ -30,6 +31,9 @@ export default function PrintWorkspace() {
   const { showToast } = useToast()
   const rb = useReportBuilder(id)
   const isMobile = useIsMobile(900)
+  // printLayout (not dirty) is the debounce-reset signal - see
+  // useAutosave.js's header comment for why.
+  const autosave = useAutosave(rb.printLayout, rb.dirty, rb.save)
 
   const [activePageId, setActivePageId] = useState(null)
   const [preview, setPreview] = useState(false)
@@ -460,6 +464,15 @@ export default function PrintWorkspace() {
         <button className="secondary" onClick={() => navigate(`/form/${id}/report/builder`)} style={{ fontSize: '0.8rem', flexShrink: 0 }}>← Exit</button>
         {!isMobile && <strong style={{ letterSpacing: '0.06em', fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--color-muted)' }}>Designer</strong>}
         <span style={{ fontSize: '0.82rem', color: 'var(--color-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{rb.form?.name}</span>
+        {!rb.saving && !rb.dirty && autosave.status === 'saved' && (
+          <span style={{ fontSize: '0.76rem', color: 'var(--color-muted)', flexShrink: 0 }}>Saved</span>
+        )}
+        {!rb.saving && autosave.status === 'error' && (
+          <span style={{ fontSize: '0.76rem', color: '#b91c1c', display: 'flex', alignItems: 'center', gap: '0.3rem', flexShrink: 0 }}>
+            Autosave failed
+            <button className="secondary" style={{ fontSize: '0.74rem', padding: '0.1rem 0.35rem' }} onClick={autosave.retry}>Retry</button>
+          </span>
+        )}
         <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
           <button className="secondary" onClick={rb.undoPrint} disabled={!rb.canUndoPrint} title="Undo (Ctrl+Z)" style={{ fontSize: '0.8rem' }}>↶ Undo</button>
           <button className="secondary" onClick={rb.redoPrint} disabled={!rb.canRedoPrint} title="Redo (Ctrl+Shift+Z)" style={{ fontSize: '0.8rem' }}>↷ Redo</button>
