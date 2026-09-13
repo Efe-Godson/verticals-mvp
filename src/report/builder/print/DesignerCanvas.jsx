@@ -30,7 +30,7 @@ import { computeSnap } from './snapping'
 const ROTATE_HANDLE_SIZE = 10
 
 export default function DesignerCanvas({
-  page, width, height, editing, onUpdateElement, renderElement,
+  page, width, height, editing, onUpdateElement, onUpdateElements, renderElement,
   selectedIds = [], onSelect,
 }) {
   const [marquee, setMarquee] = useState(null) // {x0,y0,x1,y1} in px, canvas-local
@@ -167,15 +167,20 @@ export default function DesignerCanvas({
               setGuides(null)
               if (isGroupDrag && selectedIds.includes(el.id)) {
                 const dx = d.x - x, dy = d.y - y
+                // One bulk call, not N onUpdateElement calls - so moving a
+                // group together is a single undo step (see
+                // updatePrintElements in useReportBuilder.js).
+                const patches = {}
                 selectedIds.forEach(id => {
                   const other = page.elements.find(o => o.id === id)
                   if (!other) return
                   const ob = elementBoxPx(other)
-                  onUpdateElement(page.id, id, {
+                  patches[id] = {
                     x: clampPct(toPct(ob.x + dx, width)),
                     y: clampPct(toPct(ob.y + dy, height)),
-                  })
+                  }
                 })
+                onUpdateElements(page.id, patches)
                 setGroupDrag(null)
               } else {
                 onUpdateElement(page.id, el.id, { x: clampPct(toPct(d.x, width)), y: clampPct(toPct(d.y, height)) })

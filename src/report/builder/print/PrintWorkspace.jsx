@@ -99,6 +99,23 @@ export default function PrintWorkspace() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [useFreeformCanvas, selection]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z - not gated on useFreeformCanvas (unlike
+  // Delete above): undo/redo tracks every printLayout edit, including page
+  // add/remove and page settings, which apply in legacy GridLayout mode too.
+  // Same typing guard as Delete/Backspace so it doesn't fight a field's own
+  // native undo while actively editing text or a number input.
+  useEffect(() => {
+    function onKeyDown(e) {
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'z') return
+      const t = e.target
+      if (t?.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t?.tagName)) return
+      e.preventDefault()
+      if (e.shiftKey) rb.redoPrint(); else rb.undoPrint()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [rb.undoPrint, rb.redoPrint]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const visualsById = useMemo(() => Object.fromEntries((rb.visuals || []).map(v => [v.id, v])), [rb.visuals])
 
   // Every tile the main Report.jsx dashboard shows (trend / cart / category /
@@ -444,6 +461,8 @@ export default function PrintWorkspace() {
         {!isMobile && <strong style={{ letterSpacing: '0.06em', fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--color-muted)' }}>Designer</strong>}
         <span style={{ fontSize: '0.82rem', color: 'var(--color-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{rb.form?.name}</span>
         <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
+          <button className="secondary" onClick={rb.undoPrint} disabled={!rb.canUndoPrint} title="Undo (Ctrl+Z)" style={{ fontSize: '0.8rem' }}>↶ Undo</button>
+          <button className="secondary" onClick={rb.redoPrint} disabled={!rb.canRedoPrint} title="Redo (Ctrl+Shift+Z)" style={{ fontSize: '0.8rem' }}>↷ Redo</button>
           <button className="secondary" onClick={() => setPreview(p => !p)} style={{ fontSize: '0.8rem' }}>{preview ? 'Edit' : 'Preview'}</button>
           <button className="secondary" onClick={handleSave} disabled={rb.saving} style={{ fontSize: '0.8rem' }}>
             {rb.saving ? 'Saving…' : rb.dirty ? 'Save*' : 'Save'}
@@ -475,6 +494,7 @@ export default function PrintWorkspace() {
                 onLayoutChange={rb.setPrintPageLayout}
                 onRemoveElement={rb.removePrintElement}
                 onUpdateElement={rb.updatePrintElement}
+                onUpdateElements={rb.updatePrintElements}
                 useFreeformCanvas={useFreeformCanvas}
                 selectedIds={selection.pageId === p.id ? selection.ids : []}
                 onSelect={ids => selectPage(p.id, ids)}
@@ -490,6 +510,9 @@ export default function PrintWorkspace() {
               onUpdateElement={rb.updatePrintElement}
               onRemoveElements={(pageId, ids) => { rb.removePrintElements(pageId, ids); setSelection({ pageId: null, ids: [] }) }}
               onSetZ={rb.setPrintElementZ}
+              onSetZElements={rb.setPrintElementsZ}
+              onBeginBatch={rb.beginPrintBatch}
+              onCommitBatch={rb.commitPrintBatch}
             />
           </div>
         )}

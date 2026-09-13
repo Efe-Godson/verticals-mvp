@@ -12,6 +12,7 @@ import { CURRENT_SCHEMA_VERSION } from './print/elementModel'
 import { migratePrintLayout } from './print/migratePrintLayout'
 import { fromGridCells, toGridCells, resolveElementSize } from './print/gridAdapter'
 import { nextZIndex, stepSwap, reindexFromOrder } from './print/zOrder'
+import { useHistory } from './print/useHistory'
 
 const EMPTY_PRINT_LAYOUT = {
   schemaVersion: CURRENT_SCHEMA_VERSION,
@@ -57,6 +58,11 @@ export function useReportBuilder(formId) {
   const formRef = useRef(null)
 
   const [state, setState] = useState(EMPTY_STATE)
+  // Undo/redo tracks printLayout only - Report Builder's own visuals/
+  // builderFilters aren't part of Designer's editing surface (see
+  // useReportBuilder.js's module comment and the Designer 2.0 plan's "what
+  // must not break" section), so there's nothing there for Ctrl+Z to do.
+  const printHistory = useHistory(EMPTY_PRINT_LAYOUT)
 
   useEffect(() => {
     let cancelled = false
@@ -68,13 +74,19 @@ export function useReportBuilder(formId) {
       formRef.current = formData
       setForm(formData)
       const rb = formData.settings?.reportBuilder
-      setState(rb && Array.isArray(rb.visuals)
+      const nextState = rb && Array.isArray(rb.visuals)
         ? {
             visuals: rb.visuals,
             builderFilters: { ...EMPTY_STATE.builderFilters, ...(rb.builderFilters || {}) },
             printLayout: migratePrintLayout({ ...EMPTY_PRINT_LAYOUT, ...(rb.printLayout || {}), pages: rb.printLayout?.pages || [] }),
           }
-        : EMPTY_STATE)
+        : EMPTY_STATE
+      setState(nextState)
+      // Undo/redo starts fresh per loaded document - a freshly opened
+      // report has nothing to undo into, and the placeholder EMPTY_STATE
+      // this hook started with before the fetch resolved was never a real
+      // edit worth keeping reachable via Ctrl+Z.
+      printHistory.reset(nextState.printLayout)
 
       const { data: subs } = await supabase.from('submissions').select('*')
         .eq('form_id', formId).is('deleted_at', null).order('created_at', { ascending: true })
@@ -84,7 +96,10 @@ export function useReportBuilder(formId) {
     }
     load()
     return () => { cancelled = true }
-  }, [formId])
+    // printHistory's methods are individually stable (see useHistory.js) -
+    // re-running this effect only on formId change is intentional, not a
+    // missed dependency.
+  }, [formId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const persist = useCallback(async (nextState) => {
     setSaving(true)
@@ -225,9 +240,40 @@ export function useReportBuilder(formId) {
   // printLayout.pages instead of the top-level visuals array. Kept on this
   // hook (not a separate one) so a print-layout write and a visuals write
   // can never race each other over the same settings JSONB column.
+  // Computes the next printLayout synchronously off stateRef (not via
+  // mutate's own setState updater) and records it into history right here,
+  // as a plain side effect in the caller's event handler - not inside a
+  // function passed to setState. React (in StrictMode, which this app runs
+  // in - see main.jsx) intentionally double-invokes updater functions to
+  // catch impurities; recording history (a ref write + a nested setState)
+  // from inside one would double-record every edit in dev. The updater
+  // handed to `mutate` below stays a pure merge, safe to double-invoke.
   const mutatePrint = useCallback((updater) => {
-    mutate(prev => ({ ...prev, printLayout: typeof updater === 'function' ? updater(prev.printLayout) : updater }))
+    const nextPrintLayout = typeof updater === 'function' ? updater(stateRef.current.printLayout) : updater
+    printHistory.record(nextPrintLayout)
+    mutate(prev => ({ ...prev, printLayout: nextPrintLayout }))
+  }, [mutate, printHistory.record]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Restores a printLayout from undo/redo without re-recording it as a new
+  // history entry (mutatePrint above does that unconditionally, which is
+  // right for real edits but would turn "undo" into "undo, then immediately
+  // push a redo-cancelling entry").
+  const applyPrintLayout = useCallback((printLayout) => {
+    mutate(prev => ({ ...prev, printLayout }))
   }, [mutate])
+
+  const undoPrint = useCallback(() => {
+    const restored = printHistory.undo()
+    if (restored !== undefined) applyPrintLayout(restored)
+  }, [printHistory.undo, applyPrintLayout]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const redoPrint = useCallback(() => {
+    const restored = printHistory.redo()
+    if (restored !== undefined) applyPrintLayout(restored)
+  }, [printHistory.redo, applyPrintLayout]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const beginPrintBatch = printHistory.beginBatch
+  const commitPrintBatch = printHistory.commitBatch
 
   const addPrintPage = useCallback((afterId) => {
     let created
@@ -307,6 +353,22 @@ export function useReportBuilder(formId) {
     }))
   }, [mutatePrint])
 
+  // Bulk position/size update for a multi-select group move - every element
+  // in `patchesById` lands in one mutatePrint call, so dragging a group of
+  // elements together is one undo step, not N. (N separate updatePrintElement
+  // calls would each be its own history entry - see useHistory.js's header
+  // comment on why that can't be fixed with beginBatch/commitBatch when the
+  // calls are all synchronous within one event handler.)
+  const updatePrintElements = useCallback((pageId, patchesById) => {
+    mutatePrint(prev => ({
+      ...prev,
+      pages: prev.pages.map(p => p.id !== pageId ? p : {
+        ...p,
+        elements: p.elements.map(el => patchesById[el.id] ? { ...el, ...patchesById[el.id] } : el),
+      }),
+    }))
+  }, [mutatePrint])
+
   const removePrintElement = useCallback((pageId, elementId) => {
     mutatePrint(prev => ({
       ...prev,
@@ -336,6 +398,36 @@ export function useReportBuilder(formId) {
         const [a, b] = swap
         const byId = { [a.id]: a.zIndex, [b.id]: b.zIndex }
         return { ...p, elements: p.elements.map(e => e.id in byId ? { ...e, zIndex: byId[e.id] } : e) }
+      }),
+    }))
+  }, [mutatePrint])
+
+  // Same as setPrintElementZ but for a multi-selection (FormatInspector's
+  // layer buttons when >1 element is selected) - applies to every id inside
+  // one mutatePrint call, same one-undo-step reasoning as updatePrintElements
+  // above. Elements are restacked in `elementIds` order so their relative
+  // order is preserved when moving the group as a whole.
+  const setPrintElementsZ = useCallback((pageId, elementIds, mode) => {
+    mutatePrint(prev => ({
+      ...prev,
+      pages: prev.pages.map(p => {
+        if (p.id !== pageId) return p
+        let elements = p.elements
+        if (mode === 'front' || mode === 'back') {
+          elementIds.forEach(id => {
+            const z = nextZIndex(elements, mode)
+            elements = elements.map(e => e.id === id ? { ...e, zIndex: z } : e)
+          })
+          return { ...p, elements }
+        }
+        elementIds.forEach(id => {
+          const swap = stepSwap(elements, id, mode === 'forward' ? 1 : -1)
+          if (!swap) return
+          const [a, b] = swap
+          const byId = { [a.id]: a.zIndex, [b.id]: b.zIndex }
+          elements = elements.map(e => e.id in byId ? { ...e, zIndex: byId[e.id] } : e)
+        })
+        return { ...p, elements }
       }),
     }))
   }, [mutatePrint])
@@ -459,9 +551,11 @@ export function useReportBuilder(formId) {
     addVisual, updateVisual, updateVisualQuery, duplicateVisual, removeVisual,
     setCanvasLayout, promote, demote, setBuilderFilters, save, saveFormSetting,
     addPrintPage, duplicatePrintPage, removePrintPage, reorderPrintPages,
-    addPrintElement, updatePrintElement, removePrintElement, removePrintElements, setPrintElementZ,
-    reorderPrintElementsZ,
+    addPrintElement, updatePrintElement, updatePrintElements, removePrintElement, removePrintElements,
+    setPrintElementZ, setPrintElementsZ, reorderPrintElementsZ,
     setPrintPageLayout, updatePrintSettings,
     seedPrintPages,
+    undoPrint, redoPrint, canUndoPrint: printHistory.canUndo, canRedoPrint: printHistory.canRedo,
+    beginPrintBatch, commitPrintBatch,
   }
 }

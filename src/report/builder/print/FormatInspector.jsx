@@ -29,11 +29,16 @@ function FieldRow({ label, children }) {
   )
 }
 
-function NumberInput({ value, onChange, step = 0.1 }) {
+// onFocus/onBlur are optional history-batching hooks (see FormatInspector's
+// onBeginBatch/onCommitBatch below) - held-open typing or arrow-key spinner
+// clicks in one focus session collapse to a single undo step instead of one
+// per keystroke/click.
+function NumberInput({ value, onChange, step = 0.1, onFocus, onBlur }) {
   return (
     <input
       type="number" step={step} value={Number.isFinite(value) ? Math.round(value * 10) / 10 : 0}
       onChange={e => { const v = parseFloat(e.target.value); if (!Number.isNaN(v)) onChange(v) }}
+      onFocus={onFocus} onBlur={onBlur}
       style={numberInput}
     />
   )
@@ -50,48 +55,72 @@ function LayerButtons({ onSetZ }) {
   )
 }
 
-function ShapeStyleFields({ page, el, onUpdateElement }) {
+function ShapeStyleFields({ page, el, onUpdateElement, onBeginBatch, onCommitBatch }) {
   const canRadius = el.shape === 'rectangle' || el.shape === 'rounded-rectangle'
   return (
     <>
       <SectionLabel>Style</SectionLabel>
       <FieldRow label="Fill">
-        <input type="color" value={el.fill || '#e5e7eb'} onChange={e => onUpdateElement(page.id, el.id, { fill: e.target.value })} />
+        <input
+          type="color" value={el.fill || '#e5e7eb'} onFocus={onBeginBatch} onBlur={onCommitBatch}
+          onChange={e => onUpdateElement(page.id, el.id, { fill: e.target.value })}
+        />
       </FieldRow>
       <FieldRow label="Stroke">
-        <input type="color" value={el.stroke || '#111827'} onChange={e => onUpdateElement(page.id, el.id, { stroke: e.target.value })} />
+        <input
+          type="color" value={el.stroke || '#111827'} onFocus={onBeginBatch} onBlur={onCommitBatch}
+          onChange={e => onUpdateElement(page.id, el.id, { stroke: e.target.value })}
+        />
       </FieldRow>
       <FieldRow label="Stroke width">
-        <NumberInput value={el.strokeWidth ?? 1} step={1} onChange={v => onUpdateElement(page.id, el.id, { strokeWidth: Math.max(0, v) })} />
+        <NumberInput
+          value={el.strokeWidth ?? 1} step={1} onFocus={onBeginBatch} onBlur={onCommitBatch}
+          onChange={v => onUpdateElement(page.id, el.id, { strokeWidth: Math.max(0, v) })}
+        />
       </FieldRow>
       {canRadius && (
         <FieldRow label="Corner radius">
-          <NumberInput value={el.radius ?? 0} step={1} onChange={v => onUpdateElement(page.id, el.id, { radius: Math.max(0, v) })} />
+          <NumberInput
+            value={el.radius ?? 0} step={1} onFocus={onBeginBatch} onBlur={onCommitBatch}
+            onChange={v => onUpdateElement(page.id, el.id, { radius: Math.max(0, v) })}
+          />
         </FieldRow>
       )}
       <FieldRow label="Opacity">
-        <NumberInput value={el.opacity ?? 1} step={0.1} onChange={v => onUpdateElement(page.id, el.id, { opacity: Math.min(1, Math.max(0, v)) })} />
+        <NumberInput
+          value={el.opacity ?? 1} step={0.1} onFocus={onBeginBatch} onBlur={onCommitBatch}
+          onChange={v => onUpdateElement(page.id, el.id, { opacity: Math.min(1, Math.max(0, v)) })}
+        />
       </FieldRow>
     </>
   )
 }
 
-function ImageStyleFields({ page, el, onUpdateElement }) {
+function ImageStyleFields({ page, el, onUpdateElement, onBeginBatch, onCommitBatch }) {
   return (
     <>
       <SectionLabel>Style</SectionLabel>
       <FieldRow label="Fit">
-        <select value={el.fit || 'cover'} onChange={e => onUpdateElement(page.id, el.id, { fit: e.target.value })} style={{ fontSize: '0.8rem' }}>
+        <select
+          value={el.fit || 'cover'} style={{ fontSize: '0.8rem' }}
+          onChange={e => onUpdateElement(page.id, el.id, { fit: e.target.value })}
+        >
           <option value="cover">Cover</option>
           <option value="contain">Contain</option>
           <option value="fill">Stretch</option>
         </select>
       </FieldRow>
       <FieldRow label="Corner radius">
-        <NumberInput value={el.radius ?? 0} step={1} onChange={v => onUpdateElement(page.id, el.id, { radius: Math.max(0, v) })} />
+        <NumberInput
+          value={el.radius ?? 0} step={1} onFocus={onBeginBatch} onBlur={onCommitBatch}
+          onChange={v => onUpdateElement(page.id, el.id, { radius: Math.max(0, v) })}
+        />
       </FieldRow>
       <FieldRow label="Opacity">
-        <NumberInput value={el.opacity ?? 1} step={0.1} onChange={v => onUpdateElement(page.id, el.id, { opacity: Math.min(1, Math.max(0, v)) })} />
+        <NumberInput
+          value={el.opacity ?? 1} step={0.1} onFocus={onBeginBatch} onBlur={onCommitBatch}
+          onChange={v => onUpdateElement(page.id, el.id, { opacity: Math.min(1, Math.max(0, v)) })}
+        />
       </FieldRow>
     </>
   )
@@ -106,7 +135,10 @@ function labelForKind(kind) {
   return 'Element'
 }
 
-export default function FormatInspector({ page, selectedElements, onUpdateElement, onRemoveElements, onSetZ }) {
+export default function FormatInspector({
+  page, selectedElements, onUpdateElement, onRemoveElements, onSetZ, onSetZElements,
+  onBeginBatch, onCommitBatch,
+}) {
   if (!page || selectedElements.length === 0) {
     return (
       <div style={panelStyle}>
@@ -122,7 +154,7 @@ export default function FormatInspector({ page, selectedElements, onUpdateElemen
     return (
       <div style={panelStyle}>
         <SectionLabel>{selectedElements.length} elements selected</SectionLabel>
-        <LayerButtons onSetZ={mode => ids.forEach(id => onSetZ(page.id, id, mode))} />
+        <LayerButtons onSetZ={mode => onSetZElements(page.id, ids, mode)} />
         <button className="secondary" style={dangerBtn} onClick={() => onRemoveElements(page.id, ids)}>
           Delete {selectedElements.length} elements
         </button>
@@ -135,16 +167,31 @@ export default function FormatInspector({ page, selectedElements, onUpdateElemen
     <div style={panelStyle}>
       <SectionLabel>{labelForKind(el.kind)}</SectionLabel>
 
-      {el.kind === 'shape' && <ShapeStyleFields page={page} el={el} onUpdateElement={onUpdateElement} />}
-      {el.kind === 'image' && <ImageStyleFields page={page} el={el} onUpdateElement={onUpdateElement} />}
+      {el.kind === 'shape' && (
+        <ShapeStyleFields page={page} el={el} onUpdateElement={onUpdateElement} onBeginBatch={onBeginBatch} onCommitBatch={onCommitBatch} />
+      )}
+      {el.kind === 'image' && (
+        <ImageStyleFields page={page} el={el} onUpdateElement={onUpdateElement} onBeginBatch={onBeginBatch} onCommitBatch={onCommitBatch} />
+      )}
 
       <SectionLabel>Position</SectionLabel>
-      <FieldRow label="X %"><NumberInput value={el.x} onChange={v => onUpdateElement(page.id, el.id, { x: v })} /></FieldRow>
-      <FieldRow label="Y %"><NumberInput value={el.y} onChange={v => onUpdateElement(page.id, el.id, { y: v })} /></FieldRow>
-      <FieldRow label="Width %"><NumberInput value={el.width} onChange={v => onUpdateElement(page.id, el.id, { width: v })} /></FieldRow>
-      <FieldRow label="Height %"><NumberInput value={el.height} onChange={v => onUpdateElement(page.id, el.id, { height: v })} /></FieldRow>
+      <FieldRow label="X %">
+        <NumberInput value={el.x} onFocus={onBeginBatch} onBlur={onCommitBatch} onChange={v => onUpdateElement(page.id, el.id, { x: v })} />
+      </FieldRow>
+      <FieldRow label="Y %">
+        <NumberInput value={el.y} onFocus={onBeginBatch} onBlur={onCommitBatch} onChange={v => onUpdateElement(page.id, el.id, { y: v })} />
+      </FieldRow>
+      <FieldRow label="Width %">
+        <NumberInput value={el.width} onFocus={onBeginBatch} onBlur={onCommitBatch} onChange={v => onUpdateElement(page.id, el.id, { width: v })} />
+      </FieldRow>
+      <FieldRow label="Height %">
+        <NumberInput value={el.height} onFocus={onBeginBatch} onBlur={onCommitBatch} onChange={v => onUpdateElement(page.id, el.id, { height: v })} />
+      </FieldRow>
       <FieldRow label="Rotation °">
-        <NumberInput value={el.rotation || 0} step={1} onChange={v => onUpdateElement(page.id, el.id, { rotation: v })} />
+        <NumberInput
+          value={el.rotation || 0} step={1} onFocus={onBeginBatch} onBlur={onCommitBatch}
+          onChange={v => onUpdateElement(page.id, el.id, { rotation: v })}
+        />
       </FieldRow>
 
       <div style={{ display: 'flex', gap: '0.8rem', margin: '0.7rem 0 0.2rem' }}>

@@ -18,7 +18,7 @@ import { pageFormatMm, pageAspectRatio, GRID_COLS, ROWS_PER_PAGE, PAGE_SIZES, fo
 
 export default function PrintPage({
   page, pageSize, orientation, visualsById, tilesById, form, submissions, editing, settings,
-  pageNumber, totalPages, onLayoutChange, onRemoveElement, onUpdateElement, pageRef,
+  pageNumber, totalPages, onLayoutChange, onRemoveElement, onUpdateElement, onUpdateElements, pageRef,
   useFreeformCanvas, selectedIds, onSelect,
 }) {
   const containerRef = useRef(null)
@@ -121,6 +121,7 @@ export default function PrintPage({
             height={heightPx}
             editing={editing}
             onUpdateElement={onUpdateElement}
+            onUpdateElements={onUpdateElements}
             renderElement={renderElementContent}
             selectedIds={selectedIds}
             onSelect={onSelect}
