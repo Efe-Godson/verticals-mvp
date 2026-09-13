@@ -15,10 +15,12 @@ import { exportPrintLayoutToPDF } from '../../../reportExport'
 import PrintPage from './PrintPage'
 import FormatInspector from './FormatInspector'
 import LayersPanel from './LayersPanel'
+import PageThumbnail from './PageThumbnail'
 import { TEXT_VARIANTS, defaultElementSize, PAGE_SIZES, PAGE_NUMBER_FORMATS } from './printConstants'
 import { buildDashboardReplicaPages } from './replicateDashboard'
 import { withGridLayout } from './gridAdapter'
 import { makeShapeElement, makeImageElement, SHAPE_TYPES } from './elementModel'
+import { CATALOGUE_BY_TYPE } from '../catalogue'
 
 const sideBtn = { fontSize: '0.78rem', padding: '0.3rem 0.5rem' }
 
@@ -255,11 +257,16 @@ export default function PrintWorkspace() {
               {filteredVisuals.map(v => (
                 <button
                   key={v.id} className="secondary"
-                  style={{ ...sideBtn, textAlign: 'left', display: 'flex', justifyContent: 'space-between', gap: '0.4rem' }}
+                  style={{ ...sideBtn, textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.4rem' }}
                   onClick={() => addVisualToActivePage(v.id)}
                 >
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.title}</span>
-                  <span>+</span>
+                  <span style={{ overflow: 'hidden', minWidth: 0 }}>
+                    <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.title}</span>
+                    <span style={{ display: 'block', fontSize: '0.68rem', color: 'var(--color-muted)' }}>
+                      {CATALOGUE_BY_TYPE[v.type]?.label || v.type}
+                    </span>
+                  </span>
+                  <span style={{ flexShrink: 0 }}>+</span>
                 </button>
               ))}
             </div>
@@ -321,16 +328,19 @@ export default function PrintWorkspace() {
           <span style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-muted)' }}>Pages</span>
           <button className="secondary" style={sideBtn} onClick={() => setActivePageId(rb.addPrintPage(activePageId))}>+ Add page</button>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
           {pages.map((p, i) => (
             <div
               key={p.id}
               onClick={() => setActivePageId(p.id)}
               style={{
-                display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.3rem 0.5rem', borderRadius: '6px', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.3rem 0.5rem', borderRadius: '6px', cursor: 'pointer',
                 background: activePageId === p.id ? 'var(--color-primary-soft)' : 'transparent', fontSize: '0.8rem',
               }}
             >
+              <div style={{ width: '38px', flexShrink: 0 }}>
+                <PageThumbnail page={p} pageSize={pageSize} orientation={orientation} />
+              </div>
               <span style={{ flex: 1 }}>Page {i + 1}</span>
               <button className="secondary" style={{ ...sideBtn, padding: '0 0.3rem' }} title="Duplicate" onClick={e => { e.stopPropagation(); rb.duplicatePrintPage(p.id) }}>⧉</button>
               <button className="secondary" style={{ ...sideBtn, padding: '0 0.3rem' }} title="Move up" disabled={i === 0}
