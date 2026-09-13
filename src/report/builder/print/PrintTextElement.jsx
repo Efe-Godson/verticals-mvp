@@ -15,9 +15,18 @@ const iconBtn = (active) => ({
   color: 'var(--color-text)',
 })
 
-export default function PrintTextElement({ element, editing, onChange, onRemove }) {
+// `directEdit=false` (the freeform canvas - see DesignerCanvas.jsx) means a
+// single click is already claimed for selecting/dragging the element, so
+// text only becomes editable after a double-click; `onEditingChange` lets
+// the canvas disable dragging for the duration so clicking to place a
+// cursor doesn't also start a drag. The legacy GridLayout renderer passes
+// directEdit=true (its default) and keeps the original always-editable
+// behavior unchanged.
+export default function PrintTextElement({ element, editing, onChange, onRemove, directEdit = true, onEditingChange }) {
   const [focused, setFocused] = useState(false)
+  const [manualEdit, setManualEdit] = useState(false)
   const text = element.text || { variant: 'body', content: '', align: 'left', bold: false }
+  const canType = directEdit || manualEdit
 
   if (text.variant === 'divider') {
     return (
@@ -53,14 +62,20 @@ export default function PrintTextElement({ element, editing, onChange, onRemove 
         </div>
       )}
       <div
-        contentEditable={editing}
+        contentEditable={editing && canType}
         suppressContentEditableWarning
+        onDoubleClick={e => { if (editing && !directEdit) { e.stopPropagation(); setManualEdit(true); onEditingChange?.(true) } }}
         onFocus={() => setFocused(true)}
-        onBlur={e => { setFocused(false); onChange({ text: { ...text, content: e.currentTarget.textContent } }) }}
+        onBlur={e => {
+          setFocused(false)
+          onChange({ text: { ...text, content: e.currentTarget.textContent } })
+          if (!directEdit) { setManualEdit(false); onEditingChange?.(false) }
+        }}
         style={{
           flex: 1, outline: focused ? '1px dashed var(--color-border)' : 'none',
           fontSize: spec.fontSize, fontWeight: text.bold ? 800 : spec.fontWeight,
-          textAlign: text.align || 'left', color: '#111', cursor: editing ? 'text' : 'default',
+          textAlign: text.align || 'left', color: '#111',
+          cursor: editing ? (canType ? 'text' : 'default') : 'default',
           overflow: 'hidden', wordBreak: 'break-word',
         }}
       >

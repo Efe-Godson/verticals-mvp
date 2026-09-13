@@ -37,6 +37,7 @@ export default function DesignerCanvas({
   const [groupDrag, setGroupDrag] = useState(null) // {activeId, dx, dy} in px
   const [rotating, setRotating] = useState(null) // {id, value} in degrees
   const [guides, setGuides] = useState(null) // {x, y} - each a computeSnap guide descriptor or null
+  const [textEditingId, setTextEditingId] = useState(null)
   const containerRef = useRef(null)
   const rndRefs = useRef({})
 
@@ -144,8 +145,8 @@ export default function DesignerCanvas({
             size={{ width: w, height: h }}
             position={{ x, y }}
             bounds="parent"
-            enableResizing={editing && !el.locked && selected && !isGroupDrag}
-            disableDragging={!editing || el.locked}
+            enableResizing={editing && !el.locked && selected && !isGroupDrag && textEditingId !== el.id}
+            disableDragging={!editing || el.locked || textEditingId === el.id}
             style={{ zIndex: selected ? 1000 : (el.zIndex || 1), transform: groupOffset }}
             onDrag={(e, d) => {
               if (isGroupDrag && selectedIds.includes(el.id)) {
@@ -199,8 +200,8 @@ export default function DesignerCanvas({
                 opacity: el.locked ? 0.85 : 1,
               }}
             >
-              {renderElement(el)}
-              {selected && !el.locked && !isGroupDrag && (
+              {renderElement(el, { onEditingChange: isEditing => setTextEditingId(isEditing ? el.id : null) })}
+              {selected && !el.locked && !isGroupDrag && textEditingId !== el.id && (
                 <div
                   data-html2canvas-ignore="true"
                   onMouseDown={e => startRotate(el, e)}

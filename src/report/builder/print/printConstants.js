@@ -42,6 +42,8 @@ export const TEXT_VARIANTS = [
   { value: 'heading', label: 'Heading', fontSize: '1.15rem', fontWeight: 700 },
   { value: 'body', label: 'Text', fontSize: '0.9rem', fontWeight: 400 },
   { value: 'small', label: 'Small', fontSize: '0.78rem', fontWeight: 400 },
+  { value: 'caption', label: 'Caption', fontSize: '0.72rem', fontWeight: 400 },
+  { value: 'big-number', label: 'Big number', fontSize: '2.4rem', fontWeight: 800 },
 ]
 
 export const PAGE_NUMBER_FORMATS = [
@@ -59,6 +61,8 @@ export function formatPageNumber(format, n, total) {
 export function defaultElementSize(kind, variant) {
   if (kind === 'text') {
     if (variant === 'divider') return { w: 12, h: 2 }
+    if (variant === 'caption') return { w: 12, h: 2 }
+    if (variant === 'big-number') return { w: 4, h: 5 }
     return { w: 12, h: variant === 'title' ? 4 : 3 }
   }
   return { w: 6, h: 10 } // visual

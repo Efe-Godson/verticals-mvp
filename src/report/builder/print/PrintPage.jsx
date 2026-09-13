@@ -51,9 +51,12 @@ export default function PrintPage({
 
   // Shared between both the legacy GridLayout branch and the freeform
   // DesignerCanvas branch below, so an element renders identically either
-  // way - only the positioning mechanism differs.
-  function renderElementContent(el) {
-    const boxed = !(el.kind === 'text' && (el.text?.variant || 'body') === 'title')
+  // way - only the positioning mechanism differs. `canvasHelpers` is only
+  // passed by DesignerCanvas (undefined in GridLayout mode, preserving its
+  // original always-editable text behavior exactly) - see PrintTextElement's
+  // directEdit prop for why freeform mode needs double-click-to-edit.
+  function renderElementContent(el, canvasHelpers) {
+    const boxed = !(el.kind === 'text' && ['title', 'big-number'].includes(el.text?.variant || 'body'))
     return (
       <div
         style={{
@@ -66,6 +69,8 @@ export default function PrintPage({
         {el.kind === 'text' ? (
           <PrintTextElement
             element={el} editing={editing}
+            directEdit={!canvasHelpers}
+            onEditingChange={canvasHelpers?.onEditingChange}
             onChange={patch => onUpdateElement(page.id, el.id, patch)}
             onRemove={() => onRemoveElement(page.id, el.id)}
           />
