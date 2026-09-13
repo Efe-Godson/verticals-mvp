@@ -17,6 +17,7 @@ import { useEffect, useState } from 'react'
 import { NavLink, Link, Outlet, useOutletContext, useNavigate, useParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import PageSkeleton from './components/PageSkeleton'
+import VerticalsLogo from './components/VerticalsLogo'
 import Records from './Records'
 import Report from './Report'
 import DemoBuild from './demoBuild/DemoBuild'
@@ -101,7 +102,7 @@ function TopBar() {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', minWidth: 0 }}>
-        <img src="/verticals-logo-sm.png" alt="Verticals" width={59} height={20} style={{ height: 20, width: 'auto' }} />
+        <VerticalsLogo height={19} style={{ color: 'var(--color-primary)' }} />
         <span style={{
           fontSize: '0.64rem', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase',
           color: 'var(--color-primary)', border: '1px solid var(--color-primary)', borderRadius: 999, padding: '2px 8px',

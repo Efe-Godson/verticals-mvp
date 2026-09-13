@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Menu, X } from 'lucide-react'
+import VerticalsLogo from '../components/VerticalsLogo'
 
 const LINKS = [
   { href: '#product', label: 'Product' },
@@ -31,7 +32,7 @@ export default function MarketingNav() {
       <nav className={`mkt-nav${scrolled ? ' is-scrolled' : ''}`}>
         <div className="mkt-container mkt-nav-inner">
           <Link to="/" className="mkt-logo">
-            VerticalS
+            <VerticalsLogo height={22} />
           </Link>
           <ul className="mkt-nav-links">
             {LINKS.map(l => (
@@ -59,7 +60,7 @@ export default function MarketingNav() {
         <div className="mkt-mobile-menu" role="dialog" aria-modal="true" aria-label="Menu">
           <div className="mkt-mobile-menu-top">
             <Link to="/" className="mkt-logo" onClick={() => setMenuOpen(false)}>
-              VerticalS
+              <VerticalsLogo height={22} />
             </Link>
             <button
               type="button"

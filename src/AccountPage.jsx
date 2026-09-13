@@ -186,8 +186,15 @@ function AccountPage() {
     showToast('Password changed.', 'success')
   }
 
-  async function handleLogout() {
-    await supabase.auth.signOut()
+  function handleLogout() {
+    // Navigate before signOut()'s promise resolves, not after: awaiting it
+    // first lets onAuthStateChange fire while we're still on this
+    // PrivateRoute-wrapped page, which redirects to /login (this is a
+    // returning session, so isFirstVisit() is false) before this function's
+    // own navigate('/') gets a chance to run - the user ends up stuck on
+    // the login screen instead of the marketing page. Firing signOut()
+    // without awaiting it (same order NavBar's logout uses) avoids the race.
+    supabase.auth.signOut()
     navigate('/')
   }
 

@@ -7,9 +7,9 @@ import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
 import { categoryColor, CategoryIcon } from './templateVisuals'
-import { usePageTitle } from './PageTitleContext'
+import { usePageTitle, usePageBack } from './PageTitleContext'
 
-function ReportTile({ template, locationCount, onOpen }) {
+function ReportTile({ template, locationCount, ownerEmail, onOpen }) {
   const color = categoryColor(template.category)
   return (
     <div
@@ -41,6 +41,11 @@ function ReportTile({ template, locationCount, onOpen }) {
           {locationCount} location{locationCount !== 1 ? 's' : ''}
         </span>
       )}
+      {ownerEmail && (
+        <span style={{ fontSize: '0.68rem', color: 'var(--color-muted)', marginTop: '0.2rem' }}>
+          Shared by {ownerEmail}
+        </span>
+      )}
     </div>
   )
 }
@@ -49,41 +54,46 @@ function Reports() {
   const { session } = useAuth()
   const navigate = useNavigate()
   usePageTitle('Reports')
+  usePageBack('/', 'Home')
 
-  const [usedTemplates, setUsedTemplates] = useState([]) // [{ template, locationCount, singleFormId, isBundle }]
+  const [usedTemplates, setUsedTemplates] = useState([]) // [{ template, locationCount, singleFormId, ownerId, role, ownerEmail }]
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const { data: forms } = await supabase
-        .from('forms').select('id, settings')
-        .eq('user_id', session.user.id)
-        .is('deleted_at', null)
-        .not('settings->>templateSlug', 'is', null)
-        .is('settings->>primaryFormId', null)
+      // Unlike BusinessesHome.jsx's Home tiles, Reports keeps Viewer-role
+      // rows - this (and RecordsHome.jsx) is exactly where a Viewer
+      // collaborator gets access, just never on Home. Grouped by
+      // (owner_id, template_slug), not slug alone - the same slug isn't
+      // unique across different owners.
+      const { data: rows } = await supabase.rpc('list_accessible_workflows')
 
-      const bySlug = {} // slug -> { count, firstFormId }
-      ;(forms || []).forEach(f => {
-        const slug = f.settings?.templateSlug
-        if (!slug) return
-        if (!bySlug[slug]) bySlug[slug] = { count: 0, firstFormId: f.id }
-        bySlug[slug].count += 1
+      const byKey = {} // "ownerId:slug" -> { ownerId, slug, role, ownerEmail, formIds }
+      ;(rows || []).forEach(r => {
+        byKey[`${r.owner_id}:${r.template_slug}`] = {
+          ownerId: r.owner_id, slug: r.template_slug, role: r.role,
+          ownerEmail: r.owner_email, formIds: r.form_ids || [],
+        }
       })
 
-      const slugs = Object.keys(bySlug)
-      if (slugs.length === 0) {
+      const keys = Object.keys(byKey)
+      if (keys.length === 0) {
         setUsedTemplates([])
         setLoading(false)
         return
       }
 
+      const slugs = [...new Set(Object.values(byKey).map(e => e.slug))]
       const { data: templates } = await supabase.from('templates').select('*').in('slug', slugs)
-      const list = (templates || []).map(template => ({
-        template,
-        locationCount: bySlug[template.slug].count,
-        singleFormId: bySlug[template.slug].firstFormId,
-      }))
+      const list = Object.values(byKey).map(entry => {
+        const template = (templates || []).find(t => t.slug === entry.slug)
+        if (!template) return null
+        return {
+          template, locationCount: entry.formIds.length, singleFormId: entry.formIds[0],
+          ownerId: entry.ownerId, role: entry.role, ownerEmail: entry.ownerEmail,
+        }
+      }).filter(Boolean)
       setUsedTemplates(list)
       setLoading(false)
     }
@@ -94,9 +104,10 @@ function Reports() {
   // single obvious "report" to jump into - route through the location
   // picker first (see TemplateLocations.jsx's ?goto=report handling)
   // instead of silently opening whichever location happened to load first.
-  function openReport({ template, singleFormId, locationCount }) {
+  function openReport({ template, singleFormId, locationCount, ownerId, role }) {
     if (!template.bundle?.length && locationCount > 1) {
-      navigate(`/templates/${template.slug}/locations?goto=report`)
+      const ownerParam = role === 'owner' ? '' : `&owner=${ownerId}`
+      navigate(`/templates/${template.slug}/locations?goto=report${ownerParam}`)
       return
     }
     navigate(`/form/${singleFormId}/report`)
@@ -125,12 +136,13 @@ function Reports() {
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.8rem' }}>
-          {usedTemplates.map(({ template, locationCount, singleFormId }) => (
+          {usedTemplates.map(({ template, locationCount, singleFormId, ownerId, role, ownerEmail }) => (
             <ReportTile
-              key={template.slug}
+              key={`${ownerId}:${template.slug}`}
               template={template}
               locationCount={template.bundle?.length > 0 ? 0 : locationCount}
-              onOpen={() => openReport({ template, singleFormId, locationCount })}
+              ownerEmail={role !== 'owner' ? ownerEmail : null}
+              onOpen={() => openReport({ template, singleFormId, locationCount, ownerId, role })}
             />
           ))}
         </div>

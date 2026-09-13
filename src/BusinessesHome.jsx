@@ -10,6 +10,7 @@ import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
 import { useToast } from './Toast'
 import ConfirmDialog from './ConfirmDialog'
+import ShareModal from './ShareModal'
 import HomeRecycleBinDialog from './HomeRecycleBinDialog'
 import { useRecycleBinTrigger } from './RecycleBinContext'
 import { categoryColor, CategoryIcon } from './templateVisuals'
@@ -33,9 +34,10 @@ function usesLocationCount(category) {
 // ever touch its first form - see performDeleteBusiness's formIds.in(...)
 // batch below, which is what makes "Delete" a well-defined single action
 // here even when a tile stands for several locations at once).
-function BusinessTile({ template, secondaryLabel, onManage, onDelete }) {
+function BusinessTile({ template, secondaryLabel, role, ownerEmail, onManage, onShare, onDelete }) {
   const color = categoryColor(template.category)
   const [menuOpen, setMenuOpen] = useState(false)
+  const isOwner = role === 'owner'
   return (
     <div
       className="template-tile"
@@ -72,6 +74,14 @@ function BusinessTile({ template, secondaryLabel, onManage, onDelete }) {
               background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
               boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 20, minWidth: '130px', overflow: 'hidden'
             }}>
+              {isOwner && (
+                <div
+                  onClick={() => { setMenuOpen(false); onShare() }}
+                  style={{ padding: '0.55rem 0.8rem', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
+                >
+                  Share
+                </div>
+              )}
               <div
                 onClick={() => { setMenuOpen(false); onDelete() }}
                 style={{ padding: '0.55rem 0.8rem', fontSize: '0.82rem', cursor: 'pointer', color: '#c0392b', textAlign: 'left' }}
@@ -97,6 +107,11 @@ function BusinessTile({ template, secondaryLabel, onManage, onDelete }) {
       {secondaryLabel && (
         <span style={{ fontSize: '0.72rem', color: 'var(--color-muted)' }}>
           {secondaryLabel}
+        </span>
+      )}
+      {!isOwner && (
+        <span style={{ fontSize: '0.68rem', color: 'var(--color-muted)', marginTop: '0.2rem' }}>
+          Shared by {ownerEmail}
         </span>
       )}
     </div>
@@ -135,12 +150,13 @@ function BusinessesHome() {
   const { setTrigger } = useRecycleBinTrigger()
   usePageTitle('Home')
 
-  const [usedTemplates, setUsedTemplates] = useState([]) // [{ template, locationCount, singleFormId, secondaryLabel }]
+  const [usedTemplates, setUsedTemplates] = useState([]) // [{ template, locationCount, singleFormId, secondaryLabel, ownerId, role, ownerEmail }]
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
 
-  const [pendingDeleteSlug, setPendingDeleteSlug] = useState(null)
+  const [shareTarget, setShareTarget] = useState(null) // { templateSlug, displayName } | null
+  const [pendingDeleteKey, setPendingDeleteKey] = useState(null) // "ownerId:slug"
   const [pendingBinConfirm, setPendingBinConfirm] = useState(null) // { type: 'permanentDelete', formId } | { type: 'emptyBin' }
   const [binCount, setBinCount] = useState(0)
   const [showBin, setShowBin] = useState(false)
@@ -169,53 +185,60 @@ function BusinessesHome() {
     setRefreshing(true)
     setError('')
     try {
-      const { data: forms, error: formsError } = await supabase
-        .from('forms').select('id, settings')
-        .eq('user_id', session.user.id)
-        .is('deleted_at', null)
-        .not('settings->>templateSlug', 'is', null)
-        .is('settings->>primaryFormId', null)
-      if (formsError) throw formsError
+      // list_accessible_workflows() replaces a plain "my own forms" query -
+      // it returns everything this account can reach: workflows owned
+      // outright, plus workflows/locations an owner has shared as Admin
+      // (Viewer shares are resolved here too, but filtered out below - Home
+      // never shows a Viewer-role tile, see RecordsHome.jsx/Reports.jsx for
+      // where those surface instead). Grouped by (owner_id, template_slug)
+      // rather than template_slug alone, since the same slug (e.g.
+      // "restaurant") isn't unique across different owners' accounts.
+      const { data: rows, error: rowsError } = await supabase.rpc('list_accessible_workflows')
+      if (rowsError) throw rowsError
 
-      const bySlug = {} // slug -> { count, firstFormId, formIds }
-      ;(forms || []).forEach(f => {
-        const slug = f.settings?.templateSlug
-        if (!slug) return
-        if (!bySlug[slug]) bySlug[slug] = { count: 0, firstFormId: f.id, formIds: [] }
-        bySlug[slug].count += 1
-        bySlug[slug].formIds.push(f.id)
+      const byKey = {} // "ownerId:slug" -> { ownerId, slug, role, ownerEmail, formIds }
+      ;(rows || []).filter(r => r.role !== 'viewer').forEach(r => {
+        byKey[`${r.owner_id}:${r.template_slug}`] = {
+          ownerId: r.owner_id, slug: r.template_slug, role: r.role,
+          ownerEmail: r.owner_email, formIds: r.form_ids || [],
+        }
       })
 
-      const slugs = Object.keys(bySlug)
-      if (slugs.length === 0) {
+      const keys = Object.keys(byKey)
+      if (keys.length === 0) {
         setUsedTemplates([])
         setPageCache(cacheKey, [])
         return
       }
 
+      const slugs = [...new Set(Object.values(byKey).map(e => e.slug))]
       const { data: templates, error: templatesError } = await supabase.from('templates').select('*').in('slug', slugs)
       if (templatesError) throw templatesError
 
       // Each tile's secondary line is whichever count is actually meaningful
       // for that kind of template - staff for the payroll bundle, locations
       // for Retail/Restaurant, otherwise how many responses it's collected.
-      const list = await Promise.all((templates || []).map(async template => {
-        const entry = bySlug[template.slug]
+      const list = (await Promise.all(Object.values(byKey).map(async entry => {
+        const template = (templates || []).find(t => t.slug === entry.slug)
+        if (!template) return null
         const isBundle = template.bundle?.length > 0
         let secondaryLabel
         if (isBundle) {
           const { count } = await supabase.from('submissions').select('id', { count: 'exact', head: true })
-            .eq('form_id', entry.firstFormId).is('deleted_at', null)
+            .eq('form_id', entry.formIds[0]).is('deleted_at', null)
           secondaryLabel = `${count || 0} staff`
         } else if (usesLocationCount(template.category)) {
-          secondaryLabel = `${entry.count} location${entry.count !== 1 ? 's' : ''}`
+          secondaryLabel = `${entry.formIds.length} location${entry.formIds.length !== 1 ? 's' : ''}`
         } else {
           const { count } = await supabase.from('submissions').select('id', { count: 'exact', head: true })
             .in('form_id', entry.formIds).is('deleted_at', null)
           secondaryLabel = `${count || 0} response${count === 1 ? '' : 's'}`
         }
-        return { template, locationCount: entry.count, singleFormId: entry.firstFormId, formIds: entry.formIds, secondaryLabel }
-      }))
+        return {
+          template, locationCount: entry.formIds.length, singleFormId: entry.formIds[0], formIds: entry.formIds,
+          secondaryLabel, ownerId: entry.ownerId, role: entry.role, ownerEmail: entry.ownerEmail,
+        }
+      }))).filter(Boolean)
       setUsedTemplates(list)
       setPageCache(cacheKey, list)
     } catch (err) {
@@ -313,26 +336,28 @@ function BusinessesHome() {
     else if (confirm.type === 'emptyBin') performEmptyBin()
   }
 
-  // Deletes every location under this slug, not just entry.singleFormId -
+  // Deletes every location under this workflow, not just entry.singleFormId -
   // a tile can stand for several locations at once (Restaurant, Retail),
   // and "Delete" on the tile has to mean all of them or it'd silently only
-  // remove one while claiming to have deleted "the business".
+  // remove one while claiming to have deleted "the business". Keyed by
+  // ownerId+slug (not slug alone) since Home can now show another owner's
+  // workflow (shared as Admin) alongside one of my own at the same slug.
   async function performDeleteBusiness() {
-    const slug = pendingDeleteSlug
-    setPendingDeleteSlug(null)
-    const entry = usedTemplates.find(u => u.template.slug === slug)
+    const key = pendingDeleteKey
+    setPendingDeleteKey(null)
+    const entry = usedTemplates.find(u => `${u.ownerId}:${u.template.slug}` === key)
     if (!entry) return
     const { error } = await supabase.from('forms').update({ deleted_at: new Date().toISOString() }).in('id', entry.formIds)
     if (error) {
       showToast('Could not delete: ' + error.message, 'error')
       return
     }
-    setUsedTemplates(current => current.filter(u => u.template.slug !== slug))
+    setUsedTemplates(current => current.filter(u => `${u.ownerId}:${u.template.slug}` !== key))
     setBinCount(count => count + entry.formIds.length)
     showToast(`"${entry.template.name}" moved to Recycle Bin.`, 'success')
   }
 
-  function manage({ template, singleFormId }) {
+  function manage({ template, singleFormId, ownerId, role }) {
     if (template.bundle?.length > 0) {
       const destination = template.bundle[0]?.settings?.payrollRole === 'employees'
         ? `/form/${singleFormId}/payroll?panel=1`
@@ -340,7 +365,11 @@ function BusinessesHome() {
       navigate(destination)
       return
     }
-    navigate(`/templates/${template.slug}/locations`)
+    // Own workflows keep the clean URL - ?owner= is only added once this
+    // tile stands for someone else's workflow (an Admin share), so
+    // TemplateLocations.jsx knows whose locations to load.
+    const ownerParam = role === 'owner' ? '' : `?owner=${ownerId}`
+    navigate(`/templates/${template.slug}/locations${ownerParam}`)
   }
 
   const workflowCount = usedTemplates.length
@@ -376,21 +405,24 @@ function BusinessesHome() {
         <ErrorState message={error} onRetry={() => loadTemplates()} />
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.8rem' }}>
-          {usedTemplates.map(({ template, secondaryLabel, singleFormId }) => (
+          {usedTemplates.map(({ template, secondaryLabel, singleFormId, ownerId, role, ownerEmail }) => (
             <BusinessTile
-              key={template.slug}
+              key={`${ownerId}:${template.slug}`}
               template={template}
               secondaryLabel={secondaryLabel}
-              onManage={() => manage({ template, singleFormId })}
-              onDelete={() => setPendingDeleteSlug(template.slug)}
+              role={role}
+              ownerEmail={ownerEmail}
+              onManage={() => manage({ template, singleFormId, ownerId, role })}
+              onShare={() => setShareTarget({ templateSlug: template.slug, displayName: template.name })}
+              onDelete={() => setPendingDeleteKey(`${ownerId}:${template.slug}`)}
             />
           ))}
           <AddTemplateTile />
         </div>
       )}
 
-      {pendingDeleteSlug && (() => {
-        const entry = usedTemplates.find(u => u.template.slug === pendingDeleteSlug)
+      {pendingDeleteKey && (() => {
+        const entry = usedTemplates.find(u => `${u.ownerId}:${u.template.slug}` === pendingDeleteKey)
         const locationCount = entry?.formIds?.length ?? 1
         return (
           <ConfirmDialog
@@ -402,10 +434,19 @@ function BusinessesHome() {
             }
             confirmLabel="Move to Bin"
             onConfirm={performDeleteBusiness}
-            onCancel={() => setPendingDeleteSlug(null)}
+            onCancel={() => setPendingDeleteKey(null)}
           />
         )
       })()}
+
+      {shareTarget && (
+        <ShareModal
+          scope="workflow"
+          templateSlug={shareTarget.templateSlug}
+          displayName={shareTarget.displayName}
+          onClose={() => setShareTarget(null)}
+        />
+      )}
 
       {showBin && (
         <HomeRecycleBinDialog

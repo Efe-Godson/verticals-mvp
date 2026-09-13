@@ -13,9 +13,9 @@ import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
 import { categoryColor, CategoryIcon } from './templateVisuals'
-import { usePageTitle } from './PageTitleContext'
+import { usePageTitle, usePageBack } from './PageTitleContext'
 
-function RecordsTile({ template, recordCount, onOpen }) {
+function RecordsTile({ template, recordCount, ownerEmail, onOpen }) {
   const color = categoryColor(template.category)
   return (
     <div
@@ -45,6 +45,11 @@ function RecordsTile({ template, recordCount, onOpen }) {
       <span style={{ fontSize: '0.72rem', color: 'var(--color-muted)' }}>
         {recordCount.toLocaleString()} record{recordCount !== 1 ? 's' : ''}
       </span>
+      {ownerEmail && (
+        <span style={{ fontSize: '0.68rem', color: 'var(--color-muted)', marginTop: '0.2rem' }}>
+          Shared by {ownerEmail}
+        </span>
+      )}
     </div>
   )
 }
@@ -53,42 +58,47 @@ function RecordsHome() {
   const { session } = useAuth()
   const navigate = useNavigate()
   usePageTitle('Records')
+  usePageBack('/', 'Home')
 
-  const [usedTemplates, setUsedTemplates] = useState([]) // [{ template, recordCount, singleFormId, locationCount }]
+  const [usedTemplates, setUsedTemplates] = useState([]) // [{ template, recordCount, singleFormId, locationCount, ownerId, role, ownerEmail }]
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const { data: forms } = await supabase
-        .from('forms').select('id, settings')
-        .eq('user_id', session.user.id)
-        .is('deleted_at', null)
-        .not('settings->>templateSlug', 'is', null)
-        .is('settings->>primaryFormId', null)
+      // Unlike BusinessesHome.jsx's Home tiles, Records keeps Viewer-role
+      // rows - this (and Reports.jsx) is exactly where a Viewer collaborator
+      // gets access, just never on Home. Grouped by (owner_id, template_slug),
+      // not slug alone - the same slug isn't unique across different owners.
+      const { data: rows } = await supabase.rpc('list_accessible_workflows')
 
-      const bySlug = {} // slug -> { firstFormId, formIds }
-      ;(forms || []).forEach(f => {
-        const slug = f.settings?.templateSlug
-        if (!slug) return
-        if (!bySlug[slug]) bySlug[slug] = { firstFormId: f.id, formIds: [] }
-        bySlug[slug].formIds.push(f.id)
+      const byKey = {} // "ownerId:slug" -> { ownerId, slug, role, ownerEmail, formIds }
+      ;(rows || []).forEach(r => {
+        byKey[`${r.owner_id}:${r.template_slug}`] = {
+          ownerId: r.owner_id, slug: r.template_slug, role: r.role,
+          ownerEmail: r.owner_email, formIds: r.form_ids || [],
+        }
       })
 
-      const slugs = Object.keys(bySlug)
-      if (slugs.length === 0) {
+      const keys = Object.keys(byKey)
+      if (keys.length === 0) {
         setUsedTemplates([])
         setLoading(false)
         return
       }
 
+      const slugs = [...new Set(Object.values(byKey).map(e => e.slug))]
       const { data: templates } = await supabase.from('templates').select('*').in('slug', slugs)
-      const list = await Promise.all((templates || []).map(async template => {
-        const entry = bySlug[template.slug]
+      const list = (await Promise.all(Object.values(byKey).map(async entry => {
+        const template = (templates || []).find(t => t.slug === entry.slug)
+        if (!template) return null
         const { count } = await supabase.from('submissions').select('id', { count: 'exact', head: true })
           .in('form_id', entry.formIds).is('deleted_at', null)
-        return { template, recordCount: count || 0, singleFormId: entry.firstFormId, locationCount: entry.formIds.length }
-      }))
+        return {
+          template, recordCount: count || 0, singleFormId: entry.formIds[0], locationCount: entry.formIds.length,
+          ownerId: entry.ownerId, role: entry.role, ownerEmail: entry.ownerEmail,
+        }
+      }))).filter(Boolean)
       setUsedTemplates(list)
       setLoading(false)
     }
@@ -99,9 +109,10 @@ function RecordsHome() {
   // single obvious "records" to jump into - route through the location
   // picker first (see TemplateLocations.jsx's ?goto=records handling)
   // instead of silently opening whichever location happened to load first.
-  function openRecords({ template, singleFormId, locationCount }) {
+  function openRecords({ template, singleFormId, locationCount, ownerId, role }) {
     if (!template.bundle?.length && locationCount > 1) {
-      navigate(`/templates/${template.slug}/locations?goto=records`)
+      const ownerParam = role === 'owner' ? '' : `&owner=${ownerId}`
+      navigate(`/templates/${template.slug}/locations?goto=records${ownerParam}`)
       return
     }
     navigate(`/form/${singleFormId}/records`)
@@ -130,12 +141,13 @@ function RecordsHome() {
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.8rem' }}>
-          {usedTemplates.map(({ template, recordCount, singleFormId, locationCount }) => (
+          {usedTemplates.map(({ template, recordCount, singleFormId, locationCount, ownerId, role, ownerEmail }) => (
             <RecordsTile
-              key={template.slug}
+              key={`${ownerId}:${template.slug}`}
               template={template}
               recordCount={recordCount}
-              onOpen={() => openRecords({ template, singleFormId, locationCount })}
+              ownerEmail={role !== 'owner' ? ownerEmail : null}
+              onOpen={() => openRecords({ template, singleFormId, locationCount, ownerId, role })}
             />
           ))}
         </div>

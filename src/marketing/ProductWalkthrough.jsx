@@ -41,7 +41,7 @@ function ReportsVisual() {
     <div className="mkt-walk-visual mkt-walk-visual--shaded">
       <div className="mkt-outcome-panel-label">This month vs. last</div>
       <svg viewBox="0 0 240 90" width="100%" height="90" preserveAspectRatio="none" aria-hidden="true">
-        <polyline points="0,70 40,60 80,65 120,40 160,45 200,20 240,25" fill="none" stroke="var(--color-border)" strokeWidth="2" />
+        <polyline points="0,70 40,60 80,65 120,40 160,45 200,20 240,25" fill="none" stroke="var(--chart-series-8)" strokeWidth="2" />
         <polyline points="0,80 40,55 80,58 120,35 160,30 200,15 240,10" fill="none" stroke="var(--chart-series-1)" strokeWidth="2.5" strokeLinecap="round" />
       </svg>
     </div>

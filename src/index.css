@@ -479,6 +479,27 @@ button.secondary:hover {
   background: var(--color-bg);
 }
 
+/* MobileOptionsPanel.jsx redefines --color-* on its root so the exact same
+   optionsMenuItems content (Report.jsx/Records.jsx) reads correctly against
+   a blue surface - covers everything styled through those tokens. A plain
+   (non-secondary) button is the one thing that doesn't: its background is
+   literally var(--color-primary), same blue as the panel itself, so without
+   this override it'd disappear into the background instead of just
+   recoloring with it. */
+.pos-style-options-panel button:not(.secondary) {
+  background: rgba(255, 255, 255, 0.16);
+}
+.pos-style-options-panel button:not(.secondary):hover {
+  background: rgba(255, 255, 255, 0.26);
+}
+.pos-style-options-panel button:disabled {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.5);
+}
+.pos-style-options-panel input[type="checkbox"] {
+  accent-color: #fff;
+}
+
 input, select, textarea {
   font-family: inherit;
   border: 1px solid var(--color-border);
@@ -694,7 +715,7 @@ input[type="checkbox"]:focus, input[type="radio"]:focus {
    card on a cart/POS or multi-section screen. The brand tint only lands
    once the field actually has a value - not every field pre-shaded. */
 .pf-tile {
-  padding: 14px 16px 16px;
+  padding: 10px 14px 12px;
   border: 1px solid var(--color-border);
   border-radius: 12px;
   background: var(--color-surface);
@@ -710,7 +731,7 @@ input[type="checkbox"]:focus, input[type="radio"]:focus {
   font-size: 15px;
   font-weight: 600;
   color: var(--color-text);
-  margin-bottom: 7px;
+  margin-bottom: 5px;
 }
 .pf-control {
   width: 100%;
@@ -1232,7 +1253,7 @@ textarea.pf-control {
      last bit of a page (a table's final row, a form's Save button) would
      sit underneath it. */
   .app-content-under-navbar .page {
-    padding: 1.25rem 1rem calc(84px + env(safe-area-inset-bottom));
+    padding: 1.25rem 1rem calc(72px + env(safe-area-inset-bottom));
   }
 
   .page {
@@ -1263,7 +1284,7 @@ textarea.pf-control {
     align-items: center;
     justify-content: space-between;
     gap: 0.6rem;
-    padding: 0.7rem 1rem;
+    padding: 0.45rem 1rem;
   }
 
   .navbar-bottom-bar {
@@ -1273,7 +1294,7 @@ textarea.pf-control {
     right: 0;
     bottom: 0;
     z-index: 140;
-    height: calc(68px + env(safe-area-inset-bottom));
+    height: calc(56px + env(safe-area-inset-bottom));
     align-items: stretch;
     justify-content: space-between;
     background: var(--color-surface);
@@ -1282,10 +1303,10 @@ textarea.pf-control {
   }
 
   /* DarkModeToggle.jsx's floating eye button: same fixed bottom-right spot
-     as desktop, just lifted clear of the mobile bottom tab bar (68px +
+     as desktop, just lifted clear of the mobile bottom tab bar (56px +
      safe-area) instead of sitting under it. */
   .dark-mode-toggle {
-    bottom: calc(68px + env(safe-area-inset-bottom) + 0.8rem) !important;
+    bottom: calc(56px + env(safe-area-inset-bottom) + 0.8rem) !important;
   }
 
   /* CreateForm/EditForm floating "Preview" button - stacked clear above the

@@ -69,8 +69,11 @@ function FieldInput({ field, value, onChange, disabled }) {
 }
 
 function fieldRow(field, value, onChange, disabled) {
+  const filled = Array.isArray(value)
+    ? value.length > 0
+    : value != null && value !== '' && (typeof value !== 'object' || Object.values(value).some(Boolean))
   return (
-    <div key={field.id} className="pf-tile">
+    <div key={field.id} className={`pf-tile${filled ? ' is-filled' : ''}`}>
       <label className="pf-label">
         {field.label}{field.required && <span className="field-required-mark"> *</span>}
       </label>

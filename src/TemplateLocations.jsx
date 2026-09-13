@@ -9,6 +9,7 @@ import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
 import { useToast } from './Toast'
 import ConfirmDialog from './ConfirmDialog'
+import ShareModal from './ShareModal'
 import Modal from './components/Modal'
 import HomeRecycleBinDialog from './HomeRecycleBinDialog'
 import { useRecycleBinTrigger } from './RecycleBinContext'
@@ -23,10 +24,15 @@ import { usePageTitle, usePageBack } from './PageTitleContext'
 // with Duplicate/logo actions added alongside Delete - the old "Manage
 // Locations" modal (a single flat list with only Delete) is gone in favor
 // of putting every action right on the card it acts on.
-function LocationTile({ location, color, uploading, onManage, onDuplicate, onDelete, onLogoChange, onLogoRemove }) {
+function LocationTile({ location, color, uploading, role, onManage, onShare, onDuplicate, onDelete, onLogoChange, onLogoRemove }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const fileInputRef = useRef(null)
   const logoUrl = location.settings?.logoUrl
+  const isOwner = role === 'owner'
+  // Deny-listing just 'viewer' would also show write controls to a role of
+  // null (no access at all, shouldn't happen given RLS already hides the
+  // location itself, but not worth relying on that) - allow-list instead.
+  const canWrite = role === 'owner' || role === 'admin'
 
   return (
     <div
@@ -54,6 +60,10 @@ function LocationTile({ location, color, uploading, onManage, onDuplicate, onDel
         }}
       />
 
+      {/* Viewers (and no-access) get no menu at all - every action here is a
+          write except Share, and only the owner can manage sharing (see
+          ShareModal.jsx), so there's nothing left for a Viewer to do here. */}
+      {canWrite && (
       <div style={{ position: 'absolute', top: '0.4rem', right: '0.4rem' }} onClick={(e) => e.stopPropagation()}>
         <button
           type="button"
@@ -76,6 +86,14 @@ function LocationTile({ location, color, uploading, onManage, onDuplicate, onDel
               background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
               boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 20, minWidth: '150px', overflow: 'hidden'
             }}>
+              {isOwner && (
+                <div
+                  onClick={() => { setMenuOpen(false); onShare() }}
+                  style={{ padding: '0.55rem 0.8rem', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
+                >
+                  Share
+                </div>
+              )}
               <div
                 onClick={() => { setMenuOpen(false); onDuplicate() }}
                 style={{ padding: '0.55rem 0.8rem', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
@@ -113,6 +131,7 @@ function LocationTile({ location, color, uploading, onManage, onDuplicate, onDel
           </>
         )}
       </div>
+      )}
 
       <div style={{
         width: '44px', height: '44px', borderRadius: '10px', background: logoUrl ? 'transparent' : `${color}16`,
@@ -172,6 +191,14 @@ function TemplateLocations() {
   // instead of its usual builder/order-screen destination.
   const goto = searchParams.get('goto')
 
+  // Absent for my own workflows (clean URL). Set by BusinessesHome.jsx's
+  // tile click whenever this workflow is someone else's, shared to me as
+  // Admin - see manage() there. Everything below reads/writes as this
+  // owner rather than session.user.id once it's set.
+  const ownerId = searchParams.get('owner') || session.user.id
+  const isOwnWorkflow = ownerId === session.user.id
+  const [role, setRole] = useState(isOwnWorkflow ? 'owner' : undefined) // 'owner' | 'admin' | 'viewer' | undefined (resolving)
+
   const { setTrigger } = useRecycleBinTrigger()
 
   const [template, setTemplate] = useState(null)
@@ -197,20 +224,39 @@ function TemplateLocations() {
   const [trashedLocations, setTrashedLocations] = useState([])
   const [loadingBin, setLoadingBin] = useState(false)
   const [uploadingLogoId, setUploadingLogoId] = useState(null)
+  const [shareTarget, setShareTarget] = useState(null) // { formId, displayName } | null
+
+  // Not trusted from route state (this page is also reached via a plain
+  // navigate() from RecordsHome.jsx/Reports.jsx's ?goto= flow, which
+  // wouldn't reliably carry a role through a refresh/deep link) - resolved
+  // fresh from the same RPC BusinessesHome.jsx uses, matched to this
+  // specific (ownerId, slug).
+  useEffect(() => {
+    if (isOwnWorkflow) { setRole('owner'); return }
+    let cancelled = false
+    setRole(undefined)
+    supabase.rpc('list_accessible_workflows').then(({ data }) => {
+      if (cancelled) return
+      const match = (data || []).find(r => r.owner_id === ownerId && r.template_slug === slug)
+      setRole(match?.role || null)
+    })
+    return () => { cancelled = true }
+  }, [ownerId, slug, isOwnWorkflow])
 
   async function loadLocations(templateSlug) {
     const { data } = await supabase
       .from('forms').select('id, name, settings')
-      .eq('user_id', session.user.id)
+      .eq('user_id', ownerId)
       .eq('settings->>templateSlug', templateSlug)
       .is('deleted_at', null)
       .is('settings->>primaryFormId', null)
       .order('created_at', { ascending: false })
     setLocations(data || [])
 
+    if (!isOwnWorkflow) return // Recycle Bin is owner-only, see openBin below
     const { count } = await supabase
       .from('forms').select('id', { count: 'exact', head: true })
-      .eq('user_id', session.user.id)
+      .eq('user_id', ownerId)
       .eq('settings->>templateSlug', templateSlug)
       .not('deleted_at', 'is', null)
     setBinCount(count || 0)
@@ -234,18 +280,22 @@ function TemplateLocations() {
 
   // Publishes the bin's open handler + count to NavBar (see BusinessesHome.jsx
   // for the same pattern) so it's reachable from here too, scoped to just
-  // this template's locations rather than every form on the account.
+  // this template's locations rather than every form on the account. Bin
+  // access stays owner-only (see loadLocations above) - a shared Admin can
+  // delete a location directly from its tile, but housekeeping the owner's
+  // whole Recycle Bin (restore/permanently empty) isn't part of that share.
   useEffect(() => {
+    if (!isOwnWorkflow) { setTrigger(null); return }
     setTrigger({ onOpen: openBin, count: binCount })
     return () => setTrigger(null)
-  }, [binCount])
+  }, [binCount, isOwnWorkflow])
 
   async function openBin() {
     setShowBin(true)
     setLoadingBin(true)
     const { data } = await supabase
       .from('forms').select('id, name, settings, deleted_at')
-      .eq('user_id', session.user.id)
+      .eq('user_id', ownerId)
       .eq('settings->>templateSlug', slug)
       .not('deleted_at', 'is', null)
       .order('deleted_at', { ascending: false })
@@ -374,8 +424,8 @@ function TemplateLocations() {
     setCreating(true)
     try {
       const form = duplicateSourceId
-        ? await duplicateLocationForm({ session, sourceFormId: duplicateSourceId, locationName: locationNameInput })
-        : await createLocationForm({ session, template, locationName: locationNameInput })
+        ? await duplicateLocationForm({ session, sourceFormId: duplicateSourceId, locationName: locationNameInput, ownerId })
+        : await createLocationForm({ session, template, locationName: locationNameInput, ownerId })
       showToast(`"${form.name}" ${duplicateSourceId ? 'duplicated' : 'created'}, customize it now.`, 'success')
       setShowAddModal(false)
       navigate(locationDestination(template, form.id))
@@ -386,8 +436,13 @@ function TemplateLocations() {
     }
   }
 
-  const showSkel = useDeferredLoading(loading)
-  if (loading) return showSkel ? <PageSkeleton variant="cards" /> : null
+  // role stays undefined briefly while list_accessible_workflows() resolves
+  // for a shared workflow - waiting it out here (rather than defaulting to
+  // some role) avoids a flash of Admin-only controls (Duplicate/Delete/Add
+  // Location) for someone who turns out to be a Viewer.
+  const roleResolving = role === undefined
+  const showSkel = useDeferredLoading(loading || roleResolving)
+  if (loading || roleResolving) return showSkel ? <PageSkeleton variant="cards" /> : null
   if (error) return <ErrorState message={error} />
 
   const color = categoryColor(template.category)
@@ -418,14 +473,19 @@ function TemplateLocations() {
             location={location}
             color={color}
             uploading={uploadingLogoId === location.id}
+            role={role}
             onManage={() => navigate(goto ? `/form/${location.id}/${goto}` : locationDestination(template, location.id))}
+            onShare={() => setShareTarget({
+              formId: location.id,
+              displayName: location.settings?.locationName || location.name,
+            })}
             onDuplicate={() => openDuplicateModal(location)}
             onDelete={() => requestDeleteLocation(location.id)}
             onLogoChange={(file) => handleLogoChange(location, file)}
             onLogoRemove={() => saveLocationSettings(location, { logoUrl: null })}
           />
         ))}
-        <AddLocationTile onClick={openAddModal} />
+        {(role === 'owner' || role === 'admin') && <AddLocationTile onClick={openAddModal} />}
       </div>
 
       {pendingDeleteId && (
@@ -446,6 +506,15 @@ function TemplateLocations() {
           onPermanentDelete={(formId) => setPendingBinConfirm({ type: 'permanentDelete', formId })}
           onEmptyBin={() => trashedLocations.length > 0 && setPendingBinConfirm({ type: 'emptyBin' })}
           onClose={() => setShowBin(false)}
+        />
+      )}
+
+      {shareTarget && (
+        <ShareModal
+          scope="location"
+          formId={shareTarget.formId}
+          displayName={shareTarget.displayName}
+          onClose={() => setShareTarget(null)}
         />
       )}
 

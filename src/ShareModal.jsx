@@ -1,0 +1,178 @@
+// Place at: src/ShareModal.jsx
+// Google-Workspace-style share dialog, opened from the "⋮" menu on a
+// workflow tile (BusinessesHome.jsx) or a location tile (TemplateLocations.jsx)
+// - only ever shown to the owner (see decision: only the owner manages
+// sharing), so `session.user` here is always the owner, never a
+// collaborator. All the actual work happens server-side in the manage-share
+// edge function, which re-verifies ownership itself (the service-role key
+// it runs with bypasses RLS entirely).
+import { useEffect, useState } from 'react'
+import Modal from './components/Modal'
+import { supabase } from './supabaseClient'
+import { useAuth } from './AuthContext'
+import { useToast } from './Toast'
+
+function ShareModal({ scope, templateSlug, formId, displayName, onClose }) {
+  const { session } = useAuth()
+  const { showToast } = useToast()
+  const [shares, setShares] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [email, setEmail] = useState('')
+  const [role, setRole] = useState('viewer')
+  const [inviting, setInviting] = useState(false)
+  const [busyId, setBusyId] = useState(null)
+
+  const scopeParams = scope === 'workflow' ? { scope, template_slug: templateSlug } : { scope, form_id: formId }
+
+  async function callShareFunction(body) {
+    const { data, error } = await supabase.functions.invoke('manage-share', { body: { ...scopeParams, ...body } })
+    if (error) throw new Error(error.message || 'Something went wrong')
+    if (data?.error) throw new Error(data.error)
+    return data
+  }
+
+  async function loadShares() {
+    setLoading(true)
+    try {
+      const data = await callShareFunction({ action: 'list' })
+      setShares(data.shares || [])
+    } catch (err) {
+      showToast('Could not load who has access: ' + err.message, 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { loadShares() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function handleInvite(e) {
+    e.preventDefault()
+    if (!email.trim()) return
+    setInviting(true)
+    try {
+      const data = await callShareFunction({ action: 'invite', email, role })
+      setShares(current => [data.share, ...current.filter(s => s.id !== data.share.id)])
+      setEmail('')
+      showToast(
+        data.emailSent
+          ? `Invited ${data.share.email}.`
+          : `${data.share.email} now has access - they already had an account, so no invite email was sent.`,
+        'success'
+      )
+    } catch (err) {
+      showToast('Could not invite: ' + err.message, 'error')
+    } finally {
+      setInviting(false)
+    }
+  }
+
+  async function handleRoleChange(share, newRole) {
+    if (newRole === share.role) return
+    setBusyId(share.id)
+    try {
+      const data = await callShareFunction({ action: 'update_role', share_id: share.id, role: newRole })
+      setShares(current => current.map(s => s.id === share.id ? data.share : s))
+    } catch (err) {
+      showToast('Could not change role: ' + err.message, 'error')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  async function handleRemove(share) {
+    setBusyId(share.id)
+    try {
+      await callShareFunction({ action: 'remove', share_id: share.id })
+      setShares(current => current.filter(s => s.id !== share.id))
+    } catch (err) {
+      showToast('Could not remove: ' + err.message, 'error')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  function copyLink() {
+    const link = scope === 'workflow'
+      ? `${window.location.origin}/templates/${templateSlug}/locations?owner=${session.user.id}`
+      : `${window.location.origin}/form/${formId}/records`
+    navigator.clipboard.writeText(link)
+    showToast('Link copied.', 'success')
+  }
+
+  return (
+    <Modal size="md" onClose={onClose} title={`Share "${displayName}"`}>
+      <p style={{ color: 'var(--color-muted)', fontSize: '0.85rem', margin: '0 0 1rem' }}>
+        {scope === 'workflow'
+          ? 'Admins can manage every location in this workflow, including ones added later. Viewers get read-only access from Records and Reports, and never see it on Home.'
+          : 'Admins get full access to this location. Viewers get read-only access from Records and Reports, and never see it on Home.'}
+      </p>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.5rem 0.1rem' }}>
+          <span style={{ fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {session?.user?.email}
+          </span>
+          <span style={{ fontSize: '0.75rem', color: 'var(--color-muted)', fontWeight: 600, flexShrink: 0 }}>Owner</span>
+        </div>
+
+        {loading ? (
+          <span style={{ fontSize: '0.8rem', color: 'var(--color-muted)', padding: '0.4rem 0.1rem' }}>Loading…</span>
+        ) : shares.length === 0 ? (
+          <span style={{ fontSize: '0.8rem', color: 'var(--color-muted)', padding: '0.4rem 0.1rem' }}>
+            Not shared with anyone yet.
+          </span>
+        ) : shares.map(share => (
+          <div
+            key={share.id}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem',
+              padding: '0.5rem 0.1rem', borderTop: '1px solid var(--color-border)'
+            }}
+          >
+            <span style={{ fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {share.email}
+            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
+              <select
+                value={share.role}
+                disabled={busyId === share.id}
+                onChange={(e) => handleRoleChange(share, e.target.value)}
+                style={{ fontSize: '0.8rem', padding: '0.25rem 0.4rem' }}
+              >
+                <option value="admin">Admin</option>
+                <option value="viewer">Viewer</option>
+              </select>
+              <button
+                type="button" className="secondary" disabled={busyId === share.id}
+                onClick={() => handleRemove(share)}
+                style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <form onSubmit={handleInvite} style={{ display: 'flex', gap: '0.4rem', marginBottom: '1rem' }}>
+        <input
+          type="email" required placeholder="Email address" value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          style={{ flex: 1, minWidth: 0, padding: '0.5rem', fontSize: '0.85rem' }}
+        />
+        <select value={role} onChange={(e) => setRole(e.target.value)} style={{ fontSize: '0.85rem', padding: '0.5rem' }}>
+          <option value="viewer">Viewer</option>
+          <option value="admin">Admin</option>
+        </select>
+        <button type="submit" disabled={inviting}>{inviting ? 'Inviting…' : 'Invite'}</button>
+      </form>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+        <button type="button" className="secondary" onClick={copyLink}>Copy share link</button>
+        <button type="button" className="secondary" onClick={onClose}>Done</button>
+      </div>
+    </Modal>
+  )
+}
+
+export default ShareModal

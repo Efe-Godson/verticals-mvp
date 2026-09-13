@@ -29,6 +29,12 @@ const FIELD_TYPES = [
 const TYPES_WITH_OPTIONS = ['dropdown', 'multiplechoice', 'checkbox']
 
 const smallBtn = { padding: '0.25rem 0.55rem', fontSize: '0.8rem', lineHeight: 1 }
+const removeBtn = {
+  ...smallBtn,
+  color: '#c0392b',
+  borderColor: 'color-mix(in srgb, #c0392b 45%, var(--color-border))',
+  background: 'color-mix(in srgb, #c0392b 8%, var(--color-surface))',
+}
 
 function newFieldId() {
   return 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
@@ -49,7 +55,16 @@ function FieldListEditor({ fields, onChange }) {
   return (
     <div>
       {fields.map((field, index) => (
-        <div key={field.id} style={{ padding: '0.6rem 0', borderBottom: index < fields.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
+        <div
+          key={field.id}
+          style={{
+            padding: '0.65rem 0.75rem',
+            marginBottom: index < fields.length - 1 ? '0.6rem' : 0,
+            background: 'color-mix(in srgb, var(--color-primary) 4%, var(--color-surface))',
+            border: '1px solid color-mix(in srgb, var(--color-primary) 16%, var(--color-border))',
+            borderRadius: 10,
+          }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <input value={field.label} onChange={e => update(index, { label: e.target.value })} style={{ flex: 1, minWidth: 0 }} />
             <select value={field.type} onChange={e => update(index, { type: e.target.value })} style={{ width: 150, flexShrink: 0 }}>
@@ -58,7 +73,7 @@ function FieldListEditor({ fields, onChange }) {
             <div style={{ display: 'flex', gap: '0.2rem', flexShrink: 0 }}>
               <button type="button" className="secondary" style={smallBtn} disabled={index === 0} onClick={() => move(index, -1)}>↑</button>
               <button type="button" className="secondary" style={smallBtn} disabled={index === fields.length - 1} onClick={() => move(index, 1)}>↓</button>
-              <button type="button" className="secondary" style={smallBtn} onClick={() => remove(index)}>✕</button>
+              <button type="button" className="secondary" style={removeBtn} onClick={() => remove(index)}>✕</button>
             </div>
           </div>
           {TYPES_WITH_OPTIONS.includes(field.type) && (
@@ -66,7 +81,7 @@ function FieldListEditor({ fields, onChange }) {
               placeholder="Options, comma separated e.g. Cash, Card, Transfer"
               value={(field.options || []).join(', ')}
               onChange={e => update(index, { options: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
-              style={{ width: '100%', marginTop: '0.4rem' }}
+              style={{ width: '100%', marginTop: '0.5rem' }}
             />
           )}
         </div>

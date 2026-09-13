@@ -50,8 +50,8 @@ function NavItem({ as: As = Link, active, label, ariaLabel, icon, ...rest }) {
         // the row sat from the true bottom edge. Anchoring to the bottom
         // instead means only the actual safe-area buffer separates the
         // label from the edge.
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', gap: '0.2rem',
-        flex: '1 1 0', minWidth: 0, height: '100%', padding: '0.3rem 0.2rem 0.5rem',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', gap: '0.15rem',
+        flex: '1 1 0', minWidth: 0, height: '100%', padding: '0.2rem 0.2rem 0.35rem',
         color: active ? 'var(--color-primary)' : 'var(--color-muted)',
         background: 'transparent', border: 'none', textDecoration: 'none', cursor: 'pointer',
       }}
@@ -64,13 +64,13 @@ function NavItem({ as: As = Link, active, label, ariaLabel, icon, ...rest }) {
             a selection, it doesn't repaint the container). */}
         {active && (
           <span style={{
-            position: 'absolute', top: '-7px', left: '50%', transform: 'translateX(-50%)',
-            width: '16px', height: '3px', borderRadius: '999px', background: 'var(--color-primary)',
+            position: 'absolute', top: '-6px', left: '50%', transform: 'translateX(-50%)',
+            width: '14px', height: '3px', borderRadius: '999px', background: 'var(--color-primary)',
           }} />
         )}
         {icon}
       </span>
-      <span style={{ fontSize: '0.68rem', fontWeight: 600, lineHeight: 1 }}>{label}</span>
+      <span style={{ fontSize: '0.62rem', fontWeight: 600, lineHeight: 1 }}>{label}</span>
     </As>
   )
 }
@@ -97,9 +97,9 @@ function MobileBottomNav() {
 
   return (
     <nav className="navbar-bottom-bar" aria-label="Primary navigation">
-      <NavItem to="/" active={isHome} icon={<HomeIcon />} label="Home" />
-      <NavItem to={recordsTo} active={isRecords} icon={<RecordsIcon />} label="Records" ariaLabel="Open Records" />
-      <NavItem to={reportsTo} active={isReports} icon={<ReportsIcon />} label="Reports" ariaLabel="Open Reports" />
+      <NavItem to="/" active={isHome} icon={<HomeIcon size={19} />} label="Home" />
+      <NavItem to={recordsTo} active={isRecords} icon={<RecordsIcon size={19} />} label="Records" ariaLabel="Open Records" />
+      <NavItem to={reportsTo} active={isReports} icon={<ReportsIcon size={19} />} label="Reports" ariaLabel="Open Reports" />
     </nav>
   )
 }

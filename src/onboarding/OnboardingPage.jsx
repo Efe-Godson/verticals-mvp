@@ -15,6 +15,7 @@
 // configurable (see needsTextPrompt).
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import VerticalsLogo from '../components/VerticalsLogo'
 import { markVisited } from '../firstVisit'
 import { track } from '../lib/onboardingEvents'
 import { ENTRY_INTENTS, getEntryIntent, needsTextPrompt, loadActiveDemoRoutes, resolveWorkflowExample } from './entryIntents'
@@ -43,7 +44,7 @@ function AuthHeader({ onCreateAccount, onSignIn }) {
       background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)',
       position: 'sticky', top: 0, zIndex: 260,
     }}>
-      <img src="/verticals-logo-sm.png" alt="Verticals" width={59} height={20} style={{ height: 20, width: 'auto' }} />
+      <VerticalsLogo height={19} style={{ color: 'var(--color-primary)' }} />
       <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
         <button type="button" className="secondary" onClick={onSignIn} style={{ fontSize: '0.85rem', padding: '0.45rem 0.9rem' }}>
           Sign in

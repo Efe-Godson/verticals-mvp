@@ -1,6 +1,5 @@
 // Place at: src/Report.jsx
 import { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react'
-import { createPortal } from 'react-dom'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
@@ -20,7 +19,8 @@ import PageSkeleton from './components/PageSkeleton'
 import { useDeferredLoading } from './components/loadingHooks'
 import useIsMobile from './hooks/useIsMobile'
 import { ErrorState } from './ErrorState'
-import { usePageOptions } from './PageTitleContext'
+import { usePageOptions, usePageBack } from './PageTitleContext'
+import MobileOptionsPanel from './components/MobileOptionsPanel'
 
 function getPreviousDateRangeBounds(range, customStart, customEnd) {
   if (range === 'all') return { start: null, end: null }
@@ -178,6 +178,7 @@ function Report({ formId: formIdProp, headerExtra, extraSubmissions = [] } = {})
   // (and Options menu) to open - not during loading/error/empty-state,
   // which render early below instead of the filter bar this menu lives in.
   usePageOptions(!loading && !error && submissions.length > 0, () => setOptionsMenuOpen(v => !v))
+  usePageBack('/', 'Home')
 
   // The "record date": a form date field the owner nominated in Settings
   // (so backdated / backlog entries count on the date actually set), falling
@@ -400,8 +401,9 @@ function Report({ formId: formIdProp, headerExtra, extraSubmissions = [] } = {})
              (hover tooltips are desktop-only anyway - see ChartTooltip). */
           .report-tile-card { padding: 1.05rem; overflow: hidden; }
           .report-filter-bar {
-            position: sticky; top: 0.5rem; z-index: 30; background: rgba(255,255,255,0.95);
-            backdrop-filter: blur(10px); border: 1px solid var(--color-border); border-radius: var(--radius);
+            position: sticky; top: 0.5rem; z-index: 30;
+            background: linear-gradient(135deg, var(--color-surface) 0%, var(--color-primary-soft) 100%);
+            border: 1px solid var(--color-border); border-radius: var(--radius);
             padding: 0.85rem; margin-bottom: 1rem;
           }
         }
@@ -410,7 +412,8 @@ function Report({ formId: formIdProp, headerExtra, extraSubmissions = [] } = {})
       <div className="report-filter-bar" data-html2canvas-ignore="true" style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap',
         gap: '0.8rem', padding: '0.5rem 0.7rem', border: '1px solid var(--color-border)',
-        borderRadius: 'var(--radius)', marginBottom: '0.75rem', background: 'rgba(255,255,255,0.95)'
+        borderRadius: 'var(--radius)', marginBottom: '0.75rem',
+        background: 'linear-gradient(135deg, var(--color-surface) 0%, var(--color-primary-soft) 100%)'
       }}>
         {/* The title (or, for IntentDestination.jsx's demo preview, its own
             title+tabs - see the headerExtra prop) shares this same tile/row
@@ -505,24 +508,14 @@ function Report({ formId: formIdProp, headerExtra, extraSubmissions = [] } = {})
         </div>
       </div>
 
-      {optionsMenuOpen && createPortal(
-        <div className="page-options-panel-mobile">
-          <div
-            style={{ position: 'fixed', inset: 0, zIndex: 149 }}
-            onClick={() => setOptionsMenuOpen(false)}
-          />
-          <div className="dropdown-panel" style={{
-            position: 'fixed', top: '4.2rem', right: '0.8rem',
-            background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 150,
-            width: 'min(220px, calc(100vw - 1.6rem))', padding: '0.6rem',
-            overflow: 'hidden'
-          }}>
-            {optionsMenuItems}
-          </div>
-        </div>,
-        document.body
-      )}
+      <MobileOptionsPanel
+        open={optionsMenuOpen}
+        className="page-options-panel-mobile"
+        title="Report options"
+        onClose={() => setOptionsMenuOpen(false)}
+      >
+        {optionsMenuItems}
+      </MobileOptionsPanel>
 
       {filteredSubmissions.length === 0 ? (
         <div className="card" style={{ padding: '1.8rem', marginBottom: '1.2rem' }}>

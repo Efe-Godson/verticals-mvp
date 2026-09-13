@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef, Fragment } from 'react'
-import { createPortal } from 'react-dom'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
+import { useAuth } from './AuthContext'
 import { exportRecordsToExcel, exportRecordsToCSV, exportRecordsToPDF, printRecordsTable, syncFormGoogleSheet } from './recordsExport'
 import { downloadRecordsTemplate, parseRecordsFile, readWorkbookRows } from './recordsImport'
 import { DATE_RANGE_OPTIONS, getDateRangeBounds, passesFilter, makeSortComparator, valueDisplayString, isBlankValue } from './records/recordsUtils'
@@ -17,12 +17,13 @@ import { useToast } from './Toast'
 import PageSkeleton from './components/PageSkeleton'
 import { useDeferredLoading } from './components/loadingHooks'
 import { ErrorState } from './ErrorState'
-import { usePageOptions } from './PageTitleContext'
+import { usePageOptions, usePageBack } from './PageTitleContext'
 import { getPageCache, setPageCache } from './hooks/pageCache'
 import { RefreshingIndicator } from './components/InlineLoader'
 import EmptyState, { SearchOffIcon } from './components/EmptyState'
 import useIsMobile from './hooks/useIsMobile'
 import { DataCard, DataCardList } from './components/DataCards'
+import MobileOptionsPanel from './components/MobileOptionsPanel'
 import { getEntryNoun } from './report/helpers/analysisUtils'
 
 const PAGE_SIZE = 10
@@ -48,9 +49,18 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
   const [searchParams] = useSearchParams()
   const isFocusMode = searchParams.get('focus') === '1'
   const { showToast } = useToast()
+  const { session } = useAuth()
   const isMobile = useIsMobile()
   const [pendingConfirm, setPendingConfirm] = useState(null) // { type: 'deleteSelected' } | { type: 'permanentlyDelete', subId } | { type: 'emptyBin' }
   const [form, setForm] = useState(null)
+  // RLS is the real enforcement boundary for a Viewer collaborator's write
+  // attempts (see the collaborator_shares migration) - this is only a UX
+  // pass so the most prominent write affordances (editing a record, bulk
+  // delete, sheet import, the Recycle Bin) aren't dangled in front of
+  // someone whose click would just bounce off a permission error. null =
+  // not a collaborator (owns the form, or ownership hasn't resolved yet).
+  const [collaboratorRole, setCollaboratorRole] = useState(null)
+  const isViewer = collaboratorRole === 'viewer'
   const [submissions, setSubmissions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -108,6 +118,16 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
   // fresh copy loads silently behind it (see src/hooks/pageCache.js).
   const [refreshing, setRefreshing] = useState(false)
   const cacheKey = `records:${id}`
+
+  useEffect(() => {
+    if (!form || !session?.user?.id) return
+    if (form.user_id === session.user.id) { setCollaboratorRole(null); return }
+    let cancelled = false
+    supabase.rpc('get_share_role', { p_form_id: form.id }).then(({ data }) => {
+      if (!cancelled) setCollaboratorRole(data || null)
+    })
+    return () => { cancelled = true }
+  }, [form, session?.user?.id])
 
   useEffect(() => {
     async function loadData(silent) {
@@ -329,6 +349,7 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
   // is up - not during the loading/error early returns just below, which
   // render before this page's own Options menu ever exists.
   usePageOptions(!loading && !error, () => setActiveMenu(current => current === 'options' ? null : 'options'))
+  usePageBack('/', 'Home')
 
   // The filter/sort/pagination pipeline below (and the two summaries that
   // key off it) all scan the full submissions array, so each is memoized -
@@ -838,7 +859,7 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
   // version below, so the two don't drift out of sync with each other.
   const optionsMenuItems = (
     <>
-      {!hasCartField && (
+      {!hasCartField && !isViewer && (
         <>
           <DropdownItem onClick={() => { handleDownloadFillTemplate(); setActiveMenu(null) }}>
             Download Fill-In Template (.xlsx)
@@ -937,15 +958,19 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
         + Save current filters
       </button>
 
-      <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.7rem 0 0.5rem' }} />
+      {!isViewer && (
+        <>
+          <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.7rem 0 0.5rem' }} />
 
-      <button
-        className="secondary"
-        onClick={() => { setActiveMenu(null); openBin() }}
-        style={{ width: '100%', fontSize: '0.8rem' }}
-      >
-        Recycle Bin{binCount > 0 ? ` (${binCount})` : ''}
-      </button>
+          <button
+            className="secondary"
+            onClick={() => { setActiveMenu(null); openBin() }}
+            style={{ width: '100%', fontSize: '0.8rem' }}
+          >
+            Recycle Bin{binCount > 0 ? ` (${binCount})` : ''}
+          </button>
+        </>
+      )}
     </>
   )
 
@@ -1190,20 +1215,14 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
         </div>
       </div>
 
-      {activeMenu === 'options' && createPortal(
-        <div className="page-options-panel-mobile">
-          <div style={{ position: 'fixed', inset: 0, zIndex: 149 }} onClick={() => setActiveMenu(null)} />
-          <div className="dropdown-panel" style={{
-            position: 'fixed', top: '4.2rem', right: '0.8rem',
-            background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 150,
-            width: 'min(240px, calc(100vw - 1.6rem))', maxHeight: 'calc(100vh - 6rem)', overflowY: 'auto', padding: '0.6rem',
-          }}>
-            {optionsMenuItems}
-          </div>
-        </div>,
-        document.body
-      )}
+      <MobileOptionsPanel
+        open={activeMenu === 'options'}
+        className="page-options-panel-mobile"
+        title="Records options"
+        onClose={() => setActiveMenu(null)}
+      >
+        {optionsMenuItems}
+      </MobileOptionsPanel>
 
       {selectedIds.length > 0 && (
         <div style={{
@@ -1211,7 +1230,9 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
           padding: '0.6rem 1rem', background: 'var(--color-warning-soft)', borderRadius: 'var(--radius)'
         }}>
           <span style={{ fontSize: '0.9rem' }}>{selectedIds.length} selected</span>
-          <button className="secondary" style={{ color: '#c0392b' }} onClick={deleteSelected}>Move to Bin</button>
+          {!isViewer && (
+            <button className="secondary" style={{ color: '#c0392b' }} onClick={deleteSelected}>Move to Bin</button>
+          )}
           <button className="secondary" onClick={() => setSelectedIds([])}>Clear selection</button>
         </div>
       )}
@@ -1496,19 +1517,21 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
                       style={{ borderBottom: '1px solid var(--color-border)', padding: '0.75rem 0.9rem', whiteSpace: 'nowrap' }}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <span
-                        onClick={() => {
-                          if (hasCartField && sub.edit_token) {
-                            setEditIframeUrl(`/form/${form.id}/response/${sub.edit_token}`)
-                          } else {
-                            setSelectedRecord(sub)
-                            setOpenRecordEditing(true)
-                          }
-                        }}
-                        style={{ fontSize: '0.85rem', color: 'var(--color-primary)', fontWeight: 600, cursor: 'pointer' }}
-                      >
-                        Edit
-                      </span>
+                      {!isViewer && (
+                        <span
+                          onClick={() => {
+                            if (hasCartField && sub.edit_token) {
+                              setEditIframeUrl(`/form/${form.id}/response/${sub.edit_token}`)
+                            } else {
+                              setSelectedRecord(sub)
+                              setOpenRecordEditing(true)
+                            }
+                          }}
+                          style={{ fontSize: '0.85rem', color: 'var(--color-primary)', fontWeight: 600, cursor: 'pointer' }}
+                        >
+                          Edit
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -1539,7 +1562,7 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
           onClose={() => { setSelectedRecord(null); setOpenRecordEditing(false) }}
           onUpdated={handleRecordUpdated}
           initialEditing={openRecordEditing}
-          hideEdit={hasCartField && !openRecordEditing}
+          hideEdit={isViewer || (hasCartField && !openRecordEditing)}
         />
       )}
 

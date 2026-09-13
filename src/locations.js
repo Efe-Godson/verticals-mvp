@@ -8,13 +8,13 @@
 // affecting any other location under the same template.
 import { supabase } from './supabaseClient'
 
-export async function createLocationForm({ session, template, locationName }) {
+export async function createLocationForm({ session, template, locationName, ownerId }) {
   const trimmed = locationName.trim()
   const { data, error } = await supabase.from('forms').insert([{
     name: trimmed,
     fields: template.fields,
     status: 'published',
-    user_id: session.user.id,
+    user_id: ownerId || session.user.id,
     settings: {
       templateSlug: template.slug,
       locationName: trimmed,
@@ -57,7 +57,7 @@ function expenseDefaults(template) {
 // always a primary/standalone location here (that same list query already
 // excludes bundle secondaries via settings->>primaryFormId), so there's no
 // risk of accidentally cloning a form into someone else's bundle group.
-export async function duplicateLocationForm({ session, sourceFormId, locationName }) {
+export async function duplicateLocationForm({ session, sourceFormId, locationName, ownerId }) {
   const { data: source, error: fetchError } = await supabase
     .from('forms').select('fields, settings').eq('id', sourceFormId).single()
   if (fetchError || !source) throw new Error(fetchError?.message || 'Could not load the location to duplicate')
@@ -67,7 +67,7 @@ export async function duplicateLocationForm({ session, sourceFormId, locationNam
     name: trimmed,
     fields: source.fields,
     status: 'published',
-    user_id: session.user.id,
+    user_id: ownerId || session.user.id,
     settings: {
       ...source.settings,
       locationName: trimmed,
