@@ -28,6 +28,7 @@ import ForSmallBusinessesPage from './marketing/pages/ForSmallBusinessesPage'
 import ForRestaurantsPage from './marketing/pages/ForRestaurantsPage'
 import ForRetailPage from './marketing/pages/ForRetailPage'
 import ResourcesPage from './marketing/pages/ResourcesPage'
+import TemplateGalleryPage from './marketing/pages/TemplateGalleryPage'
 
 const PAGES_BY_SEO_KEY = {
   home: LandingPage,
@@ -47,6 +48,7 @@ const PAGES_BY_SEO_KEY = {
   forRestaurants: ForRestaurantsPage,
   forRetail: ForRetailPage,
   resources: ResourcesPage,
+  templateGallery: TemplateGalleryPage,
 }
 
 export function renderPage(seoKey, path) {

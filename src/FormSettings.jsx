@@ -55,7 +55,10 @@ function FormSettings() {
 
   useEffect(() => {
     async function loadForm() {
-      const { data, error } = await supabase.from('forms').select('*').eq('id', id).single()
+      const [{ data, error }, sharedViewers] = await Promise.all([
+        supabase.from('forms').select('*').eq('id', id).single(),
+        supabase.from('report_shared_viewers').select('email').eq('form_id', id),
+      ])
       if (error) {
         setError('This form could not be found.')
       } else {
@@ -72,7 +75,7 @@ function FormSettings() {
         setStaffReportRange(data.settings?.staffReportRange ?? 'today')
         setExpenseMode(data.settings?.expenseMode ?? 'business')
         setReportDateField(data.settings?.reportDateField ?? '')
-        setReportShareEmails((data.settings?.reportSharedEmails ?? []).join('\n'))
+        setReportShareEmails((sharedViewers.data ?? []).map(v => v.email).join('\n'))
         setAiFillRules(data.settings?.aiFillRules ?? '')
         setLogoUrl(data.settings?.logoUrl ?? '')
         setLogoIconKey(data.settings?.logoIconKey ?? '')
@@ -109,19 +112,19 @@ function FormSettings() {
       ...form.settings,
       allowMultipleResponses, allowEditResponse, formLayout, collectEmail,
       companyName, companyPhone, companyAddress, companyEmail, receiptPaperWidth,
-      staffReportRange, expenseMode, reportDateField, reportSharedEmails, aiFillRules, logoUrl, logoIconKey,
+      staffReportRange, expenseMode, reportDateField, aiFillRules, logoUrl, logoIconKey,
       showVerticalsBranding, defaultInvoiceView, paymentBankName, paymentAccountNumber, paymentAccountName, invoiceNotes,
       invoiceAuthorizedBy, invoiceAuthorizedDesignation, signatureUrl,
     }
 
-    const { error } = await supabase
-      .from('forms')
-      .update({ settings: newSettings })
-      .eq('id', id)
+    const [{ error }, { error: shareError }] = await Promise.all([
+      supabase.from('forms').update({ settings: newSettings }).eq('id', id),
+      supabase.rpc('set_report_shared_viewers', { p_form_id: id, p_emails: reportSharedEmails }),
+    ])
 
     setSaving(false)
-    if (error) {
-      setSaveError('Could not save: ' + error.message)
+    if (error || shareError) {
+      setSaveError('Could not save: ' + (error?.message || shareError?.message))
       return
     }
     setForm(current => ({ ...current, settings: newSettings }))

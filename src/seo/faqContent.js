@@ -48,6 +48,21 @@ export const RETAIL_FAQS = [
   },
 ]
 
+export const TEMPLATES_FAQS = [
+  {
+    q: 'Can I start from a template instead of building a form from scratch?',
+    a: 'Yes. Retail, Restaurant and Expenses templates come with the fields and workflow already set up - pick one and start recording right away.',
+  },
+  {
+    q: 'Can I customize a template after starting?',
+    a: "Yes. A template is a starting point, not a fixed structure - fields can still be adjusted once you've started using it.",
+  },
+  {
+    q: "What if none of the templates fit my business?",
+    a: 'The Forms template starts from a blank canvas - add exactly the fields you need with no preset catalogue or workflow.',
+  },
+]
+
 export const SALES_TRACKING_FAQS = [
   {
     q: 'How can I track daily sales?',

@@ -90,6 +90,7 @@ const ForSmallBusinessesPage = lazy(() => import('./marketing/pages/ForSmallBusi
 const ForRestaurantsPage = lazy(() => import('./marketing/pages/ForRestaurantsPage'))
 const ForRetailPage = lazy(() => import('./marketing/pages/ForRetailPage'))
 const ResourcesPage = lazy(() => import('./marketing/pages/ResourcesPage'))
+const TemplateGalleryPage = lazy(() => import('./marketing/pages/TemplateGalleryPage'))
 const NotFound = lazy(() => import('./NotFound'))
 
 function PrivateRoute({ children }) {
@@ -174,7 +175,7 @@ function AppShell() {
   const isLandingPreview = location.pathname === '/lab/landing'
   // Public marketing sub-pages (see src/marketing/pages/) bring their own
   // MarketingNav/MarketingFooter, same reasoning as isLandingRoot above.
-  const isMarketingSubpage = ['/product', '/forms', '/product/records', '/product/reports', '/sales-tracking', '/expense-tracking', '/inventory-management', '/payroll', '/for-small-businesses', '/for-restaurants', '/for-retail', '/resources', '/about', '/contact', '/privacy', '/terms'].includes(location.pathname)
+  const isMarketingSubpage = ['/product', '/forms', '/product/records', '/product/reports', '/sales-tracking', '/expense-tracking', '/inventory-management', '/payroll', '/for-small-businesses', '/for-restaurants', '/for-retail', '/resources', '/template-gallery', '/about', '/contact', '/privacy', '/terms'].includes(location.pathname)
   const isPublicForm = /^\/form\/[^/]+(\/response\/[^/]+)?$/.test(location.pathname)
   // /s/:code (see ShortLinkRedirect.jsx) is just a brief hop through to the
   // above before the real /form/:id replaces it in history - same reason to
@@ -263,6 +264,7 @@ function AppShell() {
         <Route path="/for-restaurants" element={<ForRestaurantsPage />} />
         <Route path="/for-retail" element={<ForRetailPage />} />
         <Route path="/resources" element={<ResourcesPage />} />
+        <Route path="/template-gallery" element={<TemplateGalleryPage />} />
         <Route path="/lab" element={<PrivateRoute><StaffScopedRoute><AdminOnlyRoute><Home /></AdminOnlyRoute></StaffScopedRoute></PrivateRoute>} />
         {/* Preview-only: the same public LandingPage RootRoute shows a
             signed-out visitor at "/", reachable here while signed in so it

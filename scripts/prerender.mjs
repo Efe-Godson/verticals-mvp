@@ -13,7 +13,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import { PUBLIC_ROUTES, seoPages, absoluteUrl, DEFAULT_OG_IMAGE, SITE_NAME } from '../src/config/seo.js'
 import { buildOrganization, buildWebSite, buildSoftwareApplication, buildBreadcrumbList, buildFAQPage } from '../src/seo/structuredData.js'
-import { SALES_TRACKING_FAQS, EXPENSE_TRACKING_FAQS, FORMS_FAQS, RECORDS_FAQS, REPORTS_FAQS, SMALL_BUSINESS_FAQS, RESTAURANT_FAQS, RETAIL_FAQS, INVENTORY_FAQS, PAYROLL_FAQS } from '../src/seo/faqContent.js'
+import { SALES_TRACKING_FAQS, EXPENSE_TRACKING_FAQS, FORMS_FAQS, RECORDS_FAQS, REPORTS_FAQS, SMALL_BUSINESS_FAQS, RESTAURANT_FAQS, RETAIL_FAQS, INVENTORY_FAQS, PAYROLL_FAQS, TEMPLATES_FAQS } from '../src/seo/faqContent.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const root = path.join(__dirname, '..')
@@ -82,6 +82,10 @@ const SCHEMAS_BY_SEO_KEY = {
   forRetail: () => [
     buildBreadcrumbList([{ name: 'Home', path: '/' }, { name: 'For Retail' }]),
     buildFAQPage(RETAIL_FAQS),
+  ],
+  templateGallery: () => [
+    buildBreadcrumbList([{ name: 'Home', path: '/' }, { name: 'Templates' }]),
+    buildFAQPage(TEMPLATES_FAQS),
   ],
   resources: () => [buildBreadcrumbList([{ name: 'Home', path: '/' }, { name: 'Resources' }])],
   about: () => [buildBreadcrumbList([{ name: 'Home', path: '/' }, { name: 'About' }])],

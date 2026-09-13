@@ -96,6 +96,7 @@ export default function ProductPage() {
           <div className="mkt-related">
             <p className="mkt-related-title">Related</p>
             <div className="mkt-related-links">
+              <Link to="/template-gallery">Browse templates</Link>
               <Link to="/sales-tracking">Sales tracking</Link>
               <Link to="/expense-tracking">Expense tracking</Link>
               <Link to="/about">Learn what Verticals is</Link>

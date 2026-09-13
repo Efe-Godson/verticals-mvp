@@ -84,6 +84,14 @@ export const seoPages = {
     title: 'Verticals for Retail',
     description: 'Record sales, generate invoices, track inventory and see your best-selling products with Verticals.',
   },
+  // "/template-gallery" rather than the brief's suggested "/templates" -
+  // that path is already the existing authenticated template picker (see
+  // App.jsx), same naming collision as /records and /reports.
+  templateGallery: {
+    canonical: '/template-gallery',
+    title: 'Templates | Verticals',
+    description: 'Start from a ready-made Retail, Restaurant or Expenses template, or build your own from a blank Forms canvas.',
+  },
   resources: {
     canonical: '/resources',
     title: 'Resources | Verticals',
@@ -160,6 +168,7 @@ export const PUBLIC_ROUTES = [
   { seoKey: 'forSmallBusinesses', path: '/for-small-businesses', priority: '0.7', changefreq: 'monthly', prerender: true },
   { seoKey: 'forRestaurants', path: '/for-restaurants', priority: '0.7', changefreq: 'monthly', prerender: true },
   { seoKey: 'forRetail', path: '/for-retail', priority: '0.7', changefreq: 'monthly', prerender: true },
+  { seoKey: 'templateGallery', path: '/template-gallery', priority: '0.6', changefreq: 'monthly', prerender: true },
   { seoKey: 'resources', path: '/resources', priority: '0.4', changefreq: 'monthly', prerender: true },
   { seoKey: 'about', path: '/about', priority: '0.5', changefreq: 'monthly', prerender: true },
   { seoKey: 'contact', path: '/contact', priority: '0.5', changefreq: 'monthly', prerender: true },

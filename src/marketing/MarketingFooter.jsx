@@ -40,7 +40,7 @@ export default function MarketingFooter() {
             <Link to="/for-small-businesses">Small Businesses</Link> &middot; <Link to="/for-restaurants">Restaurants</Link> &middot; <Link to="/for-retail">Retail</Link>
           </div>
           <div className="mkt-footer-col">
-            <Link to="/about">About</Link> &middot; <Link to="/resources">Resources</Link>
+            <Link to="/template-gallery">Templates</Link> &middot; <Link to="/about">About</Link> &middot; <Link to="/resources">Resources</Link>
           </div>
           <div className="mkt-footer-col">
             <Link to="/contact">Contact</Link> &middot; <Link to="/privacy">Privacy</Link> &middot; <Link to="/terms">Terms</Link>
