@@ -19,10 +19,17 @@ import TrustSection from './TrustSection'
 import PricingSection from './PricingSection'
 import FAQSection from './FAQSection'
 import MarketingFooter from './MarketingFooter'
+import SEO from '../seo/SEO'
+import { seoPages } from '../config/seo'
+import { buildOrganization, buildWebSite, buildSoftwareApplication } from '../seo/structuredData'
 
 export default function LandingPage() {
   return (
     <div className="mkt">
+      <SEO
+        {...seoPages.home}
+        structuredData={[buildOrganization(), buildWebSite(), buildSoftwareApplication()]}
+      />
       <MarketingNav />
 
       {/* Chapter I - Discover: the hero. */}

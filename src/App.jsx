@@ -12,6 +12,8 @@ import PosSidePanel from './PosSidePanel'
 import DarkModeToggle from './DarkModeToggle'
 import { LoadingState } from './LoadingState'
 import OfflineBanner from './OfflineBanner'
+import SEO from './seo/SEO'
+import { seoPages } from './config/seo'
 
 // Every route's own page component is lazy-loaded instead of imported
 // up front - previously all of them (Payroll's calculators, the Quiz game
@@ -72,6 +74,23 @@ const ConfirmEmail = lazy(() => import('./ConfirmEmail'))
 const ResetPassword = lazy(() => import('./ResetPassword'))
 const Templates = lazy(() => import('./Templates'))
 const AccountPage = lazy(() => import('./AccountPage'))
+const ProductPage = lazy(() => import('./marketing/pages/ProductPage'))
+const FormsPage = lazy(() => import('./marketing/pages/FormsPage'))
+const RecordsPage = lazy(() => import('./marketing/pages/RecordsPage'))
+const ReportsPage = lazy(() => import('./marketing/pages/ReportsPage'))
+const SalesTrackingPage = lazy(() => import('./marketing/pages/SalesTrackingPage'))
+const ExpenseTrackingPage = lazy(() => import('./marketing/pages/ExpenseTrackingPage'))
+const AboutPage = lazy(() => import('./marketing/pages/AboutPage'))
+const ContactPage = lazy(() => import('./marketing/pages/ContactPage'))
+const PrivacyPage = lazy(() => import('./marketing/pages/PrivacyPage'))
+const TermsPage = lazy(() => import('./marketing/pages/TermsPage'))
+const InventoryManagementPage = lazy(() => import('./marketing/pages/InventoryManagementPage'))
+const PayrollPage = lazy(() => import('./marketing/pages/PayrollPage'))
+const ForSmallBusinessesPage = lazy(() => import('./marketing/pages/ForSmallBusinessesPage'))
+const ForRestaurantsPage = lazy(() => import('./marketing/pages/ForRestaurantsPage'))
+const ForRetailPage = lazy(() => import('./marketing/pages/ForRetailPage'))
+const ResourcesPage = lazy(() => import('./marketing/pages/ResourcesPage'))
+const NotFound = lazy(() => import('./NotFound'))
 
 function PrivateRoute({ children }) {
   const { session, loading } = useAuth()
@@ -116,6 +135,17 @@ function PublicOnlyRoute({ children }) {
   return children
 }
 
+// Thin noindex wrappers (brief section 32/31) around existing pages, rather
+// than editing each of those components directly - <SEO> only renders
+// <title>/<meta> tags that React 19 hoists into <head> regardless of where
+// in the tree they sit, so a sibling works exactly like rendering it inside
+// the wrapped component would.
+function LoginPage() { return <><SEO {...seoPages.login} /><Login /></> }
+function SignUpPage() { return <><SEO {...seoPages.signup} /><SignUp /></> }
+function ConfirmEmailPage() { return <><SEO {...seoPages.confirmEmail} /><ConfirmEmail /></> }
+function ResetPasswordPage() { return <><SEO {...seoPages.resetPassword} /><ResetPassword /></> }
+function PublicFormPage() { return <><SEO {...seoPages.publicForm} /><PublicForm /></> }
+
 // "/" itself: the public marketing landing page for a signed-out visitor,
 // BusinessesHome (as before) for a signed-in one. Every other private route
 // still bounces a signed-out visitor into /onboarding or /login via
@@ -142,6 +172,9 @@ function AppShell() {
   // while signed in, for reviewing it without logging out - same reasoning
   // as isLandingRoot, no app NavBar behind it either.
   const isLandingPreview = location.pathname === '/lab/landing'
+  // Public marketing sub-pages (see src/marketing/pages/) bring their own
+  // MarketingNav/MarketingFooter, same reasoning as isLandingRoot above.
+  const isMarketingSubpage = ['/product', '/forms', '/product/records', '/product/reports', '/sales-tracking', '/expense-tracking', '/inventory-management', '/payroll', '/for-small-businesses', '/for-restaurants', '/for-retail', '/resources', '/about', '/contact', '/privacy', '/terms'].includes(location.pathname)
   const isPublicForm = /^\/form\/[^/]+(\/response\/[^/]+)?$/.test(location.pathname)
   // /s/:code (see ShortLinkRedirect.jsx) is just a brief hop through to the
   // above before the real /form/:id replaces it in history - same reason to
@@ -179,7 +212,7 @@ function AppShell() {
   // Records/Report tabs (see src/PublicDemoExperience.jsx) - no app NavBar,
   // same reasoning as isPublicForm above.
   const isPublicDemo = location.pathname.startsWith('/demo')
-  const showNavBar = !isPublicForm && !isShortLink && !isQuizPlayer && !isLogin && !isSignUp && !isOnboarding && !isConfirmEmail && !isResetPassword && !isFocusMode && !isReportBuilder && !isPayrollEnv && !isExpenseEnv && !isSharedReport && !isPublicDemo && !isLandingRoot && !isLandingPreview
+  const showNavBar = !isPublicForm && !isShortLink && !isQuizPlayer && !isLogin && !isSignUp && !isOnboarding && !isConfirmEmail && !isResetPassword && !isFocusMode && !isReportBuilder && !isPayrollEnv && !isExpenseEnv && !isSharedReport && !isPublicDemo && !isLandingRoot && !isLandingPreview && !isMarketingSubpage
 
   // The POS side panel is mounted here (not inside each focus-mode page) so
   // it stays put across navigation between Records / Reports / Settings /
@@ -207,13 +240,29 @@ function AppShell() {
       <Routes>
         <Route path="/s/:code" element={<ShortLinkRedirect />} />
         <Route path="/onboarding" element={<PublicOnlyRoute><OnboardingPage /></PublicOnlyRoute>} />
-        <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
-        <Route path="/signup" element={<PublicOnlyRoute><SignUp /></PublicOnlyRoute>} />
-        <Route path="/confirm-email" element={<PublicOnlyRoute><ConfirmEmail /></PublicOnlyRoute>} />
+        <Route path="/login" element={<PublicOnlyRoute><LoginPage /></PublicOnlyRoute>} />
+        <Route path="/signup" element={<PublicOnlyRoute><SignUpPage /></PublicOnlyRoute>} />
+        <Route path="/confirm-email" element={<PublicOnlyRoute><ConfirmEmailPage /></PublicOnlyRoute>} />
         {/* No auth guard here: Supabase's reset link creates a temporary session
             on its own, and PublicOnlyRoute would incorrectly redirect it away. */}
-        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/" element={<RootRoute />} />
+        <Route path="/product" element={<ProductPage />} />
+        <Route path="/forms" element={<FormsPage />} />
+        <Route path="/product/records" element={<RecordsPage />} />
+        <Route path="/product/reports" element={<ReportsPage />} />
+        <Route path="/sales-tracking" element={<SalesTrackingPage />} />
+        <Route path="/expense-tracking" element={<ExpenseTrackingPage />} />
+        <Route path="/about" element={<AboutPage />} />
+        <Route path="/contact" element={<ContactPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/terms" element={<TermsPage />} />
+        <Route path="/inventory-management" element={<InventoryManagementPage />} />
+        <Route path="/payroll" element={<PayrollPage />} />
+        <Route path="/for-small-businesses" element={<ForSmallBusinessesPage />} />
+        <Route path="/for-restaurants" element={<ForRestaurantsPage />} />
+        <Route path="/for-retail" element={<ForRetailPage />} />
+        <Route path="/resources" element={<ResourcesPage />} />
         <Route path="/lab" element={<PrivateRoute><StaffScopedRoute><AdminOnlyRoute><Home /></AdminOnlyRoute></StaffScopedRoute></PrivateRoute>} />
         {/* Preview-only: the same public LandingPage RootRoute shows a
             signed-out visitor at "/", reachable here while signed in so it
@@ -254,8 +303,8 @@ function AppShell() {
         <Route path="/templates/:slug/locations" element={<PrivateRoute><StaffScopedRoute><TemplateLocations /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/account" element={<PrivateRoute><StaffScopedRoute><AccountPage /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/create" element={<PrivateRoute><StaffScopedRoute><CreateForm /></StaffScopedRoute></PrivateRoute>} />
-        <Route path="/form/:id" element={<PublicForm />} />
-        <Route path="/form/:id/response/:token" element={<PublicForm />} />
+        <Route path="/form/:id" element={<PublicFormPage />} />
+        <Route path="/form/:id/response/:token" element={<PublicFormPage />} />
         {/* Fully public - no PrivateRoute/StaffScopedRoute, same as
             PublicForm above - meant to be linked to directly from outside
             the app. See src/PublicDemoExperience.jsx. */}
@@ -301,6 +350,7 @@ function AppShell() {
         <Route path="/form/:id/expenses" element={<PrivateRoute><StaffScopedRoute><ExpenseShell /></StaffScopedRoute></PrivateRoute>}>
           <Route index element={<ExpenseOverview />} />
         </Route>
+        <Route path="*" element={<NotFound />} />
       </Routes>
       </Suspense>
       </ErrorBoundary>

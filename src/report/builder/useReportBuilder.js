@@ -12,6 +12,7 @@ import { makeVisual } from './catalogue'
 const EMPTY_PRINT_LAYOUT = {
   pageSize: 'slide', orientation: 'landscape', pages: [],
   showLogo: true, showDate: true, showPageNumber: true, showWatermark: true,
+  pageNumberFormat: 'page-x-of-y', numberTitlePage: false,
 }
 
 const EMPTY_STATE = {
@@ -237,6 +238,7 @@ export function useReportBuilder(formId) {
       if (idx === -1) return prev
       const src = prev.pages[idx]
       const copy = {
+        ...src,
         id: newPrintId('page'),
         elements: src.elements.map(el => ({ ...el, id: newPrintId('el') })),
       }
@@ -325,6 +327,7 @@ export function useReportBuilder(formId) {
   // never destroys pages the user already built by hand).
   const seedPrintPages = useCallback((pageContents, { append = false } = {}) => {
     const newPages = pageContents.map(p => ({
+      ...p,
       id: newPrintId('page'),
       elements: p.elements.map(el => ({ ...el, id: newPrintId('el') })),
     }))

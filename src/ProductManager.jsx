@@ -7,7 +7,7 @@
 // room for), and Import/Package as their own modals instead of buttons
 // crowding the field. Products stay embedded in the form's own field
 // definition for now; there's no shared catalog across forms yet.
-import { useState } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import * as XLSX from 'xlsx'
 import Modal from './components/Modal'
@@ -295,6 +295,14 @@ function AiImportModal({ onClose, onImport }) {
 function ProductManager({ products, onChange, onClose, inline = false, hideAiImport = false }) {
   const isMobile = useIsMobile()
   const [search, setSearch] = useState('')
+  // The filtered list below re-scans every product on each keystroke; a
+  // short debounce keeps the input itself instant while the (potentially
+  // large) filter/sort work only re-runs once typing pauses.
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 200)
+    return () => clearTimeout(timer)
+  }, [search])
   const [activeCategory, setActiveCategory] = useState('All')
   const [editingProduct, setEditingProduct] = useState(null) // null closed, 'new', or a product object
   const [openRowMenuId, setOpenRowMenuId] = useState(null)
@@ -306,14 +314,14 @@ function ProductManager({ products, onChange, onClose, inline = false, hideAiImp
   // does nothing when I search" bug).
   const [rowMenuAnchor, setRowMenuAnchor] = useState(null)
 
-  function openRowMenu(e, id) {
+  const openRowMenu = useCallback((e, id) => {
     if (openRowMenuId === id) { setOpenRowMenuId(null); return }
     const r = e.currentTarget.getBoundingClientRect()
     setRowMenuAnchor({ top: r.bottom + 4, right: window.innerWidth - r.right })
     setOpenRowMenuId(id)
-  }
+  }, [openRowMenuId])
 
-  function closeRowMenu() { setOpenRowMenuId(null) }
+  const closeRowMenu = useCallback(() => setOpenRowMenuId(null), [])
 
   // The shared row-action menu (Edit / Duplicate / Delete), portaled to
   // <body> so no transformed / overflow-clipped ancestor can hide it.
@@ -345,42 +353,54 @@ function ProductManager({ products, onChange, onClose, inline = false, hideAiImp
   const [confirmingClearAll, setConfirmingClearAll] = useState(false)
   const [categoriesExpanded, setCategoriesExpanded] = useState(false)
 
-  const categoryNames = Array.from(new Set(products.map(p => p.category).filter(c => c && c.trim() !== '')))
-  const categoryCounts = { All: products.length }
-  categoryNames.forEach(cat => { categoryCounts[cat] = products.filter(p => p.category === cat).length })
+  const categoryNames = useMemo(
+    () => Array.from(new Set(products.map(p => p.category).filter(c => c && c.trim() !== ''))),
+    [products]
+  )
+  const categoryCounts = useMemo(() => {
+    const counts = { All: products.length }
+    categoryNames.forEach(cat => { counts[cat] = products.filter(p => p.category === cat).length })
+    return counts
+  }, [products, categoryNames])
 
   // Same treatment as the customer-facing menu (PublicForm.jsx): lead with
   // the biggest categories and tuck the long tail behind "+N more" instead
   // of wrapping a dozen-plus pills across several rows.
-  const sortedCategoryNames = [...categoryNames].sort((a, b) => categoryCounts[b] - categoryCounts[a])
-  let visibleCategoryNames = categoriesExpanded ? sortedCategoryNames : sortedCategoryNames.slice(0, TOP_CATEGORY_COUNT)
-  if (activeCategory !== 'All' && !visibleCategoryNames.includes(activeCategory)) {
-    visibleCategoryNames = [...visibleCategoryNames, activeCategory]
-  }
+  const sortedCategoryNames = useMemo(
+    () => [...categoryNames].sort((a, b) => categoryCounts[b] - categoryCounts[a]),
+    [categoryNames, categoryCounts]
+  )
+  const visibleCategoryNames = useMemo(() => {
+    let names = categoriesExpanded ? sortedCategoryNames : sortedCategoryNames.slice(0, TOP_CATEGORY_COUNT)
+    if (activeCategory !== 'All' && !names.includes(activeCategory)) {
+      names = [...names, activeCategory]
+    }
+    return names
+  }, [categoriesExpanded, sortedCategoryNames, activeCategory])
   const hiddenCategoryCount = sortedCategoryNames.length - visibleCategoryNames.length
-  const categories = ['All', ...visibleCategoryNames]
+  const categories = useMemo(() => ['All', ...visibleCategoryNames], [visibleCategoryNames])
 
-  const filtered = products.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase())
+  const filtered = useMemo(() => products.filter(p => {
+    const matchesSearch = p.name.toLowerCase().includes(debouncedSearch.toLowerCase())
     const matchesCategory = activeCategory === 'All' || p.category === activeCategory
     return matchesSearch && matchesCategory
-  })
+  }), [products, debouncedSearch, activeCategory])
 
-  function saveProduct(product) {
+  const saveProduct = useCallback((product) => {
     const exists = products.some(p => p.id === product.id)
     onChange(exists ? products.map(p => p.id === product.id ? product : p) : [...products, product])
     setEditingProduct(null)
-  }
+  }, [products, onChange])
 
-  function duplicateProduct(product) {
+  const duplicateProduct = useCallback((product) => {
     onChange([...products, { ...product, id: newProductId(), name: `${product.name} (Copy)` }])
     setOpenRowMenuId(null)
-  }
+  }, [products, onChange])
 
-  function deleteProduct(productId) {
+  const deleteProduct = useCallback((productId) => {
     onChange(products.filter(p => p.id !== productId))
     setPendingDeleteId(null)
-  }
+  }, [products, onChange])
 
   function clearAllProducts() {
     onChange([])

@@ -16,20 +16,22 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Verticals" />
 
-    <title>Verticals | Capture. Understand. Act.</title>
-    <meta name="description" content="Create workflows, organise your records and turn what you track into clear reports and useful insights." />
-    <link rel="canonical" href="https://verticalsapp.com/" />
-
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://verticalsapp.com/" />
-    <meta property="og:title" content="Verticals | Capture. Understand. Act." />
-    <meta property="og:description" content="Create workflows, organise your records and turn what you track into clear reports and useful insights." />
-    <meta property="og:image" content="https://verticalsapp.com/verticals-mark.png" />
-
-    <meta name="twitter:card" content="summary" />
-    <meta name="twitter:title" content="Verticals | Capture. Understand. Act." />
-    <meta name="twitter:description" content="Create workflows, organise your records and turn what you track into clear reports and useful insights." />
-    <meta name="twitter:image" content="https://verticalsapp.com/verticals-mark.png" />
+    <!-- Generic fallback only - every routed page (public marketing pages,
+         and the noindex auth pages) now supplies its own <title>/
+         description/canonical/OG/Twitter via src/seo/SEO.jsx, which React
+         19 renders as real tags once it mounts. A static canonical/OG/
+         Twitter block here would sit *alongside* those (React doesn't
+         remove markup it didn't render), producing duplicate/conflicting
+         tags - e.g. every page's canonical would coexist with a second one
+         permanently pointing at "/". So this fallback stays deliberately
+         minimal: just a sensible default title/description for the
+         authenticated app pages that don't render their own <SEO> (out of
+         scope here - only the public marketing surface got one), and for
+         the brief instant before JS mounts. See scripts/prerender.mjs for
+         how the public marketing pages' static HTML gets its own complete,
+         non-duplicated head instead of this fallback. -->
+    <title>Verticals | Capture, Manage &amp; Understand Your Data</title>
+    <meta name="description" content="Collect records, manage workflows and turn your data into clear reports and insights with Verticals." />
   </head>
   <body>
     <div id="root"></div>

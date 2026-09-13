@@ -1,32 +1,37 @@
 // Place at: src/report/builder/print/replicateDashboard.js
-// Auto-fills the Print/PDF workspace with a paginated replica of the main
-// Report.jsx dashboard - every chart tile (report/analysis/buildDashboardTiles.js)
-// plus every visual promoted to Reports - so Print View opens already looking
-// like the report, instead of a blank page the user has to rebuild by hand.
+// Auto-fills the Designer with a paginated replica of the main Report.jsx
+// dashboard - a title page, then every chart tile (report/analysis/
+// buildDashboardTiles.js) and every visual promoted to Reports, one per
+// page - so Designer opens already looking like a finished deck instead of
+// a blank page the user has to rebuild by hand.
 import { buildChartTiles } from '../../analysis/buildDashboardTiles'
 import { GRID_COLS, ROWS_PER_PAGE } from './printConstants'
 
-const ELEMENT_W = GRID_COLS / 2 // two per row, matching the dashboard's own two-column tile grid
-const ELEMENT_H = 10
+// Rows reserved at the bottom of every content page as a deliberately empty
+// footer band (the date/page-number overlays already live there - see
+// PrintPage.jsx - this just keeps the visual itself from crowding them).
+const FOOTER_ROWS = 3
+const CONTENT_H = ROWS_PER_PAGE - FOOTER_ROWS
 
-// Places same-size elements two per row, top to bottom; starts a new page
-// only at a row boundary (never splits a row across pages).
-function packIntoPages(items) {
-  const pages = []
-  let current = []
-  let x = 0
-  let y = 0
-  for (const item of items) {
-    if (x === 0 && y + ELEMENT_H > ROWS_PER_PAGE && current.length > 0) {
-      pages.push(current)
-      current = []
-      y = 0
-    }
-    current.push({ ...item, layout: { x, y, w: ELEMENT_W, h: ELEMENT_H } })
-    if (x === 0) { x = ELEMENT_W } else { x = 0; y += ELEMENT_H }
+function buildTitlePage(form) {
+  return {
+    kind: 'title',
+    elements: [
+      {
+        kind: 'text',
+        text: { variant: 'title', content: form?.name || 'Report', align: 'center', bold: true },
+        layout: { x: 1, y: 9, w: 10, h: 5 },
+      },
+      {
+        kind: 'text',
+        text: {
+          variant: 'heading', align: 'center', bold: false,
+          content: new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
+        },
+        layout: { x: 1, y: 14, w: 10, h: 3 },
+      },
+    ],
   }
-  if (current.length > 0) pages.push(current)
-  return pages
 }
 
 // Returns page content ready for useReportBuilder's seedPrintPages - no ids
@@ -41,6 +46,14 @@ export function buildDashboardReplicaPages(form, submissions, visuals) {
   ]
   if (items.length === 0) return []
 
-  const packed = packIntoPages(items)
-  return packed.map(elements => ({ elements }))
+  // One visual per page, full width, filling the page (minus the footer
+  // band) - not the dashboard's own cramped two-per-row grid. Its own inline
+  // header (see PrintVisualElement/PrintTileElement) already serves as the
+  // page's title section, so this needs no separate title text element.
+  const contentPages = items.map(item => ({
+    kind: 'content',
+    elements: [{ ...item, layout: { x: 0, y: 0, w: GRID_COLS, h: CONTENT_H } }],
+  }))
+
+  return [buildTitlePage(form), ...contentPages]
 }

@@ -28,3 +28,6 @@ dist-ssr
 
 # Supabase CLI local project cache (machine-specific)
 supabase/.temp
+
+# Claude Code local settings (machine-specific)
+.claude/

@@ -13,7 +13,7 @@ import { useReportBuilder } from '../useReportBuilder'
 import { buildChartTiles } from '../../analysis/buildDashboardTiles'
 import { exportPrintLayoutToPDF } from '../../../reportExport'
 import PrintPage from './PrintPage'
-import { TEXT_VARIANTS, defaultElementSize, PAGE_SIZES } from './printConstants'
+import { TEXT_VARIANTS, defaultElementSize, PAGE_SIZES, PAGE_NUMBER_FORMATS } from './printConstants'
 import { buildDashboardReplicaPages } from './replicateDashboard'
 
 const sideBtn = { fontSize: '0.78rem', padding: '0.3rem 0.5rem' }
@@ -289,6 +289,26 @@ export default function PrintWorkspace() {
             {label}
           </label>
         ))}
+        {settings.showPageNumber && (
+          <>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', margin: '0.3rem 0' }}>
+              Number format
+              <select
+                style={{ fontSize: '0.8rem' }} value={settings.pageNumberFormat || 'page-x-of-y'}
+                onChange={e => rb.updatePrintSettings({ pageNumberFormat: e.target.value })}
+              >
+                {PAGE_NUMBER_FORMATS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
+              </select>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', marginBottom: '0.25rem' }}>
+              <input
+                type="checkbox" checked={!!settings.numberTitlePage}
+                onChange={e => rb.updatePrintSettings({ numberTitlePage: e.target.checked })}
+              />
+              Number the title page
+            </label>
+          </>
+        )}
       </div>
     </div>
   )
@@ -313,7 +333,7 @@ export default function PrintWorkspace() {
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0.7rem', borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface)', flexShrink: 0, flexWrap: 'wrap' }}>
         <button className="secondary" onClick={() => navigate(`/form/${id}/report/builder`)} style={{ fontSize: '0.8rem', flexShrink: 0 }}>← Exit</button>
-        {!isMobile && <strong style={{ letterSpacing: '0.06em', fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--color-muted)' }}>Print / PDF View</strong>}
+        {!isMobile && <strong style={{ letterSpacing: '0.06em', fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--color-muted)' }}>Designer</strong>}
         <span style={{ fontSize: '0.82rem', color: 'var(--color-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{rb.form?.name}</span>
         <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
           <button className="secondary" onClick={() => setPreview(p => !p)} style={{ fontSize: '0.8rem' }}>{preview ? 'Edit' : 'Preview'}</button>

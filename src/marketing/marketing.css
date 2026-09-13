@@ -782,16 +782,24 @@
    classes directly), just centered and width-capped for its own context
    here in the footer instead of sitting in a hero text column. */
 .mkt-footer-cta { width: 100%; max-width: var(--mkt-w-narrow); margin: 0 auto; }
-/* A 5-column grid rather than a single inline line, so whatever gets added
-   here later (link groups, social, extra legal text) drops in as its own
-   .mkt-footer-col and lines up with everything else automatically instead
-   of needing manual spacing each time. Today only the copyright column is
-   populated - the other four tracks just sit empty until something fills
-   them. Collapses to one stacked, centered column on mobile since a 5-up
-   grid has no room to be anything but cramped there. */
+.mkt-footer-description {
+  max-width: var(--mkt-w-content);
+  margin: 0 auto var(--mkt-sp-3);
+  padding-top: var(--mkt-sp-2);
+  color: var(--color-muted);
+  font-size: var(--mkt-fs-xs);
+  line-height: var(--mkt-lh-body);
+  text-align: center;
+}
+/* A column-per-group grid rather than a single inline line, so each link
+   group (copyright, Product/Forms, Sales/Expense Tracking, use-case pages,
+   About/Resources, legal) drops in as its own .mkt-footer-col and lines up
+   automatically instead of needing manual spacing each time. Collapses to
+   one stacked, centered column on mobile since a many-up grid has no room
+   to be anything but cramped there. */
 .mkt-footer-bottom {
   display: grid;
-  grid-template-columns: repeat(5, max-content);
+  grid-template-columns: repeat(6, max-content);
   justify-content: space-between;
   gap: var(--mkt-sp-3);
   color: var(--color-muted);
@@ -839,3 +847,55 @@
   .mkt * { transition: none !important; animation: none !important; }
   .mkt-reveal { opacity: 1; transform: none; }
 }
+
+/* Sub-pages (Sales Tracking, Expense Tracking, About, Contact, Privacy,
+   Terms - see src/marketing/pages/). Reuse the same tokens/section rhythm
+   as the landing page rather than a separate visual system. */
+.mkt-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--mkt-fs-2xs);
+  color: var(--color-muted);
+  margin: 0 0 var(--mkt-sp-3);
+}
+.mkt-breadcrumb a { color: var(--color-muted); text-decoration: none; }
+.mkt-breadcrumb a:hover { color: var(--color-text); text-decoration: underline; }
+.mkt-breadcrumb-current { color: var(--color-text); font-weight: 600; }
+
+.mkt-page-hero { max-width: var(--mkt-w-content); }
+.mkt-page-hero .mkt-heading { margin-bottom: var(--mkt-sp-2); }
+
+.mkt-prose { max-width: var(--mkt-w-content); }
+.mkt-prose h2 {
+  font-size: var(--mkt-fs-h3);
+  line-height: var(--mkt-lh-tight);
+  font-weight: 800;
+  margin: var(--mkt-sp-5) 0 var(--mkt-sp-2);
+}
+.mkt-prose h2:first-child { margin-top: 0; }
+.mkt-prose p {
+  font-size: var(--mkt-fs-body);
+  line-height: var(--mkt-lh-body);
+  color: var(--color-muted);
+  margin: 0 0 var(--mkt-sp-3);
+}
+.mkt-prose ul { margin: 0 0 var(--mkt-sp-3); padding-left: 1.3em; color: var(--color-muted); }
+.mkt-prose li { margin-bottom: 6px; line-height: var(--mkt-lh-body); }
+.mkt-prose strong { color: var(--color-text); }
+
+.mkt-checklist { list-style: none; margin: 0 0 var(--mkt-sp-3); padding: 0; display: grid; gap: 10px; }
+.mkt-checklist li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--color-text);
+  font-size: var(--mkt-fs-sm);
+}
+.mkt-checklist svg { flex-shrink: 0; margin-top: 2px; color: var(--color-primary); }
+
+.mkt-related { border-top: 1px solid var(--color-border); padding-top: var(--mkt-sp-3); margin-top: var(--mkt-sp-4); }
+.mkt-related-title { font-size: var(--mkt-fs-2xs); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-muted); margin: 0 0 var(--mkt-sp-2); }
+.mkt-related-links { display: flex; flex-wrap: wrap; gap: var(--mkt-sp-2) var(--mkt-sp-4); }
+.mkt-related-links a { color: var(--color-primary); font-weight: 600; text-decoration: none; font-size: var(--mkt-fs-sm); }
+.mkt-related-links a:hover { text-decoration: underline; }

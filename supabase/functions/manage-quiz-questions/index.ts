@@ -73,9 +73,15 @@ Deno.serve(async req => {
         .from('quiz_questions').select('id').eq('room_id', room_id).order('idx')
       if (listError) throw listError
 
-      for (let i = 0; i < questions.length; i++) {
-        await supabase.from('quiz_questions').update({ idx: i }).eq('id', questions[i].id)
-      }
+      // Fire the per-question renumbering updates concurrently instead of
+      // awaiting them one at a time - see the matching comment in
+      // advance-quiz-room's finalizeRoom for why this (rather than a single
+      // bulk statement) is the stopgap here.
+      await Promise.all(
+        questions.map((q: any, i: number) =>
+          supabase.from('quiz_questions').update({ idx: i }).eq('id', q.id)
+        )
+      )
       await supabase.from('quiz_rooms').update({ question_count: questions.length }).eq('id', room_id)
 
       return jsonResponse({ ok: true, question_count: questions.length })
@@ -85,11 +91,15 @@ Deno.serve(async req => {
       const { order } = body
       if (!Array.isArray(order) || order.length === 0) return jsonResponse({ error: 'order is required' }, 400)
 
-      for (let i = 0; i < order.length; i++) {
-        const { error } = await supabase
-          .from('quiz_questions').update({ idx: i }).eq('id', order[i]).eq('room_id', room_id)
-        if (error) throw error
-      }
+      // Concurrent instead of sequential, same stopgap as the delete branch
+      // above - each row is independent so firing them together is safe.
+      const results = await Promise.all(
+        order.map((id: string, i: number) =>
+          supabase.from('quiz_questions').update({ idx: i }).eq('id', id).eq('room_id', room_id)
+        )
+      )
+      const failed = results.find(r => r.error)
+      if (failed?.error) throw failed.error
 
       const { data: questions, error: listError } = await supabase
         .from('quiz_questions').select('*').eq('room_id', room_id).order('idx')

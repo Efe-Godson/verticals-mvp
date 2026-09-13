@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, Fragment } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef, Fragment } from 'react'
 import { createPortal } from 'react-dom'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
@@ -56,6 +56,16 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
   const [error, setError] = useState('')
 
   const [searchText, setSearchText] = useState('')
+  // The actual filter pipeline reads this instead of searchText directly, so
+  // a fast typist doesn't re-run the filter/sort over every record on every
+  // keystroke - only once typing pauses for a beat. searchText itself still
+  // drives the input's own value and the filter-summary text, so what's
+  // shown as typed never lags.
+  const [debouncedSearchText, setDebouncedSearchText] = useState('')
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearchText(searchText), 200)
+    return () => clearTimeout(t)
+  }, [searchText])
   const [dateRange, setDateRange] = useState('all')
   const [customStart, setCustomStart] = useState('')
   const [customEnd, setCustomEnd] = useState('')
@@ -283,11 +293,12 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
     return { error: null }
   }
 
-  function handleRecordUpdated(updatedRecord) {
-    setSubmissions(submissions.map(s => s.id === updatedRecord.id ? updatedRecord : s))
+  const handleRecordUpdated = useCallback((updatedRecord) => {
+    setSubmissions(current => current.map(s => s.id === updatedRecord.id ? updatedRecord : s))
     setSelectedRecord(updatedRecord)
     scheduleAutoSync()
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function reloadSubmissions() {
     const { data } = await supabase
@@ -319,57 +330,70 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
   // render before this page's own Options menu ever exists.
   usePageOptions(!loading && !error, () => setActiveMenu(current => current === 'options' ? null : 'options'))
 
-  const showSkel = useDeferredLoading(loading)
-  if (loading) return showSkel ? <PageSkeleton variant="table" /> : null
-  if (error) return <ErrorState message={error} />
-
-  const { start: rangeStart, end: rangeEnd } = getDateRangeBounds(dateRange, customStart, customEnd)
-
-  let visible = submissions.filter(sub => {
-    const created = new Date(sub.created_at)
-    if (rangeStart && created < rangeStart) return false
-    if (rangeEnd && created > rangeEnd) return false
-    return true
-  })
-
-  visible = visible.filter(sub => {
-    const search = searchText.trim().toLowerCase()
-    if (search === '') return true
-    if (sub.order_number && `#${sub.order_number}`.includes(search.replace('#', ''))) return true
-    return form.fields.some(field => {
-      const val = sub.data[field.id]
-      if (field.type === 'cart') return false
-      return val && val.toString().toLowerCase().includes(search)
-    })
-  })
+  // The filter/sort/pagination pipeline below (and the two summaries that
+  // key off it) all scan the full submissions array, so each is memoized -
+  // without it, every keystroke, hover, or menu toggle elsewhere on the page
+  // would re-run the whole thing from scratch. These have to sit above the
+  // loading/error early returns since hooks can't run conditionally; each
+  // guards for `form`/`submissions` not being ready yet instead.
+  const { start: rangeStart, end: rangeEnd } = useMemo(
+    () => getDateRangeBounds(dateRange, customStart, customEnd),
+    [dateRange, customStart, customEnd]
+  )
 
   // The date-range + keyword view, before any per-column filter. The column
   // menu's value list is built from this, so unticking a value in one column
   // never makes the other values vanish from its own list (Excel behaviour).
-  const searchScoped = visible
-
-  visible = visible.filter(sub => {
-    return Object.keys(filters).every(fieldId => {
-      const field = form.fields.find(f => f.id === fieldId)
-      const filter = filters[fieldId]
-      if (!filter || filter.cleared) return true
-      return passesFilter(sub, field, filter)
+  const searchScoped = useMemo(() => {
+    if (!form) return []
+    const dateFiltered = submissions.filter(sub => {
+      const created = new Date(sub.created_at)
+      if (rangeStart && created < rangeStart) return false
+      if (rangeEnd && created > rangeEnd) return false
+      return true
     })
-  })
+    const search = debouncedSearchText.trim().toLowerCase()
+    if (search === '') return dateFiltered
+    return dateFiltered.filter(sub => {
+      if (sub.order_number && `#${sub.order_number}`.includes(search.replace('#', ''))) return true
+      return form.fields.some(field => {
+        const val = sub.data[field.id]
+        if (field.type === 'cart') return false
+        return val && val.toString().toLowerCase().includes(search)
+      })
+    })
+  }, [form, submissions, rangeStart, rangeEnd, debouncedSearchText])
 
-  if (sortConfig) {
-    const sortField = form.fields.find(f => f.id === sortConfig.fieldId)
-    if (sortField) visible = [...visible].sort(makeSortComparator(sortField, sortConfig.dir))
-  }
+  const visible = useMemo(() => {
+    if (!form) return []
+    let result = searchScoped.filter(sub => {
+      return Object.keys(filters).every(fieldId => {
+        const field = form.fields.find(f => f.id === fieldId)
+        const filter = filters[fieldId]
+        if (!filter || filter.cleared) return true
+        return passesFilter(sub, field, filter)
+      })
+    })
+    if (sortConfig) {
+      const sortField = form.fields.find(f => f.id === sortConfig.fieldId)
+      if (sortField) result = [...result].sort(makeSortComparator(sortField, sortConfig.dir))
+    }
+    return result
+  }, [form, searchScoped, filters, sortConfig])
 
-  // Distinct values (+ blank tally) for one column's menu, from searchScoped.
-  const columnValueSummary = (fieldId) => {
-    const field = form.fields.find(f => f.id === fieldId)
-    if (!field) return { values: [], hasBlanks: false, blankCount: 0 }
+  // Distinct values (+ blank tally) for whichever column's filter menu is
+  // currently open, from searchScoped. Only one column menu can be open at
+  // once, so this only ever needs to summarize a single field per render
+  // instead of every column.
+  const openColumnValueSummary = useMemo(() => {
+    const empty = { values: [], hasBlanks: false, blankCount: 0 }
+    if (!form || !openFilterId) return empty
+    const field = form.fields.find(f => f.id === openFilterId)
+    if (!field) return empty
     const counts = new Map()
     let blankCount = 0
     for (const sub of searchScoped) {
-      const raw = sub.data?.[fieldId]
+      const raw = sub.data?.[openFilterId]
       if (isBlankValue(raw)) { blankCount++; continue }
       const disp = valueDisplayString(raw, field)
       counts.set(disp, (counts.get(disp) || 0) + 1)
@@ -383,19 +407,14 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
       values.sort((a, b) => a.v.localeCompare(b.v))
     }
     return { values, hasBlanks: blankCount > 0, blankCount }
-  }
-
-  const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE))
-  const safePage = Math.min(currentPage, totalPages)
-  const startIndex = (safePage - 1) * PAGE_SIZE
-  const pageRows = visible.slice(startIndex, startIndex + PAGE_SIZE)
+  }, [form, openFilterId, searchScoped])
 
   // Columns that are completely empty across every record don't show at all
   // (common on template forms - restaurant orders rarely fill every optional
   // field). Reappears automatically once any record has a value there. Cart
   // is always kept. Skipped while there are no records yet.
-  const populatedFieldIds = (() => {
-    if (submissions.length === 0) return null // null = "keep everything"
+  const populatedFieldIds = useMemo(() => {
+    if (!form || submissions.length === 0) return null // null = "keep everything"
     const seen = new Set()
     for (const sub of submissions) {
       for (const f of form.fields) {
@@ -404,7 +423,16 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
       }
     }
     return seen
-  })()
+  }, [form, submissions])
+
+  const showSkel = useDeferredLoading(loading)
+  if (loading) return showSkel ? <PageSkeleton variant="table" /> : null
+  if (error) return <ErrorState message={error} />
+
+  const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE))
+  const safePage = Math.min(currentPage, totalPages)
+  const startIndex = (safePage - 1) * PAGE_SIZE
+  const pageRows = visible.slice(startIndex, startIndex + PAGE_SIZE)
 
   const isColumnPopulated = (fieldId) => !populatedFieldIds || populatedFieldIds.has(fieldId)
 
@@ -1317,7 +1345,7 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
                           <div style={overlayStyle} onClick={() => setOpenFilterId(null)} />
                           <ColumnHeaderMenu
                             field={field}
-                            valueSummary={columnValueSummary(field.id)}
+                            valueSummary={openColumnValueSummary}
                             currentFilter={filters[field.id]}
                             currentSort={sortConfig?.fieldId === field.id ? sortConfig.dir : null}
                             onSort={(dir) => { setSortConfig(dir ? { fieldId: field.id, dir } : null); setCurrentPage(1) }}

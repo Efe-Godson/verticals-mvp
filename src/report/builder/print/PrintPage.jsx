@@ -11,7 +11,7 @@ import 'react-grid-layout/css/styles.css'
 import PrintVisualElement from './PrintVisualElement'
 import PrintTextElement from './PrintTextElement'
 import PrintTileElement from './PrintTileElement'
-import { pageFormatMm, pageAspectRatio, GRID_COLS, ROWS_PER_PAGE, PAGE_SIZES } from './printConstants'
+import { pageFormatMm, pageAspectRatio, GRID_COLS, ROWS_PER_PAGE, PAGE_SIZES, formatPageNumber } from './printConstants'
 
 export default function PrintPage({
   page, pageSize, orientation, visualsById, tilesById, form, submissions, editing, settings,
@@ -64,8 +64,8 @@ export default function PrintPage({
             width={width}
             cols={GRID_COLS}
             rowHeight={rowHeight}
-            margin={[6, 6]}
-            containerPadding={[16, 30]}
+            margin={[10, 10]}
+            containerPadding={[20, 34]}
             layout={layout}
             compactType="vertical"
             preventCollision={false}
@@ -85,7 +85,7 @@ export default function PrintPage({
                     style={{
                       height: '100%', boxSizing: 'border-box', overflow: 'hidden',
                       ...(boxed
-                        ? { border: '1px solid #ddd', borderRadius: '6px', background: '#fff', padding: '0.6rem' }
+                        ? { border: '1px solid #ddd', borderRadius: '8px', background: '#fff', padding: '1rem' }
                         : { padding: '0.2rem 0' }),
                     }}
                   >
@@ -123,8 +123,10 @@ export default function PrintPage({
             {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
           </div>
         )}
-        {settings?.showPageNumber && (
-          <div style={{ position: 'absolute', bottom: 6, right: 16, fontSize: '0.7rem', color: '#666' }}>Page {pageNumber} of {totalPages}</div>
+        {settings?.showPageNumber && (page.kind !== 'title' || settings?.numberTitlePage) && (
+          <div style={{ position: 'absolute', bottom: 6, right: 16, fontSize: '0.7rem', color: '#666' }}>
+            {formatPageNumber(settings?.pageNumberFormat, pageNumber, totalPages)}
+          </div>
         )}
         {settings?.showWatermark && (
           <div style={{ position: 'absolute', bottom: 6, left: 16, fontSize: '0.65rem', color: '#aaa' }}>Powered by Verticals</div>

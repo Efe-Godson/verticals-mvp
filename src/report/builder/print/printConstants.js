@@ -44,6 +44,18 @@ export const TEXT_VARIANTS = [
   { value: 'small', label: 'Small', fontSize: '0.78rem', fontWeight: 400 },
 ]
 
+export const PAGE_NUMBER_FORMATS = [
+  { value: 'page-x-of-y', label: 'Page 1 of N' },
+  { value: 'x-of-y', label: '1 / N' },
+  { value: 'x-only', label: '1' },
+]
+
+export function formatPageNumber(format, n, total) {
+  if (format === 'x-of-y') return `${n} / ${total}`
+  if (format === 'x-only') return `${n}`
+  return `Page ${n} of ${total}`
+}
+
 export function defaultElementSize(kind, variant) {
   if (kind === 'text') {
     if (variant === 'divider') return { w: 12, h: 2 }

@@ -1,5 +1,5 @@
 // Place at: src/Report.jsx
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react'
 import { createPortal } from 'react-dom'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
@@ -58,6 +58,10 @@ function getCompletionRate(form, submissions) {
 const CATEGORICAL_TYPES = ['dropdown', 'multiplechoice', 'checkbox', 'autocomplete']
 const NUMERIC_TYPES = ['number', 'rating', 'linearscale']
 const DEMOGRAPHIC_TYPES = ['email', 'phone']
+// A stable "no pairs saved" reference so ChartTileGrid's memoized props stay
+// referentially equal across renders instead of a fresh `[]` literal
+// invalidating the memo every single time.
+const EMPTY_ARRAY = []
 
 function Report({ formId: formIdProp, headerExtra, extraSubmissions = [] } = {}) {
   const params = useParams()
@@ -95,15 +99,20 @@ function Report({ formId: formIdProp, headerExtra, extraSubmissions = [] } = {})
   // as a list of "join with next" tile ids on the form.
   const isDesktop = !useIsMobile(1024)
   const canEditLayout = !isStaffView && !isSharedViewer && isDesktop
-  const chartPairs = form?.settings?.reportChartPairs || []
-  async function toggleChartPair(tileId) {
-    const cur = form?.settings?.reportChartPairs || []
+  const chartPairs = form?.settings?.reportChartPairs || EMPTY_ARRAY
+  // Passed straight into ChartTileGrid (memoized below, since it renders a
+  // list of chart tiles) - useCallback keeps this reference stable across
+  // renders that don't actually change `form`/`id`, so an unrelated re-render
+  // (opening the Options menu, a PDF-progress tick, ...) doesn't force that
+  // whole tile list to re-render along with it.
+  const toggleChartPair = useCallback(async (tileId) => {
+    const cur = form?.settings?.reportChartPairs || EMPTY_ARRAY
     const next = cur.includes(tileId) ? cur.filter(x => x !== tileId) : [...cur, tileId]
     const settings = { ...(form?.settings || {}), reportChartPairs: next }
     setForm(f => ({ ...f, settings }))
     const { error: saveErr } = await supabase.from('forms').update({ settings }).eq('id', id)
     if (saveErr && import.meta.env.DEV) console.error('Could not save chart layout:', saveErr)
-  }
+  }, [form, id])
 
   const cacheKey = `report:${id}`
 
@@ -170,6 +179,100 @@ function Report({ formId: formIdProp, headerExtra, extraSubmissions = [] } = {})
   // which render early below instead of the filter bar this menu lives in.
   usePageOptions(!loading && !error && submissions.length > 0, () => setOptionsMenuOpen(v => !v))
 
+  // The "record date": a form date field the owner nominated in Settings
+  // (so backdated / backlog entries count on the date actually set), falling
+  // back to when the record was submitted. Cheap (a single .find over the
+  // field list, not the submissions), so left as a plain value rather than
+  // memoized - but it (and recordDate, which closes over it) has to be
+  // computed up here regardless, since the useMemo pipeline below reads it
+  // and hooks can't be skipped by the loading/error/empty returns further down.
+  const reportDateField = form?.fields?.find(f => f.id === form.settings?.reportDateField && f.type === 'date') || null
+  // Same setting Expenses' own dashboard reads (src/expenses/expenseFields.js)
+  // to know which number field is "the amount" - used here so a non-cart
+  // form's category breakdown can show spend-by-category, not just a count.
+  const reportAmountField = form?.fields?.find(f => f.id === form.settings?.reportAmountField && f.type === 'number') || null
+  function recordDate(sub) {
+    if (reportDateField) {
+      const raw = sub.data[reportDateField.id]
+      if (raw) {
+        const d = new Date(raw)
+        if (!isNaN(d.getTime())) return d
+      }
+    }
+    return new Date(sub.created_at)
+  }
+
+  // The filter pipeline (date range -> current/previous period) and the
+  // dashboard's chart tiles all scan the full submissions array (tiles via
+  // ~40+ map/filter/sort/reduce calls in buildDashboardTiles.js), so each
+  // step is memoized - without it, any unrelated state change on this page
+  // (opening the Options menu, a PDF-export tick, hovering a tile) would
+  // re-run the entire dashboard's worth of analysis from scratch. These sit
+  // above the loading/error/empty-state early returns since hooks can't run
+  // conditionally; each guards for `form` not being ready yet instead.
+  const { start: rangeStart, end: rangeEnd } = useMemo(
+    () => getDateRangeBounds(dateRange, customStart, customEnd),
+    [dateRange, customStart, customEnd]
+  )
+  const filteredSubmissions = useMemo(() => {
+    return submissions.filter(s => {
+      const when = recordDate(s)
+      if (rangeStart && when < rangeStart) return false
+      if (rangeEnd && when > rangeEnd) return false
+      return true
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [submissions, rangeStart, rangeEnd, reportDateField])
+
+  const previousRange = useMemo(
+    () => getPreviousDateRangeBounds(dateRange, customStart, customEnd),
+    [dateRange, customStart, customEnd]
+  )
+  const previousFilteredSubmissions = useMemo(() => {
+    if (!previousRange.start) return []
+    return submissions.filter(s => {
+      const when = recordDate(s)
+      if (previousRange.start && when < previousRange.start) return false
+      if (previousRange.end && when > previousRange.end) return false
+      return true
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [submissions, previousRange, reportDateField])
+
+  // Every chart tile the dashboard shows, built by the exact same function
+  // the Print/PDF builder calls (see report/analysis/buildDashboardTiles.js)
+  // so the two can never drift apart.
+  const { tiles: orderedChartTiles, entryNoun } = useMemo(() => {
+    if (!form) return { tiles: [], entryNoun: { singular: 'Response', plural: 'Responses' } }
+    return buildChartTiles(form, filteredSubmissions)
+  }, [form, filteredSubmissions])
+
+  // Passed straight into ChartTileGrid (memoized below) - useCallback keeps
+  // this stable across renders that don't actually change the tile list or
+  // form, so an unrelated re-render elsewhere on the page doesn't force the
+  // whole chart-tile list to re-render with it.
+  const moveChartTile = useCallback((tileId, where) => {
+    const ids = orderedChartTiles.map(t => t.id)
+    const i = ids.indexOf(tileId)
+    if (i < 0) return
+    // Pairing is positional ("join with next"), so a joined tile has to move
+    // together with its partner or the pairing re-attaches to a new neighbour.
+    const pairedForward = new Set(form?.settings?.reportChartPairs || EMPTY_ARRAY)
+    const blockLen = pairedForward.has(tileId) && i + 1 < ids.length ? 2 : 1
+    const block = ids.slice(i, i + blockLen)
+    const rest = [...ids.slice(0, i), ...ids.slice(i + blockLen)]
+    const pos = where === 'top' ? 0
+      : where === 'bottom' ? rest.length
+      : where === 'up' ? Math.max(0, i - 1)
+      : Math.min(rest.length, i + 1)
+    rest.splice(pos, 0, ...block)
+    const settings = { ...(form?.settings || {}), reportChartOrder: rest }
+    setForm(f => ({ ...f, settings }))
+    supabase.from('forms').update({ settings }).eq('id', id).then(({ error: e }) => {
+      if (e && import.meta.env.DEV) console.error('Could not save chart order:', e)
+    })
+  }, [orderedChartTiles, form, id])
+
   const showSkel = useDeferredLoading(loading)
   if (loading) return showSkel ? <PageSkeleton variant="report" /> : null
   if (error) return <ErrorState message={error} />
@@ -185,70 +288,8 @@ function Report({ formId: formIdProp, headerExtra, extraSubmissions = [] } = {})
     )
   }
 
-  // The "record date": a form date field the owner nominated in Settings
-  // (so backdated / backlog entries count on the date actually set), falling
-  // back to when the record was submitted.
-  const reportDateField = form.fields.find(f => f.id === form.settings?.reportDateField && f.type === 'date')
-  // Same setting Expenses' own dashboard reads (src/expenses/expenseFields.js)
-  // to know which number field is "the amount" - used here so a non-cart
-  // form's category breakdown can show spend-by-category, not just a count.
-  const reportAmountField = form.fields.find(f => f.id === form.settings?.reportAmountField && f.type === 'number')
-  function recordDate(sub) {
-    if (reportDateField) {
-      const raw = sub.data[reportDateField.id]
-      if (raw) {
-        const d = new Date(raw)
-        if (!isNaN(d.getTime())) return d
-      }
-    }
-    return new Date(sub.created_at)
-  }
-
-  const { start: rangeStart, end: rangeEnd } = getDateRangeBounds(dateRange, customStart, customEnd)
-  const filteredSubmissions = submissions.filter(s => {
-    const when = recordDate(s)
-    if (rangeStart && when < rangeStart) return false
-    if (rangeEnd && when > rangeEnd) return false
-    return true
-  })
-
-  const previousRange = getPreviousDateRangeBounds(dateRange, customStart, customEnd)
-  const previousFilteredSubmissions = previousRange.start ? submissions.filter(s => {
-    const when = recordDate(s)
-    if (previousRange.start && when < previousRange.start) return false
-    if (previousRange.end && when > previousRange.end) return false
-    return true
-  }) : []
-
   const totalResponses = filteredSubmissions.length
   const dateRangeLabel = getDateRangeLabel(dateRange, customStart, customEnd)
-
-  // Every chart tile the dashboard shows, built by the exact same function
-  // the Print/PDF builder calls (see report/analysis/buildDashboardTiles.js)
-  // so the two can never drift apart.
-  const { tiles: orderedChartTiles, entryNoun } = buildChartTiles(form, filteredSubmissions)
-
-  function moveChartTile(tileId, where) {
-    const ids = orderedChartTiles.map(t => t.id)
-    const i = ids.indexOf(tileId)
-    if (i < 0) return
-    // Pairing is positional ("join with next"), so a joined tile has to move
-    // together with its partner or the pairing re-attaches to a new neighbour.
-    const pairedForward = new Set(form?.settings?.reportChartPairs || [])
-    const blockLen = pairedForward.has(tileId) && i + 1 < ids.length ? 2 : 1
-    const block = ids.slice(i, i + blockLen)
-    const rest = [...ids.slice(0, i), ...ids.slice(i + blockLen)]
-    const pos = where === 'top' ? 0
-      : where === 'bottom' ? rest.length
-      : where === 'up' ? Math.max(0, i - 1)
-      : Math.min(rest.length, i + 1)
-    rest.splice(pos, 0, ...block)
-    const settings = { ...(form?.settings || {}), reportChartOrder: rest }
-    setForm(f => ({ ...f, settings }))
-    supabase.from('forms').update({ settings }).eq('id', id).then(({ error: e }) => {
-      if (e && import.meta.env.DEV) console.error('Could not save chart order:', e)
-    })
-  }
 
   function buildFilterSummary() {
     return dateRange === 'all' ? '' : dateRangeLabel
@@ -657,7 +698,11 @@ function MoveControl({ tileId, onMove, isFirst, isLast, label = 'Move' }) {
   )
 }
 
-function ChartTileGrid({ tiles, pairs, onTogglePair, onMove, canEdit }) {
+// Memoized: it renders every chart tile (each already a nontrivial chart
+// component), and its props (tiles/pairs/onTogglePair/onMove) are now kept
+// referentially stable upstream in Report specifically so this can skip
+// re-rendering on state changes that don't actually touch the dashboard data.
+const ChartTileGrid = memo(function ChartTileGrid({ tiles, pairs, onTogglePair, onMove, canEdit }) {
   const joined = new Set(pairs || [])
   const out = []
   for (let i = 0; i < tiles.length; i++) {
@@ -709,28 +754,35 @@ function ChartTileGrid({ tiles, pairs, onTogglePair, onMove, canEdit }) {
   // Two tiles per row on a wide screen (each still its own independent card);
   // a joined pair spans both columns.
   return <div className="report-tile-list">{out}</div>
-}
+})
 
-function OverviewCard({ form, submissions }) {
-  const cartFields = form.fields.filter(f => f.type === 'cart')
-  let totalRevenue = 0
-  let hasCartData = false
+// Memoized: OverviewCard does a nested forEach over every cart field x
+// submission plus computeInsights' own scans, all pointless to redo when
+// `form`/`submissions` (now stable references from Report's memoized
+// filteredSubmissions) haven't actually changed.
+const OverviewCard = memo(function OverviewCard({ form, submissions }) {
+  const { totalRevenue, hasCartData, totalResponses, noun, insights } = useMemo(() => {
+    const cartFields = form.fields.filter(f => f.type === 'cart')
+    let totalRevenue = 0
+    let hasCartData = false
 
-  cartFields.forEach(field => {
-    submissions.forEach(s => {
-      const v = s.data[field.id]
-      if (v && v.items && v.items.length > 0) {
-        hasCartData = true
-        totalRevenue += v.total + (v.deliveryFee || 0)
-      }
+    cartFields.forEach(field => {
+      submissions.forEach(s => {
+        const v = s.data[field.id]
+        if (v && v.items && v.items.length > 0) {
+          hasCartData = true
+          totalRevenue += v.total + (v.deliveryFee || 0)
+        }
+      })
     })
-  })
 
-  const totalResponses = submissions.length
-  const noun = getEntryNoun(form, cartFields.length > 0)
-  // Keep this concise: a briefing, not a list of everything the data could
-  // say - revenue and salesperson lines only, capped at 4.
-  const insights = computeInsights(form, submissions).slice(0, 4)
+    const noun = getEntryNoun(form, cartFields.length > 0)
+    // Keep this concise: a briefing, not a list of everything the data could
+    // say - revenue and salesperson lines only, capped at 4.
+    const insights = computeInsights(form, submissions).slice(0, 4)
+
+    return { totalRevenue, hasCartData, totalResponses: submissions.length, noun, insights }
+  }, [form, submissions])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', marginBottom: '1.2rem' }}>
@@ -771,7 +823,7 @@ function OverviewCard({ form, submissions }) {
       )}
     </div>
   )
-}
+})
 
 // Aggregates the numbers a trend comparison needs from a set of submissions,
 // shared between the current and previous period so the two are computed
@@ -828,135 +880,149 @@ function formatKpiValue(raw, kind, mode) {
   return kind === 'currency' ? `₦${abbreviateNumber(n)}` : abbreviateNumber(n)
 }
 
-function KPIGrid({ form, submissions, previousSubmissions = [], totalResponses, moreMenuOpen, setMoreMenuOpen }) {
+// Memoized, and its own KPI computation is further wrapped in useMemo below -
+// this component alone accounts for most of the ~40+ map/filter/sort/reduce
+// calls the perf audit flagged (computeCartTotals, getCompletionRate, plus a
+// pass per numeric/category/demographic/date field). None of that has
+// anything to do with `selectedMore`/`metricSearch`/`valueFormat`, so typing
+// in the metric search box or toggling a checkbox no longer re-runs it - and
+// memo() means an unrelated Report re-render (Options menu, PDF progress,
+// AI panel) skips this component's render entirely when its props haven't
+// changed.
+const KPIGrid = memo(function KPIGrid({ form, submissions, previousSubmissions = [], totalResponses, moreMenuOpen, setMoreMenuOpen }) {
   const [selectedMore, setSelectedMore] = useState([])
   const [metricSearch, setMetricSearch] = useState('')
   const [valueFormat, setValueFormat] = useState('auto')
-  const cartFields = form.fields.filter(f => f.type === 'cart')
-  const numericFields = form.fields.filter(f => NUMERIC_TYPES.includes(f.type))
-  const categoryFields = form.fields.filter(f => CATEGORICAL_TYPES.includes(f.type))
-  const demographicFields = form.fields.filter(f => DEMOGRAPHIC_TYPES.includes(f.type))
-  const dateFields = form.fields.filter(f => f.type === 'date')
-  const hasPreviousPeriod = previousSubmissions.length > 0
-  const noun = getEntryNoun(form, cartFields.length > 0)
 
-  const primaryKpis = []
-  // Every other computed metric lives behind "More metrics" so the grid above
-  // never gets crowded, add new KPI computations here as the report grows,
-  // and they show up in the checklist automatically.
-  const moreKpis = []
+  const { primaryKpis, moreKpis } = useMemo(() => {
+    const cartFields = form.fields.filter(f => f.type === 'cart')
+    const numericFields = form.fields.filter(f => NUMERIC_TYPES.includes(f.type))
+    const categoryFields = form.fields.filter(f => CATEGORICAL_TYPES.includes(f.type))
+    const demographicFields = form.fields.filter(f => DEMOGRAPHIC_TYPES.includes(f.type))
+    const dateFields = form.fields.filter(f => f.type === 'date')
+    const hasPreviousPeriod = previousSubmissions.length > 0
+    const noun = getEntryNoun(form, cartFields.length > 0)
 
-  // ---- Cart / revenue metrics ----
-  const { totalRevenue, totalOrders, totalItems, orderTotals } = computeCartTotals(cartFields, submissions)
-  const previousCart = hasPreviousPeriod ? computeCartTotals(cartFields, previousSubmissions) : null
-  const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0
+    const primaryKpis = []
+    // Every other computed metric lives behind "More metrics" so the grid above
+    // never gets crowded, add new KPI computations here as the report grows,
+    // and they show up in the checklist automatically.
+    const moreKpis = []
 
-  if (cartFields.length > 0) {
-    primaryKpis.push({
-      label: 'Revenue', raw: totalRevenue, kind: 'currency',
-      trend: computeTrend(totalRevenue, previousCart?.totalRevenue)
-    })
-    primaryKpis.push({
-      label: 'Orders', raw: totalOrders, kind: 'count',
-      trend: computeTrend(totalOrders, previousCart?.totalOrders)
-    })
-    primaryKpis.push({
-      label: 'Average Order Value', raw: avgOrderValue, kind: 'currency',
-      trend: computeTrend(avgOrderValue, previousCart?.totalOrders > 0 ? previousCart.totalRevenue / previousCart.totalOrders : undefined)
-    })
+    // ---- Cart / revenue metrics ----
+    const { totalRevenue, totalOrders, totalItems, orderTotals } = computeCartTotals(cartFields, submissions)
+    const previousCart = hasPreviousPeriod ? computeCartTotals(cartFields, previousSubmissions) : null
+    const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0
 
-    moreKpis.push({
-      label: 'Median Order Value',
-      raw: median(orderTotals), kind: 'currency'
-    })
-    moreKpis.push({
-      label: 'Highest Order Value',
-      raw: orderTotals.length > 0 ? Math.max(...orderTotals) : 0, kind: 'currency'
-    })
-    moreKpis.push({ label: 'Total Items Sold', raw: totalItems, kind: 'count' })
-    moreKpis.push({
-      label: 'Average Items per Order',
-      value: totalOrders > 0 ? (totalItems / totalOrders).toFixed(1) : '0'
-    })
-  }
+    if (cartFields.length > 0) {
+      primaryKpis.push({
+        label: 'Revenue', raw: totalRevenue, kind: 'currency',
+        trend: computeTrend(totalRevenue, previousCart?.totalRevenue)
+      })
+      primaryKpis.push({
+        label: 'Orders', raw: totalOrders, kind: 'count',
+        trend: computeTrend(totalOrders, previousCart?.totalOrders)
+      })
+      primaryKpis.push({
+        label: 'Average Order Value', raw: avgOrderValue, kind: 'currency',
+        trend: computeTrend(avgOrderValue, previousCart?.totalOrders > 0 ? previousCart.totalRevenue / previousCart.totalOrders : undefined)
+      })
 
-  moreKpis.push({
-    label: `Total ${noun.plural}`, raw: totalResponses, kind: 'count',
-    trend: computeTrend(totalResponses, hasPreviousPeriod ? previousSubmissions.length : undefined)
-  })
-
-  // ---- Completion & pacing ----
-  const completionRate = getCompletionRate(form, submissions)
-  if (completionRate > 0) {
-    moreKpis.push({ label: 'Avg. Completion', value: `${completionRate}%` })
-  }
-
-  if (submissions.length > 1) {
-    const timestamps = submissions.map(s => new Date(s.created_at).getTime()).filter(t => !isNaN(t))
-    if (timestamps.length > 1) {
-      const spanDays = Math.max(1, (Math.max(...timestamps) - Math.min(...timestamps)) / (1000 * 60 * 60 * 24))
-      moreKpis.push({ label: `${noun.plural} per Day`, value: (totalResponses / spanDays).toFixed(1) })
+      moreKpis.push({
+        label: 'Median Order Value',
+        raw: median(orderTotals), kind: 'currency'
+      })
+      moreKpis.push({
+        label: 'Highest Order Value',
+        raw: orderTotals.length > 0 ? Math.max(...orderTotals) : 0, kind: 'currency'
+      })
+      moreKpis.push({ label: 'Total Items Sold', raw: totalItems, kind: 'count' })
+      moreKpis.push({
+        label: 'Average Items per Order',
+        value: totalOrders > 0 ? (totalItems / totalOrders).toFixed(1) : '0'
+      })
     }
-  }
 
-  // ---- Numeric fields (one set of stats per field) ----
-  numericFields.forEach(field => {
-    const values = submissions.map(s => Number(s.data[field.id])).filter(v => !isNaN(v))
-    if (values.length === 0) return
-    const avg = values.reduce((a, b) => a + b, 0) / values.length
-    moreKpis.push({ label: `Average ${field.label}`, raw: Math.round(avg), kind: 'count' })
-    moreKpis.push({ label: `Median ${field.label}`, raw: median(values), kind: 'count' })
-    moreKpis.push({ label: `Highest ${field.label}`, raw: Math.max(...values), kind: 'count' })
-    moreKpis.push({ label: `Lowest ${field.label}`, raw: Math.min(...values), kind: 'count' })
-  })
+    moreKpis.push({
+      label: `Total ${noun.plural}`, raw: totalResponses, kind: 'count',
+      trend: computeTrend(totalResponses, hasPreviousPeriod ? previousSubmissions.length : undefined)
+    })
 
-  // ---- Category fields (top value + variety) ----
-  categoryFields.forEach(field => {
-    const answered = submissions.filter(s => {
-      const v = s.data[field.id]
-      return field.type === 'checkbox' ? Array.isArray(v) && v.length > 0 : v !== undefined && v !== null && v !== ''
-    })
-    if (answered.length === 0) return
-    const countMap = {}
-    answered.forEach(s => {
-      const v = s.data[field.id]
-      const vals = Array.isArray(v) ? v : [v]
-      vals.forEach(val => { countMap[val] = (countMap[val] || 0) + 1 })
-    })
-    const entries = Object.entries(countMap)
-    const top = entries.sort((a, b) => b[1] - a[1])[0]
-    if (top) {
-      const percent = Math.round((top[1] / answered.length) * 100)
-      moreKpis.push({ label: `Top ${field.label}`, value: `${top[0]} (${percent}%)` })
+    // ---- Completion & pacing ----
+    const completionRate = getCompletionRate(form, submissions)
+    if (completionRate > 0) {
+      moreKpis.push({ label: 'Avg. Completion', value: `${completionRate}%` })
     }
-    moreKpis.push({ label: `Distinct ${field.label} values`, raw: entries.length, kind: 'count' })
-  })
 
-  // ---- Demographic coverage ----
-  demographicFields.forEach(field => {
-    const answered = submissions.filter(s => {
-      const v = s.data[field.id]
-      return v !== undefined && v !== null && v.toString().trim() !== ''
-    })
-    if (submissions.length === 0) return
-    const percent = Math.round((answered.length / submissions.length) * 100)
-    moreKpis.push({ label: `${field.label} Provided`, value: `${percent}%` })
-  })
+    if (submissions.length > 1) {
+      const timestamps = submissions.map(s => new Date(s.created_at).getTime()).filter(t => !isNaN(t))
+      if (timestamps.length > 1) {
+        const spanDays = Math.max(1, (Math.max(...timestamps) - Math.min(...timestamps)) / (1000 * 60 * 60 * 24))
+        moreKpis.push({ label: `${noun.plural} per Day`, value: (totalResponses / spanDays).toFixed(1) })
+      }
+    }
 
-  // ---- Date fields ----
-  dateFields.forEach(field => {
-    const answered = submissions.filter(s => s.data[field.id])
-    if (answered.length === 0) return
-    const dayCounts = {}
-    answered.forEach(s => {
-      const d = new Date(s.data[field.id])
-      if (isNaN(d)) return
-      const dn = d.toLocaleDateString('en-GB', { weekday: 'long' })
-      dayCounts[dn] = (dayCounts[dn] || 0) + 1
+    // ---- Numeric fields (one set of stats per field) ----
+    numericFields.forEach(field => {
+      const values = submissions.map(s => Number(s.data[field.id])).filter(v => !isNaN(v))
+      if (values.length === 0) return
+      const avg = values.reduce((a, b) => a + b, 0) / values.length
+      moreKpis.push({ label: `Average ${field.label}`, raw: Math.round(avg), kind: 'count' })
+      moreKpis.push({ label: `Median ${field.label}`, raw: median(values), kind: 'count' })
+      moreKpis.push({ label: `Highest ${field.label}`, raw: Math.max(...values), kind: 'count' })
+      moreKpis.push({ label: `Lowest ${field.label}`, raw: Math.min(...values), kind: 'count' })
     })
-    const top = Object.entries(dayCounts).sort((a, b) => b[1] - a[1])[0]
-    if (top) moreKpis.push({ label: `Busiest Day (${field.label})`, value: top[0] })
-  })
+
+    // ---- Category fields (top value + variety) ----
+    categoryFields.forEach(field => {
+      const answered = submissions.filter(s => {
+        const v = s.data[field.id]
+        return field.type === 'checkbox' ? Array.isArray(v) && v.length > 0 : v !== undefined && v !== null && v !== ''
+      })
+      if (answered.length === 0) return
+      const countMap = {}
+      answered.forEach(s => {
+        const v = s.data[field.id]
+        const vals = Array.isArray(v) ? v : [v]
+        vals.forEach(val => { countMap[val] = (countMap[val] || 0) + 1 })
+      })
+      const entries = Object.entries(countMap)
+      const top = entries.sort((a, b) => b[1] - a[1])[0]
+      if (top) {
+        const percent = Math.round((top[1] / answered.length) * 100)
+        moreKpis.push({ label: `Top ${field.label}`, value: `${top[0]} (${percent}%)` })
+      }
+      moreKpis.push({ label: `Distinct ${field.label} values`, raw: entries.length, kind: 'count' })
+    })
+
+    // ---- Demographic coverage ----
+    demographicFields.forEach(field => {
+      const answered = submissions.filter(s => {
+        const v = s.data[field.id]
+        return v !== undefined && v !== null && v.toString().trim() !== ''
+      })
+      if (submissions.length === 0) return
+      const percent = Math.round((answered.length / submissions.length) * 100)
+      moreKpis.push({ label: `${field.label} Provided`, value: `${percent}%` })
+    })
+
+    // ---- Date fields ----
+    dateFields.forEach(field => {
+      const answered = submissions.filter(s => s.data[field.id])
+      if (answered.length === 0) return
+      const dayCounts = {}
+      answered.forEach(s => {
+        const d = new Date(s.data[field.id])
+        if (isNaN(d)) return
+        const dn = d.toLocaleDateString('en-GB', { weekday: 'long' })
+        dayCounts[dn] = (dayCounts[dn] || 0) + 1
+      })
+      const top = Object.entries(dayCounts).sort((a, b) => b[1] - a[1])[0]
+      if (top) moreKpis.push({ label: `Busiest Day (${field.label})`, value: top[0] })
+    })
+
+    return { primaryKpis, moreKpis }
+  }, [form, submissions, previousSubmissions, totalResponses])
 
   const visibleMoreKpis = moreKpis.filter(k => selectedMore.includes(k.label))
   const filteredMoreKpis = moreKpis.filter(k => k.label.toLowerCase().includes(metricSearch.toLowerCase()))
@@ -1036,7 +1102,7 @@ function KPIGrid({ form, submissions, previousSubmissions = [], totalResponses, 
       )}
     </>
   )
-}
+})
 
 // "Key highlights" is deliberately narrow: what sold (revenue items) and who
 // sold it (staff / salesperson / rep). Category fields like payment method,

@@ -53,9 +53,18 @@ async function finalizeRoom(supabase: any, roomId: string) {
     .order('total_points', { ascending: false })
   if (error) throw error
 
-  for (let i = 0; i < (players || []).length; i++) {
-    await supabase.from('quiz_players').update({ final_rank: i + 1 }).eq('id', players[i].id)
-  }
+  // One UPDATE per player, but fired concurrently instead of awaited
+  // one-at-a-time in a loop - supabase-js has no bulk "different value per
+  // row" update, and there's no existing pattern in this codebase for
+  // calling a raw-SQL/RPC Postgres function from an edge function, so this
+  // is the stopgap; a real bulk-update Postgres function (single round trip
+  // via a CASE WHEN ... END, called through supabase.rpc) would be the next
+  // step if this ever needs to scale past a normal quiz room's player count.
+  await Promise.all(
+    (players || []).map((p: any, i: number) =>
+      supabase.from('quiz_players').update({ final_rank: i + 1 }).eq('id', p.id)
+    )
+  )
 
   await supabase.from('quiz_rooms').update({ state: 'finished', live_phase: null }).eq('id', roomId)
 }

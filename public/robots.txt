@@ -1,4 +1,10 @@
 User-agent: *
 Allow: /
+Disallow: /lab
+Disallow: /account
+Disallow: /create
+Disallow: /reports
+Disallow: /records
+Disallow: /templates
 
 Sitemap: https://verticalsapp.com/sitemap.xml

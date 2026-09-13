@@ -8,7 +8,7 @@
 // App.jsx instead of the generic tile-grid TemplateLocations.jsx - a
 // "however many custom forms you build" template needs this richer list
 // far more than a bare grid of location tiles does.
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
@@ -96,6 +96,15 @@ function FormsTemplateHome() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [searchText, setSearchText] = useState('')
+  // Filtering/sorting/paginating the form list re-runs on every keystroke;
+  // debounce the value that actually drives that work so typing itself
+  // stays instant while the (potentially large) recompute settles after a
+  // short pause.
+  const [debouncedSearchText, setDebouncedSearchText] = useState('')
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearchText(searchText), 200)
+    return () => clearTimeout(timer)
+  }, [searchText])
   const [currentPage, setCurrentPage] = useState(1)
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('verticals_view_mode') || 'grid')
   const [openMenuId, setOpenMenuId] = useState(null)
@@ -203,32 +212,32 @@ function FormsTemplateHome() {
     localStorage.setItem('verticals_view_mode', mode)
   }
 
-  function copyLink(formId) {
+  const copyLink = useCallback((formId) => {
     const url = `${window.location.origin}/form/${formId}`
     navigator.clipboard.writeText(url)
     showToast('Form link copied!', 'success')
-  }
+  }, [showToast])
 
-  async function publishForm(formId) {
+  const publishForm = useCallback(async (formId) => {
     const { error } = await supabase.from('forms').update({ status: 'published' }).eq('id', formId)
     if (!error) {
-      setForms(forms.map(f => f.id === formId ? { ...f, status: 'published' } : f))
+      setForms(current => current.map(f => f.id === formId ? { ...f, status: 'published' } : f))
     }
-  }
+  }, [])
 
-  async function setFormStatus(formId, status) {
+  const setFormStatus = useCallback(async (formId, status) => {
     const { error } = await supabase.from('forms').update({ status }).eq('id', formId)
     if (!error) {
       setForms(current => current.map(form => form.id === formId ? { ...form, status } : form))
     }
-  }
+  }, [])
 
   // Reuses the same helper every other template's "Duplicate" already calls
   // (see TemplateLocations.jsx) rather than Home.jsx's own inline insert -
   // this one carries the source's settings (templateSlug included) forward,
   // so the copy stays part of this same template instead of falling out of
   // it as an untagged plain form.
-  async function duplicateForm(form) {
+  const duplicateForm = useCallback(async (form) => {
     setOpenMenuId(null)
     try {
       const data = await duplicateLocationForm({ session, sourceFormId: form.id, locationName: `${form.name} (Copy)` })
@@ -236,33 +245,33 @@ function FormsTemplateHome() {
     } catch (err) {
       showToast('Could not duplicate: ' + err.message, 'error')
     }
-  }
+  }, [session, showToast])
 
-  async function togglePin(formId, currentlyPinned) {
+  const togglePin = useCallback(async (formId, currentlyPinned) => {
     const { error } = await supabase.from('forms').update({ pinned: !currentlyPinned }).eq('id', formId)
     if (!error) {
-      setForms(forms.map(f => f.id === formId ? { ...f, pinned: !currentlyPinned } : f))
+      setForms(current => current.map(f => f.id === formId ? { ...f, pinned: !currentlyPinned } : f))
     }
-  }
+  }, [])
 
-  function requestDelete(formId) {
+  const requestDelete = useCallback((formId) => {
     setOpenMenuId(null)
     setPendingConfirm({ type: 'moveToBin', formId })
-  }
+  }, [])
 
   function requestBulkDelete() {
     if (selectedFormIds.length === 0) return
     setPendingConfirm({ type: 'bulkMoveToBin' })
   }
 
-  function toggleSelectForm(formId) {
+  const toggleSelectForm = useCallback((formId) => {
     setSelectedFormIds(current => current.includes(formId) ? current.filter(id => id !== formId) : [...current, formId])
-  }
+  }, [])
 
-  function enterSelectionMode() {
+  const enterSelectionMode = useCallback(() => {
     setOpenMenuId(null)
     setSelectionMode(true)
-  }
+  }, [])
 
   function exitSelectionMode() {
     setSelectionMode(false)
@@ -388,25 +397,34 @@ function FormsTemplateHome() {
     }
   }
 
-  if (templateError) return <ErrorState message={templateError} />
-
-  const visible = forms.filter(form =>
-    form.name.toLowerCase().includes(searchText.toLowerCase())
+  // These derive the visible list from `forms`, which can grow large, so
+  // they're memoized; they're declared above the templateError early return
+  // (rather than the return's original spot) so every hook here still runs
+  // on every render, error state included, per the Rules of Hooks.
+  const visible = useMemo(
+    () => forms.filter(form => form.name.toLowerCase().includes(debouncedSearchText.toLowerCase())),
+    [forms, debouncedSearchText]
   )
 
-  const pinnedForms = visible.filter(f => f.pinned)
-  const unpinnedForms = visible.filter(f => !f.pinned)
+  const pinnedForms = useMemo(() => visible.filter(f => f.pinned), [visible])
+  const unpinnedForms = useMemo(() => visible.filter(f => !f.pinned), [visible])
 
   const totalPages = Math.max(1, Math.ceil(unpinnedForms.length / PAGE_SIZE))
   const safePage = Math.min(currentPage, totalPages)
   const startIndex = (safePage - 1) * PAGE_SIZE
-  const pageForms = unpinnedForms.slice(startIndex, startIndex + PAGE_SIZE)
+  const pageForms = useMemo(
+    () => unpinnedForms.slice(startIndex, startIndex + PAGE_SIZE),
+    [unpinnedForms, startIndex]
+  )
+
+  const formPendingDelete = forms.find(f => f.id === pendingConfirm?.formId)
+
+  if (templateError) return <ErrorState message={templateError} />
 
   const sharedProps = {
     togglePin, publishForm, setFormStatus, duplicateForm, copyLink, requestDelete, responseCounts,
     selectedFormIds, toggleSelectForm, selectionMode, enterSelectionMode,
   }
-  const formPendingDelete = forms.find(f => f.id === pendingConfirm?.formId)
 
   return (
     <div className="page">
@@ -586,7 +604,7 @@ function FormsTemplateHome() {
   )
 }
 
-function ListView({ pageForms, togglePin, publishForm, setFormStatus, duplicateForm, copyLink, requestDelete, selectedFormIds, toggleSelectForm, selectionMode, enterSelectionMode, openMenuId, setOpenMenuId, menuRef }) {
+const ListView = memo(function ListView({ pageForms, togglePin, publishForm, setFormStatus, duplicateForm, copyLink, requestDelete, selectedFormIds, toggleSelectForm, selectionMode, enterSelectionMode, openMenuId, setOpenMenuId, menuRef }) {
   return (
     <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
       {pageForms.map(form => {
@@ -752,9 +770,9 @@ function ListView({ pageForms, togglePin, publishForm, setFormStatus, duplicateF
       })}
     </div>
   )
-}
+})
 
-function GridView({ pageForms, togglePin, publishForm, setFormStatus, duplicateForm, copyLink, requestDelete, responseCounts, selectedFormIds, toggleSelectForm, selectionMode, enterSelectionMode, openMenuId, setOpenMenuId, menuRef }) {
+const GridView = memo(function GridView({ pageForms, togglePin, publishForm, setFormStatus, duplicateForm, copyLink, requestDelete, responseCounts, selectedFormIds, toggleSelectForm, selectionMode, enterSelectionMode, openMenuId, setOpenMenuId, menuRef }) {
   return (
     <div className="form-grid" style={{
       display: 'grid',
@@ -884,7 +902,7 @@ function GridView({ pageForms, togglePin, publishForm, setFormStatus, duplicateF
       })}
     </div>
   )
-}
+})
 
 function MenuItem({ children, onClick, danger }) {
   return (
