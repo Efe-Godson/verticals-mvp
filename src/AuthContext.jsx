@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 import { syncThemeColorFromAccount } from './theme'
+import { captureEvent, captureException, identifyUser, resetPostHog } from './lib/posthog'
 
 const AuthContext = createContext(null)
 
@@ -24,8 +25,10 @@ export function AuthProvider({ children }) {
         if (!mounted) return
 
         setSession(data?.session ?? null)
+        if (data?.session?.user) identifyUser(data.session.user)
       } catch (error) {
         console.error('Auth initialization failed', error)
+        captureException(error, { flow: 'auth_initialization' })
         if (mounted) {
           setSession(null)
         }
@@ -46,7 +49,16 @@ export function AuthProvider({ children }) {
       // account signed in from multiple places" alert. Never blocks the
       // login UX on it - a failed/slow log shouldn't hold up sign-in.
       if (event === 'SIGNED_IN') {
+        if (newSession?.user) {
+          identifyUser(newSession.user)
+          const accountAge = Date.now() - new Date(newSession.user.created_at).getTime()
+          captureEvent(accountAge < 5 * 60 * 1000 ? 'user_signed_up' : 'user_signed_in', {
+            auth_provider: newSession.user.app_metadata?.provider || 'unknown',
+          })
+        }
         supabase.functions.invoke('log-sign-in', { body: {} }).catch(() => {})
+      } else if (event === 'SIGNED_OUT') {
+        resetPostHog()
       }
     })
 

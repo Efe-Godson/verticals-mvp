@@ -12,6 +12,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { jsonResponse, corsHeaders } from '../_shared/stats.ts'
 import { clientIp, enforceRateLimit } from '../_shared/rateLimit.ts'
+import { capturePostHogEvent } from '../_shared/posthog.ts'
 
 Deno.serve(async req => {
   try {
@@ -85,6 +86,15 @@ Deno.serve(async req => {
       })
       if (stockError) console.error('apply_cart_stock_changes failed:', stockError.message)
     }
+
+    const distinctId = req.headers.get('X-POSTHOG-DISTINCT-ID') || submission.id
+    const sessionId = req.headers.get('X-POSTHOG-SESSION-ID')
+    await capturePostHogEvent('form_submission_completed', distinctId, {
+      form_id,
+      item_count: stockItems.reduce((total, item) => total + item.quantity, 0),
+      has_cart: stockItems.length > 0,
+      ...(sessionId ? { $session_id: sessionId } : {}),
+    })
 
     return jsonResponse({
       id: submission.id,

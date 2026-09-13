@@ -11,6 +11,7 @@ import BannerImagePicker from './components/BannerImagePicker'
 import { uploadBannerImage } from './lib/formImages'
 import PackageBuilder from './PackageBuilder'
 import { DEFAULT_COUNTRY } from './lib/locationData'
+import { captureEvent, captureException } from './lib/posthog'
 
 const FIELD_TYPES = [
   { value: 'text', label: 'Short Text' },
@@ -396,12 +397,21 @@ function CreateForm() {
       setSaving(false)
 
       if (error) {
+        captureException(error, { flow: 'form_save' })
         setMessage('Error saving: ' + error.message)
         return
       }
+      captureEvent('form_created', {
+        form_id: id,
+        field_count: cleanedFields.filter(field => field.type !== 'section').length,
+        section_count: cleanedFields.filter(field => field.type === 'section').length,
+        has_cart: cleanedFields.some(field => field.type === 'cart'),
+        has_banner: Boolean(bannerImageUrl),
+      })
       setMessage('Form saved as draft.')
       setTimeout(() => navigate('/'), 700)
     } catch (err) {
+      captureException(err, { flow: 'form_save' })
       setSaving(false)
       setMessage('Error saving: ' + (err?.message || 'Unknown error'))
     }

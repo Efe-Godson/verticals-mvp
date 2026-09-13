@@ -22,6 +22,7 @@ import { InlineLoader } from './components/InlineLoader'
 import { usePageTitle, usePageBack } from './PageTitleContext'
 import { createLocationForm, duplicateLocationForm, locationDestination } from './locations'
 import { ErrorState } from './ErrorState'
+import { captureEvent, captureException } from './lib/posthog'
 
 const TEMPLATE_SLUG = 'forms'
 const PAGE_SIZE = 8
@@ -388,9 +389,14 @@ function FormsTemplateHome() {
     setCreating(true)
     try {
       const form = await createLocationForm({ session, template, locationName: locationNameInput })
+      captureEvent('template_form_created', {
+        form_id: form.id,
+        template_slug: TEMPLATE_SLUG,
+      })
       setShowAddModal(false)
       navigate(locationDestination(template, form.id))
     } catch (err) {
+      captureException(err, { flow: 'template_form_creation', template_slug: TEMPLATE_SLUG })
       showToast('Could not create this form: ' + err.message, 'error')
     } finally {
       setCreating(false)

@@ -2,6 +2,7 @@ import * as XLSX from 'xlsx'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { supabase } from './supabaseClient'
+import { captureEvent } from './lib/posthog'
 
 // Sheets/Drive access is requested incrementally via Supabase's Google OAuth
 // session, not at login (see Login.jsx, which only requests openid/email/
@@ -15,6 +16,15 @@ const GOOGLE_SHEETS_SCOPES = 'https://www.googleapis.com/auth/spreadsheets https
 // touching form.fields directly.
 function dataFields(form) {
   return form.fields.filter(f => f.type !== 'section')
+}
+
+function trackRecordsExport(form, records, format) {
+  captureEvent('records_exported', {
+    form_id: form.id,
+    format,
+    record_count: records.length,
+    field_count: dataFields(form).length,
+  })
 }
 
 // Turns any field's stored value into a plain, human-readable string,
@@ -80,6 +90,7 @@ export function exportRecordsToExcel(form, records) {
 
   const safeName = form.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase().replace(/^-+|-+$/g, '')
   XLSX.writeFile(workbook, `${safeName || 'records'}-export.xlsx`)
+  trackRecordsExport(form, records, 'xlsx')
 }
 
 export function buildRecordsCSV(form, records) {
@@ -119,6 +130,7 @@ export function exportRecordsToCSV(form, records) {
   link.click()
   document.body.removeChild(link)
   URL.revokeObjectURL(url)
+  trackRecordsExport(form, records, 'csv')
 }
 
 function buildRecordsSheetValues(form, records) {
@@ -349,7 +361,10 @@ export async function syncFormGoogleSheet(form, records, { silent = false } = {}
     }
   }
 
-  if (!silent) window.open(result.url, '_blank', 'noopener,noreferrer')
+  if (!silent) {
+    window.open(result.url, '_blank', 'noopener,noreferrer')
+    trackRecordsExport(form, records, 'google_sheets')
+  }
   return result
 }
 
@@ -491,6 +506,7 @@ export function exportRecordsToPDF(form, records, filterSummary) {
 
   const safeName = form.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase().replace(/^-+|-+$/g, '')
   doc.save(`${safeName || 'records'}-export.pdf`)
+  trackRecordsExport(form, records, 'pdf')
 }
 
 export function printRecordsTable(form, records, filterSummary) {

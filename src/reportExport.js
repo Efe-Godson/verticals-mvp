@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
 import { pageFormatMm } from './report/builder/print/printConstants'
+import { captureEvent } from './lib/posthog'
 
 function median(values) {
   if (values.length === 0) return 0
@@ -285,6 +286,11 @@ export async function exportReportToPDF(element, fileName, { variant = 'standard
 
   onProgress?.(blocks.length, blocks.length, 'Saving…')
   pdf.save(`${fileName}${mobile ? '-mobile' : ''}.pdf`)
+  captureEvent('report_exported', {
+    format: 'pdf',
+    layout: variant,
+    page_count: blocks.length,
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -320,5 +326,10 @@ export async function exportPrintLayoutToPDF(pageSize, orientation, pageNodes, f
 
   onProgress?.(nodes.length, nodes.length, 'Saving…')
   pdf.save(`${safeFileName(fileName)}.pdf`)
+  captureEvent('report_exported', {
+    format: 'pdf',
+    layout: 'print_builder',
+    page_count: nodes.length,
+  })
 }
 

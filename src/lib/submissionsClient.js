@@ -1,5 +1,6 @@
 // Place at: src/lib/submissionsClient.js
 import { supabase } from '../supabaseClient'
+import { getPostHogContext } from './posthog'
 
 async function throwFunctionError(error) {
   const response = error?.context
@@ -25,8 +26,14 @@ async function throwFunctionError(error) {
 // server-side and the submitter's IP can be stamped, see submit-form's
 // header comment for why.
 export async function submitForm(formId, data) {
+  const { distinctId, sessionId } = getPostHogContext()
+  const headers = {}
+  if (distinctId) headers['X-POSTHOG-DISTINCT-ID'] = distinctId
+  if (sessionId) headers['X-POSTHOG-SESSION-ID'] = sessionId
+
   const { data: result, error } = await supabase.functions.invoke('submit-form', {
     body: { form_id: formId, data },
+    headers,
   })
   if (error) await throwFunctionError(error)
   if (result?.error) throw new Error(result.error)

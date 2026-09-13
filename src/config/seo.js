@@ -4,11 +4,11 @@
 // HTML, and PUBLIC_ROUTES below drives scripts/generate-sitemap.mjs - so a
 // route's title/description/canonical/priority only ever gets typed once.
 //
-// No "www" - the app has consistently used the bare apex domain
-// (verticalsapp.com) in index.html, robots.txt, sitemap.xml and the
-// marketing footer's contact link, so this keeps that convention rather
-// than introducing a second one.
-export const SITE_URL = 'https://verticalsapp.com'
+// www.verticalsapp.com is the primary domain (Vercel's own domain
+// redirect sends the bare apex here) - keep this in sync with that, since
+// SEO.jsx, prerender.mjs and generate-sitemap.mjs all treat this as the
+// one true canonical host.
+export const SITE_URL = 'https://www.verticalsapp.com'
 export const SITE_NAME = 'Verticals'
 // Dedicated 1200x630 Open Graph/Twitter image (brief section 18) rather
 // than reusing the square verticals-mark.png directly - see

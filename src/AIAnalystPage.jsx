@@ -10,6 +10,7 @@ import PageSkeleton from './components/PageSkeleton'
 import { useDeferredLoading } from './components/loadingHooks'
 import { ErrorState, InlineError } from './ErrorState'
 import { usePageBack } from './PageTitleContext'
+import { captureEvent, captureException } from './lib/posthog'
 
 const EXAMPLE_QUESTIONS = [
   'Which product should I restock first?',
@@ -199,7 +200,14 @@ function AIAnalystPage() {
       const meta = { generatedAt: result.generated_at || new Date().toISOString(), dateRangeLabel, languageStyle }
       setAnalysisMeta(meta)
       localStorage.setItem(`ai-analysis:${form.id}`, JSON.stringify({ analysis: result, meta }))
+      captureEvent('ai_analysis_generated', {
+        form_id: form.id,
+        record_count: submissionIds.length,
+        date_range: dateRange,
+        language_style: languageStyle,
+      })
     } catch (err) {
+      captureException(err, { flow: 'ai_analysis_generation', form_id: form.id })
       setError(await describeAIError(err, "Couldn't generate the analysis right now - please try again in a moment."))
     }
     setAnalyzing(false)
@@ -214,7 +222,14 @@ function AIAnalystPage() {
       const result = await askAIQuestion(form.id, trimmed, submissionIds, languageStyle)
       setQaHistory(current => [...current, { question: trimmed, answer: result }])
       setQuestion('')
+      captureEvent('ai_question_answered', {
+        form_id: form.id,
+        record_count: submissionIds.length,
+        date_range: dateRange,
+        language_style: languageStyle,
+      })
     } catch (err) {
+      captureException(err, { flow: 'ai_question', form_id: form.id })
       setAskError(await describeAIError(err, "Couldn't get an answer right now - please try again in a moment."))
     }
     setAsking(false)

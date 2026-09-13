@@ -7,4 +7,4 @@ Disallow: /reports
 Disallow: /records
 Disallow: /templates
 
-Sitemap: https://verticalsapp.com/sitemap.xml
+Sitemap: https://www.verticalsapp.com/sitemap.xml
