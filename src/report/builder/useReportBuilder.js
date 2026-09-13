@@ -10,14 +10,22 @@ import { buildDatasets } from '../engine'
 import { makeVisual } from './catalogue'
 import { CURRENT_SCHEMA_VERSION } from './print/elementModel'
 import { migratePrintLayout } from './print/migratePrintLayout'
-import { fromGridCells, toGridCells } from './print/gridAdapter'
-import { GRID_COLS } from './print/printConstants'
+import { fromGridCells, resolveElementSize } from './print/gridAdapter'
+import { nextZIndex, stepSwap, reindexFromOrder } from './print/zOrder'
+import { useHistory } from './print/useHistory'
 
 const EMPTY_PRINT_LAYOUT = {
   schemaVersion: CURRENT_SCHEMA_VERSION,
   pageSize: 'slide', orientation: 'landscape', pages: [],
   showLogo: true, showDate: true, showPageNumber: true, showWatermark: true,
   pageNumberFormat: 'page-x-of-y', numberTitlePage: false,
+  // Phase 2 additions - theme (theme.js), master page header/footer text,
+  // saved text/shape styles, and saved multi-element components. All
+  // additive: a document saved before Phase 2 just has these read as their
+  // defaults below, no migration step needed.
+  theme: 'default',
+  masterHeaderText: '', masterFooterText: '',
+  savedStyles: [], savedComponents: [],
 }
 
 const EMPTY_STATE = {
@@ -47,6 +55,10 @@ function nextElementSlotPct(elements, width, height) {
   return { x: 0, y: maxY, width, height }
 }
 
+function clampPctLocal(v) {
+  return Math.min(100, Math.max(0, v))
+}
+
 export function useReportBuilder(formId) {
   const [form, setForm] = useState(null)
   const [submissions, setSubmissions] = useState([])
@@ -57,6 +69,11 @@ export function useReportBuilder(formId) {
   const formRef = useRef(null)
 
   const [state, setState] = useState(EMPTY_STATE)
+  // Undo/redo tracks printLayout only - Report Builder's own visuals/
+  // builderFilters aren't part of Designer's editing surface (see
+  // useReportBuilder.js's module comment and the Designer 2.0 plan's "what
+  // must not break" section), so there's nothing there for Ctrl+Z to do.
+  const printHistory = useHistory(EMPTY_PRINT_LAYOUT)
 
   useEffect(() => {
     let cancelled = false
@@ -68,13 +85,19 @@ export function useReportBuilder(formId) {
       formRef.current = formData
       setForm(formData)
       const rb = formData.settings?.reportBuilder
-      setState(rb && Array.isArray(rb.visuals)
+      const nextState = rb && Array.isArray(rb.visuals)
         ? {
             visuals: rb.visuals,
             builderFilters: { ...EMPTY_STATE.builderFilters, ...(rb.builderFilters || {}) },
             printLayout: migratePrintLayout({ ...EMPTY_PRINT_LAYOUT, ...(rb.printLayout || {}), pages: rb.printLayout?.pages || [] }),
           }
-        : EMPTY_STATE)
+        : EMPTY_STATE
+      setState(nextState)
+      // Undo/redo starts fresh per loaded document - a freshly opened
+      // report has nothing to undo into, and the placeholder EMPTY_STATE
+      // this hook started with before the fetch resolved was never a real
+      // edit worth keeping reachable via Ctrl+Z.
+      printHistory.reset(nextState.printLayout)
 
       const { data: subs } = await supabase.from('submissions').select('*')
         .eq('form_id', formId).is('deleted_at', null).order('created_at', { ascending: true })
@@ -84,7 +107,10 @@ export function useReportBuilder(formId) {
     }
     load()
     return () => { cancelled = true }
-  }, [formId])
+    // printHistory's methods are individually stable (see useHistory.js) -
+    // re-running this effect only on formId change is intentional, not a
+    // missed dependency.
+  }, [formId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const persist = useCallback(async (nextState) => {
     setSaving(true)
@@ -225,9 +251,40 @@ export function useReportBuilder(formId) {
   // printLayout.pages instead of the top-level visuals array. Kept on this
   // hook (not a separate one) so a print-layout write and a visuals write
   // can never race each other over the same settings JSONB column.
+  // Computes the next printLayout synchronously off stateRef (not via
+  // mutate's own setState updater) and records it into history right here,
+  // as a plain side effect in the caller's event handler - not inside a
+  // function passed to setState. React (in StrictMode, which this app runs
+  // in - see main.jsx) intentionally double-invokes updater functions to
+  // catch impurities; recording history (a ref write + a nested setState)
+  // from inside one would double-record every edit in dev. The updater
+  // handed to `mutate` below stays a pure merge, safe to double-invoke.
   const mutatePrint = useCallback((updater) => {
-    mutate(prev => ({ ...prev, printLayout: typeof updater === 'function' ? updater(prev.printLayout) : updater }))
+    const nextPrintLayout = typeof updater === 'function' ? updater(stateRef.current.printLayout) : updater
+    printHistory.record(nextPrintLayout)
+    mutate(prev => ({ ...prev, printLayout: nextPrintLayout }))
+  }, [mutate, printHistory.record]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Restores a printLayout from undo/redo without re-recording it as a new
+  // history entry (mutatePrint above does that unconditionally, which is
+  // right for real edits but would turn "undo" into "undo, then immediately
+  // push a redo-cancelling entry").
+  const applyPrintLayout = useCallback((printLayout) => {
+    mutate(prev => ({ ...prev, printLayout }))
   }, [mutate])
+
+  const undoPrint = useCallback(() => {
+    const restored = printHistory.undo()
+    if (restored !== undefined) applyPrintLayout(restored)
+  }, [printHistory.undo, applyPrintLayout]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const redoPrint = useCallback(() => {
+    const restored = printHistory.redo()
+    if (restored !== undefined) applyPrintLayout(restored)
+  }, [printHistory.redo, applyPrintLayout]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const beginPrintBatch = printHistory.beginBatch
+  const commitPrintBatch = printHistory.commitBatch
 
   const addPrintPage = useCallback((afterId) => {
     let created
@@ -269,21 +326,28 @@ export function useReportBuilder(formId) {
   }, [mutatePrint])
 
   // `element.layout` (when passed by a caller) is still grid-cell {w,h} -
-  // every call site (PrintWorkspace.jsx's sidebar buttons) uses
-  // defaultElementSize()'s grid units, so convert to percentage width/height
-  // here rather than changing every caller.
+  // most call sites (PrintWorkspace.jsx's visual/tile/text sidebar buttons)
+  // use defaultElementSize()'s grid units; the shape/image "add" buttons
+  // instead pass elementModel.js's makeShapeElement()/makeImageElement()
+  // factory output, which already carries percentage width/height directly.
+  // resolveElementSize() reconciles both conventions.
   const addPrintElement = useCallback((pageId, element) => {
     let created
     mutatePrint(prev => ({
       ...prev,
       pages: prev.pages.map(p => {
         if (p.id !== pageId) return p
-        const { layout, ...rest } = element
-        const { width, height } = fromGridCells({ w: layout?.w ?? GRID_COLS, h: layout?.h ?? 4 })
+        // Strip any id the caller's object already carries (e.g.
+        // elementModel.js's makeShapeElement()/makeImageElement() factories
+        // assign their own) - addPrintElement is always the sole authority
+        // on ids for elements it creates.
+        const { layout: _layout, id: _id, ...rest } = element
+        const { width, height } = resolveElementSize(element)
         const slot = nextElementSlotPct(p.elements, width, height)
         created = {
           id: newPrintId('el'), ...rest, ...slot,
-          rotation: 0, zIndex: p.elements.length + 1, locked: false, visible: true,
+          rotation: rest.rotation ?? 0, zIndex: p.elements.length + 1, locked: false, visible: true,
+          styleRef: rest.styleRef ?? null, groupId: rest.groupId ?? null,
         }
         return { ...p, elements: [...p.elements, created] }
       }),
@@ -301,6 +365,22 @@ export function useReportBuilder(formId) {
     }))
   }, [mutatePrint])
 
+  // Bulk position/size update for a multi-select group move - every element
+  // in `patchesById` lands in one mutatePrint call, so dragging a group of
+  // elements together is one undo step, not N. (N separate updatePrintElement
+  // calls would each be its own history entry - see useHistory.js's header
+  // comment on why that can't be fixed with beginBatch/commitBatch when the
+  // calls are all synchronous within one event handler.)
+  const updatePrintElements = useCallback((pageId, patchesById) => {
+    mutatePrint(prev => ({
+      ...prev,
+      pages: prev.pages.map(p => p.id !== pageId ? p : {
+        ...p,
+        elements: p.elements.map(el => patchesById[el.id] ? { ...el, ...patchesById[el.id] } : el),
+      }),
+    }))
+  }, [mutatePrint])
+
   const removePrintElement = useCallback((pageId, elementId) => {
     mutatePrint(prev => ({
       ...prev,
@@ -308,37 +388,203 @@ export function useReportBuilder(formId) {
     }))
   }, [mutatePrint])
 
-  // react-grid-layout fires onLayoutChange on mount with the layout it was
-  // already given - same no-op guard as setCanvasLayout above, so opening a
-  // print page doesn't immediately flip on the unsaved-changes indicator.
-  // `layouts` arrives in grid cells (react-grid-layout's own coordinate
-  // system, via gridAdapter's withGridLayout - see PrintWorkspace.jsx);
-  // elements are stored in percentage space, so convert on the way in and
-  // compare in grid-cell space (matching the granularity the guard already
-  // relied on, avoiding false "changed" positives from rounding drift).
-  const setPrintPageLayout = useCallback((pageId, layouts) => {
-    setState(prev => {
-      let changed = false
-      const pages = prev.printLayout.pages.map(p => {
+  const removePrintElements = useCallback((pageId, elementIds) => {
+    mutatePrint(prev => ({
+      ...prev,
+      pages: prev.pages.map(p => p.id !== pageId ? p : { ...p, elements: p.elements.filter(el => !elementIds.includes(el.id)) }),
+    }))
+  }, [mutatePrint])
+
+  // ---- z-order (brief §13 "Layering") - arithmetic lives in zOrder.js ----
+  const setPrintElementZ = useCallback((pageId, elementId, mode) => {
+    mutatePrint(prev => ({
+      ...prev,
+      pages: prev.pages.map(p => {
         if (p.id !== pageId) return p
-        const elements = p.elements.map(el => {
-          const l = layouts.find(x => x.i === el.id)
-          if (!l) return el
-          const cur = toGridCells(el)
-          if (cur.x === l.x && cur.y === l.y && cur.w === l.w && cur.h === l.h) return el
-          changed = true
-          return { ...el, ...fromGridCells(l) }
+        if (mode === 'front' || mode === 'back') {
+          const z = nextZIndex(p.elements, mode)
+          return { ...p, elements: p.elements.map(e => e.id === elementId ? { ...e, zIndex: z } : e) }
+        }
+        const swap = stepSwap(p.elements, elementId, mode === 'forward' ? 1 : -1)
+        if (!swap) return p
+        const [a, b] = swap
+        const byId = { [a.id]: a.zIndex, [b.id]: b.zIndex }
+        return { ...p, elements: p.elements.map(e => e.id in byId ? { ...e, zIndex: byId[e.id] } : e) }
+      }),
+    }))
+  }, [mutatePrint])
+
+  // Same as setPrintElementZ but for a multi-selection (FormatInspector's
+  // layer buttons when >1 element is selected) - applies to every id inside
+  // one mutatePrint call, same one-undo-step reasoning as updatePrintElements
+  // above. Elements are restacked in `elementIds` order so their relative
+  // order is preserved when moving the group as a whole.
+  const setPrintElementsZ = useCallback((pageId, elementIds, mode) => {
+    mutatePrint(prev => ({
+      ...prev,
+      pages: prev.pages.map(p => {
+        if (p.id !== pageId) return p
+        let elements = p.elements
+        if (mode === 'front' || mode === 'back') {
+          elementIds.forEach(id => {
+            const z = nextZIndex(elements, mode)
+            elements = elements.map(e => e.id === id ? { ...e, zIndex: z } : e)
+          })
+          return { ...p, elements }
+        }
+        elementIds.forEach(id => {
+          const swap = stepSwap(elements, id, mode === 'forward' ? 1 : -1)
+          if (!swap) return
+          const [a, b] = swap
+          const byId = { [a.id]: a.zIndex, [b.id]: b.zIndex }
+          elements = elements.map(e => e.id in byId ? { ...e, zIndex: byId[e.id] } : e)
         })
         return { ...p, elements }
-      })
-      if (!changed) return prev
-      setDirty(true)
-      return { ...prev, printLayout: { ...prev.printLayout, pages } }
-    })
-  }, [])
+      }),
+    }))
+  }, [mutatePrint])
 
+  // Full front-to-back restack, from the Layers panel's drag-to-reorder.
+  const reorderPrintElementsZ = useCallback((pageId, orderedIdsFrontToBack) => {
+    mutatePrint(prev => ({
+      ...prev,
+      pages: prev.pages.map(p => {
+        if (p.id !== pageId) return p
+        const zById = reindexFromOrder(orderedIdsFrontToBack)
+        return { ...p, elements: p.elements.map(el => el.id in zById ? { ...el, zIndex: zById[el.id] } : el) }
+      }),
+    }))
+  }, [mutatePrint])
+
+  // updatePrintSettings already covers theme/masterHeaderText/
+  // masterFooterText (Phase 2) - they're plain top-level printLayout
+  // fields, same shape as pageSize/showLogo/etc.
   const updatePrintSettings = useCallback((patch) => {
     mutatePrint(prev => ({ ...prev, ...patch }))
+  }, [mutatePrint])
+
+  // Per-page master-page override (Phase 2) - hides the header/footer/logo/
+  // date/page-number/watermark overlay on just this page (e.g. a full-bleed
+  // cover). Separate from the per-report showLogo/etc toggles, which stay
+  // the default every other page inherits.
+  const setPageHideMaster = useCallback((pageId, hide) => {
+    mutatePrint(prev => ({ ...prev, pages: prev.pages.map(p => p.id === pageId ? { ...p, hideMaster: hide } : p) }))
+  }, [mutatePrint])
+
+  // ---- grouping (Phase 2) - one bulk mutatePrint call each, same one-
+  // undo-step reasoning as updatePrintElements/setPrintElementsZ ----
+  const groupPrintElements = useCallback((pageId, elementIds) => {
+    const groupId = newPrintId('grp')
+    mutatePrint(prev => ({
+      ...prev,
+      pages: prev.pages.map(p => p.id !== pageId ? p : {
+        ...p,
+        elements: p.elements.map(el => elementIds.includes(el.id) ? { ...el, groupId } : el),
+      }),
+    }))
+    return groupId
+  }, [mutatePrint])
+
+  const ungroupPrintElements = useCallback((pageId, elementIds) => {
+    mutatePrint(prev => ({
+      ...prev,
+      pages: prev.pages.map(p => p.id !== pageId ? p : {
+        ...p,
+        elements: p.elements.map(el => elementIds.includes(el.id) ? { ...el, groupId: null } : el),
+      }),
+    }))
+  }, [mutatePrint])
+
+  // ---- reusable text/shape styles (Phase 2) ----
+  // A style is just a named bag of the same kind-specific props an element
+  // already carries (fontWeight/align/fill/stroke/etc, never x/y/width/
+  // height/rotation - those stay per-placement). Applying one copies its
+  // props onto the element and stamps styleRef so the picker can show
+  // which style (if any) is currently applied; editing the element after
+  // that doesn't retroactively change the saved style or other elements
+  // using it - "detach" is implicit, there's no live binding to break.
+  const addSavedStyle = useCallback((name, kind, props) => {
+    const style = { id: newPrintId('style'), name, kind, props }
+    mutatePrint(prev => ({ ...prev, savedStyles: [...(prev.savedStyles || []), style] }))
+    return style.id
+  }, [mutatePrint])
+
+  const removeSavedStyle = useCallback((styleId) => {
+    mutatePrint(prev => ({ ...prev, savedStyles: (prev.savedStyles || []).filter(s => s.id !== styleId) }))
+  }, [mutatePrint])
+
+  const applySavedStyle = useCallback((pageId, elementId, style) => {
+    mutatePrint(prev => ({
+      ...prev,
+      pages: prev.pages.map(p => p.id !== pageId ? p : {
+        ...p,
+        elements: p.elements.map(el => el.id === elementId ? { ...el, ...style.props, styleRef: style.id } : el),
+      }),
+    }))
+  }, [mutatePrint])
+
+  // ---- saved components (Phase 2) ----
+  // A component is a named cluster of elements, stored with positions
+  // relative to the cluster's own top-left corner (0-100 within the
+  // cluster's own bounding box) so it can be re-inserted at a fresh slot
+  // on any page/report, not just where it was originally placed.
+  const addSavedComponent = useCallback((name, elements) => {
+    const minX = Math.min(...elements.map(el => el.x || 0))
+    const minY = Math.min(...elements.map(el => el.y || 0))
+    const relative = elements.map(({ id: _id, ...el }) => ({ ...el, x: (el.x || 0) - minX, y: (el.y || 0) - minY }))
+    const component = { id: newPrintId('cmp'), name, elements: relative }
+    mutatePrint(prev => ({ ...prev, savedComponents: [...(prev.savedComponents || []), component] }))
+    return component.id
+  }, [mutatePrint])
+
+  const removeSavedComponent = useCallback((componentId) => {
+    mutatePrint(prev => ({ ...prev, savedComponents: (prev.savedComponents || []).filter(c => c.id !== componentId) }))
+  }, [mutatePrint])
+
+  // Re-creates a saved component's elements (fresh ids, a shared fresh
+  // groupId so they move together, offset onto the next open slot) in one
+  // mutatePrint call - one undo step for the whole insert.
+  const insertSavedComponent = useCallback((pageId, componentId) => {
+    mutatePrint(prev => {
+      const component = (prev.savedComponents || []).find(c => c.id === componentId)
+      if (!component) return prev
+      const groupId = newPrintId('grp')
+      return {
+        ...prev,
+        pages: prev.pages.map(p => {
+          if (p.id !== pageId) return p
+          const slotY = nextElementSlotPct(p.elements, 0, 0).y
+          const newElements = component.elements.map((el, i) => ({
+            ...el, id: newPrintId('el'), groupId,
+            x: el.x, y: clampPctLocal(el.y + slotY),
+            zIndex: p.elements.length + i + 1,
+          }))
+          return { ...p, elements: [...p.elements, ...newElements] }
+        }),
+      }
+    })
+  }, [mutatePrint])
+
+  // ---- page layout presets (Phase 2, pageLayouts.js) ----
+  // Creates a new page already populated with a preset's elements in one
+  // mutatePrint call, so it's one undo step (not "add page" + N "add
+  // element"s). `makeElements` is a pageLayouts.js factory - see its own
+  // comment for why the shape differs slightly from a normal add.
+  const addPrintPageWithElements = useCallback((afterId, makeElements) => {
+    let createdId
+    mutatePrint(prev => {
+      const newPage = { id: newPrintId('page'), elements: [] }
+      createdId = newPage.id
+      newPage.elements = makeElements().map((el, i) => ({
+        id: newPrintId('el'), ...el, zIndex: i + 1, locked: false, visible: true,
+        styleRef: null, groupId: null,
+      }))
+      const pages = [...prev.pages]
+      const idx = afterId ? pages.findIndex(p => p.id === afterId) : pages.length - 1
+      pages.splice(idx + 1, 0, newPage)
+      return { ...prev, pages }
+    })
+    return createdId
   }, [mutatePrint])
 
   // Bulk-create pages from plain content (see report/builder/print/
@@ -415,7 +661,14 @@ export function useReportBuilder(formId) {
     addVisual, updateVisual, updateVisualQuery, duplicateVisual, removeVisual,
     setCanvasLayout, promote, demote, setBuilderFilters, save, saveFormSetting,
     addPrintPage, duplicatePrintPage, removePrintPage, reorderPrintPages,
-    addPrintElement, updatePrintElement, removePrintElement, setPrintPageLayout, updatePrintSettings,
-    seedPrintPages,
+    addPrintElement, updatePrintElement, updatePrintElements, removePrintElement, removePrintElements,
+    setPrintElementZ, setPrintElementsZ, reorderPrintElementsZ,
+    updatePrintSettings, setPageHideMaster,
+    seedPrintPages, addPrintPageWithElements,
+    groupPrintElements, ungroupPrintElements,
+    addSavedStyle, removeSavedStyle, applySavedStyle,
+    addSavedComponent, removeSavedComponent, insertSavedComponent,
+    undoPrint, redoPrint, canUndoPrint: printHistory.canUndo, canRedoPrint: printHistory.canRedo,
+    beginPrintBatch, commitPrintBatch,
   }
 }

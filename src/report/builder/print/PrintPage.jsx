@@ -1,21 +1,26 @@
 // Place at: src/report/builder/print/PrintPage.jsx
-// One authored A4 page (brief §24-28). A fixed-aspect-ratio white canvas -
+// One authored page (brief §24-28). A fixed-aspect-ratio white canvas -
 // exported by rasterizing exactly this DOM node, so whatever fits on screen
-// is what ends up on the PDF page. Not wrapped in WidthProvider: rowHeight
-// has to be derived from the *measured* width together with the page's
-// aspect ratio (so the grid always spans exactly one page's height), which
-// WidthProvider's own width-only plumbing doesn't expose.
+// is what ends up on the PDF page. Renders via DesignerCanvas (Designer 2.0
+// Phase 1's freeform canvas) - the earlier react-grid-layout renderer was
+// removed at cutover (plan step 13); gridAdapter.js's fromGridCells/
+// resolveElementSize stay only as a units adapter for default-size inputs
+// (printConstants.js's defaultElementSize, replicateDashboard.js's output),
+// unrelated to which component renders a page.
 import { useEffect, useRef, useState } from 'react'
-import GridLayout from 'react-grid-layout/legacy'
-import 'react-grid-layout/css/styles.css'
+import DesignerCanvas from './DesignerCanvas'
 import PrintVisualElement from './PrintVisualElement'
 import PrintTextElement from './PrintTextElement'
 import PrintTileElement from './PrintTileElement'
-import { pageFormatMm, pageAspectRatio, GRID_COLS, ROWS_PER_PAGE, PAGE_SIZES, formatPageNumber } from './printConstants'
+import ShapeElement from './elements/ShapeElement'
+import ImageElement from './elements/ImageElement'
+import { pageFormatMm, pageAspectRatio, PAGE_SIZES, formatPageNumber } from './printConstants'
+import { themeCssVars } from './theme'
 
 export default function PrintPage({
   page, pageSize, orientation, visualsById, tilesById, form, submissions, editing, settings,
-  pageNumber, totalPages, onLayoutChange, onRemoveElement, onUpdateElement, pageRef,
+  pageNumber, totalPages, onRemoveElement, onUpdateElement, onUpdateElements, pageRef,
+  selectedIds, onSelect, tokenContext,
 }) {
   const containerRef = useRef(null)
   const [width, setWidth] = useState(0)
@@ -33,19 +38,57 @@ export default function PrintPage({
 
   const [wMm, hMm] = pageFormatMm(pageSize, orientation)
   const heightPx = width ? width * (hMm / wMm) : 0
-  const rowHeight = heightPx ? heightPx / ROWS_PER_PAGE : 20
   const maxWidthPx = (PAGE_SIZES[pageSize] || PAGE_SIZES.slide).orientable
     ? (orientation === 'landscape' ? '1000px' : '780px')
     : '1000px'
 
-  const layout = page.elements.map(el => ({
-    i: el.id,
-    x: el.layout?.x ?? 0, y: el.layout?.y ?? 0,
-    w: el.layout?.w ?? 12, h: el.layout?.h ?? 4,
-    minW: 2, minH: 2,
-  }))
+  const overflowing = page.elements.some(el => (el.y || 0) + (el.height || 0) > 100)
 
-  const overflowing = page.elements.some(el => (el.layout?.y || 0) + (el.layout?.h || 0) > ROWS_PER_PAGE)
+  function renderElementContent(el, canvasHelpers) {
+    // Shapes/images own their entire visual boundary (fill, image edges) -
+    // wrapping them in the generic card would double up the border/padding.
+    const boxed = !(
+      (el.kind === 'text' && ['title', 'big-number'].includes(el.text?.variant || 'body'))
+      || el.kind === 'shape' || el.kind === 'image'
+    )
+    return (
+      <div
+        style={{
+          height: '100%', boxSizing: 'border-box', overflow: 'hidden',
+          ...(boxed
+            ? { border: '1px solid #ddd', borderRadius: '8px', background: '#fff', padding: '1rem' }
+            : { padding: '0.2rem 0' }),
+        }}
+      >
+        {el.kind === 'text' ? (
+          <PrintTextElement
+            element={el} editing={editing}
+            directEdit={false}
+            onEditingChange={canvasHelpers?.onEditingChange}
+            onChange={patch => onUpdateElement(page.id, el.id, patch)}
+            onRemove={() => onRemoveElement(page.id, el.id)}
+            tokenContext={tokenContext}
+          />
+        ) : el.kind === 'tile' ? (
+          <PrintTileElement
+            tile={tilesById?.[el.tileId]} editing={editing}
+            onRemove={() => onRemoveElement(page.id, el.id)}
+          />
+        ) : el.kind === 'shape' ? (
+          <ShapeElement element={el} />
+        ) : el.kind === 'image' ? (
+          <ImageElement element={el} editing={editing} onChange={patch => onUpdateElement(page.id, el.id, patch)} />
+        ) : (
+          <PrintVisualElement
+            visual={visualsById[el.visualId]} form={form} submissions={submissions}
+            override={el.override} editing={editing}
+            onChangeOverride={ov => onUpdateElement(page.id, el.id, { override: ov })}
+            onRemove={() => onRemoveElement(page.id, el.id)}
+          />
+        )}
+      </div>
+    )
+  }
 
   return (
     <div style={{ marginBottom: '1.5rem' }}>
@@ -55,81 +98,57 @@ export default function PrintPage({
         style={{
           width: '100%', maxWidth: maxWidthPx,
           aspectRatio: pageAspectRatio(pageSize, orientation),
-          background: '#fff', border: '1px solid var(--color-border)', boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+          background: 'var(--designer-bg, #fff)', border: '1px solid var(--color-border)', boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
           overflow: 'hidden', position: 'relative', margin: '0 auto',
+          ...themeCssVars(settings?.theme),
         }}
       >
         {width > 0 && (
-          <GridLayout
+          <DesignerCanvas
+            page={page}
             width={width}
-            cols={GRID_COLS}
-            rowHeight={rowHeight}
-            margin={[10, 10]}
-            containerPadding={[20, 34]}
-            layout={layout}
-            compactType="vertical"
-            preventCollision={false}
-            isDraggable={editing}
-            isResizable={editing}
-            resizeHandles={['se']}
-            onLayoutChange={editing ? (l) => onLayoutChange(page.id, l) : undefined}
-          >
-            {page.elements.map(el => {
-              // Every element gets a visible card boundary except a Title
-              // block - it already reads fine spanning the page's full width
-              // unboxed, the way a document's own title would.
-              const boxed = !(el.kind === 'text' && (el.text?.variant || 'body') === 'title')
-              return (
-                <div key={el.id} style={{ height: '100%' }}>
-                  <div
-                    style={{
-                      height: '100%', boxSizing: 'border-box', overflow: 'hidden',
-                      ...(boxed
-                        ? { border: '1px solid #ddd', borderRadius: '8px', background: '#fff', padding: '1rem' }
-                        : { padding: '0.2rem 0' }),
-                    }}
-                  >
-                    {el.kind === 'text' ? (
-                      <PrintTextElement
-                        element={el} editing={editing}
-                        onChange={patch => onUpdateElement(page.id, el.id, patch)}
-                        onRemove={() => onRemoveElement(page.id, el.id)}
-                      />
-                    ) : el.kind === 'tile' ? (
-                      <PrintTileElement
-                        tile={tilesById?.[el.tileId]} editing={editing}
-                        onRemove={() => onRemoveElement(page.id, el.id)}
-                      />
-                    ) : (
-                      <PrintVisualElement
-                        visual={visualsById[el.visualId]} form={form} submissions={submissions}
-                        override={el.override} editing={editing}
-                        onChangeOverride={ov => onUpdateElement(page.id, el.id, { override: ov })}
-                        onRemove={() => onRemoveElement(page.id, el.id)}
-                      />
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </GridLayout>
+            height={heightPx}
+            editing={editing}
+            onUpdateElement={onUpdateElement}
+            onUpdateElements={onUpdateElements}
+            renderElement={renderElementContent}
+            selectedIds={selectedIds}
+            onSelect={onSelect}
+          />
         )}
 
-        {settings?.showLogo && (
-          <div style={{ position: 'absolute', top: 8, left: 16, fontSize: '0.75rem', fontWeight: 800, color: '#111' }}>VerticalS</div>
-        )}
-        {settings?.showDate && (
-          <div style={{ position: 'absolute', top: 8, right: 16, fontSize: '0.7rem', color: '#666' }}>
-            {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-          </div>
-        )}
-        {settings?.showPageNumber && (page.kind !== 'title' || settings?.numberTitlePage) && (
-          <div style={{ position: 'absolute', bottom: 6, right: 16, fontSize: '0.7rem', color: '#666' }}>
-            {formatPageNumber(settings?.pageNumberFormat, pageNumber, totalPages)}
-          </div>
-        )}
-        {settings?.showWatermark && (
-          <div style={{ position: 'absolute', bottom: 6, left: 16, fontSize: '0.65rem', color: '#aaa' }}>Powered by Verticals</div>
+        {/* Master page overlay (Phase 2) - logo/date/page-number/watermark
+            plus optional header/footer text, all hideable per-page for a
+            full-bleed cover/section page. */}
+        {!page.hideMaster && (
+          <>
+            {settings?.showLogo && (
+              <div style={{ position: 'absolute', top: 8, left: 16, fontSize: '0.75rem', fontWeight: 800, color: '#111' }}>VerticalS</div>
+            )}
+            {settings?.showDate && (
+              <div style={{ position: 'absolute', top: 8, right: 16, fontSize: '0.7rem', color: '#666' }}>
+                {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+              </div>
+            )}
+            {settings?.masterHeaderText && (
+              <div style={{ position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)', fontSize: '0.7rem', color: '#666' }}>
+                {settings.masterHeaderText}
+              </div>
+            )}
+            {settings?.masterFooterText && (
+              <div style={{ position: 'absolute', bottom: 6, left: '50%', transform: 'translateX(-50%)', fontSize: '0.65rem', color: '#888' }}>
+                {settings.masterFooterText}
+              </div>
+            )}
+            {settings?.showPageNumber && (page.kind !== 'title' || settings?.numberTitlePage) && (
+              <div style={{ position: 'absolute', bottom: 6, right: 16, fontSize: '0.7rem', color: '#666' }}>
+                {formatPageNumber(settings?.pageNumberFormat, pageNumber, totalPages)}
+              </div>
+            )}
+            {settings?.showWatermark && (
+              <div style={{ position: 'absolute', bottom: 6, left: 16, fontSize: '0.65rem', color: '#aaa' }}>Powered by Verticals</div>
+            )}
+          </>
         )}
       </div>
 

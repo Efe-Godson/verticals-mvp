@@ -25,6 +25,7 @@
     "jspdf-autotable": "^5.0.8",
     "lucide-react": "^1.42.0",
     "posthog-js": "^1.430.3",
+    "pptxgenjs": "^4.0.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-easy-crop": "^6.2.3",

@@ -38,9 +38,13 @@ function ChartFallback() {
   return <SkeletonChart style={{ height: '100%', minHeight: 160 }} />
 }
 
-export default function VisualRenderer({ visual, result, form, onSelectDatapoint }) {
+export default function VisualRenderer({ visual, result, form, onSelectDatapoint, tableStyle, displayOverride }) {
   if (!result) return <EmptyViz message="Configure this visual on the right." />
   const type = visual.type
+  // Chart presentation-style presets (Phase 3) - a print placement's own
+  // override (chartPresets.js) wins over the visual's own saved display
+  // settings, same per-placement precedence tableStyle already has.
+  const display = { ...(visual.display || {}), ...(displayOverride || {}) }
 
   if (['kpi', 'number', 'comparison', 'progress'].includes(type)) {
     return <KpiViz result={result} visual={visual} display={visual.display || {}} />
@@ -49,19 +53,19 @@ export default function VisualRenderer({ visual, result, form, onSelectDatapoint
     return <PivotViz result={result} />
   }
   if (type === 'summaryTable') {
-    return <SummaryTableViz result={result} />
+    return <SummaryTableViz result={result} tableStyle={tableStyle} />
   }
   if (type === 'table') {
-    return <DataTableViz result={result} form={form} />
+    return <DataTableViz result={result} form={form} tableStyle={tableStyle} />
   }
 
   let chart = null
   if (BAR_VARIANTS.includes(type)) {
-    chart = <BarViz result={result} variant={type} display={visual.display || {}} onSelectDatapoint={onSelectDatapoint} />
+    chart = <BarViz result={result} variant={type} display={display} onSelectDatapoint={onSelectDatapoint} />
   } else if (LINE_VARIANTS.includes(type)) {
-    chart = <LineViz result={result} variant={type} display={visual.display || {}} />
+    chart = <LineViz result={result} variant={type} display={display} />
   } else if (type === 'pie' || type === 'donut') {
-    chart = <PieViz result={result} variant={type} display={visual.display || {}} onSelectDatapoint={onSelectDatapoint} />
+    chart = <PieViz result={result} variant={type} display={display} onSelectDatapoint={onSelectDatapoint} />
   } else if (type === 'scatter') {
     chart = <ScatterViz result={result} onSelectDatapoint={onSelectDatapoint} />
   }
