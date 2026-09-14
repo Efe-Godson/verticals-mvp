@@ -1,12 +1,14 @@
 // Place at: src/lib/registerServiceWorker.js
-// vite.config.js's VitePWA block (registerType: 'autoUpdate', skipWaiting,
-// clientsClaim) already makes a new deploy's service worker take over as
-// soon as it installs - but "takes over" only means it starts controlling
-// *future* requests. A tab that was already open keeps running the old
-// HTML/JS it originally loaded until something actually reloads it, so
-// without this a deploy could sit one version behind indefinitely for
-// anyone who doesn't manually hard-refresh. onNeedRefresh reloads once the
-// new worker is ready, which is what actually fetches the new build.
+// A new deploy's service worker installs and sits "waiting" until this file
+// tells it to take over (see vite.config.js - skipWaiting is intentionally
+// NOT set in the workbox config, so it doesn't skip that waiting state on
+// its own). Even once it does take over, that only means it starts
+// controlling *future* requests. A tab that was already open keeps running
+// the old HTML/JS it originally loaded until something actually reloads it,
+// so without this a deploy could sit one version behind indefinitely for
+// anyone who doesn't manually hard-refresh. onNeedRefresh fires when the new
+// worker is waiting, and updateSW(true) tells it to activate and reloads
+// once it does, which is what actually fetches the new build.
 //
 // Switched from vite-plugin-pwa's auto-injected registration script (see
 // vite.config.js's injectRegister: null) to this explicit virtual:pwa-

@@ -10,7 +10,21 @@ export default defineConfig({
       // We author manifest.webmanifest by hand in public/ and link it
       // ourselves in index.html, so the plugin doesn't need to generate one.
       manifest: false,
-      registerType: 'autoUpdate',
+      // Must be 'prompt', not 'autoUpdate': vite-plugin-pwa forces
+      // workbox.skipWaiting/clientsClaim to true internally whenever
+      // registerType is 'autoUpdate' (see its source, injectManifest
+      // handling around registerType === "autoUpdate") - REGARDLESS of what
+      // this file's workbox block sets. skipWaiting makes the new service
+      // worker call self.skipWaiting() unconditionally on install, so it
+      // never enters the "waiting" state that workbox-window watches for.
+      // registerServiceWorker.js's onNeedRefresh only fires on that
+      // "waiting" state, so with 'autoUpdate' it silently never fires - the
+      // new worker takes over in the background but the open tab keeps
+      // running its old JS/HTML until someone manually hard-refreshes.
+      // 'prompt' leaves the new worker waiting and lets the client
+      // (registerServiceWorker.js) decide when to tell it to activate, via
+      // updateSW(true), which is exactly what onNeedRefresh does here.
+      registerType: 'prompt',
       // Registered explicitly via virtual:pwa-register instead
       // (src/lib/registerServiceWorker.js) - that's the only way to get an
       // onNeedRefresh hook that actually reloads an already-open tab once
@@ -19,11 +33,10 @@ export default defineConfig({
       injectRegister: null,
       includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'icons/*.png'],
       workbox: {
-        // Take over and drop the previous build's precache as soon as the
-        // new service worker installs, so a deploy actually reaches open
-        // tabs on the next load instead of lingering a version behind.
+        // clientsClaim (not skipWaiting - see registerType above) is what
+        // lets a newly-activated service worker take over already-open
+        // tabs once registerServiceWorker.js tells it to.
         clientsClaim: true,
-        skipWaiting: true,
         cleanupOutdatedCaches: true,
         // Vendor chunks (jspdf, xlsx, pptxgenjs, html2canvas) can land above
         // the 2MB default - raise the ceiling so the precache build doesn't
