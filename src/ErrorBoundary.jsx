@@ -3,6 +3,7 @@
 // screen with nothing to go on. This catches it, shows the message + stack,
 // and offers a reload. Wraps <Routes> in App.jsx.
 import { Component } from 'react'
+import { captureException } from './lib/posthog'
 
 export default class ErrorBoundary extends Component {
   constructor(props) {
@@ -17,6 +18,11 @@ export default class ErrorBoundary extends Component {
   componentDidCatch(error, info) {
     // eslint-disable-next-line no-console
     console.error('App crashed:', error, info?.componentStack)
+    // Was console-only before, so a crash like this was invisible unless
+    // someone happened to be watching devtools when it happened - report it
+    // so an intermittent one shows up without needing a user to reproduce
+    // it live.
+    captureException(error, { componentStack: info?.componentStack })
   }
 
   render() {
