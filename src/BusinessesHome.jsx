@@ -19,6 +19,7 @@ import { SkeletonCard } from './components/Skeleton'
 import { RefreshingIndicator } from './components/InlineLoader'
 import { getPageCache, setPageCache } from './hooks/pageCache'
 import { ErrorState } from './ErrorState'
+import EmptyState from './components/EmptyState'
 import { completeOnboardingEntry } from './lib/completeOnboardingEntry'
 
 // Retail/Restaurant are the only categories where "how many locations" is
@@ -72,8 +73,16 @@ function BusinessTile({ template, secondaryLabel, role, ownerEmail, onManage, on
             <div className="dropdown-panel" style={{
               position: 'absolute', top: '100%', right: '0.4rem', marginTop: '-0.3rem',
               background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 20, minWidth: '130px', overflow: 'hidden'
+              boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 20, minWidth: '160px', overflow: 'hidden'
             }}>
+              {!isOwner && (
+                <div style={{
+                  padding: '0.55rem 0.8rem', fontSize: '0.72rem', color: 'var(--color-muted)', textAlign: 'left',
+                  borderBottom: '1px solid var(--color-border)', wordBreak: 'break-word',
+                }}>
+                  Shared by {ownerEmail}
+                </div>
+              )}
               {isOwner && (
                 <div
                   onClick={() => { setMenuOpen(false); onShare() }}
@@ -107,11 +116,6 @@ function BusinessTile({ template, secondaryLabel, role, ownerEmail, onManage, on
       {secondaryLabel && (
         <span style={{ fontSize: '0.72rem', color: 'var(--color-muted)' }}>
           {secondaryLabel}
-        </span>
-      )}
-      {!isOwner && (
-        <span style={{ fontSize: '0.68rem', color: 'var(--color-muted)', marginTop: '0.2rem' }}>
-          Shared by {ownerEmail}
         </span>
       )}
     </div>
@@ -372,8 +376,16 @@ function BusinessesHome() {
     navigate(`/templates/${template.slug}/locations${ownerParam}`)
   }
 
-  const workflowCount = usedTemplates.length
-  const locationTotal = usedTemplates.reduce((sum, u) => sum + (u.template.bundle?.length > 0 ? 0 : u.locationCount), 0)
+  // Split by role, not just "everything usedTemplates returns" - a workflow
+  // shared with you (Admin role) isn't yours to count toward your own
+  // workflow/location totals or to offer the "+ Add a template" tile
+  // under, so it gets its own section instead of blending into "Your
+  // Workflows" the way it used to (with just a "Shared by" caption on the
+  // tile - see BusinessTile's dropdown for where that moved).
+  const myTemplates = usedTemplates.filter(u => u.role === 'owner')
+  const sharedTemplates = usedTemplates.filter(u => u.role !== 'owner')
+  const workflowCount = myTemplates.length
+  const locationTotal = myTemplates.reduce((sum, u) => sum + (u.template.bundle?.length > 0 ? 0 : u.locationCount), 0)
 
   return (
     <div className="page" style={{ maxWidth: '860px' }}>
@@ -383,7 +395,7 @@ function BusinessesHome() {
         .template-tile:active { transform: translateY(0); box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
       `}</style>
 
-      {!loading && usedTemplates.length > 0 && (
+      {!loading && myTemplates.length > 0 && (
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '1rem', gap: '0.7rem', flexWrap: 'wrap' }}>
           <span style={{ display: 'flex', alignItems: 'baseline', gap: '0.6rem' }}>
             <span style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-muted)' }}>
@@ -403,9 +415,15 @@ function BusinessesHome() {
         </div>
       ) : error && usedTemplates.length === 0 ? (
         <ErrorState message={error} onRetry={() => loadTemplates()} />
+      ) : myTemplates.length === 0 ? (
+        <EmptyState
+          title="Set up your first workflow"
+          message="Pick a template to start collecting records, tracking sales, or running payroll - everything else builds on top of it."
+          action={<button onClick={() => navigate('/templates')}>Choose a template</button>}
+        />
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.8rem' }}>
-          {usedTemplates.map(({ template, secondaryLabel, singleFormId, ownerId, role, ownerEmail }) => (
+          {myTemplates.map(({ template, secondaryLabel, singleFormId, ownerId, role, ownerEmail }) => (
             <BusinessTile
               key={`${ownerId}:${template.slug}`}
               template={template}
@@ -419,6 +437,30 @@ function BusinessesHome() {
           ))}
           <AddTemplateTile />
         </div>
+      )}
+
+      {!loading && sharedTemplates.length > 0 && (
+        <>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.6rem', marginTop: '1.6rem', marginBottom: '1rem' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-muted)' }}>
+              Shared with me
+            </span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.8rem' }}>
+            {sharedTemplates.map(({ template, secondaryLabel, singleFormId, ownerId, role, ownerEmail }) => (
+              <BusinessTile
+                key={`${ownerId}:${template.slug}`}
+                template={template}
+                secondaryLabel={secondaryLabel}
+                role={role}
+                ownerEmail={ownerEmail}
+                onManage={() => manage({ template, singleFormId, ownerId, role })}
+                onShare={() => setShareTarget({ templateSlug: template.slug, displayName: template.name })}
+                onDelete={() => setPendingDeleteKey(`${ownerId}:${template.slug}`)}
+              />
+            ))}
+          </div>
+        </>
       )}
 
       {pendingDeleteKey && (() => {
