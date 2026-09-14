@@ -55,6 +55,7 @@ const OnboardingPrototype = lazy(() => import('./lab/onboarding/OnboardingProtot
 const DemoSetupPage = lazy(() => import('./lab/DemoSetupPage'))
 const DemoDataManagerPage = lazy(() => import('./lab/DemoDataManagerPage'))
 const TrustLegalManagerPage = lazy(() => import('./lab/TrustLegalManagerPage'))
+const LocationOverridesPage = lazy(() => import('./lab/LocationOverridesPage'))
 const PublicDemoShell = lazy(() => import('./PublicDemoExperience'))
 const PublicDemoHome = lazy(() => import('./PublicDemoExperience').then(m => ({ default: m.PublicDemoHome })))
 const PublicDemoRecords = lazy(() => import('./PublicDemoExperience').then(m => ({ default: m.PublicDemoRecords })))
@@ -300,6 +301,7 @@ function AppShell() {
         <Route path="/lab/demo-setup" element={<PrivateRoute><StaffScopedRoute><AdminOnlyRoute><DemoSetupPage /></AdminOnlyRoute></StaffScopedRoute></PrivateRoute>} />
         <Route path="/lab/demo-data" element={<PrivateRoute><StaffScopedRoute><AdminOnlyRoute><DemoDataManagerPage /></AdminOnlyRoute></StaffScopedRoute></PrivateRoute>} />
         <Route path="/lab/trust-legal" element={<PrivateRoute><StaffScopedRoute><AdminOnlyRoute><TrustLegalManagerPage /></AdminOnlyRoute></StaffScopedRoute></PrivateRoute>} />
+        <Route path="/lab/location-names" element={<PrivateRoute><StaffScopedRoute><AdminOnlyRoute><LocationOverridesPage /></AdminOnlyRoute></StaffScopedRoute></PrivateRoute>} />
         <Route path="/reports" element={<PrivateRoute><StaffScopedRoute><Reports /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/records" element={<PrivateRoute><StaffScopedRoute><RecordsHome /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/templates" element={<PrivateRoute><StaffScopedRoute><Templates /></StaffScopedRoute></PrivateRoute>} />

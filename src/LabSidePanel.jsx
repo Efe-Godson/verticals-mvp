@@ -19,6 +19,7 @@ const ENTRIES = [
   { label: '🧩 Demo Setup', to: '/lab/demo-setup' },
   { label: '🗂️ Demo Data', to: '/lab/demo-data' },
   { label: '⚖️ Trust & Legal', to: '/lab/trust-legal' },
+  { label: '📍 Location Names', to: '/lab/location-names' },
   { label: '🌐 Public Demo', to: '/demo' },
 ]
 

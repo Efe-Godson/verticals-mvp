@@ -12,24 +12,36 @@ import {
   getStatesOfCountry,
   getCitiesOfState,
 } from '@countrystatecity/countries-browser'
+import { supabase } from '../supabaseClient'
 
 // Sensible default for this app's main market - used where a country is
 // needed before the async list has loaded (form builder defaults, SignUp).
 export const DEFAULT_COUNTRY = 'Nigeria'
 
-// A few Nigerian state names in the source data don't match common local
-// usage / what older submissions stored. Normalise on the way out (display)
-// and accept either spelling on the way in (lookups).
-const STATE_ALIASES = {
-  'Abuja Federal Capital Territory': 'Abuja (FCT)',
-  'Nassarawa': 'Nasarawa',
-}
-const normalizeState = (name) => STATE_ALIASES[name] || name
-
 // --- caches -------------------------------------------------------------
 let countriesPromise = null // Promise<[{ name, code }]>
 const statesCache = new Map() // countryCode -> Promise<[{ name, code }]>
 const citiesCache = new Map() // `${countryCode}|${stateCode}` -> Promise<string[]>
+// A state name the CDN dataset uses can be wrong/unfamiliar (e.g. Nigerian
+// states - see the seed rows in supabase/migrations/20260914100000_
+// location_state_overrides.sql). Rather than hardcoding fixes here, they're
+// editable from Lab (src/lab/LocationOverridesPage.jsx) - loaded once per
+// session and applied on the way out of loadStates. Accept either spelling
+// on the way in (stateCode below already searches the overridden list).
+let stateOverridesPromise = null // Promise<Map<"country|sourceName" (lowercase), displayName>>
+
+function loadStateOverrides() {
+  if (!stateOverridesPromise) {
+    stateOverridesPromise = supabase
+      .from('location_state_overrides').select('country, source_name, display_name')
+      .then(({ data, error }) => {
+        if (error) throw error
+        return new Map((data || []).map(r => [`${r.country.toLowerCase()}|${r.source_name.toLowerCase()}`, r.display_name]))
+      })
+      .catch(() => { stateOverridesPromise = null; return new Map() })
+  }
+  return stateOverridesPromise
+}
 
 // --- public API -------------------------------------------------------
 
@@ -53,18 +65,30 @@ async function countryCode(countryName) {
   return hit ? hit.code : null
 }
 
-// [{ name, code }] for a country name. `name` is already normalised.
+// [{ name, code }] for a country name, with any Lab-configured overrides
+// applied to `name`.
 export async function loadStates(countryName) {
   const code = await countryCode(countryName)
   if (!code) return []
   if (!statesCache.has(code)) {
-    statesCache.set(code, getStatesOfCountry(code)
-      .then(list => list
-        .map(s => ({ name: normalizeState(s.name), code: s.iso2 }))
+    statesCache.set(code, Promise.all([getStatesOfCountry(code), loadStateOverrides()])
+      .then(([list, overrides]) => list
+        .map(s => ({ name: overrides.get(`${countryName.toLowerCase()}|${s.name.toLowerCase()}`) || s.name, code: s.iso2 }))
         .sort((a, b) => a.name.localeCompare(b.name)))
       .catch(() => { statesCache.delete(code); return [] }))
   }
   return statesCache.get(code)
+}
+
+// The CDN's raw state list for a country, with no overrides applied - what
+// Lab's LocationOverridesPage shows so an admin can see the "before" name
+// they're overriding, separate from statesCache (which holds the
+// already-overridden list every other caller wants).
+export async function loadRawStates(countryName) {
+  const code = await countryCode(countryName)
+  if (!code) return []
+  const list = await getStatesOfCountry(code)
+  return list.map(s => ({ name: s.name, code: s.iso2 })).sort((a, b) => a.name.localeCompare(b.name))
 }
 
 async function stateCode(countryName, stateName) {
