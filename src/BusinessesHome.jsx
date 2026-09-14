@@ -11,6 +11,7 @@ import { useAuth } from './AuthContext'
 import { useToast } from './Toast'
 import ConfirmDialog from './ConfirmDialog'
 import ShareModal from './ShareModal'
+import Modal from './components/Modal'
 import HomeRecycleBinDialog from './HomeRecycleBinDialog'
 import { useRecycleBinTrigger } from './RecycleBinContext'
 import { categoryColor, CategoryIcon } from './templateVisuals'
@@ -35,7 +36,7 @@ function usesLocationCount(category) {
 // ever touch its first form - see performDeleteBusiness's formIds.in(...)
 // batch below, which is what makes "Delete" a well-defined single action
 // here even when a tile stands for several locations at once).
-function BusinessTile({ template, secondaryLabel, role, ownerEmail, onManage, onShare, onDelete }) {
+function BusinessTile({ template, displayName, secondaryLabel, role, ownerEmail, onManage, onShare, onRename, onDelete }) {
   const color = categoryColor(template.category)
   const [menuOpen, setMenuOpen] = useState(false)
   const isOwner = role === 'owner'
@@ -92,6 +93,12 @@ function BusinessTile({ template, secondaryLabel, role, ownerEmail, onManage, on
                 </div>
               )}
               <div
+                onClick={() => { setMenuOpen(false); onRename() }}
+                style={{ padding: '0.55rem 0.8rem', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
+              >
+                Rename
+              </div>
+              <div
                 onClick={() => { setMenuOpen(false); onDelete() }}
                 style={{ padding: '0.55rem 0.8rem', fontSize: '0.82rem', cursor: 'pointer', color: '#c0392b', textAlign: 'left' }}
               >
@@ -111,7 +118,7 @@ function BusinessTile({ template, secondaryLabel, role, ownerEmail, onManage, on
         fontSize: '0.85rem', fontWeight: 600, lineHeight: 1.25, marginBottom: '0.35rem',
         display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
       }}>
-        {template.name}
+        {displayName}
       </span>
       {secondaryLabel && (
         <span style={{ fontSize: '0.72rem', color: 'var(--color-muted)' }}>
@@ -154,12 +161,15 @@ function BusinessesHome() {
   const { setTrigger } = useRecycleBinTrigger()
   usePageTitle('Home')
 
-  const [usedTemplates, setUsedTemplates] = useState([]) // [{ template, locationCount, singleFormId, secondaryLabel, ownerId, role, ownerEmail }]
+  const [usedTemplates, setUsedTemplates] = useState([]) // [{ template, locationCount, singleFormId, secondaryLabel, ownerId, role, ownerEmail, workflowName }]
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
 
   const [shareTarget, setShareTarget] = useState(null) // { templateSlug, displayName } | null
+  const [renameTarget, setRenameTarget] = useState(null) // { ownerId, template, currentName } | null
+  const [renameInput, setRenameInput] = useState('')
+  const [renaming, setRenaming] = useState(false)
   const [pendingDeleteKey, setPendingDeleteKey] = useState(null) // "ownerId:slug"
   const [pendingBinConfirm, setPendingBinConfirm] = useState(null) // { type: 'permanentDelete', formId } | { type: 'emptyBin' }
   const [binCount, setBinCount] = useState(0)
@@ -200,11 +210,11 @@ function BusinessesHome() {
       const { data: rows, error: rowsError } = await supabase.rpc('list_accessible_workflows')
       if (rowsError) throw rowsError
 
-      const byKey = {} // "ownerId:slug" -> { ownerId, slug, role, ownerEmail, formIds }
+      const byKey = {} // "ownerId:slug" -> { ownerId, slug, role, ownerEmail, formIds, workflowName }
       ;(rows || []).filter(r => r.role !== 'viewer').forEach(r => {
         byKey[`${r.owner_id}:${r.template_slug}`] = {
           ownerId: r.owner_id, slug: r.template_slug, role: r.role,
-          ownerEmail: r.owner_email, formIds: r.form_ids || [],
+          ownerEmail: r.owner_email, formIds: r.form_ids || [], workflowName: r.workflow_name,
         }
       })
 
@@ -241,6 +251,7 @@ function BusinessesHome() {
         return {
           template, locationCount: entry.formIds.length, singleFormId: entry.formIds[0], formIds: entry.formIds,
           secondaryLabel, ownerId: entry.ownerId, role: entry.role, ownerEmail: entry.ownerEmail,
+          workflowName: entry.workflowName,
         }
       }))).filter(Boolean)
       setUsedTemplates(list)
@@ -361,6 +372,47 @@ function BusinessesHome() {
     showToast(`"${entry.template.name}" moved to Recycle Bin.`, 'success')
   }
 
+  function openRenameModal(entry) {
+    setRenameInput(entry.workflowName || entry.template.name)
+    setRenameTarget(entry)
+  }
+
+  // Blank, or typing the template's own name back, clears the override
+  // (deletes the row) instead of storing a redundant one - workflow_names
+  // having no row for this (owner, slug) is exactly what "use the template's
+  // default name" means server-side too, see list_accessible_workflows().
+  async function saveWorkflowName(e) {
+    e.preventDefault()
+    const entry = renameTarget
+    const trimmed = renameInput.trim()
+    setRenaming(true)
+    try {
+      if (!trimmed || trimmed === entry.template.name) {
+        const { error } = await supabase.from('workflow_names')
+          .delete().eq('owner_id', entry.ownerId).eq('template_slug', entry.template.slug)
+        if (error) throw new Error(error.message)
+        setUsedTemplates(current => current.map(u =>
+          u.ownerId === entry.ownerId && u.template.slug === entry.template.slug ? { ...u, workflowName: null } : u
+        ))
+      } else {
+        const { error } = await supabase.from('workflow_names').upsert(
+          { owner_id: entry.ownerId, template_slug: entry.template.slug, display_name: trimmed, updated_at: new Date().toISOString() },
+          { onConflict: 'owner_id,template_slug' }
+        )
+        if (error) throw new Error(error.message)
+        setUsedTemplates(current => current.map(u =>
+          u.ownerId === entry.ownerId && u.template.slug === entry.template.slug ? { ...u, workflowName: trimmed } : u
+        ))
+      }
+      setRenameTarget(null)
+      showToast('Renamed.', 'success')
+    } catch (err) {
+      showToast('Could not rename: ' + err.message, 'error')
+    } finally {
+      setRenaming(false)
+    }
+  }
+
   function manage({ template, singleFormId, ownerId, role }) {
     if (template.bundle?.length > 0) {
       const destination = template.bundle[0]?.settings?.payrollRole === 'employees'
@@ -423,18 +475,23 @@ function BusinessesHome() {
         />
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.8rem' }}>
-          {myTemplates.map(({ template, secondaryLabel, singleFormId, ownerId, role, ownerEmail }) => (
+          {myTemplates.map((entry) => {
+            const { template, secondaryLabel, singleFormId, ownerId, role, ownerEmail, workflowName } = entry
+            return (
             <BusinessTile
               key={`${ownerId}:${template.slug}`}
               template={template}
+              displayName={workflowName || template.name}
               secondaryLabel={secondaryLabel}
               role={role}
               ownerEmail={ownerEmail}
               onManage={() => manage({ template, singleFormId, ownerId, role })}
-              onShare={() => setShareTarget({ templateSlug: template.slug, displayName: template.name })}
+              onShare={() => setShareTarget({ templateSlug: template.slug, displayName: workflowName || template.name })}
+              onRename={() => openRenameModal(entry)}
               onDelete={() => setPendingDeleteKey(`${ownerId}:${template.slug}`)}
             />
-          ))}
+            )
+          })}
           <AddTemplateTile />
         </div>
       )}
@@ -447,18 +504,23 @@ function BusinessesHome() {
             </span>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.8rem' }}>
-            {sharedTemplates.map(({ template, secondaryLabel, singleFormId, ownerId, role, ownerEmail }) => (
+            {sharedTemplates.map((entry) => {
+              const { template, secondaryLabel, singleFormId, ownerId, role, ownerEmail, workflowName } = entry
+              return (
               <BusinessTile
                 key={`${ownerId}:${template.slug}`}
                 template={template}
+                displayName={workflowName || template.name}
                 secondaryLabel={secondaryLabel}
                 role={role}
                 ownerEmail={ownerEmail}
                 onManage={() => manage({ template, singleFormId, ownerId, role })}
-                onShare={() => setShareTarget({ templateSlug: template.slug, displayName: template.name })}
+                onShare={() => setShareTarget({ templateSlug: template.slug, displayName: workflowName || template.name })}
+                onRename={() => openRenameModal(entry)}
                 onDelete={() => setPendingDeleteKey(`${ownerId}:${template.slug}`)}
               />
-            ))}
+              )
+            })}
           </div>
         </>
       )}
@@ -488,6 +550,26 @@ function BusinessesHome() {
           displayName={shareTarget.displayName}
           onClose={() => setShareTarget(null)}
         />
+      )}
+
+      {renameTarget && (
+        <Modal size="sm" onClose={() => setRenameTarget(null)} title="Rename this workflow">
+          <p style={{ color: 'var(--color-muted)', fontSize: '0.85rem', margin: '0 0 1rem' }}>
+            Shown here on Home instead of "{renameTarget.template.name}". Leave it as the template's own name to clear this.
+          </p>
+          <form onSubmit={saveWorkflowName}>
+            <input
+              type="text" autoFocus value={renameInput}
+              onChange={(e) => setRenameInput(e.target.value)}
+              placeholder={renameTarget.template.name}
+              style={{ width: '100%', padding: '0.5rem', marginBottom: '1rem' }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem' }}>
+              <button type="button" className="secondary" onClick={() => setRenameTarget(null)}>Cancel</button>
+              <button type="submit" disabled={renaming}>{renaming ? 'Saving...' : 'Save'}</button>
+            </div>
+          </form>
+        </Modal>
       )}
 
       {showBin && (

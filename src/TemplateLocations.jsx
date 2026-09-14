@@ -24,7 +24,7 @@ import { usePageTitle, usePageBack } from './PageTitleContext'
 // with Duplicate/logo actions added alongside Delete - the old "Manage
 // Locations" modal (a single flat list with only Delete) is gone in favor
 // of putting every action right on the card it acts on.
-function LocationTile({ location, color, uploading, role, onManage, onShare, onDuplicate, onDelete, onLogoChange, onLogoRemove }) {
+function LocationTile({ location, color, uploading, role, onManage, onShare, onRename, onDuplicate, onDelete, onLogoChange, onLogoRemove }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const fileInputRef = useRef(null)
   const logoUrl = location.settings?.logoUrl
@@ -94,6 +94,12 @@ function LocationTile({ location, color, uploading, role, onManage, onShare, onD
                   Share
                 </div>
               )}
+              <div
+                onClick={() => { setMenuOpen(false); onRename() }}
+                style={{ padding: '0.55rem 0.8rem', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
+              >
+                Rename
+              </div>
               <div
                 onClick={() => { setMenuOpen(false); onDuplicate() }}
                 style={{ padding: '0.55rem 0.8rem', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
@@ -216,6 +222,9 @@ function TemplateLocations() {
   // existing one rather than creating a fresh one from the template -
   // holds just the source location's id (see duplicateLocationForm).
   const [duplicateSourceId, setDuplicateSourceId] = useState(null)
+  const [renameTarget, setRenameTarget] = useState(null) // location being renamed, or null
+  const [renameInput, setRenameInput] = useState('')
+  const [renaming, setRenaming] = useState(false)
 
   const [pendingDeleteId, setPendingDeleteId] = useState(null)
   const [pendingBinConfirm, setPendingBinConfirm] = useState(null) // { type: 'permanentDelete', formId } | { type: 'emptyBin' }
@@ -315,6 +324,35 @@ function TemplateLocations() {
       return
     }
     setLocations(current => current.map(l => l.id === location.id ? { ...l, settings: updatedSettings } : l))
+  }
+
+  function openRenameModal(location) {
+    setRenameInput(location.settings?.locationName || location.name)
+    setRenameTarget(location)
+  }
+
+  // Renaming touches forms.name + settings.locationName together (both
+  // read as the location's display name in different places - see
+  // LocationTile above and locations.js) but deliberately leaves
+  // settings.companyName untouched: that's the separate "Business Name"
+  // field FormSettings.jsx exposes for receipts, not this tile's name.
+  async function saveLocationName(e) {
+    e.preventDefault()
+    const trimmed = renameInput.trim()
+    if (!trimmed) return
+    setRenaming(true)
+    try {
+      const updatedSettings = { ...(renameTarget.settings || {}), locationName: trimmed }
+      const { error } = await supabase.from('forms').update({ name: trimmed, settings: updatedSettings }).eq('id', renameTarget.id)
+      if (error) throw new Error(error.message)
+      setLocations(current => current.map(l => l.id === renameTarget.id ? { ...l, name: trimmed, settings: updatedSettings } : l))
+      setRenameTarget(null)
+      showToast('Renamed.', 'success')
+    } catch (err) {
+      showToast('Could not rename: ' + err.message, 'error')
+    } finally {
+      setRenaming(false)
+    }
   }
 
   async function handleLogoChange(location, file) {
@@ -479,6 +517,7 @@ function TemplateLocations() {
               formId: location.id,
               displayName: location.settings?.locationName || location.name,
             })}
+            onRename={() => openRenameModal(location)}
             onDuplicate={() => openDuplicateModal(location)}
             onDelete={() => requestDeleteLocation(location.id)}
             onLogoChange={(file) => handleLogoChange(location, file)}
@@ -516,6 +555,22 @@ function TemplateLocations() {
           displayName={shareTarget.displayName}
           onClose={() => setShareTarget(null)}
         />
+      )}
+
+      {renameTarget && (
+        <Modal size="sm" onClose={() => setRenameTarget(null)} title="Rename this location">
+          <form onSubmit={saveLocationName}>
+            <input
+              type="text" required autoFocus value={renameInput}
+              onChange={(e) => setRenameInput(e.target.value)}
+              style={{ width: '100%', padding: '0.5rem', marginBottom: '1rem' }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem' }}>
+              <button type="button" className="secondary" onClick={() => setRenameTarget(null)}>Cancel</button>
+              <button type="submit" disabled={renaming}>{renaming ? 'Saving...' : 'Save'}</button>
+            </div>
+          </form>
+        </Modal>
       )}
 
       {pendingBinConfirm && (
