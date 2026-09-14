@@ -11,6 +11,12 @@ export default defineConfig({
       // ourselves in index.html, so the plugin doesn't need to generate one.
       manifest: false,
       registerType: 'autoUpdate',
+      // Registered explicitly via virtual:pwa-register instead
+      // (src/lib/registerServiceWorker.js) - that's the only way to get an
+      // onNeedRefresh hook that actually reloads an already-open tab once
+      // the new worker takes over, instead of it silently running the old
+      // build until someone happens to hard-refresh.
+      injectRegister: null,
       includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'icons/*.png'],
       workbox: {
         // Take over and drop the previous build's precache as soon as the

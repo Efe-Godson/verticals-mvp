@@ -8,12 +8,14 @@ import App from './App.jsx'
 import { applyCachedThemeColor, applyCachedThemeMode, watchSystemTheme } from './theme.js'
 import { initPostHog, posthog, posthogEnabled } from './lib/posthog.js'
 import { initDateInputClickToOpen } from './lib/dateInputClick.js'
+import { registerServiceWorker } from './lib/registerServiceWorker.js'
 
 applyCachedThemeMode()
 applyCachedThemeColor()
 watchSystemTheme()
 initPostHog()
 initDateInputClickToOpen()
+registerServiceWorker()
 
 const app = (
   <BrowserRouter>
