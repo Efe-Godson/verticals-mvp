@@ -8,7 +8,8 @@ import { TEMPLATE_ADMIN_USER_ID } from './adminAccount'
 import ArrowLeftIcon from './ArrowLeftIcon'
 import MobileBottomNav from './MobileBottomNav'
 import VerticalsLogo from './components/VerticalsLogo'
-import { LayoutGrid, FlaskConical, Trash2, SquarePen, Wallet, Sparkles, Settings, UserX, X } from 'lucide-react'
+import { forceRefreshApp } from './lib/registerServiceWorker'
+import { LayoutGrid, FlaskConical, Trash2, SquarePen, Wallet, Sparkles, Settings, UserX, X, RefreshCw } from 'lucide-react'
 
 // Same icon spec PosSidePanel.jsx's nav rows use, so the two menus read as
 // one visual language.
@@ -250,6 +251,19 @@ function NavBar() {
                   <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.3rem 0' }} />
                   <button
                     className="secondary"
+                    title="Reload the app and clear its cache - use this if something looks out of date"
+                    onClick={() => { setAccountMenuOpen(false); forceRefreshApp() }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%', textAlign: 'left',
+                      border: 'none', background: 'transparent', padding: '0.5rem 0.6rem', fontSize: '0.85rem',
+                    }}
+                  >
+                    <RefreshCw size={15} strokeWidth={1.8} aria-hidden="true" />
+                    Refresh app
+                  </button>
+                  <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.3rem 0' }} />
+                  <button
+                    className="secondary"
                     onClick={() => { setAccountMenuOpen(false); supabase.auth.signOut(); navigate('/') }}
                     style={{
                       display: 'block', width: '100%', textAlign: 'left', border: 'none', background: 'transparent',
@@ -423,6 +437,7 @@ function NavBar() {
           {binTrigger && (
             <MenuRow icon={Trash2} badge={binTrigger.count} onClick={() => { setMenuOpen(false); binTrigger.onOpen() }}>Recycle Bin</MenuRow>
           )}
+          <MenuRow icon={RefreshCw} onClick={() => { setMenuOpen(false); forceRefreshApp() }}>Refresh app</MenuRow>
         </div>
 
         {/* Records/Report are deliberately not repeated here either - the

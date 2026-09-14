@@ -29,3 +29,30 @@ export function registerServiceWorker() {
     },
   })
 }
+
+// Manual "Refresh app" button (NavBar.jsx) - the autoUpdate flow above
+// handles a normal deploy on its own, but someone who suspects they're
+// stuck on a stale build (or just wants to be sure right now, same
+// situation that motivated this file) shouldn't have to know DevTools
+// exists to force it. Unregisters every service worker and empties the
+// Cache Storage entries workbox precached into, so the reload that follows
+// can't be served anything but a fresh network fetch - stronger than
+// registerSW(true) above, which only helps if a new build is actually
+// waiting; this works even when the current one just needs a clean reload.
+export async function forceRefreshApp() {
+  try {
+    if ('serviceWorker' in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations()
+      await Promise.all(registrations.map(r => r.unregister()))
+    }
+    if ('caches' in window) {
+      const keys = await caches.keys()
+      await Promise.all(keys.map(k => caches.delete(k)))
+    }
+  } catch {
+    // Fall through to reload regardless - worst case it's a normal reload
+    // instead of a cache-busting one, not a failure to refresh at all.
+  } finally {
+    window.location.reload()
+  }
+}
