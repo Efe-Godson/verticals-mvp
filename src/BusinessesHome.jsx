@@ -89,7 +89,7 @@ function BusinessTile({ template, displayName, secondaryLabel, role, ownerEmail,
                   onClick={() => { setMenuOpen(false); onShare() }}
                   style={{ padding: '0.55rem 0.8rem', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
                 >
-                  Share
+                  Share all locations…
                 </div>
               )}
               <div

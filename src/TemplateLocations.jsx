@@ -91,7 +91,7 @@ function LocationTile({ location, color, uploading, role, onManage, onShare, onR
                   onClick={() => { setMenuOpen(false); onShare() }}
                   style={{ padding: '0.55rem 0.8rem', fontSize: '0.82rem', cursor: 'pointer', textAlign: 'left' }}
                 >
-                  Share
+                  Share this location…
                 </div>
               )}
               <div

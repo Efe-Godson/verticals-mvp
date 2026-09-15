@@ -100,12 +100,20 @@ function ShareModal({ scope, templateSlug, formId, displayName, onClose }) {
   }
 
   return (
-    <Modal size="md" onClose={onClose} title={`Share "${displayName}"`}>
-      <p style={{ color: 'var(--color-muted)', fontSize: '0.85rem', margin: '0 0 1rem' }}>
-        {scope === 'workflow'
-          ? 'Admins can manage every location in this workflow, including ones added later. Viewers get read-only access from Records and Reports, and never see it on Home.'
-          : 'Admins get full access to this location. Viewers get read-only access from Records and Reports, and never see it on Home.'}
-      </p>
+    <Modal
+      size="md"
+      onClose={onClose}
+      title={scope === 'workflow' ? `Share "${displayName}" — all locations` : `Share "${displayName}"`}
+    >
+      {scope === 'workflow' ? (
+        <p style={{ fontSize: '0.85rem', margin: '0 0 1rem', padding: '0.6rem 0.8rem', background: 'var(--color-warning-soft)', borderRadius: 'var(--radius)' }}>
+          This shares every location in this workflow, including ones added later. Admins can manage all of them; viewers get read-only access from Records and Reports. To share just one location, use Share on that location's tile instead.
+        </p>
+      ) : (
+        <p style={{ color: 'var(--color-muted)', fontSize: '0.85rem', margin: '0 0 1rem' }}>
+          Admins get full access to this location. Viewers get read-only access from Records and Reports, and never see it on Home.
+        </p>
+      )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', marginBottom: '1rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.5rem 0.1rem' }}>

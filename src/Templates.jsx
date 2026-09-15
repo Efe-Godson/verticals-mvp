@@ -222,16 +222,6 @@ function Templates() {
         .template-tile { transition: border-color 0.12s ease, box-shadow 0.12s ease; }
         .template-tile:hover { border-color: var(--color-primary); box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
       `}</style>
-      <div className="card" style={{ padding: '1.4rem 1.5rem', marginBottom: '1.2rem', background: 'linear-gradient(135deg, var(--color-surface) 0%, var(--color-primary-soft) 100%)' }}>
-        <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-          Templates
-        </div>
-        <h1 style={{ margin: '0.35rem 0 0.55rem', fontSize: '1.8rem' }}>Start faster with ready-made form ideas</h1>
-        <p style={{ margin: 0, color: 'var(--color-muted)', maxWidth: '720px', lineHeight: 1.6 }}>
-          Pick a starting point for your business or organization and launch a polished form in minutes.
-        </p>
-      </div>
-
       {!loading && inUseTemplates.length > 0 && (
         <div style={{ marginBottom: '2rem' }}>
           <h3 style={{ margin: '0 0 0.7rem', fontSize: '0.85rem', color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
