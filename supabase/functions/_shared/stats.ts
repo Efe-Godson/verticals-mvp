@@ -12,10 +12,15 @@ const MAX_CONCURRENT_SUBMISSION_REQUESTS = 5
 // The browser SDK sends authorization, apikey, and x-client-info headers when
 // invoking a function. Explicitly permit those headers on the OPTIONS
 // preflight request; otherwise browsers block the request before the Edge
-// Function can run and report it as a failed send.
+// Function can run and report it as a failed send. submitForm() (see
+// src/lib/submissionsClient.js) also attaches x-posthog-distinct-id/
+// x-posthog-session-id when PostHog has identified the visitor - without
+// those listed here too, placing an order fails with that same generic
+// "Failed to send a request to the Edge Function" error, since the
+// preflight itself gets blocked before submit-form ever runs.
 export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-posthog-distinct-id, x-posthog-session-id',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
