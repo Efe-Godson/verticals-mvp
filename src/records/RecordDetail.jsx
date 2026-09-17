@@ -10,7 +10,7 @@ import { RecordEditInput } from './RecordEditInput'
 import { InlineLoader } from '../components/InlineLoader'
 import Modal from '../components/Modal'
 
-export function RecordDetail({ form, record, fields, onClose, onUpdated, initialEditing = false, hideEdit = false }) {
+export function RecordDetail({ form, record, fields, onClose, onUpdated, initialEditing = false, hideEdit = false, onToggleReconciled = null }) {
   const { session } = useAuth()
   const hasCartField = fields.some(f => f.type === 'cart')
   const isRetail = isRetailTemplate(form)
@@ -134,6 +134,17 @@ export function RecordDetail({ form, record, fields, onClose, onUpdated, initial
               <div style={{ color: 'var(--color-muted)', fontSize: '0.8rem', marginTop: '0.25rem' }}>
                 Submitted {new Date(record.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
               </div>
+            )}
+            {!showHistory && onToggleReconciled && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.4rem', fontSize: '0.85rem', cursor: 'pointer' }}>
+                <input type="checkbox" checked={!!record.reconciled_at} onChange={onToggleReconciled} />
+                Reconciled
+                {record.reconciled_at && (
+                  <span style={{ color: 'var(--color-muted)', fontSize: '0.78rem' }}>
+                    ({record.reconciled_by || 'unknown'}, {new Date(record.reconciled_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })})
+                  </span>
+                )}
+              </label>
             )}
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>

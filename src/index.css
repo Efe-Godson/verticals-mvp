@@ -15,6 +15,11 @@
   /* Light tint for warning/attention banners (e.g. "N selected"), same
      role as --color-primary-soft but off the warning hue instead. */
   --color-warning-soft: #fff4e5;
+  /* Same role again, off --status-good's green - a "done" shade that stays
+     recognizable regardless of the account's chosen --color-primary (e.g.
+     reconciled records rows in Records.jsx), unlike --color-primary-soft
+     which follows the theme color. */
+  --color-success-soft: #e7f8e7;
   --radius: 8px;
   --shadow: 0 1px 3px rgba(0,0,0,0.06);
 
@@ -68,6 +73,7 @@
     --color-primary-hover: #7ab0ff;
     --color-primary-soft: #25334b;
     --color-warning-soft: #3a2f1e;
+    --color-success-soft: #1d3320;
     --shadow: 0 1px 3px rgba(0,0,0,0.35);
 
     --chart-series-1: #3987e5;
@@ -98,6 +104,7 @@
   --color-primary-hover: #7ab0ff;
   --color-primary-soft: #25334b;
   --color-warning-soft: #3a2f1e;
+  --color-success-soft: #1d3320;
   --shadow: 0 1px 3px rgba(0,0,0,0.35);
 
   --chart-series-1: #3987e5;
@@ -1643,9 +1650,12 @@ body.payroll-panel-docked .payroll-shell > .page {
 .adaptive-inline-filters .date-range-group { flex: 0 1 auto; }
 .adaptive-menu-backdrop { position: fixed; inset: 0; z-index: 15; }
 .adaptive-options-panel { position: absolute; top: calc(100% + 0.5rem); right: 0; width: min(420px, 100%); max-height: 70vh; overflow-y: auto; padding: 0.75rem; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); box-shadow: 0 4px 12px rgba(0,0,0,0.12); z-index: 20; }
-.adaptive-menu-filters { display: flex; flex-direction: column; gap: 0.75rem; padding-bottom: 0.75rem; margin-bottom: 0.5rem; border-bottom: 1px solid var(--color-border); }
-.adaptive-menu-filters .records-search { width: 100%; max-width: none; flex: none; }
-.adaptive-menu-filters input, .adaptive-menu-filters select { max-width: 100%; }
+/* Full-width collapsible row below the header (see AdaptivePageHeader.jsx's
+   ribbon toggle) - search/filters land here once the title crowds them out
+   of the row, instead of inside the Options dropdown. */
+.adaptive-ribbon-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; margin-top: 0.7rem; padding: 0.75rem 0.9rem; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); }
+.adaptive-ribbon-row .records-search { width: 100%; max-width: none; flex: 1 1 200px; }
+.adaptive-ribbon-row input, .adaptive-ribbon-row select { max-width: 100%; }
 
 .name-input-with-tip { position: relative; min-width: 0; }
 .name-input-tip { position: absolute; top: 100%; left: 0; right: 0; z-index: 5; padding: 0.65rem 0.8rem; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); color: var(--color-muted); box-shadow: 0 4px 14px rgba(0,0,0,0.12); font-size: 0.8rem; line-height: 1.45; pointer-events: none; }

@@ -1,7 +1,7 @@
 import AdaptivePageHeader from './components/AdaptivePageHeader'
 import { useState, useEffect, useMemo, useCallback, useRef, Fragment } from 'react'
 import { createPortal } from 'react-dom'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
 import { exportRecordsToExcel, exportRecordsToCSV, exportRecordsToPDF, printRecordsTable, syncFormGoogleSheet } from './recordsExport'
@@ -36,6 +36,19 @@ function hasValue(v) {
   if (Array.isArray(v)) return v.length > 0
   if (typeof v === 'object') return Object.values(v).some(x => x !== null && x !== undefined && x !== '')
   return String(v).trim() !== ''
+}
+
+// The date range filter, Daily Tally, and the weekday charts all need "what
+// date does this record fall on" - by default the submission timestamp, but
+// a form can opt (see the Filter Date Field setting) to use one of its own
+// date-type fields instead (e.g. a Delivery Date that's already its own
+// column, rather than when the order was entered). Returns null when there's
+// no usable value, so callers can exclude rather than mis-bucket a record.
+function resolveRecordDate(sub, dateFieldId) {
+  const raw = dateFieldId ? sub.data?.[dateFieldId] : sub.created_at
+  if (!raw) return null
+  const d = new Date(raw)
+  return isNaN(d) ? null : d
 }
 
 const META_COLUMNS = [
@@ -95,6 +108,14 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
   // instead), but the table itself scrolls fine on a phone and some people
   // just want it, so it's a toggle now, defaulting to table.
   const [mobileViewMode, setMobileViewMode] = useState('table')
+  // 'table' = the normal records list, 'tally' = the per-day Orders/Amount/
+  // Summary rollup (cart forms only - see dailyTally below). Selecting a day
+  // there switches back to 'table' with the date range pinned to that day.
+  const [view, setView] = useState('table')
+  // Only true once Daily Tally has actually been opened from Options this
+  // visit - the quick "back to it" button on the table (below) stays hidden
+  // until then, instead of cluttering the table for accounts that never use it.
+  const [tallyActivated, setTallyActivated] = useState(false)
   const [columnsExpanded, setColumnsExpanded] = useState(false)
   const [tilesRevealed, setTilesRevealed] = useState(false)
   const [showRevealHint, setShowRevealHint] = useState(true)
@@ -366,13 +387,21 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
     [dateRange, customStart, customEnd]
   )
 
+  // null = filter by submission timestamp (the default). Set via the
+  // "Filter Date Field" option below - a per-form, persisted choice (saved
+  // to form.settings, same as hiddenColumns) so it's a one-time, repeatable
+  // setup step rather than something re-picked every visit.
+  const dateFilterFieldId = form?.settings?.dateFilterFieldId || null
+
   // The date-range + keyword view, before any per-column filter. The column
   // menu's value list is built from this, so unticking a value in one column
   // never makes the other values vanish from its own list (Excel behaviour).
   const searchScoped = useMemo(() => {
     if (!form) return []
     const dateFiltered = submissions.filter(sub => {
-      const created = new Date(sub.created_at)
+      if (!rangeStart && !rangeEnd) return true
+      const created = resolveRecordDate(sub, dateFilterFieldId)
+      if (!created) return false
       if (rangeStart && created < rangeStart) return false
       if (rangeEnd && created > rangeEnd) return false
       return true
@@ -387,7 +416,7 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
         return val && val.toString().toLowerCase().includes(search)
       })
     })
-  }, [form, submissions, rangeStart, rangeEnd, debouncedSearchText])
+  }, [form, submissions, rangeStart, rangeEnd, debouncedSearchText, dateFilterFieldId])
 
   const visible = useMemo(() => {
     if (!form) return []
@@ -450,6 +479,53 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
     return seen
   }, [form, submissions])
 
+  // Daily Tally source data - one row per calendar day (local time) across
+  // `visible`, the same filtered/searched/sorted set the records table
+  // itself shows, not the full unfiltered history. The date-range filter (and
+  // search, and any column filters) is the one thing setting the scope for
+  // the whole page - it drives the tally, not the other way around. Drilling
+  // into a tally day still narrows further from there by switching the date
+  // range to that one specific day (see the row onClick below). Cart forms
+  // only (orders/amount only mean something there); empty otherwise. Grouped
+  // by whichever date the Filter Date Field setting points at, same as the
+  // main date-range filter above, so drilling into a tally day and the day
+  // it actually groups records under always agree.
+  const dailyTally = useMemo(() => {
+    if (!form) return []
+    const tallyCartField = form.fields.find(f => f.type === 'cart')
+    if (!tallyCartField) return []
+    const reconciledDates = form.settings?.reconciledDates || {}
+    const groups = new Map() // 'YYYY-MM-DD' -> { dateKey, date, orders, amount, itemCounts }
+    for (const sub of visible) {
+      const d = resolveRecordDate(sub, dateFilterFieldId)
+      if (!d) continue
+      const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      let group = groups.get(dateKey)
+      if (!group) {
+        group = { dateKey, date: new Date(d.getFullYear(), d.getMonth(), d.getDate()), orders: 0, amount: 0, itemCounts: new Map() }
+        groups.set(dateKey, group)
+      }
+      group.orders += 1
+      const cart = sub.data[tallyCartField.id] || {}
+      group.amount += Number(cart.total || 0) + Number(cart.deliveryFee || 0)
+      for (const item of cart.items || []) {
+        group.itemCounts.set(item.name, (group.itemCounts.get(item.name) || 0) + Number(item.quantity || 0))
+      }
+    }
+    return [...groups.values()]
+      .map(g => {
+        const items = [...g.itemCounts.entries()].sort((a, b) => b[1] - a[1])
+        const shown = items.slice(0, 4).map(([name, qty]) => `${name} ×${qty}`).join(', ')
+        const summary = items.length > 4 ? `${shown}, +${items.length - 4} more` : (shown || '—')
+        return {
+          dateKey: g.dateKey, date: g.date, orders: g.orders, amount: g.amount, summary,
+          reconciled: !!reconciledDates[g.dateKey],
+        }
+      })
+      .sort((a, b) => b.date - a.date)
+  }, [form, visible, dateFilterFieldId])
+
+
   const showSkel = useDeferredLoading(loading)
   if (loading) return showSkel ? <PageSkeleton variant="table" /> : null
   if (error) return <ErrorState message={error} />
@@ -471,6 +547,19 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
   const cartField = form.fields.find(f => f.type === 'cart')
   const hasCartField = !!cartField
   const entryNoun = getEntryNoun(form, hasCartField)
+
+  // When a custom date field is chosen as the filter date (dateFilterFieldId,
+  // set via Options > Filter Date Field), it's the meaningful date for this
+  // business (e.g. Delivery Date) - lead the table with its column instead
+  // of leaving it wherever it falls in form order, and push the raw
+  // submission timestamp to the end instead (see submissionDateAtEnd below,
+  // read by both the header and body rows further down).
+  const customDateField = hasCartField && dateFilterFieldId ? visibleFields.find(f => f.id === dateFilterFieldId) : null
+  if (customDateField) {
+    visibleFields.splice(visibleFields.indexOf(customDateField), 1)
+    visibleFields.unshift(customDateField)
+  }
+  const submissionDateAtEnd = !!customDateField
 
   // Phone card view (see the isMobile branch in the render): a wide row of
   // columns becomes a short stack showing only what's worth a glance, tap for
@@ -544,9 +633,12 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
   )
 
   function dateCell(sub) {
+    const submittedAt = new Date(sub.created_at)
     return (
       <td style={{ borderBottom: '1px solid var(--color-border)', padding: '0.75rem 0.9rem', color: 'var(--color-muted)', whiteSpace: 'nowrap' }}>
-        {new Date(sub.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+        {submittedAt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+        {', '}
+        {submittedAt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
       </td>
     )
   }
@@ -564,6 +656,37 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
     return (
       <td style={{ borderBottom: '1px solid var(--color-border)', padding: '0.75rem 0.9rem', color: 'var(--color-muted)', whiteSpace: 'nowrap' }}>
         {sub.order_number ? `Order #${sub.order_number}` : '-'}
+      </td>
+    )
+  }
+
+  // Per-sale Reconciled leads the table (right after the row checkbox)
+  // whenever you've drilled into one specific day from Daily Tally - that's
+  // exactly the "go through this day's orders and tick each one off" moment
+  // - and otherwise sits in its usual spot near Edit, out of the way.
+  const reconciledFirst = hasCartField && dateRange === 'specific'
+  const reconciledHeaderCell = (
+    <th style={{
+      textAlign: 'left', borderBottom: '2px solid var(--color-border)', padding: '0.75rem 0.9rem',
+      position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap', background: 'var(--color-bg)'
+    }}>
+      Reconciled
+    </th>
+  )
+
+  function reconciledCell(sub) {
+    return (
+      <td
+        style={{ borderBottom: '1px solid var(--color-border)', padding: '0.75rem 0.9rem', whiteSpace: 'nowrap' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <input
+          type="checkbox"
+          checked={!!sub.reconciled_at}
+          disabled={isViewer}
+          onChange={() => toggleRecordReconciled(sub)}
+          title={sub.reconciled_at ? `Reconciled by ${sub.reconciled_by || 'someone'}` : 'Mark as reconciled'}
+        />
       </td>
     )
   }
@@ -688,6 +811,57 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
 
     const { error } = await updateFormSettings({ hiddenColumns: updated })
     if (error) setHiddenFieldIds(previous) // revert the optimistic toggle - it never actually saved
+  }
+
+  // Reconciliation: a plain per-day checked/unchecked mark (e.g. "matched
+  // against the bank statement for this day"), not tied to any one record -
+  // saved the same way as every other Records preference (form.settings),
+  // so it's shared across whoever opens Daily Tally for this form.
+  async function toggleReconciled(dateKey) {
+    const current = form.settings?.reconciledDates || {}
+    const updated = { ...current }
+    if (updated[dateKey]) delete updated[dateKey]
+    else updated[dateKey] = { at: new Date().toISOString(), by: session?.user?.email || null }
+    await updateFormSettings({ reconciledDates: updated })
+  }
+
+  // Per-sale reconciliation - independent of the day-level mark above (see
+  // its comment): a plain reconciled_at/reconciled_by pair on the submission
+  // row itself (submissions.reconciled_at), same shape as the day-level
+  // mark but scoped to one record, for checking off individual sales rather
+  // than a whole day at once.
+  async function toggleRecordReconciled(sub) {
+    const patch = sub.reconciled_at
+      ? { reconciled_at: null, reconciled_by: null }
+      : { reconciled_at: new Date().toISOString(), reconciled_by: session?.user?.email || null }
+    const { data, error } = await supabase.from('submissions').update(patch).eq('id', sub.id).select().single()
+    if (error) {
+      showToast('Could not update reconciliation: ' + error.message, 'error')
+      return
+    }
+    setSubmissions(current => current.map(s => s.id === data.id ? data : s))
+    setSelectedRecord(current => current?.id === data.id ? data : current)
+  }
+
+  // Bulk version of the above, for the drilled-into-one-day view (dateRange
+  // 'specific' - see the Daily Tally row onClick above): reconciles (or, if
+  // every currently visible record is already reconciled, un-reconciles)
+  // every record in `visible` at once, rather than ticking each one by hand.
+  async function toggleReconcileAllVisible() {
+    const ids = visible.map(s => s.id)
+    if (ids.length === 0) return
+    const allReconciled = visible.every(s => !!s.reconciled_at)
+    const patch = allReconciled
+      ? { reconciled_at: null, reconciled_by: null }
+      : { reconciled_at: new Date().toISOString(), reconciled_by: session?.user?.email || null }
+    const { data, error } = await supabase.from('submissions').update(patch).in('id', ids).select()
+    if (error) {
+      showToast('Could not update reconciliation: ' + error.message, 'error')
+      return
+    }
+    const byId = new Map(data.map(d => [d.id, d]))
+    setSubmissions(current => current.map(s => byId.get(s.id) || s))
+    setSelectedRecord(current => current && byId.has(current.id) ? byId.get(current.id) : current)
   }
 
   function toggleSelectRow(subId) {
@@ -863,6 +1037,15 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
   // version below, so the two don't drift out of sync with each other.
   const optionsMenuItems = (
     <>
+      {hasCartField && (
+        <>
+          <DropdownItem onClick={() => { setView(v => v === 'tally' ? 'table' : 'tally'); setTallyActivated(true); setActiveMenu(null) }}>
+            {view === 'tally' ? 'Back to Records Table' : 'Daily Tally'}
+          </DropdownItem>
+          <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.7rem 0 0.5rem' }} />
+        </>
+      )}
+
       {!hasCartField && !isViewer && (
         <>
           <DropdownItem onClick={() => { handleDownloadFillTemplate(); setActiveMenu(null) }}>
@@ -937,6 +1120,29 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
       )}
 
       <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.7rem 0 0.5rem' }} />
+
+      {form.fields.some(f => f.type === 'date') && (
+        <>
+          <div style={{ fontWeight: 600, fontSize: '0.75rem', color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '0.4rem' }}>
+            Filter Date Field
+          </div>
+          {/* Which date the date-range dropdown (and Daily Tally's grouping)
+              go by - submission time by default, or a date field already on
+              this form (e.g. Delivery Date), already its own column here. A
+              one-time, saved choice (form.settings), not re-picked per visit. */}
+          <select
+            value={dateFilterFieldId || '__submitted'}
+            onChange={(e) => updateFormSettings({ dateFilterFieldId: e.target.value === '__submitted' ? null : e.target.value })}
+            style={{ width: '100%', padding: '0.4rem', marginBottom: '0.7rem' }}
+          >
+            <option value="__submitted">Submission date</option>
+            {form.fields.filter(f => f.type === 'date').map(f => (
+              <option key={f.id} value={f.id}>{f.label}</option>
+            ))}
+          </select>
+          <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.7rem 0 0.5rem' }} />
+        </>
+      )}
 
       <div style={{ fontWeight: 600, fontSize: '0.75rem', color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '0.4rem' }}>
         Presets
@@ -1151,6 +1357,13 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
         .records-table tbody tr:nth-child(even):hover {
           background: var(--color-primary-soft);
         }
+        .records-table tbody tr.is-reconciled {
+          background: var(--color-success-soft);
+        }
+        .records-table tbody tr.is-reconciled:hover {
+          background: var(--color-success-soft);
+          filter: brightness(0.96);
+        }
         @media (max-width: 640px) {
           .date-range-row select { width: 100%; }
           .date-range-group { width: 100%; }
@@ -1235,6 +1448,24 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
         {optionsMenuItems}
       </MobileOptionsPanel>
 
+      {/* Visible on the table itself (not just buried in Options) once Daily
+          Tally has actually been opened this visit - the way back after
+          drilling into a day needs to be obvious, not something you have to
+          go hunting for in a dropdown. */}
+      {hasCartField && view === 'table' && tallyActivated && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', marginTop: '0.8rem' }}>
+          <button className="secondary" onClick={() => setView('tally')} style={{ fontSize: '0.85rem' }}>
+            Daily Tally
+          </button>
+          {/* A quick total for whatever's currently filtered/shown below -
+              e.g. today's count/amount - without having to open Daily Tally
+              just to see it. */}
+          <span style={{ fontSize: '0.85rem', color: 'var(--color-muted)' }}>
+            {orderCount.toLocaleString()} order{orderCount === 1 ? '' : 's'} · ₦{revenue.toLocaleString()}
+          </span>
+        </div>
+      )}
+
       {selectedIds.length > 0 && (
         <div style={{
           display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '1rem', marginTop: '0.8rem',
@@ -1248,7 +1479,99 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
         </div>
       )}
 
-      {submissions.length === 0 ? (
+      {view === 'tally' ? (
+        <div style={{ marginTop: '1.2rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.8rem', marginBottom: '0.8rem', flexWrap: 'wrap' }}>
+            <h2 style={{ margin: 0, fontSize: '1.05rem' }}>Daily Tally</h2>
+            <button className="secondary" onClick={() => setView('table')}>Back to Records Table</button>
+          </div>
+          {/* The Sales/Orders by Day of Week breakdown that used to live here
+              now has its own Sum/Average/Count picker and lives on the main
+              Report page instead, alongside the other charts. */}
+          <p style={{ fontSize: '0.85rem', color: 'var(--color-muted)', margin: '0 0 1rem' }}>
+            Looking for the day-of-week breakdown? See{' '}
+            <Link to={`/form/${id}/report`} style={{ color: 'var(--color-primary)' }}>Reports</Link>.
+          </p>
+          {dailyTally.length === 0 ? (
+            <EmptyState
+              title={submissions.length === 0 ? 'No orders yet' : 'No orders in this range'}
+              message={submissions.length === 0
+                ? "Once orders come in, they'll be tallied here by day."
+                : 'The date range filter above is scoping the tally too - widen it to see more days.'}
+            />
+          ) : (
+            <>
+              {/* Reconciliation - a plain "checked this day against another
+                  source (bank statement, till roll, ...)" mark per day, not
+                  tied to any single record. Saved to form.settings so the
+                  mark is shared with anyone else who opens this form. */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6rem', marginBottom: '0.6rem', flexWrap: 'wrap' }}>
+                <h3 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--color-muted)', fontWeight: 600 }}>Reconciliation</h3>
+                <span style={{ fontSize: '0.82rem', color: 'var(--color-muted)' }}>
+                  {dailyTally.filter(g => g.reconciled).length} of {dailyTally.length} days reconciled
+                </span>
+              </div>
+
+              <div className="table-scroll table-breakout">
+                <table className="records-table" style={{ borderCollapse: 'collapse', width: '100%' }}>
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: 'left', borderBottom: '2px solid var(--color-border)', padding: '0.75rem 0.9rem', position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap', background: 'var(--color-bg)' }}>Date</th>
+                      <th style={{ textAlign: 'left', borderBottom: '2px solid var(--color-border)', padding: '0.75rem 0.9rem', position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap', background: 'var(--color-bg)' }}>Total Orders</th>
+                      <th style={{ textAlign: 'left', borderBottom: '2px solid var(--color-border)', padding: '0.75rem 0.9rem', position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap', background: 'var(--color-bg)' }}>Total Amount</th>
+                      <th style={{ textAlign: 'left', borderBottom: '2px solid var(--color-border)', padding: '0.75rem 0.9rem', position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap', background: 'var(--color-bg)' }}>Order Summary</th>
+                      <th style={{ textAlign: 'left', borderBottom: '2px solid var(--color-border)', padding: '0.75rem 0.9rem', position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap', background: 'var(--color-bg)' }}>Reconciled</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dailyTally.map(g => (
+                      <tr
+                        key={g.dateKey}
+                        className="records-row"
+                        style={{ cursor: 'pointer' }}
+                        title="View this day's records"
+                        onClick={() => {
+                          setDateRange('specific')
+                          setCustomStart(g.dateKey)
+                          setCurrentPage(1)
+                          setView('table')
+                        }}
+                      >
+                        <td style={{ borderBottom: '1px solid var(--color-border)', padding: '0.75rem 0.9rem', whiteSpace: 'nowrap', fontWeight: 600 }}>
+                          {g.date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </td>
+                        <td style={{ borderBottom: '1px solid var(--color-border)', padding: '0.75rem 0.9rem', whiteSpace: 'nowrap' }}>
+                          {g.orders.toLocaleString()}
+                        </td>
+                        <td style={{ borderBottom: '1px solid var(--color-border)', padding: '0.75rem 0.9rem', whiteSpace: 'nowrap', color: 'var(--color-primary)', fontWeight: 700 }}>
+                          ₦{g.amount.toLocaleString()}
+                        </td>
+                        <td style={{ borderBottom: '1px solid var(--color-border)', padding: '0.75rem 0.9rem', color: 'var(--color-muted)' }}>
+                          {g.summary}
+                        </td>
+                        <td
+                          style={{ borderBottom: '1px solid var(--color-border)', padding: '0.75rem 0.9rem', whiteSpace: 'nowrap' }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: isViewer ? 'default' : 'pointer', fontSize: '0.85rem' }}>
+                            <input
+                              type="checkbox"
+                              checked={g.reconciled}
+                              disabled={isViewer}
+                              onChange={() => toggleReconciled(g.dateKey)}
+                            />
+                            {g.reconciled ? 'Reviewed' : ''}
+                          </label>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+      ) : submissions.length === 0 ? (
         <EmptyState
           style={{ marginTop: '1.4rem' }}
           title="No records yet"
@@ -1305,6 +1628,13 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
         </>
       ) : (
         <>
+          {reconciledFirst && !isViewer && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', margin: '0.8rem 0 0.4rem' }}>
+              <button className="secondary" onClick={toggleReconcileAllVisible} style={{ fontSize: '0.82rem', padding: '0.3rem 0.6rem' }}>
+                {visible.length > 0 && visible.every(s => !!s.reconciled_at) ? 'Unreconcile All' : 'Reconcile All'}
+              </button>
+            </div>
+          )}
           <div className="table-scroll table-breakout">
             <table className="records-table" style={{ borderCollapse: 'collapse', width: '100%' }}>
               <thead>
@@ -1319,7 +1649,8 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
                       onChange={toggleSelectAllOnPage}
                     />
                   </th>
-                  {hasCartField && dateHeaderCell}
+                  {reconciledFirst && reconciledHeaderCell}
+                  {hasCartField && !submissionDateAtEnd && dateHeaderCell}
                   {hasCartField && !hiddenFieldIds.includes('__orderId') && orderIdHeaderCell}
                   {!hasCartField && !hiddenFieldIds.includes('__orderId') && orderIdHeaderCell}
                   {visibleFields.map(field => {
@@ -1413,7 +1744,7 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
                     </Fragment>
                     )
                   })}
-                  {!hasCartField && dateHeaderCell}
+                  {(!hasCartField || submissionDateAtEnd) && dateHeaderCell}
                   {!hiddenFieldIds.includes('__lastUpdate') && (
                     <th style={{
                       textAlign: 'left', borderBottom: '2px solid var(--color-border)', padding: '0.75rem 0.9rem',
@@ -1438,6 +1769,7 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
                       Submission ID
                     </th>
                   )}
+                  {hasCartField && !reconciledFirst && reconciledHeaderCell}
                   <th style={{
                     textAlign: 'left', borderBottom: '2px solid var(--color-border)', padding: '0.75rem 0.9rem',
                     position: 'sticky', top: 0, zIndex: 5, whiteSpace: 'nowrap', background: 'var(--color-bg)'
@@ -1450,7 +1782,11 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
                 {pageRows.map(sub => (
                   <tr
                     key={sub.id}
-                    className={sub.id === justAddedId ? 'records-row is-just-added' : 'records-row'}
+                    className={[
+                      'records-row',
+                      sub.id === justAddedId && 'is-just-added',
+                      hasCartField && sub.reconciled_at && 'is-reconciled',
+                    ].filter(Boolean).join(' ')}
                     onClick={() => setSelectedRecord(sub)}
                   >
                     <td
@@ -1466,7 +1802,8 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
                         {sub.id === justAddedId && <span className="just-added-pill">JUST ADDED</span>}
                       </div>
                     </td>
-                    {hasCartField && dateCell(sub)}
+                    {reconciledFirst && reconciledCell(sub)}
+                    {hasCartField && !submissionDateAtEnd && dateCell(sub)}
                     {hasCartField && !hiddenFieldIds.includes('__orderId') && orderIdCell(sub)}
                     {!hasCartField && !hiddenFieldIds.includes('__orderId') && orderIdCell(sub)}
                     {visibleFields.map(field => (
@@ -1506,7 +1843,7 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
                       )}
                       </Fragment>
                     ))}
-                    {!hasCartField && dateCell(sub)}
+                    {(!hasCartField || submissionDateAtEnd) && dateCell(sub)}
                     {!hiddenFieldIds.includes('__lastUpdate') && (
                       <td style={{ borderBottom: '1px solid var(--color-border)', padding: '0.75rem 0.9rem', color: 'var(--color-muted)', whiteSpace: 'nowrap' }}>
                         {sub.updated_at ? new Date(sub.updated_at).toLocaleDateString('en-GB', {
@@ -1524,6 +1861,7 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
                         {sub.id.slice(0, 8)}
                       </td>
                     )}
+                    {hasCartField && !reconciledFirst && reconciledCell(sub)}
                     <td
                       style={{ borderBottom: '1px solid var(--color-border)', padding: '0.75rem 0.9rem', whiteSpace: 'nowrap' }}
                       onClick={(e) => e.stopPropagation()}
@@ -1574,6 +1912,7 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
           onUpdated={handleRecordUpdated}
           initialEditing={openRecordEditing}
           hideEdit={isViewer || (hasCartField && !openRecordEditing)}
+          onToggleReconciled={hasCartField && !isViewer ? () => toggleRecordReconciled(selectedRecord) : null}
         />
       )}
 

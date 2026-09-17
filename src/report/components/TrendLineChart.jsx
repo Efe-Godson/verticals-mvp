@@ -60,9 +60,10 @@ export default function TrendLineChart({
   onShowLabelsChange,
   fit = false,
 }) {
-  // Off by default: labels on every point crowd a chart with more than a
-  // few - the toggle still exists for anyone who wants them.
-  const [localShowLabels, setLocalShowLabels] = useState(false)
+  // On by default, always abbreviated (see the LabelList formatter below) so
+  // a long ₦ figure never gets clipped - the toggle still exists to hide
+  // them on a chart with a lot of points.
+  const [localShowLabels, setLocalShowLabels] = useState(true)
   const [localGran, setLocalGran] = useState(defaultGranularity)
   const [focusOpen, setFocusOpen] = useState(false)
   const [drillBucket, setDrillBucket] = useState(null)
@@ -179,7 +180,7 @@ export default function TrendLineChart({
                   dataKey="value"
                   position="top"
                   offset={8}
-                  formatter={(v) => (currency ? `₦${compact(v)}` : v.toLocaleString())}
+                  formatter={(v) => (currency ? `₦${compact(v)}` : compact(v))}
                   style={{ fontSize: 10, fill: 'var(--color-text)', fontWeight: 600 }}
                 />
               )}

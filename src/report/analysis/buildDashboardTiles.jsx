@@ -10,6 +10,7 @@ import { cartReportTiles } from './Cartreport'
 import { cartCategoryTiles } from './components/CartCategoryChart'
 import { categoryCountTiles } from './components/CategoryCountChart'
 import { locationCartTiles, locationCountTile } from './components/LocationChart'
+import { weekdayTiles } from './components/WeekdayChart'
 import CustomReportWidget from '../CustomReportWidget'
 import { getEntryNoun, formatNaira } from '../helpers/analysisUtils'
 
@@ -144,6 +145,7 @@ export function buildChartTiles(form, submissions) {
       })
       return cartReportTiles({ field, answered })
     }),
+    ...weekdayTiles({ cartFields, submissions, recordDate }),
     ...[...channelCategoryPairs, ...operationsCategoryPairs, ...otherCategoryPairs].flatMap(({ cartField, catField }) =>
       cartCategoryTiles({ categoryField: catField, cartField, submissions }),
     ),

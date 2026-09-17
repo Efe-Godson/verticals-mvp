@@ -2071,7 +2071,7 @@ function PublicForm() {
 
   if (!form) return <ErrorState message={message} />
 
-  // Retail-only order-screen tweaks (compact empty cart box, "Place Order"
+  // Retail-only order-screen tweaks (compact empty cart box, "Record Order"
   // label, tighter tiles, subtler footer) all read this - declared here,
   // not reused from OrderConfirmationModal's own same-named const above
   // (a completely different component/closure, form isn't even the same
@@ -2472,7 +2472,7 @@ function PublicForm() {
               disabled={submitting}
               style={plainList ? undefined : { padding: '0.7rem 1.5rem', fontSize: '1rem', flex: cartDefersCheckout ? '1 1 auto' : undefined }}
             >
-              {submitting ? 'Submitting...' : (token ? 'Save Changes' : (isRetail ? 'Place Order' : 'Submit'))}
+              {submitting ? 'Submitting...' : (token ? 'Save Changes' : (isRetail ? 'Record Order' : 'Submit'))}
             </button>
           ) : (
             <button

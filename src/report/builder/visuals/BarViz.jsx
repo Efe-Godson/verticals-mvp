@@ -2,16 +2,21 @@
 // Bar family: vertical / horizontal / grouped / stacked / 100% stacked -
 // all off one StandardResult. Grouped & stacked read result.seriesLabels +
 // row.bySeries; the plain bars read row.value.
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell, LabelList } from 'recharts'
 import { VizBox } from './ChartCanvas'
 import { EmptyViz, axisTick, gridStroke } from './ChartFrame'
 import { seriesColor } from '../palette'
-import { valueFormatter } from '../format'
+import { valueFormatter, compactValueFormatter } from '../format'
 
 export default function BarViz({ result, variant = 'bar', display = {}, onSelectDatapoint }) {
   const rows = result?.rows || []
   if (!rows.length) return <EmptyViz />
   const fmt = valueFormatter(result)
+  // Labels default on (auto-abbreviated, so a long ₦ figure doesn't clip) -
+  // only for the single-series bar, never grouped/stacked, where per-bar
+  // labels would just crowd into each other.
+  const showLabels = display.labels !== false
+  const labelFmt = compactValueFormatter(result)
   const horizontal = variant === 'hbar'
   const grouped = variant === 'groupedBar'
   const stacked = variant === 'stackedBar' || variant === 'stackedBar100'
@@ -50,6 +55,12 @@ export default function BarViz({ result, variant = 'bar', display = {}, onSelect
             ))
           : <Bar dataKey="value" radius={horizontal ? [0, 2, 2, 0] : [2, 2, 0, 0]} onClick={click} cursor={onSelectDatapoint ? 'pointer' : undefined}>
               {data.map((d, i) => <Cell key={i} fill={seriesColor(i % 8)} />)}
+              {showLabels && (
+                <LabelList
+                  dataKey="value" position={horizontal ? 'right' : 'top'}
+                  formatter={labelFmt} style={{ fontSize: 10, fill: 'var(--color-text)', fontWeight: 600 }}
+                />
+              )}
             </Bar>}
       </BarChart>
     </VizBox>

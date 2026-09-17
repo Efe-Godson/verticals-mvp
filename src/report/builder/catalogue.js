@@ -96,7 +96,7 @@ export function makeVisual(type, layout) {
     query,
     filters: [],
     layout: layout || { x: 0, y: 0, w: (spec.defaultSize || [6, 5])[0], h: (spec.defaultSize || [6, 5])[1] },
-    display: { legend: true, labels: false },
+    display: { legend: true, labels: true },
     reportVisibility: false,
     reportLayout: null,
     selectedDatapoint: null,

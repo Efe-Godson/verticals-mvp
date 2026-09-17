@@ -1,7 +1,7 @@
 // Place at: src/report/builder/format.js
 // Value formatting for the Builder. Money -> formatNaira (the src/report
 // standard); everything else -> grouped number with sensible precision.
-import { formatNaira } from '../helpers/analysisUtils'
+import { formatNaira, compactNumber } from '../helpers/analysisUtils'
 
 export function formatNumber(v, decimals) {
   const n = Number(v) || 0
@@ -23,4 +23,13 @@ export function valueFormatter(result) {
   const agg = result?.aggregation
   if (agg === 'avg' || agg === 'median') return (v) => formatNumber(v, 2)
   return (v) => formatNumber(v)
+}
+
+// Same currency/percent detection as valueFormatter, but abbreviated (K/M/B)
+// instead of the full grouped number - for on-chart data labels, which clip
+// or crowd a bar/point far sooner than an axis tick or tooltip does.
+export function compactValueFormatter(result) {
+  if (result?.matrix?.percentMode) return (v) => formatPercent(v)
+  if (result?.metricRole === 'cartRevenue') return (v) => `₦${compactNumber(v)}`
+  return (v) => compactNumber(v)
 }

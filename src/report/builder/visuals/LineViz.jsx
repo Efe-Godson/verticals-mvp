@@ -1,15 +1,19 @@
 // Place at: src/report/builder/visuals/LineViz.jsx
 // Line / multi-line / area / stacked-area - one component, `variant` picks.
-import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts'
+import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, LabelList } from 'recharts'
 import { VizBox } from './ChartCanvas'
 import { EmptyViz, axisTick, gridStroke } from './ChartFrame'
 import { seriesColor } from '../palette'
-import { valueFormatter } from '../format'
+import { valueFormatter, compactValueFormatter } from '../format'
 
 export default function LineViz({ result, variant = 'line', display = {} }) {
   const rows = result?.rows || []
   if (!rows.length) return <EmptyViz />
   const fmt = valueFormatter(result)
+  // Labels default on, single series only - a multi-line/area chart's
+  // overlapping series would just turn labels into noise.
+  const showLabels = display.labels !== false
+  const labelFmt = compactValueFormatter(result)
   const isArea = variant === 'area' || variant === 'stackedArea'
   const stacked = variant === 'stackedArea'
   const multi = (variant === 'multiLine' || isArea) && result.seriesLabels
@@ -39,7 +43,11 @@ export default function LineViz({ result, variant = 'line', display = {} }) {
                 stroke={seriesColor(i)} fill={seriesColor(i)} fillOpacity={isArea ? 0.18 : 1} strokeWidth={2} dot={false} />
             ))
           : <Series type="monotone" dataKey="value" stroke={seriesColor(0)} fill={seriesColor(0)}
-              fillOpacity={isArea ? 0.18 : 1} strokeWidth={2} dot={rows.length <= 20} />}
+              fillOpacity={isArea ? 0.18 : 1} strokeWidth={2} dot={rows.length <= 20}>
+              {showLabels && (
+                <LabelList dataKey="value" position="top" formatter={labelFmt} style={{ fontSize: 10, fill: 'var(--color-text)', fontWeight: 600 }} />
+              )}
+            </Series>}
       </Chart>
     </VizBox>
   )

@@ -102,9 +102,11 @@ function HorizontalBarChart({
     //   'pct'                 - share of the bars shown here (top N add to ~100%)
     //   'pctAll'              - share of the whole breakdown (only when the list
     //                           is capped and there are rows past the top N)
-    // Phones default to 'auto' (a full "₦4,036,000" collides above a narrow
-    // column); desktop defaults to the caller's full formatted number.
-    const [valueMode, setValueMode] = useState(isMobile ? 'auto' : 'full')
+    // Always defaults to 'auto' - a full "₦4,036,000" collides/clips above a
+    // narrow column or a long bar-list row just as easily on desktop as on a
+    // phone; the "Full" option is still one click away for anyone who wants
+    // the unrounded number.
+    const [valueMode, setValueMode] = useState('auto')
 
     // Keep whatever the caller's formatter wraps a number in - a leading "₦"
     // or a trailing "%" - so the abbreviated form stays "₦4.0M" / "45%".
