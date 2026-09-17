@@ -468,13 +468,18 @@ function BusinessesHome() {
         </div>
       ) : error && usedTemplates.length === 0 ? (
         <ErrorState message={error} onRetry={() => loadTemplates()} />
-      ) : myTemplates.length === 0 ? (
+      ) : usedTemplates.length === 0 ? (
+        // Only when there's truly nothing accessible yet - not just nothing
+        // owned. Someone whose only access is a workflow shared with them
+        // (myTemplates empty, sharedTemplates below not) already has
+        // somewhere to work; prompting them to "set up your first workflow"
+        // there read as if the share hadn't given them anything at all.
         <EmptyState
           title="Set up your first workflow"
           message="Pick a template to start collecting records, tracking sales, or running payroll - everything else builds on top of it."
           action={<button onClick={() => navigate('/templates')}>Choose a template</button>}
         />
-      ) : (
+      ) : myTemplates.length === 0 ? null : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.8rem' }}>
           {myTemplates.map((entry) => {
             const { template, secondaryLabel, singleFormId, ownerId, role, ownerEmail, workflowName } = entry
