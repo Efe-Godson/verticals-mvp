@@ -8,6 +8,7 @@ import { TEMPLATE_ADMIN_USER_ID } from './adminAccount'
 import { supabase } from './supabaseClient'
 import CompactTopBar from './components/CompactTopBar'
 import VerticalsLogo from './components/VerticalsLogo'
+import { useCurrentPageTitle } from './PageTitleContext'
 import { LAB_ENTRIES } from './LabSidePanel'
 import useAppUpdate from './hooks/useAppUpdate'
 import AppUpdateModal from './components/AppUpdateModal'
@@ -44,7 +45,13 @@ export default function HomeSidePanel() {
     ...(session?.user?.id === TEMPLATE_ADMIN_USER_ID ? [{ label: 'Lab', to: '/lab', icon: FlaskConical }] : []),
   ]
 
-  const title = links.find(link => link.to === pathname)?.label || 'Home'
+  // Home/Records/Reports/Templates/Lab never call usePageTitle() themselves,
+  // so this stays empty there and the static label below covers them - but
+  // a page that DOES set one (e.g. TemplateLocations.jsx's template name)
+  // needs to win, or every such page read as "Home" here regardless of
+  // which one it actually was.
+  const dynamicTitle = useCurrentPageTitle()
+  const title = dynamicTitle || links.find(link => link.to === pathname)?.label || 'Home'
 
   return (
     <>
