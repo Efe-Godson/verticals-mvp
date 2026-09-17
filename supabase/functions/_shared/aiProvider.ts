@@ -107,6 +107,14 @@ async function callVercelGateway(prompt: string, jsonSchema?: object) {
   return text
 }
 
+async function retryOnce<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn()
+  } catch {
+    return await fn()
+  }
+}
+
 // jsonSchema: pass the Gemini responseSchema object for structured output -
 // used for Gemini's own strict decoding, and doubles as the signal to ask
 // OpenRouter for JSON mode on fallback. Omit for a plain free-text answer
@@ -118,9 +126,18 @@ export async function generateText(prompt: string, jsonSchema?: object) {
     const status = (geminiErr as Error & { status?: number }).status
     if (status !== 429 && status !== 503) throw geminiErr
     try {
-      return await callOpenRouter(prompt, jsonSchema)
+      // One same-tier retry before cascading further - a 429/503 is often a
+      // brief blip on a free/shared tier, and retrying costs far less than
+      // falling all the way to Vercel AI Gateway (opt-in, last resort - and
+      // currently unusable without a credit card on file for that Vercel
+      // team, so every request that reaches it fails outright).
+      return await retryOnce(() => callGemini(prompt, jsonSchema))
     } catch {
-      return await callVercelGateway(prompt, jsonSchema)
+      try {
+        return await retryOnce(() => callOpenRouter(prompt, jsonSchema))
+      } catch {
+        return await callVercelGateway(prompt, jsonSchema)
+      }
     }
   }
 }
