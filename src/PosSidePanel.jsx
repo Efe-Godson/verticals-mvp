@@ -25,7 +25,7 @@ import useIsMobile from './hooks/useIsMobile'
 import {
   ShoppingCart, CirclePlus, Package, ClipboardList,
   ChartNoAxesColumnIncreasing, Settings, ShieldCheck, Share2, ChevronLeft,
-  LayoutDashboard, FileText, SquarePen,
+  LayoutDashboard, FileText, SquarePen, Home,
 } from 'lucide-react'
 
 // One shared spec so every nav icon matches (see the design brief).
@@ -178,13 +178,23 @@ function PosSidePanel({ formId, backLink, hasCartField: hasCartFieldProp, bottom
 
   const isExpense = templateSlug === 'expenses'
 
+  // Everything below is inside focus mode, where the app's own NavBar (and
+  // its route back to Home) is hidden - without this, desktop had no way
+  // back to Home at all, and mobile only had the floating exitLink arrow,
+  // which goes to this form's Locations/All Businesses page, not Home
+  // itself. Skipped for staff accounts: StaffScopedRoute confines them to
+  // their one assigned form, so "/" would just bounce them right back.
+  const homeLink = isStaff ? [] : [{ label: 'Home', to: '/', icon: Home }]
+
   const links = isExpense ? [
+    ...homeLink,
     { label: 'Overview', to: `/form/${formId}/expenses`, icon: LayoutDashboard },
     { label: 'Add Expense', to: `/form/${formId}/expenses?add=1`, icon: CirclePlus },
     { label: 'Records', to: `/form/${formId}/records?focus=1`, icon: ClipboardList },
     { label: 'Reports', to: `/form/${formId}/report?focus=1`, icon: ChartNoAxesColumnIncreasing },
     ...(isStaff ? [] : [{ label: 'Settings', to: `/form/${formId}/settings?focus=1`, icon: Settings }]),
   ] : [
+    ...homeLink,
     hasCartField
       ? { label: 'Order Screen', to: `/form/${formId}`, icon: ShoppingCart }
       : { label: 'View Form', to: `/form/${formId}`, icon: FileText },
