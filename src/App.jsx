@@ -97,6 +97,7 @@ const ForRetailPage = lazy(() => import('./marketing/pages/ForRetailPage'))
 const ResourcesPage = lazy(() => import('./marketing/pages/ResourcesPage'))
 const TemplateGalleryPage = lazy(() => import('./marketing/pages/TemplateGalleryPage'))
 const NotFound = lazy(() => import('./NotFound'))
+const WorkflowTransferPage = lazy(() => import('./WorkflowTransferPage'))
 
 function PrivateRoute({ children }) {
   const { session, loading } = useAuth()
@@ -262,6 +263,11 @@ function AppShell() {
         {/* No auth guard here: Supabase's reset link creates a temporary session
             on its own, and PublicOnlyRoute would incorrectly redirect it away. */}
         <Route path="/reset-password" element={<ResetPasswordPage />} />
+        {/* No PrivateRoute here either - it handles "not signed in" itself
+            without redirecting, since a redirect would drop the invite's
+            #token fragment before the page ever reads it (see
+            WorkflowTransferPage.jsx). */}
+        <Route path="/workflow-transfer/:id" element={<WorkflowTransferPage />} />
         <Route path="/" element={<RootRoute />} />
         <Route path="/product" element={<ProductPage />} />
         <Route path="/forms" element={<FormsPage />} />

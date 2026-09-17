@@ -8,9 +8,16 @@
 // it runs with bypasses RLS entirely).
 import { useEffect, useState } from 'react'
 import Modal from './components/Modal'
+import ConfirmDialog from './ConfirmDialog'
 import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
 import { useToast } from './Toast'
+
+// Transfers move either the whole workflow or a single location (see
+// supabase/functions/manage-workflow-transfer) - scope here is the same
+// 'workflow' | 'location' value manage-share already uses, so it doubles as
+// the transfer scope too.
+const ACTIVE_TRANSFER_STATUSES = ['sending', 'pending']
 
 function ShareModal({ scope, templateSlug, formId, displayName, onClose }) {
   const { session } = useAuth()
@@ -21,11 +28,23 @@ function ShareModal({ scope, templateSlug, formId, displayName, onClose }) {
   const [role, setRole] = useState('viewer')
   const [inviting, setInviting] = useState(false)
   const [busyId, setBusyId] = useState(null)
+  const [transfer, setTransfer] = useState(null)
+  const [transferLoading, setTransferLoading] = useState(true)
+  const [transferEmail, setTransferEmail] = useState('')
+  const [transferBusy, setTransferBusy] = useState(false)
+  const [confirmingTransfer, setConfirmingTransfer] = useState(false)
 
   const scopeParams = scope === 'workflow' ? { scope, template_slug: templateSlug } : { scope, form_id: formId }
 
   async function callShareFunction(body) {
     const { data, error } = await supabase.functions.invoke('manage-share', { body: { ...scopeParams, ...body } })
+    if (error) throw new Error(error.message || 'Something went wrong')
+    if (data?.error) throw new Error(data.error)
+    return data
+  }
+
+  async function callTransferFunction(body) {
+    const { data, error } = await supabase.functions.invoke('manage-workflow-transfer', { body: { scope, template_slug: templateSlug, form_id: formId, ...body } })
     if (error) throw new Error(error.message || 'Something went wrong')
     if (data?.error) throw new Error(data.error)
     return data
@@ -43,7 +62,22 @@ function ShareModal({ scope, templateSlug, formId, displayName, onClose }) {
     }
   }
 
-  useEffect(() => { loadShares() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  async function loadTransferStatus() {
+    setTransferLoading(true)
+    try {
+      const data = await callTransferFunction({ action: 'status' })
+      setTransfer(data.transfer)
+    } catch (err) {
+      showToast('Could not load transfer status: ' + err.message, 'error')
+    } finally {
+      setTransferLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadShares()
+    loadTransferStatus()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleInvite(e) {
     e.preventDefault()
@@ -91,6 +125,33 @@ function ShareModal({ scope, templateSlug, formId, displayName, onClose }) {
     }
   }
 
+  async function handleRequestTransfer() {
+    setConfirmingTransfer(false)
+    setTransferBusy(true)
+    try {
+      const data = await callTransferFunction({ action: 'request', email: transferEmail })
+      setTransfer(data.transfer)
+      setTransferEmail('')
+      showToast(`Transfer invitation sent to ${data.transfer.recipient_email}.`, 'success')
+    } catch (err) {
+      showToast('Could not start transfer: ' + err.message, 'error')
+    } finally {
+      setTransferBusy(false)
+    }
+  }
+
+  async function handleCancelTransfer() {
+    setTransferBusy(true)
+    try {
+      await callTransferFunction({ action: 'cancel', id: transfer.id })
+      setTransfer(null)
+    } catch (err) {
+      showToast('Could not cancel the transfer: ' + err.message, 'error')
+    } finally {
+      setTransferBusy(false)
+    }
+  }
+
   function copyLink() {
     const link = scope === 'workflow'
       ? `${window.location.origin}/templates/${templateSlug}/locations?owner=${session.user.id}`
@@ -100,6 +161,7 @@ function ShareModal({ scope, templateSlug, formId, displayName, onClose }) {
   }
 
   return (
+    <>
     <Modal
       size="md"
       onClose={onClose}
@@ -175,11 +237,68 @@ function ShareModal({ scope, templateSlug, formId, displayName, onClose }) {
         <button type="submit" disabled={inviting}>{inviting ? 'Inviting…' : 'Invite'}</button>
       </form>
 
+      <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1rem', marginBottom: '1rem' }}>
+        <div style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.5rem' }}>Transfer ownership</div>
+        {transferLoading ? (
+          <span style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>Loading…</span>
+        ) : transfer && ACTIVE_TRANSFER_STATUSES.includes(transfer.status) ? (
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem',
+            fontSize: '0.85rem', padding: '0.6rem 0.8rem', background: 'var(--color-warning-soft)', borderRadius: 'var(--radius)',
+          }}>
+            <span>
+              Pending — {transfer.recipient_email} has until {new Date(transfer.expires_at).toLocaleDateString()} to accept.
+            </span>
+            <button
+              type="button" className="secondary" disabled={transferBusy}
+              onClick={handleCancelTransfer}
+              style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem', flexShrink: 0 }}
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <>
+            <p style={{ color: 'var(--color-muted)', fontSize: '0.8rem', margin: '0 0 0.5rem' }}>
+              {scope === 'workflow'
+                ? 'Hand full ownership of every location in this workflow to someone else. You lose all access once they accept — this can\'t be undone.'
+                : 'Hand full ownership of this location to someone else. You lose all access once they accept — this can\'t be undone.'}
+            </p>
+            <form
+              onSubmit={(e) => { e.preventDefault(); if (transferEmail.trim()) setConfirmingTransfer(true) }}
+              style={{ display: 'flex', gap: '0.4rem' }}
+            >
+              <input
+                type="email" required placeholder="New owner's email" value={transferEmail}
+                onChange={(e) => setTransferEmail(e.target.value)}
+                style={{ flex: 1, minWidth: 0, padding: '0.5rem', fontSize: '0.85rem' }}
+              />
+              <button type="submit" className="secondary" disabled={transferBusy}>Transfer…</button>
+            </form>
+          </>
+        )}
+      </div>
+
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
         <button type="button" className="secondary" onClick={copyLink}>Copy share link</button>
         <button type="button" className="secondary" onClick={onClose}>Done</button>
       </div>
     </Modal>
+    {confirmingTransfer && (
+      <ConfirmDialog
+        title="Transfer ownership?"
+        message={
+          scope === 'workflow'
+            ? `${transferEmail} will get full ownership of "${displayName}" and every location in it. You will permanently lose access once they accept.`
+            : `${transferEmail} will get full ownership of the location "${displayName}". You will permanently lose access once they accept.`
+        }
+        confirmLabel="Send invitation"
+        danger
+        onConfirm={handleRequestTransfer}
+        onCancel={() => setConfirmingTransfer(false)}
+      />
+    )}
+    </>
   )
 }
 

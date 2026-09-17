@@ -25,15 +25,24 @@ Deno.serve(async req => {
     }
     const siteUrl = (Deno.env.get('APP_SITE_URL') || 'https://verticalsapp.com').replace(/\/$/, '')
     if (!siteUrl.startsWith('https://')) throw new Error('A secure application URL is required.')
+    // scope defaults to 'workflow' for backward compatibility with the
+    // original whole-business transfer; 'location' moves a single location
+    // (its primary form, plus any bundle secondaries naming it as their
+    // primaryFormId - see src/locations.js) instead.
+    const scope = body.scope === 'location' ? 'location' : 'workflow'
     if (action === 'request') {
       if (!emailConfigured()) return jsonResponse({ error: 'Transfer email delivery has not been configured yet.' }, 503)
-      if (typeof body.template_slug !== 'string' || typeof body.email !== 'string') return jsonResponse({ error: 'Workflow and recipient email are required.' }, 400)
+      if (typeof body.email !== 'string') return jsonResponse({ error: 'A recipient email is required.' }, 400)
+      if (scope === 'workflow' && typeof body.template_slug !== 'string') return jsonResponse({ error: 'Workflow is required.' }, 400)
+      if (scope === 'location' && typeof body.form_id !== 'string') return jsonResponse({ error: 'Location is required.' }, 400)
       const token = Array.from(crypto.getRandomValues(new Uint8Array(32)), b => b.toString(16).padStart(2, '0')).join('')
-      const transfer = await rpc({ p_action: 'request', p_slug: body.template_slug, p_email: body.email, p_hash: await hashTransferToken(token) })
+      const transfer = await rpc({ p_action: 'request', p_scope: scope, p_slug: body.template_slug, p_form_id: body.form_id, p_email: body.email, p_hash: await hashTransferToken(token) })
       const link = `${siteUrl}/workflow-transfer/${transfer.id}#token=${token}`
-      const message = `${transfer.owner_email} has offered to transfer ownership of "${transfer.display_name}" and all its locations to you. Sign in with ${transfer.recipient_email} to review and accept. Nothing changes until you accept. This invitation expires in 7 days.`
+      const message = scope === 'workflow'
+        ? `${transfer.owner_email} has offered to transfer ownership of "${transfer.display_name}" and all its locations to you. Sign in with ${transfer.recipient_email} to review and accept. Nothing changes until you accept. This invitation expires in 7 days.`
+        : `${transfer.owner_email} has offered to transfer ownership of the location "${transfer.display_name}" to you. Sign in with ${transfer.recipient_email} to review and accept. Nothing changes until you accept. This invitation expires in 7 days.`
       try {
-        await sendTransactionalEmail(transfer.recipient_email, 'Review a Verticals workflow ownership transfer', transferEmail({ title: 'Workflow ownership transfer', message, link }), `${message}\n\n${link}`, `${transfer.id}-invite`)
+        await sendTransactionalEmail(transfer.recipient_email, 'Review a Verticals ownership transfer', transferEmail({ title: 'Ownership transfer', message, link }), `${message}\n\n${link}`, `${transfer.id}-invite`)
       } catch (error) {
         await rpc({ p_action: 'email_failed', p_id: transfer.id })
         throw error
@@ -41,7 +50,7 @@ Deno.serve(async req => {
       const pending = await rpc({ p_action: 'sent', p_id: transfer.id })
       return jsonResponse({ transfer: pending })
     }
-    if (action === 'status') return jsonResponse({ transfer: await rpc({ p_action: 'status', p_slug: body.template_slug }) })
+    if (action === 'status') return jsonResponse({ transfer: await rpc({ p_action: 'status', p_scope: scope, p_slug: body.template_slug, p_form_id: body.form_id }) })
     if (typeof body.id !== 'string' || !/^[a-f0-9-]{36}$/i.test(body.id)) return jsonResponse({ error: 'Invalid invitation.' }, 400)
     if (action === 'cancel') return jsonResponse({ transfer: await rpc({ p_action: 'cancel', p_id: body.id }) })
     if (typeof body.token !== 'string' || !/^[a-f0-9]{64}$/.test(body.token)) return jsonResponse({ error: 'Invalid invitation link.' }, 400)
@@ -50,9 +59,10 @@ Deno.serve(async req => {
     const transfer = action === 'review' ? before : await rpc({ ...args, p_action: action })
     let notificationFailed = false
     if (action === 'accept' && before.status !== 'accepted') {
-      const message = `Ownership of "${transfer.display_name}" has transferred from ${transfer.owner_email} to ${transfer.recipient_email}. Existing records and other collaborators remain in place. The previous owner no longer has access. Google Sheets must be reconnected by the new owner.`
+      const subject = transfer.scope === 'workflow' ? `"${transfer.display_name}" and all its locations` : `the location "${transfer.display_name}"`
+      const message = `Ownership of ${subject} has transferred from ${transfer.owner_email} to ${transfer.recipient_email}. Existing records and other collaborators remain in place. The previous owner no longer has access. Google Sheets must be reconnected by the new owner.`
       const notifications = await Promise.allSettled([transfer.owner_email, transfer.recipient_email].map((email, index) =>
-        sendTransactionalEmail(email, 'Workflow ownership transfer completed', transferEmail({ title: 'Transfer completed', message, link: siteUrl, label: 'Open Verticals' }), message, `${transfer.id}-accepted-${index}`)))
+        sendTransactionalEmail(email, 'Ownership transfer completed', transferEmail({ title: 'Transfer completed', message, link: siteUrl, label: 'Open Verticals' }), message, `${transfer.id}-accepted-${index}`)))
       notificationFailed = notifications.some(result => result.status === 'rejected')
     }
     return jsonResponse({ transfer, notificationFailed })
