@@ -226,6 +226,11 @@ function AppShell() {
   const useRecordsShell = !isMobile && /^\/form\/[^/]+\/records\/?$/.test(location.pathname)
   const useHomeShell = !isMobile && !!session && (
     ['/', '/records', '/reports', '/templates'].includes(location.pathname) ||
+    // A business's own Locations page (e.g. /templates/restaurant/locations,
+    // or /templates/forms/locations for the Forms template's own rich home -
+    // see FormsTemplateHome.jsx) - same top-level shell as Home/Reports/
+    // Templates, just missing until now.
+    /^\/templates\/[^/]+\/locations\/?$/.test(location.pathname) ||
     (location.pathname === '/lab' && session.user.id === TEMPLATE_ADMIN_USER_ID)
   )
   const showNavBar = !useHomeShell && !useReportShell && !useRecordsShell && !isPublicForm && !isShortLink && !isQuizPlayer && !isLogin && !isSignUp && !isOnboarding && !isConfirmEmail && !isResetPassword && !isFocusMode && !isReportBuilder && !isPayrollEnv && !isExpenseEnv && !isSharedReport && !isPublicDemo && !isLandingRoot && !isLandingPreview && !isMarketingSubpage
