@@ -52,9 +52,9 @@ export async function getSubmissionByToken(editToken) {
   return result
 }
 
-export async function updateSubmissionByToken(editToken, data) {
+export async function updateSubmissionByToken(editToken, data, editorEmail = null) {
   const { data: result, error } = await supabase.functions.invoke('manage-submission', {
-    body: { action: 'update', edit_token: editToken, data },
+    body: { action: 'update', edit_token: editToken, data, editor_email: editorEmail },
   })
   if (error) await throwFunctionError(error)
   if (result?.error) throw new Error(result.error)

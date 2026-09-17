@@ -194,7 +194,7 @@ export function RecordDetail({ form, record, fields, onClose, onUpdated, initial
                     <span style={{ color: '#1a7f37' }}>{log.new_value || '(empty)'}</span>
                   </div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--color-muted)', marginTop: '0.2rem' }}>
-                    {log.changed_by_email} · {new Date(log.created_at).toLocaleString('en-GB', {
+                    {log.changed_by_email || 'Customer'} · {new Date(log.created_at).toLocaleString('en-GB', {
                       day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
                     })}
                   </div>

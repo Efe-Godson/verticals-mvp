@@ -55,7 +55,7 @@ Deno.serve(async req => {
       if (!data || typeof data !== 'object') return jsonResponse({ error: 'data is required' }, 400)
 
       const { data: existing, error: findError } = await supabase
-        .from('submissions').select('id, data').eq('edit_token', edit_token).single()
+        .from('submissions').select('id, form_id, data').eq('edit_token', edit_token).single()
       if (findError || !existing) return jsonResponse({ error: 'Submission not found' }, 404)
 
       // Merge rather than replace: the client only knows about the form's
@@ -68,6 +68,45 @@ Deno.serve(async req => {
       const { error: updateError } = await supabase
         .from('submissions').update({ data: mergedData }).eq('id', existing.id)
       if (updateError) throw updateError
+
+      // Log the change the same way RecordDetail.jsx's own edit flow does
+      // (submission_logs), so a correction made through this route (this
+      // is the flow Records.jsx's Edit link opens for a cart form, an
+      // otherwise-unauthenticated public route) still shows up in Edit
+      // History instead of leaving it looking untouched. Best-effort - a
+      // logging failure shouldn't fail the save itself. changed_by stays
+      // null here (there's no auth.users id in this flow); changed_by_email
+      // is the admin's email when opened from Records.jsx (see
+      // editor_email, passed through from the session that opened the
+      // "Correct Order" screen), or left blank for a genuine anonymous
+      // customer self-edit - RecordDetail.jsx falls back to showing
+      // "Customer" for those.
+      try {
+        const { data: form } = await supabase.from('forms').select('fields').eq('id', existing.form_id).single()
+        const editorEmail = typeof body.editor_email === 'string' && body.editor_email.trim() ? body.editor_email.trim() : null
+        const changes: Record<string, unknown>[] = []
+        for (const field of (form?.fields || [])) {
+          const oldVal = (existing.data || {})[field.id]
+          const newVal = mergedData[field.id]
+          let oldStr: string, newStr: string
+          if (field.type === 'cart') {
+            const oldItems = oldVal?.items || []
+            const newItems = newVal?.items || []
+            oldStr = oldItems.map((i: { name: string; quantity: number }) => `${i.name} ×${i.quantity}`).join(', ') || '(empty cart)'
+            newStr = newItems.map((i: { name: string; quantity: number }) => `${i.name} ×${i.quantity}`).join(', ') || '(empty cart)'
+          } else {
+            oldStr = oldVal === undefined || oldVal === null ? '' : String(oldVal)
+            newStr = newVal === undefined || newVal === null ? '' : String(newVal)
+          }
+          if (oldStr !== newStr) {
+            changes.push({
+              submission_id: existing.id, form_id: existing.form_id, changed_by: null,
+              changed_by_email: editorEmail, field_label: field.label, old_value: oldStr, new_value: newStr,
+            })
+          }
+        }
+        if (changes.length > 0) await supabase.from('submission_logs').insert(changes)
+      } catch { /* logging is best-effort - the save above already succeeded */ }
 
       return jsonResponse({ ok: true })
     }

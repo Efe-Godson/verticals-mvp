@@ -1870,7 +1870,15 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
                         <span
                           onClick={() => {
                             if (hasCartField && sub.edit_token) {
-                              setEditIframeUrl(`/form/${form.id}/response/${sub.edit_token}`)
+                              // Carries the admin's own email through to the
+                              // embedded "Correct Order" screen (an
+                              // otherwise-unauthenticated public route, see
+                              // manage-submission/index.ts) purely so the
+                              // resulting edit gets attributed properly in
+                              // Edit History instead of showing up as an
+                              // anonymous "Customer" edit.
+                              const editorEmail = session?.user?.email ? `?editorEmail=${encodeURIComponent(session.user.email)}` : ''
+                              setEditIframeUrl(`/form/${form.id}/response/${sub.edit_token}${editorEmail}`)
                             } else {
                               setSelectedRecord(sub)
                               setOpenRecordEditing(true)

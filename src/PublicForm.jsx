@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import useIsMobile from './hooks/useIsMobile'
 import Modal from './components/Modal'
 import CardChoice from './components/CardChoice'
@@ -386,6 +386,12 @@ function OrderConfirmationModal({ form, submission, onClose }) {
 
 function PublicForm() {
   const { id, token } = useParams()
+  // Only ever present on the embedded "Correct Order" edit_token flow (see
+  // Records.jsx's Edit link) - carries the admin's own email through so the
+  // resulting change gets attributed properly in Edit History, since this
+  // route itself is otherwise unauthenticated (see manage-submission/index.ts).
+  const [searchParams] = useSearchParams()
+  const editorEmail = searchParams.get('editorEmail') || null
   const { session, staffFormId } = useAuth()
   const { showToast } = useToast()
   const [form, setForm] = useState(null)
@@ -1010,7 +1016,7 @@ function PublicForm() {
       let submissionId = null
       let realOrderNumber = orderNumber
       if (token) {
-        await updateSubmissionByToken(token, finalData)
+        await updateSubmissionByToken(token, finalData, editorEmail)
         // Opened from the Records "Edit" link (either as a popup tab or,
         // for POS orders, embedded in an iframe) to make a quick correction.
         // Report back to whoever opened this and stop - the POS
