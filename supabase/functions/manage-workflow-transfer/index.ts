@@ -60,7 +60,7 @@ Deno.serve(async req => {
     let notificationFailed = false
     if (action === 'accept' && before.status !== 'accepted') {
       const subject = transfer.scope === 'workflow' ? `"${transfer.display_name}" and all its locations` : `the location "${transfer.display_name}"`
-      const message = `Ownership of ${subject} has transferred from ${transfer.owner_email} to ${transfer.recipient_email}. Existing records and other collaborators remain in place. The previous owner no longer has access. Google Sheets must be reconnected by the new owner.`
+      const message = `Ownership of ${subject} has transferred from ${transfer.owner_email} to ${transfer.recipient_email}. Existing records and other collaborators remain in place. ${transfer.owner_email} has been kept on as an admin - only ${transfer.recipient_email} can manage sharing or transfer it again from here. Google Sheets must be reconnected by the new owner.`
       const notifications = await Promise.allSettled([transfer.owner_email, transfer.recipient_email].map((email, index) =>
         sendTransactionalEmail(email, 'Ownership transfer completed', transferEmail({ title: 'Transfer completed', message, link: siteUrl, label: 'Open Verticals' }), message, `${transfer.id}-accepted-${index}`)))
       notificationFailed = notifications.some(result => result.status === 'rejected')

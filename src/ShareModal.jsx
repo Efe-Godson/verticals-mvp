@@ -206,11 +206,20 @@ function ShareModal({ scope, templateSlug, formId, displayName, onClose }) {
               <select
                 value={share.role}
                 disabled={busyId === share.id}
-                onChange={(e) => handleRoleChange(share, e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value
+                  // Picking this from the role dropdown just pre-fills the
+                  // transfer form below with this person's email (still
+                  // needs the confirm step) - it never changes their role
+                  // by itself, so the select snaps back to share.role.
+                  if (value === '__transfer') { setTransferEmail(share.email); setConfirmingTransfer(true); return }
+                  handleRoleChange(share, value)
+                }}
                 style={{ fontSize: '0.8rem', padding: '0.25rem 0.4rem' }}
               >
                 <option value="admin">Admin</option>
                 <option value="viewer">Viewer</option>
+                <option value="__transfer">Transfer ownership…</option>
               </select>
               <button
                 type="button" className="secondary" disabled={busyId === share.id}
@@ -261,8 +270,8 @@ function ShareModal({ scope, templateSlug, formId, displayName, onClose }) {
           <>
             <p style={{ color: 'var(--color-muted)', fontSize: '0.8rem', margin: '0 0 0.5rem' }}>
               {scope === 'workflow'
-                ? 'Hand full ownership of every location in this workflow to someone else. You lose all access once they accept — this can\'t be undone.'
-                : 'Hand full ownership of this location to someone else. You lose all access once they accept — this can\'t be undone.'}
+                ? 'Hand full ownership of every location in this workflow to someone else. You\'ll be kept on as an Admin once they accept - only they can manage sharing or transfer it again from here.'
+                : 'Hand full ownership of this location to someone else. You\'ll be kept on as an Admin once they accept - only they can manage sharing or transfer it again from here.'}
             </p>
             <form
               onSubmit={(e) => { e.preventDefault(); if (transferEmail.trim()) setConfirmingTransfer(true) }}
@@ -289,8 +298,8 @@ function ShareModal({ scope, templateSlug, formId, displayName, onClose }) {
         title="Transfer ownership?"
         message={
           scope === 'workflow'
-            ? `${transferEmail} will get full ownership of "${displayName}" and every location in it. You will permanently lose access once they accept.`
-            : `${transferEmail} will get full ownership of the location "${displayName}". You will permanently lose access once they accept.`
+            ? `${transferEmail} will get full ownership of "${displayName}" and every location in it. You'll be kept on as an Admin once they accept, but only they can manage sharing from here.`
+            : `${transferEmail} will get full ownership of the location "${displayName}". You'll be kept on as an Admin once they accept, but only they can manage sharing from here.`
         }
         confirmLabel="Send invitation"
         danger

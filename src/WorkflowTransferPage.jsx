@@ -122,7 +122,7 @@ function WorkflowTransferPage() {
         <>
           <p style={{ color: 'var(--color-muted)' }}>
             <strong>{transfer.owner_email}</strong> has offered to transfer ownership of {subjectLabel} to you ({transfer.recipient_email}).
-            You'll get full ownership - the previous owner loses all access. Existing records and other collaborators stay in place.
+            You'll get full ownership - the previous owner is kept on as an Admin instead of losing access outright, but only you can manage sharing or transfer it again from here. Existing records and other collaborators stay in place.
           </p>
           <div style={{ display: 'flex', gap: '0.6rem', marginTop: '1.2rem' }}>
             <button type="button" disabled={busy} onClick={() => setConfirmingAccept(true)}>Accept</button>
