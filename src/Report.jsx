@@ -1,5 +1,7 @@
+import AdaptivePageHeader from './components/AdaptivePageHeader'
 // Place at: src/Report.jsx
 import { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react'
+import { createPortal } from 'react-dom'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
@@ -19,7 +21,7 @@ import PageSkeleton from './components/PageSkeleton'
 import { useDeferredLoading } from './components/loadingHooks'
 import useIsMobile from './hooks/useIsMobile'
 import { ErrorState } from './ErrorState'
-import { usePageOptions, usePageBack } from './PageTitleContext'
+import { usePageOptions, usePageBack, useDesktopHeader } from './PageTitleContext'
 import MobileOptionsPanel from './components/MobileOptionsPanel'
 
 function getPreviousDateRangeBounds(range, customStart, customEnd) {
@@ -98,6 +100,9 @@ function Report({ formId: formIdProp, headerExtra, extraSubmissions = [] } = {})
   // a single side-by-side tile (desktop only - it stacks on mobile). Stored
   // as a list of "join with next" tile ids on the form.
   const isDesktop = !useIsMobile(1024)
+  const isMobileHeader = useIsMobile(768)
+  const { desktopHeaderTarget } = useDesktopHeader()
+  const useTopBar = !isMobileHeader && !!desktopHeaderTarget && !formIdProp && !headerExtra
   const canEditLayout = !isStaffView && !isSharedViewer && isDesktop
   const chartPairs = form?.settings?.reportChartPairs || EMPTY_ARRAY
   // Passed straight into ChartTileGrid (memoized below, since it renders a
@@ -363,6 +368,111 @@ function Report({ formId: formIdProp, headerExtra, extraSubmissions = [] } = {})
     </>
   )
 
+  const reportFilters = (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap' }}>
+          <div className="report-filter-group" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <label htmlFor="report-date-range" style={{ fontSize: '0.85rem', color: 'var(--color-text)', fontWeight: 600 }}>Date range</label>
+          {isStaffView ? (
+            <span
+              title="Set by the owner in Settings > Staff Access"
+              style={{
+                padding: '0.35rem 0.6rem', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
+                fontSize: '0.85rem', color: 'var(--color-muted)', background: 'var(--color-bg)'
+              }}
+            >
+              {getDateRangeLabel(dateRange, customStart, customEnd)}
+            </span>
+          ) : (
+            <>
+              <select id="report-date-range" value={dateRange} onChange={(e) => setDateRange(e.target.value)} style={{ padding: '0.3rem 0.4rem', fontSize: '0.85rem' }}>
+                {DATE_RANGE_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+              {dateRange === 'specific' && (
+                <div className="date-range-group">
+                  <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} style={{ padding: '0.3rem 0.4rem', fontSize: '0.85rem' }} />
+                </div>
+              )}
+              {dateRange === 'custom' && (
+                <div className="date-range-group">
+                  <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} style={{ padding: '0.3rem 0.4rem', fontSize: '0.85rem' }} />
+                  <span style={{ color: 'var(--color-muted)', fontSize: '0.85rem' }}>to</span>
+                  <input
+                    type="date" value={customEnd} title="Leave blank to filter to just the start date"
+                    onChange={(e) => setCustomEnd(e.target.value)} style={{ padding: '0.3rem 0.4rem', fontSize: '0.85rem' }}
+                  />
+                </div>
+              )}
+            </>
+          )}
+          </div>
+        </div>
+  )
+
+  const reportHeader = (
+      <div className="report-filter-bar" data-html2canvas-ignore="true" style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap',
+        gap: '0.8rem', padding: '0.5rem 0.7rem', border: '1px solid var(--color-border)',
+        borderRadius: 'var(--radius)', marginBottom: '0.75rem',
+        background: 'linear-gradient(135deg, var(--color-surface) 0%, var(--color-primary-soft) 100%)'
+      }}>
+        {/* The title (or, for IntentDestination.jsx's demo preview, its own
+            title+tabs - see the headerExtra prop) shares this same tile/row
+            with Date range/Options at every width, instead of sitting in its
+            own header block above. */}
+        <div className="report-header-extra">
+          {headerExtra || (
+            <>
+              {/* Report.jsx is generic across every vertical (Expenses, Data
+                  Collection, Inventory, Survey, ...) - "Sales Report" was a
+                  leftover from when this only served Retail/Restaurant, and
+                  read as wrong (and inconsistent from demo to demo)
+                  everywhere else. */}
+              <h1 className="report-title" style={{ margin: 0, fontSize: '1.3rem' }}>{useTopBar ? `${form.name} Report` : 'Report'}</h1>
+              <RefreshingIndicator show={refreshing && !loading} />
+            </>
+          )}
+        </div>
+        {reportFilters}
+
+        <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* Desktop only (see .page-options-panel-desktop in index.css) -
+              a small dropdown anchored right under this button. Below 768px
+              this whole thing hides in favor of the portaled version further
+              down: this button lives inside .report-filter-bar, which gets
+              backdrop-filter on mobile for its sticky-blur look, and an
+              ancestor with backdrop-filter becomes a containing block for
+              position:fixed descendants - so a "fixed" panel nested in here
+              would end up positioned relative to this bar instead of the
+              viewport. Portaling to document.body sidesteps that (and any
+              other ancestor transform/filter) entirely rather than chasing
+              it with more CSS. */}
+          <div className="page-options-panel-desktop" style={{ position: 'relative', flexShrink: 0 }}>
+            <button className="secondary page-options-trigger" onClick={() => setOptionsMenuOpen(!optionsMenuOpen)}>
+              Options ▾
+            </button>
+            {optionsMenuOpen && (
+              <>
+                <div
+                  style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 15 }}
+                  onClick={() => setOptionsMenuOpen(false)}
+                />
+                <div className="dropdown-panel" style={{
+                  position: 'absolute', top: '100%', right: 0, marginTop: '0.3rem',
+                  background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 20, minWidth: '220px', padding: '0.6rem',
+                  overflow: 'hidden'
+                }}>
+                  {optionsMenuItems}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+  )
+
   return (
     <div
       className="page"
@@ -409,104 +519,7 @@ function Report({ formId: formIdProp, headerExtra, extraSubmissions = [] } = {})
         }
       `}</style>
 
-      <div className="report-filter-bar" data-html2canvas-ignore="true" style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap',
-        gap: '0.8rem', padding: '0.5rem 0.7rem', border: '1px solid var(--color-border)',
-        borderRadius: 'var(--radius)', marginBottom: '0.75rem',
-        background: 'linear-gradient(135deg, var(--color-surface) 0%, var(--color-primary-soft) 100%)'
-      }}>
-        {/* The title (or, for IntentDestination.jsx's demo preview, its own
-            title+tabs - see the headerExtra prop) shares this same tile/row
-            with Date range/Options at every width, instead of sitting in its
-            own header block above. */}
-        <div className="report-header-extra">
-          {headerExtra || (
-            <>
-              {/* Report.jsx is generic across every vertical (Expenses, Data
-                  Collection, Inventory, Survey, ...) - "Sales Report" was a
-                  leftover from when this only served Retail/Restaurant, and
-                  read as wrong (and inconsistent from demo to demo)
-                  everywhere else. */}
-              <h1 className="report-title" style={{ margin: 0, fontSize: '1.3rem' }}>Report</h1>
-              <RefreshingIndicator show={refreshing && !loading} />
-            </>
-          )}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap' }}>
-          <div className="report-filter-group" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <label htmlFor="report-date-range" style={{ fontSize: '0.85rem', color: 'var(--color-text)', fontWeight: 600 }}>Date range</label>
-          {isStaffView ? (
-            <span
-              title="Set by the owner in Settings > Staff Access"
-              style={{
-                padding: '0.35rem 0.6rem', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
-                fontSize: '0.85rem', color: 'var(--color-muted)', background: 'var(--color-bg)'
-              }}
-            >
-              {getDateRangeLabel(dateRange, customStart, customEnd)}
-            </span>
-          ) : (
-            <>
-              <select id="report-date-range" value={dateRange} onChange={(e) => setDateRange(e.target.value)} style={{ padding: '0.3rem 0.4rem', fontSize: '0.85rem' }}>
-                {DATE_RANGE_OPTIONS.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
-              {dateRange === 'specific' && (
-                <div className="date-range-group">
-                  <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} style={{ padding: '0.3rem 0.4rem', fontSize: '0.85rem' }} />
-                </div>
-              )}
-              {dateRange === 'custom' && (
-                <div className="date-range-group">
-                  <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} style={{ padding: '0.3rem 0.4rem', fontSize: '0.85rem' }} />
-                  <span style={{ color: 'var(--color-muted)', fontSize: '0.85rem' }}>to</span>
-                  <input
-                    type="date" value={customEnd} title="Leave blank to filter to just the start date"
-                    onChange={(e) => setCustomEnd(e.target.value)} style={{ padding: '0.3rem 0.4rem', fontSize: '0.85rem' }}
-                  />
-                </div>
-              )}
-            </>
-          )}
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          {/* Desktop only (see .page-options-panel-desktop in index.css) -
-              a small dropdown anchored right under this button. Below 768px
-              this whole thing hides in favor of the portaled version further
-              down: this button lives inside .report-filter-bar, which gets
-              backdrop-filter on mobile for its sticky-blur look, and an
-              ancestor with backdrop-filter becomes a containing block for
-              position:fixed descendants - so a "fixed" panel nested in here
-              would end up positioned relative to this bar instead of the
-              viewport. Portaling to document.body sidesteps that (and any
-              other ancestor transform/filter) entirely rather than chasing
-              it with more CSS. */}
-          <div className="page-options-panel-desktop" style={{ position: 'relative', flexShrink: 0 }}>
-            <button className="secondary page-options-trigger" onClick={() => setOptionsMenuOpen(!optionsMenuOpen)}>
-              Options ▾
-            </button>
-            {optionsMenuOpen && (
-              <>
-                <div
-                  style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 15 }}
-                  onClick={() => setOptionsMenuOpen(false)}
-                />
-                <div className="dropdown-panel" style={{
-                  position: 'absolute', top: '100%', right: 0, marginTop: '0.3rem',
-                  background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 20, minWidth: '220px', padding: '0.6rem',
-                  overflow: 'hidden'
-                }}>
-                  {optionsMenuItems}
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
+      {useTopBar ? createPortal(<AdaptivePageHeader title={form.name + ' Report'} filters={reportFilters} minimumFilterWidth={dateRange === 'custom' ? 460 : dateRange === 'specific' ? 320 : 210} filterWidth={dateRange === 'custom' ? 540 : dateRange === 'specific' ? 380 : 240} open={optionsMenuOpen} onOpenChange={setOptionsMenuOpen}>{optionsMenuItems}</AdaptivePageHeader>, desktopHeaderTarget) : reportHeader}
 
       <MobileOptionsPanel
         open={optionsMenuOpen}
@@ -779,7 +792,7 @@ const OverviewCard = memo(function OverviewCard({ form, submissions }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', marginBottom: '1.2rem' }}>
-      <div className="card" style={{ padding: '1.5rem', background: 'linear-gradient(135deg, var(--color-surface) 0%, var(--color-primary-soft) 100%)' }}>
+      <div className="card" style={{ padding: '1.5rem' }}>
         {hasCartData ? (
           <div style={{ fontSize: '1.15rem', color: 'var(--color-text)', lineHeight: 1.5 }}>
             Your business generated{' '}

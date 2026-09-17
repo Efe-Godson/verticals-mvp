@@ -48,8 +48,8 @@ function HorizontalBarChart({
     recordColumns,
     embedded = false,
     description,
+    controls = true,
 }) {
-
     const all = data || []
     const shown = all.slice(0, maxBars)
     const maxValue = Math.max(...shown.map(d => d.count), 1)
@@ -137,7 +137,7 @@ function HorizontalBarChart({
 
     const showValueToggle = shown.length > 0 && !asDonut
 
-    const header = (title || canPickType || showValueToggle) && (
+    const header = controls && (title || canPickType || showValueToggle) && (
         <div
             style={{
                 display: "flex",
@@ -195,7 +195,7 @@ function HorizontalBarChart({
                     </div>
                 )}
 
-                {!embedded && shown.length > 0 && (
+                {controls && !embedded && shown.length > 0 && (
                     <button
                         type="button"
                         data-html2canvas-ignore="true"

@@ -10,6 +10,7 @@ const CATEGORY_COLORS = {
   'Retail': '#0ea5e9', 'Restaurant': '#f97316', 'Education': '#8b5cf6',
   'Healthcare': '#ef4444', 'Nonprofit': '#16a34a', 'Events': '#d946ef',
   'HR & Operations': '#0070f3', 'Finance': '#ca8a04', 'Forms': '#0d9488',
+  'Inventory': '#0891b2',
   'Other': '#6b7280',
 }
 export function categoryColor(category) {
@@ -91,6 +92,13 @@ export function CategoryIcon({ category, color }) {
           <rect x="5" y="3" width="14" height="18" rx="2" />
           <path d="M9 3V2.5A1.5 1.5 0 0 1 10.5 1h3A1.5 1.5 0 0 1 15 2.5V3" />
           <path d="M8 9.5h8M8 13.5h8M8 17.5h5" />
+        </svg>
+      )
+    case 'Inventory':
+      return (
+        <svg {...common}>
+          <path d="M4 7h16v13H4z" />
+          <path d="M8 7V4h8v3M4 11h16M9 15h6" />
         </svg>
       )
     default:

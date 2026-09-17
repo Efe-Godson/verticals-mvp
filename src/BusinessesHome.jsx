@@ -1,3 +1,4 @@
+import NameInput from './components/NameInput'
 // Place at: src/BusinessesHome.jsx
 // The landing page after login: one tile per template you've actually put
 // to use (grouped by settings.templateSlug across however many locations
@@ -558,7 +559,7 @@ function BusinessesHome() {
             Shown here on Home instead of "{renameTarget.template.name}". Leave it as the template's own name to clear this.
           </p>
           <form onSubmit={saveWorkflowName}>
-            <input
+            <NameInput
               type="text" autoFocus value={renameInput}
               onChange={(e) => setRenameInput(e.target.value)}
               placeholder={renameTarget.template.name}

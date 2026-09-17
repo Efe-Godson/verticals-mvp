@@ -1,3 +1,4 @@
+import { applyGridPatch, snapBoxToGrid } from './print/tidyUp'
 // Place at: src/report/builder/useReportBuilder.js
 // Loads the form + submissions, owns form.settings.reportBuilder, and
 // exposes visual CRUD / promotion / builder-level filters. Persistence uses
@@ -18,6 +19,7 @@ const EMPTY_PRINT_LAYOUT = {
   schemaVersion: CURRENT_SCHEMA_VERSION,
   pageSize: 'slide', orientation: 'landscape', pages: [],
   showLogo: true, showDate: true, showPageNumber: true, showWatermark: true,
+  reportDate: new Date().toISOString().slice(0, 10),
   pageNumberFormat: 'page-x-of-y', numberTitlePage: false,
   // Phase 2 additions - theme (theme.js), master page header/footer text,
   // saved text/shape styles, and saved multi-element components. All
@@ -52,7 +54,8 @@ function newPrintId(prefix) {
 // instead of grid cells.
 function nextElementSlotPct(elements, width, height) {
   const maxY = elements.reduce((m, el) => Math.max(m, (el.y || 0) + (el.height || 0)), 0)
-  return { x: 0, y: maxY, width, height }
+  const availableHeight = Math.max(1, 100 - maxY)
+  return { x: 0, y: maxY, width: Math.min(100, width), height: Math.min(height, availableHeight) }
 }
 
 function clampPctLocal(v) {
@@ -345,7 +348,7 @@ export function useReportBuilder(formId) {
         const { width, height } = resolveElementSize(element)
         const slot = nextElementSlotPct(p.elements, width, height)
         created = {
-          id: newPrintId('el'), ...rest, ...slot,
+          id: newPrintId('el'), ...rest, ...snapBoxToGrid(slot),
           rotation: rest.rotation ?? 0, zIndex: p.elements.length + 1, locked: false, visible: true,
           styleRef: rest.styleRef ?? null, groupId: rest.groupId ?? null,
         }
@@ -360,7 +363,7 @@ export function useReportBuilder(formId) {
       ...prev,
       pages: prev.pages.map(p => p.id !== pageId ? p : {
         ...p,
-        elements: p.elements.map(el => el.id === elementId ? { ...el, ...(typeof patch === 'function' ? patch(el) : patch) } : el),
+        elements: p.elements.map(el => el.id === elementId ? applyGridPatch(el, typeof patch === 'function' ? patch(el) : patch) : el),
       }),
     }))
   }, [mutatePrint])
@@ -376,7 +379,7 @@ export function useReportBuilder(formId) {
       ...prev,
       pages: prev.pages.map(p => p.id !== pageId ? p : {
         ...p,
-        elements: p.elements.map(el => patchesById[el.id] ? { ...el, ...patchesById[el.id] } : el),
+        elements: p.elements.map(el => patchesById[el.id] ? applyGridPatch(el, patchesById[el.id]) : el),
       }),
     }))
   }, [mutatePrint])
@@ -601,8 +604,16 @@ export function useReportBuilder(formId) {
       id: newPrintId('page'),
       elements: p.elements.map((el, i) => {
         const { layout, ...rest } = el
+        const box = fromGridCells(layout)
+        const fitted = {
+          ...box,
+          x: Math.min(100 - box.width, Math.max(0, box.x)),
+          y: Math.min(100 - box.height, Math.max(0, box.y)),
+          width: Math.min(100, Math.max(1, box.width)),
+          height: Math.min(100, Math.max(1, box.height)),
+        }
         return {
-          id: newPrintId('el'), ...rest, ...fromGridCells(layout),
+          id: newPrintId('el'), ...rest, ...snapBoxToGrid(fitted),
           rotation: 0, zIndex: i + 1, locked: false, visible: true,
         }
       }),

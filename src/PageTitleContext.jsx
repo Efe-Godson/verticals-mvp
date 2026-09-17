@@ -10,16 +10,18 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react'
 
 const PageTitleContext = createContext({
   title: '', setTitle: () => {},
+  desktopHeaderTarget: null, setDesktopHeaderTarget: () => {},
   backTo: null, setBackTo: () => {},
   pageOptions: null, setPageOptions: () => {},
 })
 
 export function PageTitleProvider({ children }) {
   const [title, setTitle] = useState('')
+  const [desktopHeaderTarget, setDesktopHeaderTarget] = useState(null)
   const [backTo, setBackTo] = useState(null) // { to, label } | null
   const [pageOptions, setPageOptions] = useState(null) // { onClick } | null
   return (
-    <PageTitleContext.Provider value={{ title, setTitle, backTo, setBackTo, pageOptions, setPageOptions }}>
+    <PageTitleContext.Provider value={{ desktopHeaderTarget, setDesktopHeaderTarget, title, setTitle, backTo, setBackTo, pageOptions, setPageOptions }}>
       {children}
     </PageTitleContext.Provider>
   )
@@ -90,4 +92,10 @@ export function usePageOptions(enabled, onClick) {
 
 export function useCurrentPageOptions() {
   return useContext(PageTitleContext).pageOptions
+}
+
+// A portal target lets pages keep ownership of interactive desktop controls.
+export function useDesktopHeader() {
+  const { desktopHeaderTarget, setDesktopHeaderTarget } = useContext(PageTitleContext)
+  return { desktopHeaderTarget, setDesktopHeaderTarget }
 }

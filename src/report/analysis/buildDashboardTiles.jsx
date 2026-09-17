@@ -104,6 +104,7 @@ export function buildChartTiles(form, submissions) {
     const countTile = {
       id: 'trend-orders',
       title: orderTitle,
+        trendConfig: { defaultGranularity: defaultGran },
       node: <TrendLineChart points={orderPoints} defaultGranularity={defaultGran} focusTitle={orderTitle} sourceLabel={entryNoun.plural} />,
     }
     const tiles = []
@@ -116,6 +117,7 @@ export function buildChartTiles(form, submissions) {
       tiles.push({
         id: 'trend-revenue',
         title: revenueTitle,
+        trendConfig: { defaultGranularity: defaultGran },
         node: <TrendLineChart points={revenuePoints} defaultGranularity={defaultGran} formatValue={formatNaira} currency focusTitle={revenueTitle} sourceLabel={entryNoun.plural} />,
       })
     } else if (amountPoints.length > 0) {
@@ -123,6 +125,7 @@ export function buildChartTiles(form, submissions) {
       tiles.push({
         id: 'trend-amount',
         title: amountTitle,
+        trendConfig: { defaultGranularity: defaultGran },
         node: <TrendLineChart points={amountPoints} defaultGranularity={defaultGran} formatValue={formatNaira} currency focusTitle={amountTitle} sourceLabel={entryNoun.plural} />,
       })
     }

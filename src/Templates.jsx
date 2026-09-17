@@ -1,3 +1,4 @@
+import NameInput from './components/NameInput'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
@@ -330,7 +331,7 @@ function Templates() {
             "{locationModalTemplate.name}" for e.g. your first branch, shop, or site. You can add more locations later.
           </p>
           <form onSubmit={confirmCreateFirstLocation}>
-            <input
+            <NameInput
               type="text" required autoFocus value={locationNameInput}
               onChange={(e) => setLocationNameInput(e.target.value)}
               style={{ width: '100%', padding: '0.5rem', marginBottom: '1rem' }}

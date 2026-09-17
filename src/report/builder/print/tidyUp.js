@@ -28,12 +28,22 @@ function clampBox({ x, y, width, height }) {
   return { x: cx, y: cy, width: w, height: h }
 }
 
+export function snapBoxToGrid(box) {
+  return clampBox({ x: snap(box.x), y: snap(box.y), width: snap(box.width), height: snap(box.height) })
+}
+
+export function applyGridPatch(element, patch) {
+  const next = { ...element, ...patch }
+  return ['x', 'y', 'width', 'height'].some(key => key in patch)
+    ? { ...next, ...snapBoxToGrid(next) }
+    : next
+}
+
 export function tidyPage(page) {
   const patches = {}
   ;(page.elements || []).forEach(el => {
     if (el.locked) return
-    const clamped = clampBox(el)
-    const next = { x: snap(clamped.x), y: snap(clamped.y), width: snap(clamped.width), height: snap(clamped.height) }
+    const next = snapBoxToGrid(el)
     if (next.x !== el.x || next.y !== el.y || next.width !== el.width || next.height !== el.height) {
       patches[el.id] = next
     }

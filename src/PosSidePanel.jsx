@@ -74,7 +74,7 @@ function ShareLinkModal({ url, onClose }) {
 // bottomBarPresent: kept for callers (PublicForm.jsx's deferCheckout order
 // screen) - no longer changes anything here now that the top bar treatment
 // (see `topBar` below) is universal on mobile rather than conditional on it.
-function PosSidePanel({ formId, hasCartField: hasCartFieldProp, bottomBarPresent: _bottomBarPresent = false, startCollapsed = false }) {
+function PosSidePanel({ formId, backLink, hasCartField: hasCartFieldProp, bottomBarPresent: _bottomBarPresent = false, startCollapsed = false }) {
   const [searchParams] = useSearchParams()
   const { pathname } = useLocation()
   const isMobile = useIsMobile(768)
@@ -204,7 +204,7 @@ function PosSidePanel({ formId, hasCartField: hasCartFieldProp, bottomBarPresent
     ...(isStaff ? [] : [{ label: 'Share Link', onClick: openShareLink, icon: Share2 }]),
   ]
 
-  const exitLink = isStaff ? null : backTo
+  const exitLink = isStaff ? null : (backLink || backTo)
 
   // Mobile: one full-width top bar (menu left, back right, a hairline
   // border underneath) - the same toolbar language NavBar.jsx's own compact

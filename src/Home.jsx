@@ -8,6 +8,7 @@ import { useToast } from './Toast'
 import HomeRecycleBinDialog from './HomeRecycleBinDialog'
 import { useRecycleBinTrigger } from './RecycleBinContext'
 import LabSidePanel from './LabSidePanel'
+import useIsMobile from './hooks/useIsMobile'
 import { usePageBack } from './PageTitleContext'
 import { InlineLoader } from './components/InlineLoader'
 
@@ -92,6 +93,7 @@ function getContextualAction(formId, responseCounts) {
 }
 
 function Home() {
+  const isMobile = useIsMobile(768)
   usePageBack('/', 'All Businesses')
   const { session } = useAuth()
   const { showToast } = useToast()
@@ -383,7 +385,7 @@ function Home() {
 
   return (
     <div className="page">
-      <LabSidePanel />
+      {isMobile && <LabSidePanel />}
       <style>{`
         .form-grid-card { transition: border-color 0.15s ease, background-color 0.15s ease; }
         .form-grid-card:hover { border-color: var(--color-primary); }

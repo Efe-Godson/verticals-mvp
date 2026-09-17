@@ -1,3 +1,4 @@
+import NameInput from './components/NameInput'
 // Place at: src/TemplateLocations.jsx
 // One template's "home page": every location (fully independent form -
 // own menu, own orders, own records) created from this template, plus
@@ -560,7 +561,7 @@ function TemplateLocations() {
       {renameTarget && (
         <Modal size="sm" onClose={() => setRenameTarget(null)} title="Rename this location">
           <form onSubmit={saveLocationName}>
-            <input
+            <NameInput
               type="text" required autoFocus value={renameInput}
               onChange={(e) => setRenameInput(e.target.value)}
               style={{ width: '100%', padding: '0.5rem', marginBottom: '1rem' }}
@@ -596,7 +597,7 @@ function TemplateLocations() {
               : `A new, independent "${template.name}" - its own menu and its own orders.`}
           </p>
           <form onSubmit={confirmAddLocation}>
-            <input
+            <NameInput
               type="text" required autoFocus value={locationNameInput}
               onChange={(e) => setLocationNameInput(e.target.value)}
               style={{ width: '100%', padding: '0.5rem', marginBottom: '1rem' }}

@@ -99,13 +99,44 @@ function ShapeStyleFields({ page, el, onUpdateElement, onBeginBatch, onCommitBat
 
 function TextStyleFields({ page, el, onUpdateElement, onBeginBatch, onCommitBatch }) {
   const text = el.text || {}
+  const patchText = patch => onUpdateElement(page.id, el.id, { text: { ...text, ...patch } })
   return (
     <>
       <SectionLabel>Style</SectionLabel>
+      <FieldRow label="Font">
+        <select
+          style={{ fontSize: '0.8rem', maxWidth: '130px' }}
+          value={text.fontFamily || 'inherit'}
+          onChange={e => patchText({ fontFamily: e.target.value === 'inherit' ? undefined : e.target.value })}
+        >
+          <option value="inherit">Theme default</option>
+          <option value="Arial, sans-serif">Arial</option>
+          <option value="Georgia, serif">Georgia</option>
+          <option value="Verdana, sans-serif">Verdana</option>
+          <option value="Trebuchet MS, sans-serif">Trebuchet MS</option>
+        </select>
+      </FieldRow>
+      <FieldRow label="Size (px)">
+        <NumberInput
+          value={text.fontSize || 16} step={1} onFocus={onBeginBatch} onBlur={onCommitBatch}
+          onChange={v => patchText({ fontSize: Math.max(6, Math.min(120, v)) })}
+        />
+      </FieldRow>
+      <FieldRow label="Align">
+        <select
+          style={{ fontSize: '0.8rem' }} value={text.align || 'left'}
+          onChange={e => patchText({ align: e.target.value })}
+        >
+          <option value="left">Left</option>
+          <option value="center">Center</option>
+          <option value="right">Right</option>
+          <option value="justify">Justify</option>
+        </select>
+      </FieldRow>
       <FieldRow label="Color">
         <input
           type="color" value={text.color || '#111827'} onFocus={onBeginBatch} onBlur={onCommitBatch}
-          onChange={e => onUpdateElement(page.id, el.id, { text: { ...text, color: e.target.value } })}
+          onChange={e => patchText({ color: e.target.value })}
         />
       </FieldRow>
     </>

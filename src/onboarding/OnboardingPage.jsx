@@ -44,7 +44,7 @@ function AuthHeader({ onCreateAccount, onSignIn }) {
       background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)',
       position: 'sticky', top: 0, zIndex: 260,
     }}>
-      <VerticalsLogo height={19} style={{ color: 'var(--color-primary)' }} />
+      <VerticalsLogo height={23} style={{ color: 'var(--color-primary)' }} />
       <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
         <button type="button" className="secondary" onClick={onSignIn} style={{ fontSize: '0.85rem', padding: '0.45rem 0.9rem' }}>
           Sign in

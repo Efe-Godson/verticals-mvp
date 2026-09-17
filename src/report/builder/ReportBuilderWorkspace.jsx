@@ -149,8 +149,8 @@ export default function ReportBuilderWorkspace() {
     <div className="rb-workspace" style={{ position: 'fixed', inset: 0, background: 'var(--color-bg)', display: 'flex', flexDirection: 'column', zIndex: 50 }}>
       <style>{`
         .rb-workspace .rb-canvas .react-grid-item.react-grid-placeholder { background: var(--color-primary); opacity: 0.18; border-radius: var(--radius); }
-        .rb-cols { display: grid; grid-template-columns: 232px 1fr 316px; flex: 1; min-height: 0; }
-        .rb-cols > * { min-height: 0; overflow: hidden; }
+        .rb-cols { display: grid; grid-template-columns: 232px minmax(0, 1fr) 316px; flex: 1; min-height: 0; }
+        .rb-cols > * { min-width: 0; min-height: 0; overflow: hidden; }
         .rb-side { background: var(--color-surface); }
         .rb-mobile-bar { display: none; }
         @media (max-width: 900px) {
@@ -172,7 +172,7 @@ export default function ReportBuilderWorkspace() {
         <button className="secondary" onClick={() => navigate(`/form/${id}/report`)} style={{ fontSize: '0.8rem', flexShrink: 0 }}>← Exit</button>
         {!isMobile && <strong style={{ letterSpacing: '0.06em', fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--color-muted)' }}>Report Builder</strong>}
         <span style={{ fontSize: '0.82rem', color: 'var(--color-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{rb.form?.name}</span>
-        <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 1, flexWrap: 'wrap' }}>
           <button className="secondary" onClick={() => setShowDataset(true)} style={{ fontSize: '0.8rem' }}>Data ▤</button>
           <button className="secondary" onClick={handleSyncSheet} disabled={syncing} style={{ fontSize: '0.8rem' }}>
             {syncing ? 'Syncing…' : rb.form?.settings?.datasetsSheetId ? 'Sync Sheet ↻' : 'Link Google Sheet'}

@@ -11,7 +11,7 @@ import FocusModeModal from '../focus/FocusModeModal'
 import FocusResultsTable from '../focus/FocusResultsTable'
 import AboutThisVisual from '../focus/AboutThisVisual'
 
-const GRANULARITIES = [
+export const GRANULARITIES = [
   ['day', 'D'],
   ['week', 'W'],
   ['month', 'M'],
@@ -53,15 +53,25 @@ export default function TrendLineChart({
   recordColumns,
   description,
   embedded = false,
+  controls = true,
+  granularity,
+  showLabels: showLabelsProp,
+  onGranularityChange,
+  onShowLabelsChange,
+  fit = false,
 }) {
   // Off by default: labels on every point crowd a chart with more than a
   // few - the toggle still exists for anyone who wants them.
-  const [showLabels, setShowLabels] = useState(false)
-  const [gran, setGran] = useState(defaultGranularity)
+  const [localShowLabels, setLocalShowLabels] = useState(false)
+  const [localGran, setLocalGran] = useState(defaultGranularity)
   const [focusOpen, setFocusOpen] = useState(false)
   const [drillBucket, setDrillBucket] = useState(null)
   const isMobile = useIsMobile()
-  const chartHeight = height ?? (isMobile ? 210 : 260)
+  const chartHeight = fit ? '100%' : (height ?? (isMobile ? 210 : 260))
+  const showLabels = showLabelsProp ?? localShowLabels
+  const gran = granularity || localGran
+  const setShowLabels = value => { setLocalShowLabels(value); onShowLabelsChange?.(value) }
+  const setGran = value => { setLocalGran(value); onGranularityChange?.(value) }
 
   const data = useMemo(() => {
     const buckets = {}
@@ -82,7 +92,7 @@ export default function TrendLineChart({
 
   const chartBody = (
     <div>
-      <div
+      {controls && <div
         data-html2canvas-ignore="true"
         className="report-tile-control"
         style={{
@@ -125,9 +135,9 @@ export default function TrendLineChart({
             ⤢
           </button>
         )}
-      </div>
+      </div>}
 
-      <div style={{ width: '100%', height: chartHeight }}>
+      <div style={{ width: '100%', height: chartHeight, minHeight: 0, overflow: 'hidden' }}>
         <ResponsiveContainer>
           <AreaChart data={data} margin={{ top: showLabels ? 18 : 8, right: 16, bottom: 4, left: 0 }}>
             <defs>

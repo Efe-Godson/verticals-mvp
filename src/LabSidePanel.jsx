@@ -8,7 +8,7 @@
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 
-const ENTRIES = [
+export const LAB_ENTRIES = [
   { label: 'Lab Dashboard', to: '/lab' },
   { label: 'Templates', to: '/templates' },
   { label: '🚀 Landing Page', to: '/lab/landing' },
@@ -28,7 +28,7 @@ function LabSidePanel() {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
 
-  const filtered = ENTRIES.filter(e => e.label.toLowerCase().includes(query.trim().toLowerCase()))
+  const filtered = LAB_ENTRIES.filter(e => e.label.toLowerCase().includes(query.trim().toLowerCase()))
 
   return (
     <>

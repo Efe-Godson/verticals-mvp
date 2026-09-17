@@ -118,6 +118,7 @@
 
 * {
   box-sizing: border-box;
+  min-width: 0;
 }
 
 /* Shared by LoadingState.jsx's LoadingSpinner - defined once globally
@@ -1604,3 +1605,60 @@ body.payroll-panel-docked .payroll-shell > .page {
     margin: 0;
   }
 }
+
+/* Report controls occupy the desktop shell bar while retaining page state. */
+.compact-topbar-page-controls:empty { display: none; }
+.compact-topbar-page-controls:not(:empty) { flex: 1; min-width: 0; }
+.compact-topbar-row:has(.report-filter-bar) .compact-topbar-title { display: none; }
+.compact-topbar-page-controls .report-filter-bar {
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  background: none !important;
+  border-radius: 0 !important;
+}
+.compact-topbar-page-controls .report-header-extra { flex: 0 1 auto; min-width: 0; }
+.compact-topbar-page-controls .report-title { overflow-wrap: anywhere; }
+
+/* A consistent theme-aware shade across the report summary sections. */
+#report-overview .card,
+#report-performance .kpi-grid > .card {
+  background: linear-gradient(135deg, var(--color-surface) 0%, var(--color-primary-soft) 100%);
+}
+
+.compact-topbar-row:has(.records-topbar-controls) .compact-topbar-title { display: none; }
+.compact-topbar-page-controls .records-topbar-controls { justify-content: space-between !important; }
+.compact-topbar-page-controls .records-search { flex: 1 1 160px; max-width: 300px; }
+
+.compact-topbar-row:has(.adaptive-page-header) .compact-topbar-title { display: none; }
+.adaptive-page-header { display: flex; align-items: center; gap: 1rem; min-width: 0; position: relative; }
+.adaptive-page-header h1, .adaptive-title-measure { font-size: 1.3rem; font-weight: 700; line-height: 1.3; letter-spacing: normal; }
+.adaptive-page-header h1 { flex: 1; min-width: 0; margin: 0; overflow-wrap: anywhere; }
+.adaptive-title-measure { position: absolute; width: 0; height: 0; overflow: hidden; visibility: hidden; }
+.adaptive-title-measure span { display: inline-block; width: max-content; white-space: nowrap; }
+.adaptive-page-header > button { flex-shrink: 0; }
+.adaptive-inline-filters { display: flex; align-items: center; gap: 0.6rem; flex-shrink: 0; }
+.adaptive-inline-filters .records-search { width: 200px; flex: 1; }
+.adaptive-inline-filters .date-range-row { flex-wrap: nowrap; }
+.adaptive-inline-filters .date-range-group { flex: 0 1 auto; }
+.adaptive-menu-backdrop { position: fixed; inset: 0; z-index: 15; }
+.adaptive-options-panel { position: absolute; top: calc(100% + 0.5rem); right: 0; width: min(420px, 100%); max-height: 70vh; overflow-y: auto; padding: 0.75rem; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); box-shadow: 0 4px 12px rgba(0,0,0,0.12); z-index: 20; }
+.adaptive-menu-filters { display: flex; flex-direction: column; gap: 0.75rem; padding-bottom: 0.75rem; margin-bottom: 0.5rem; border-bottom: 1px solid var(--color-border); }
+.adaptive-menu-filters .records-search { width: 100%; max-width: none; flex: none; }
+.adaptive-menu-filters input, .adaptive-menu-filters select { max-width: 100%; }
+
+.name-input-with-tip { position: relative; min-width: 0; }
+.name-input-tip { position: absolute; top: 100%; left: 0; right: 0; z-index: 5; padding: 0.65rem 0.8rem; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); color: var(--color-muted); box-shadow: 0 4px 14px rgba(0,0,0,0.12); font-size: 0.8rem; line-height: 1.45; pointer-events: none; }
+
+/* Compact filters before hiding them; the title keeps its full width. */
+.adaptive-inline-filters .records-search { flex: 1 1 140px; min-width: 120px; width: auto; }
+.adaptive-inline-filters > .date-range-row { flex: 1 1 150px; min-width: 0; }
+.adaptive-inline-filters .date-range-row > div { min-width: 0; }
+.adaptive-inline-filters select { width: 100%; min-width: 0; }
+
+/* Keep the report date label beside its control in the desktop header. */
+.adaptive-inline-filters > div:has(.report-filter-group) { width: 100%; flex-wrap: nowrap !important; }
+.adaptive-inline-filters .report-filter-group { width: 100%; flex-wrap: nowrap !important; }
+.adaptive-inline-filters .report-filter-group label { flex-shrink: 0; white-space: nowrap; margin: 0; }
+.adaptive-inline-filters .report-filter-group select { flex: 1 1 120px; width: auto; min-width: 90px; }
+.adaptive-inline-filters .report-filter-group .date-range-group { flex-shrink: 1; }

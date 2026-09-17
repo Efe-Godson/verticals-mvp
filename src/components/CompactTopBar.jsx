@@ -15,6 +15,7 @@
 //   width) so it doesn't run under the panel.
 import { useLayoutEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
+import { useDesktopHeader } from '../PageTitleContext'
 import ArrowLeftIcon from '../ArrowLeftIcon'
 
 // Responsive button box - small on a narrow window, a touch larger on a wide
@@ -29,6 +30,7 @@ export default function CompactTopBar({
   padX = 'clamp(1rem, 4vw, 4.5rem)',
 }) {
   const ref = useRef(null)
+  const { setDesktopHeaderTarget } = useDesktopHeader()
 
   useLayoutEffect(() => {
     const el = ref.current
@@ -53,6 +55,7 @@ export default function CompactTopBar({
       }}
     >
       <div
+        className="compact-topbar-row"
         style={{
           maxWidth: contentMax, margin: '0 auto',
           paddingTop: 'clamp(5px, 0.9vw, 9px)', paddingBottom: 'clamp(5px, 0.9vw, 9px)',
@@ -76,13 +79,15 @@ export default function CompactTopBar({
         )}
 
         {title && (
-          <span style={{
+          <span className="compact-topbar-title" style={{
             fontWeight: 600, fontSize: 'clamp(0.9rem, 1.6vw, 1.05rem)', color: 'var(--color-text)',
             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0,
           }}>
             {title}
           </span>
         )}
+
+        <div className="compact-topbar-page-controls" ref={setDesktopHeaderTarget} />
 
         {exitLink && (
           <Link

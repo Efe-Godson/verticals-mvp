@@ -7,7 +7,7 @@
 // never pull recharts in.
 import { ResponsiveContainer } from 'recharts'
 
-export function VizBox({ children, height = '100%', minHeight = 160 }) {
+export function VizBox({ children, height = '100%', minHeight = 0 }) {
   return (
     <div style={{ width: '100%', height, minHeight, flex: 1 }}>
       <ResponsiveContainer width="100%" height="100%">

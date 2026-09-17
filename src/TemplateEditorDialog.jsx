@@ -1,3 +1,4 @@
+import NameInput from './components/NameInput'
 // Place at: src/TemplateEditorDialog.jsx
 // Used by Templates.jsx's inline "Manage"/"+ New Template" controls (admin
 // account only) to create and edit templates directly on the Templates
@@ -151,7 +152,7 @@ function TemplateEditorDialog({ template, realForms, onClose, onSaved }) {
           <div style={{ display: 'flex', gap: '0.6rem' }}>
             <div style={{ flex: 2 }}>
               <label style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>Template name</label>
-              <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Retail Sales" style={{ width: '100%', padding: '0.5rem', marginTop: '0.3rem' }} />
+              <NameInput type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Retail Sales" style={{ width: '100%', padding: '0.5rem', marginTop: '0.3rem' }} />
             </div>
             <div style={{ flex: 1 }}>
               <label style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>Category</label>

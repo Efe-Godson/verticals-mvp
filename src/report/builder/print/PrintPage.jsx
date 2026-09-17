@@ -20,29 +20,36 @@ import { themeCssVars } from './theme'
 export default function PrintPage({
   page, pageSize, orientation, visualsById, tilesById, form, submissions, editing, settings,
   pageNumber, totalPages, onRemoveElement, onUpdateElement, onUpdateElements, pageRef,
-  selectedIds, onSelect, tokenContext,
+  selectedIds, onSelect, onTextEdit, tokenContext, tileControls, onTileControlChange,
 }) {
-  const containerRef = useRef(null)
-  const [width, setWidth] = useState(0)
+  const pageRefInternal = useRef(null)
+  const contentRef = useRef(null)
+  const [contentSize, setContentSize] = useState({ width: 0, height: 0 })
+  const { width, height: contentHeight } = contentSize
 
   useEffect(() => {
-    const el = containerRef.current
+    const el = contentRef.current
     if (!el) return
     const ro = new ResizeObserver(entries => {
-      const w = entries[0]?.contentRect?.width
-      if (w) setWidth(w)
+      const rect = entries[0]?.contentRect
+      if (rect) setContentSize({ width: rect.width, height: rect.height })
     })
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
 
   const [wMm, hMm] = pageFormatMm(pageSize, orientation)
-  const heightPx = width ? width * (hMm / wMm) : 0
   const maxWidthPx = (PAGE_SIZES[pageSize] || PAGE_SIZES.slide).orientable
     ? (orientation === 'landscape' ? '1000px' : '780px')
     : '1000px'
 
   const overflowing = page.elements.some(el => (el.y || 0) + (el.height || 0) > 100)
+  const pageVisual = page.elements.find(el => el.kind === 'visual' || el.kind === 'tile')
+  const pageTitle = pageVisual?.kind === 'visual'
+    ? visualsById?.[pageVisual.visualId]?.title
+    : pageVisual?.kind === 'tile'
+      ? tilesById?.[pageVisual.tileId]?.title
+      : null
 
   function renderElementContent(el, canvasHelpers) {
     // Shapes/images own their entire visual boundary (fill, image edges) -
@@ -50,6 +57,7 @@ export default function PrintPage({
     const boxed = !(
       (el.kind === 'text' && ['title', 'big-number'].includes(el.text?.variant || 'body'))
       || el.kind === 'shape' || el.kind === 'image'
+      || el.kind === 'visual' || el.kind === 'tile'
     )
     return (
       <div
@@ -71,8 +79,10 @@ export default function PrintPage({
           />
         ) : el.kind === 'tile' ? (
           <PrintTileElement
-            tile={tilesById?.[el.tileId]} editing={editing}
-            onRemove={() => onRemoveElement(page.id, el.id)}
+            tile={tilesById?.[el.tileId]}
+            controls={false}
+            controlState={tileControls?.[el.tileId]}
+            onControlChange={patch => onTileControlChange?.(el.tileId, patch)}
           />
         ) : el.kind === 'shape' ? (
           <ShapeElement element={el} />
@@ -81,9 +91,7 @@ export default function PrintPage({
         ) : (
           <PrintVisualElement
             visual={visualsById[el.visualId]} form={form} submissions={submissions}
-            override={el.override} editing={editing}
-            onChangeOverride={ov => onUpdateElement(page.id, el.id, { override: ov })}
-            onRemove={() => onRemoveElement(page.id, el.id)}
+            override={el.override}
           />
         )}
       </div>
@@ -93,7 +101,7 @@ export default function PrintPage({
   return (
     <div style={{ marginBottom: '1.5rem' }}>
       <div
-        ref={node => { containerRef.current = node; pageRef?.(node) }}
+        ref={node => { pageRefInternal.current = node; pageRef?.(node) }}
         className="print-page-canvas"
         style={{
           width: '100%', maxWidth: maxWidthPx,
@@ -103,36 +111,42 @@ export default function PrintPage({
           ...themeCssVars(settings?.theme),
         }}
       >
-        {width > 0 && (
-          <DesignerCanvas
-            page={page}
-            width={width}
-            height={heightPx}
-            editing={editing}
-            onUpdateElement={onUpdateElement}
-            onUpdateElements={onUpdateElements}
-            renderElement={renderElementContent}
-            selectedIds={selectedIds}
-            onSelect={onSelect}
-          />
-        )}
+        <div
+          ref={contentRef}
+          style={{
+            position: 'absolute', inset: '42px 24px 30px',
+            border: editing ? '1px dashed rgba(37,99,235,0.28)' : 'none',
+            boxSizing: 'border-box',
+          }}
+        >
+          {width > 0 && contentHeight > 0 && (
+            <DesignerCanvas
+              page={page}
+              width={width}
+              height={contentHeight}
+              editing={editing}
+              onUpdateElement={onUpdateElement}
+              onUpdateElements={onUpdateElements}
+              renderElement={renderElementContent}
+              selectedIds={selectedIds}
+              onSelect={onSelect}
+              onTextEdit={onTextEdit}
+            />
+          )}
+        </div>
 
         {/* Master page overlay (Phase 2) - logo/date/page-number/watermark
             plus optional header/footer text, all hideable per-page for a
             full-bleed cover/section page. */}
         {!page.hideMaster && (
           <>
-            {settings?.showLogo && (
-              <div style={{ position: 'absolute', top: 8, left: 16, fontSize: '0.75rem', fontWeight: 800, color: '#111' }}>VerticalS</div>
-            )}
+            <div style={{ position: 'absolute', top: 8, left: 16, display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem', color: '#111' }}>
+              {settings?.showLogo && <strong>VerticalS</strong>}
+              {(settings?.masterHeaderText || pageTitle || form?.name) && <span>{settings.masterHeaderText || pageTitle || form.name}</span>}
+            </div>
             {settings?.showDate && (
               <div style={{ position: 'absolute', top: 8, right: 16, fontSize: '0.7rem', color: '#666' }}>
-                {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-              </div>
-            )}
-            {settings?.masterHeaderText && (
-              <div style={{ position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)', fontSize: '0.7rem', color: '#666' }}>
-                {settings.masterHeaderText}
+                {new Date(settings.reportDate || Date.now()).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
               </div>
             )}
             {settings?.masterFooterText && (

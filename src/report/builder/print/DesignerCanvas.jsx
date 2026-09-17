@@ -25,19 +25,17 @@
 // all of them are committed to their real x/y on drag stop.
 import { useRef, useState } from 'react'
 import { Rnd } from 'react-rnd'
-import { computeSnap } from './snapping'
+import { snapBoxToGrid } from './tidyUp'
 
 const ROTATE_HANDLE_SIZE = 10
 
 export default function DesignerCanvas({
   page, width, height, editing, onUpdateElement, onUpdateElements, renderElement,
-  selectedIds = [], onSelect,
+  selectedIds = [], onSelect, onTextEdit,
 }) {
   const [marquee, setMarquee] = useState(null) // {x0,y0,x1,y1} in px, canvas-local
   const [groupDrag, setGroupDrag] = useState(null) // {activeId, dx, dy} in px
   const [rotating, setRotating] = useState(null) // {id, value} in degrees
-  const [guides, setGuides] = useState(null) // {x, y} - each a computeSnap guide descriptor or null
-  const [textEditingId, setTextEditingId] = useState(null)
   const containerRef = useRef(null)
   const rndRefs = useRef({})
 
@@ -62,21 +60,20 @@ export default function DesignerCanvas({
     return page.elements.filter(o => o.groupId === el.groupId).map(o => o.id)
   }
 
-  function handleSelect(id, e) {
+  function handleDoubleSelect(id, e) {
     if (!editing) return
     if (e.shiftKey) {
       onSelect(selectedIds.includes(id) ? selectedIds.filter(x => x !== id) : [...selectedIds, ...groupSelectionFor(id)])
-    } else if (!selectedIds.includes(id)) {
-      // Clicking a member already in a multi-selection leaves the group
-      // selected (so it can be dragged together) - only a click on an
-      // unselected element collapses the selection down to just that one
-      // (or its whole group, if it's grouped).
+    } else if (selectedIds.includes(id)) {
+      onSelect([])
+    } else {
       onSelect(groupSelectionFor(id))
     }
   }
 
   function handleCanvasMouseDown(e) {
     if (!editing || e.target !== containerRef.current) return
+    onSelect([])
     const rect = containerRef.current.getBoundingClientRect()
     const x0 = e.clientX - rect.left
     const y0 = e.clientY - rect.top
@@ -154,26 +151,20 @@ export default function DesignerCanvas({
             size={{ width: w, height: h }}
             position={{ x, y }}
             bounds="parent"
-            enableResizing={editing && !el.locked && selected && !isGroupDrag && textEditingId !== el.id}
-            disableDragging={!editing || el.locked || textEditingId === el.id}
+            dragGrid={[width / 100, height / 100]}
+            resizeGrid={[width / 100, height / 100]}
+            enableResizing={editing && !el.locked && selected && !isGroupDrag}
+            disableDragging={!editing || el.locked}
             style={{ zIndex: selected ? 1000 : (el.zIndex || 1), transform: groupOffset }}
             onDrag={(e, d) => {
               if (isGroupDrag && selectedIds.includes(el.id)) {
                 setGroupDrag({ activeId: el.id, dx: d.x - x, dy: d.y - y })
                 return
               }
-              // Snapping only applies to a single dragged element - which
-              // other box a multi-selection's group move should snap
-              // against is ambiguous, so that's left unsnapped for now.
-              const others = page.elements
-                .filter(o => o.id !== el.id && o.visible !== false)
-                .map(o => { const b = elementBoxPx(o); return { id: o.id, x: b.x, y: b.y, width: b.w, height: b.h } })
-              const snap = computeSnap({ x: d.x, y: d.y, width: w, height: h }, { width, height }, others)
-              setGuides({ x: snap.guideX, y: snap.guideY })
-              if (snap.x !== d.x || snap.y !== d.y) rndRefs.current[el.id]?.updatePosition({ x: snap.x, y: snap.y })
+              const snap = snapBoxToGrid({ x: toPct(d.x, width), y: toPct(d.y, height), width: el.width, height: el.height })
+              rndRefs.current[el.id]?.updatePosition({ x: snap.x * width / 100, y: snap.y * height / 100 })
             }}
             onDragStop={(e, d) => {
-              setGuides(null)
               if (isGroupDrag && selectedIds.includes(el.id)) {
                 const dx = d.x - x, dy = d.y - y
                 // One bulk call, not N onUpdateElement calls - so moving a
@@ -182,7 +173,7 @@ export default function DesignerCanvas({
                 const patches = {}
                 selectedIds.forEach(id => {
                   const other = page.elements.find(o => o.id === id)
-                  if (!other) return
+                  if (!other || other.locked) return
                   const ob = elementBoxPx(other)
                   patches[id] = {
                     x: clampPct(toPct(ob.x + dx, width)),
@@ -203,7 +194,7 @@ export default function DesignerCanvas({
             }}
           >
             <div
-              onMouseDown={e => handleSelect(el.id, e)}
+              onDoubleClick={e => handleDoubleSelect(el.id, e)}
               data-print-el-id={el.id}
               style={{
                 width: '100%', height: '100%', position: 'relative',
@@ -215,8 +206,8 @@ export default function DesignerCanvas({
                 opacity: el.locked ? 0.85 : 1,
               }}
             >
-              {renderElement(el, { onEditingChange: isEditing => setTextEditingId(isEditing ? el.id : null) })}
-              {selected && !el.locked && !isGroupDrag && textEditingId !== el.id && (
+              {renderElement(el)}
+              {selected && !el.locked && !isGroupDrag && (
                 <div
                   data-html2canvas-ignore="true"
                   onMouseDown={e => startRotate(el, e)}
@@ -247,12 +238,6 @@ export default function DesignerCanvas({
         />
       )}
 
-      {guides?.x?.type === 'align' && (
-        <div data-html2canvas-ignore="true" style={{ position: 'absolute', left: guides.x.line, top: 0, width: 1, height: '100%', background: '#f43f5e', pointerEvents: 'none' }} />
-      )}
-      {guides?.y?.type === 'align' && (
-        <div data-html2canvas-ignore="true" style={{ position: 'absolute', top: guides.y.line, left: 0, height: 1, width: '100%', background: '#f43f5e', pointerEvents: 'none' }} />
-      )}
     </div>
   )
 }

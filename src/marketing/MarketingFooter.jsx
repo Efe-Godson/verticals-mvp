@@ -1,3 +1,4 @@
+import VerticalsLogo from '../components/VerticalsLogo'
 import { Link } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 
@@ -86,7 +87,7 @@ export default function MarketingFooter() {
         {/* Desktop: 4 labeled columns (Verticals/Product/Use Cases/Resources). */}
         <div className="mkt-footer-columns">
           <div className="mkt-footer-column mkt-footer-column--brand">
-            <span className="mkt-footer-column-heading">Verticals</span>
+            <Link to="/" className="mkt-footer-column-heading" aria-label="Verticals home"><VerticalsLogo height={26} /></Link>
             <p className="mkt-footer-tagline">Capture. Understand. Act.</p>
             <p className="mkt-footer-brand-desc">
               Collect records, manage workflows and understand what your data is telling you.

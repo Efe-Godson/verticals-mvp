@@ -147,6 +147,7 @@ export function locationDestination(template, formId) {
   // Expenses books open on their own Overview (src/expenses/), like a
   // cart template opens on its order screen - not the blank builder.
   if (template.slug === 'expenses') return `/form/${formId}/expenses`
+  if (template.slug === 'inventory') return `/form/${formId}/inventory?focus=1`
   const isCartTemplate = template.fields?.some(f => f.type === 'cart')
   return isCartTemplate ? `/form/${formId}` : `/form/${formId}/edit?panel=1`
 }

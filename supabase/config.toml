@@ -146,3 +146,8 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/public-content/deno.json"
 entrypoint = "./functions/public-content/index.ts"
+
+[functions.manage-workflow-transfer]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/manage-workflow-transfer/index.ts"

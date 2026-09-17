@@ -9,6 +9,8 @@ import { TEMPLATE_ADMIN_USER_ID } from './adminAccount'
 import ErrorBoundary from './ErrorBoundary'
 import NavBar from './NavBar'
 import PosSidePanel from './PosSidePanel'
+import HomeSidePanel from './HomeSidePanel'
+import useIsMobile from './hooks/useIsMobile'
 import DarkModeToggle from './DarkModeToggle'
 import { LoadingState } from './LoadingState'
 import OfflineBanner from './OfflineBanner'
@@ -166,6 +168,7 @@ function RootRoute() {
 }
 
 function AppShell() {
+  const isMobile = useIsMobile(768)
   const location = useLocation()
   const { session } = useAuth()
   // RootRoute renders the public marketing LandingPage at "/" for a signed-
@@ -217,14 +220,21 @@ function AppShell() {
   // Records/Report tabs (see src/PublicDemoExperience.jsx) - no app NavBar,
   // same reasoning as isPublicForm above.
   const isPublicDemo = location.pathname.startsWith('/demo')
-  const showNavBar = !isPublicForm && !isShortLink && !isQuizPlayer && !isLogin && !isSignUp && !isOnboarding && !isConfirmEmail && !isResetPassword && !isFocusMode && !isReportBuilder && !isPayrollEnv && !isExpenseEnv && !isSharedReport && !isPublicDemo && !isLandingRoot && !isLandingPreview && !isMarketingSubpage
+  // Desktop reports use the same shell regardless of their entry point.
+  const useReportShell = !isMobile && !isSharedReport && /^\/form\/[^/]+\/report\/?$/.test(location.pathname)
+  const useRecordsShell = !isMobile && /^\/form\/[^/]+\/records\/?$/.test(location.pathname)
+  const useHomeShell = !isMobile && !!session && (
+    ['/', '/records', '/reports', '/templates'].includes(location.pathname) ||
+    (location.pathname === '/lab' && session.user.id === TEMPLATE_ADMIN_USER_ID)
+  )
+  const showNavBar = !useHomeShell && !useReportShell && !useRecordsShell && !isPublicForm && !isShortLink && !isQuizPlayer && !isLogin && !isSignUp && !isOnboarding && !isConfirmEmail && !isResetPassword && !isFocusMode && !isReportBuilder && !isPayrollEnv && !isExpenseEnv && !isSharedReport && !isPublicDemo && !isLandingRoot && !isLandingPreview && !isMarketingSubpage
 
   // The POS side panel is mounted here (not inside each focus-mode page) so
   // it stays put across navigation between Records / Reports / Settings /
   // etc. instead of unmounting and re-fetching every time. The public order
   // screen (PublicForm) keeps its own instance - it needs bottomBarPresent.
   const focusFormMatch = location.pathname.match(/^\/form\/([^/]+)/)
-  const posPanelFormId = isFocusMode && !isReportBuilder && !isPayrollEnv && focusFormMatch
+  const posPanelFormId = (isFocusMode || useReportShell || useRecordsShell) && !isReportBuilder && !isPayrollEnv && focusFormMatch
     ? focusFormMatch[1]
     : null
 
@@ -232,8 +242,9 @@ function AppShell() {
     <>
       <OfflineBanner />
       {showNavBar && <NavBar />}
-      {showNavBar && <DarkModeToggle />}
-      {posPanelFormId && <PosSidePanel formId={posPanelFormId} />}
+      {useHomeShell && <HomeSidePanel />}
+      {(showNavBar || useHomeShell) && <DarkModeToggle />}
+      {posPanelFormId && <PosSidePanel formId={posPanelFormId} backLink={!isFocusMode ? (useRecordsShell ? { to: '/records', label: 'Records' } : useReportShell ? { to: '/reports', label: 'Reports' } : undefined) : undefined} />}
       {/* Only pages with NavBar get its fixed navbar-bottom-bar on mobile,
           so only they need the matching bottom padding reserved (see the
           .app-content-under-navbar rule in index.css) - a focus-mode/public

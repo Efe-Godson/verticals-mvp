@@ -1,15 +1,18 @@
+import SupportNote from './components/SupportNote'
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
 import { useRecycleBinTrigger } from './RecycleBinContext'
-import { useCurrentPageTitle, useCurrentPageBack, useCurrentPageOptions } from './PageTitleContext'
+import { useCurrentPageTitle, useCurrentPageBack, useCurrentPageOptions, useDesktopHeader } from './PageTitleContext'
 import { TEMPLATE_ADMIN_USER_ID } from './adminAccount'
 import ArrowLeftIcon from './ArrowLeftIcon'
 import MobileBottomNav from './MobileBottomNav'
+import useIsMobile from './hooks/useIsMobile'
+import useAppUpdate from './hooks/useAppUpdate'
 import VerticalsLogo from './components/VerticalsLogo'
-import { forceRefreshApp } from './lib/registerServiceWorker'
-import { LayoutGrid, FlaskConical, Trash2, SquarePen, Wallet, Sparkles, Settings, UserX, X, RefreshCw } from 'lucide-react'
+import AppUpdateModal from './components/AppUpdateModal'
+import { LayoutGrid, FlaskConical, Trash2, SquarePen, Wallet, Sparkles, Settings, X, RefreshCw } from 'lucide-react'
 
 // Same icon spec PosSidePanel.jsx's nav rows use, so the two menus read as
 // one visual language.
@@ -70,6 +73,10 @@ function NavBar() {
   const pageTitle = useCurrentPageTitle()
   const pageBack = useCurrentPageBack()
   const pageOptions = useCurrentPageOptions()
+  const { setDesktopHeaderTarget } = useDesktopHeader()
+  const isMobile = useIsMobile(768)
+  const { updating, updateApp } = useAppUpdate()
+  const isReportDetail = /^\/form\/[^/]+\/report\/?$/.test(location.pathname)
 
   const isAdmin = session?.user?.id === TEMPLATE_ADMIN_USER_ID
   const displayName = session?.user?.user_metadata?.full_name || ''
@@ -151,19 +158,19 @@ function NavBar() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
           <Link to="/" style={{ display: 'flex', alignItems: 'center', color: 'var(--color-primary)', flexShrink: 0 }}>
-            <VerticalsLogo height={18} />
+            <VerticalsLogo height={22} />
           </Link>
 
-          <div style={{ display: 'flex', gap: '1.2rem', fontSize: '0.9rem' }}>
+          {!isReportDetail && <div style={{ display: 'flex', gap: '1.2rem', fontSize: '0.9rem' }}>
             <Link to="/" style={{ color: location.pathname === '/' ? 'var(--color-primary)' : 'var(--color-muted)' }}>Home</Link>
             <Link to="/reports" style={{ color: location.pathname === '/reports' ? 'var(--color-primary)' : 'var(--color-muted)' }}>Reports</Link>
             <Link to="/templates" style={{ color: location.pathname === '/templates' ? 'var(--color-primary)' : 'var(--color-muted)' }}>Templates</Link>
             {isAdmin && (
               <Link to="/lab" style={{ color: location.pathname === '/lab' ? 'var(--color-primary)' : 'var(--color-muted)' }}>Lab</Link>
             )}
-          </div>
+          </div>}
 
-          {isFormContext && (
+          {isFormContext && !isReportDetail && (
             <div style={{ display: 'flex', gap: '1rem', fontSize: '0.9rem' }}>
               <Link to="/" style={{ color: 'var(--color-muted)' }}>Home</Link>
               <Link to={`/form/${id}/edit`} style={{ color: linkColor('/edit') }}>Builder</Link>
@@ -176,8 +183,12 @@ function NavBar() {
           )}
         </div>
 
+        {isReportDetail && !isMobile && (
+          <div className="compact-topbar-page-controls" style={{ flex: 1, minWidth: 0 }} ref={setDesktopHeaderTarget} />
+        )}
+
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-          {linkedForms.length > 0 && (
+          {!isReportDetail && linkedForms.length > 0 && (
             <div style={{ position: 'relative' }}>
               <button className="secondary" onClick={() => setLinkedMenuOpen(!linkedMenuOpen)}>
                 Linked Forms ▾
@@ -252,14 +263,14 @@ function NavBar() {
                   <button
                     className="secondary"
                     title="Reload the app and clear its cache - use this if something looks out of date"
-                    onClick={() => { setAccountMenuOpen(false); forceRefreshApp() }}
+                    onClick={() => { setAccountMenuOpen(false); updateApp() }}
                     style={{
                       display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%', textAlign: 'left',
                       border: 'none', background: 'transparent', padding: '0.5rem 0.6rem', fontSize: '0.85rem',
                     }}
                   >
                     <RefreshCw size={15} strokeWidth={1.8} aria-hidden="true" />
-                    Refresh app
+                    Update app
                   </button>
                   <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.3rem 0' }} />
                   <button
@@ -272,6 +283,7 @@ function NavBar() {
                   >
                     Log out
                   </button>
+                  <SupportNote />
                 </div>
               </>
             )}
@@ -437,7 +449,7 @@ function NavBar() {
           {binTrigger && (
             <MenuRow icon={Trash2} badge={binTrigger.count} onClick={() => { setMenuOpen(false); binTrigger.onOpen() }}>Recycle Bin</MenuRow>
           )}
-          <MenuRow icon={RefreshCw} onClick={() => { setMenuOpen(false); forceRefreshApp() }}>Refresh app</MenuRow>
+          <MenuRow icon={RefreshCw} onClick={() => { setMenuOpen(false); updateApp() }}>Update app</MenuRow>
         </div>
 
         {/* Records/Report are deliberately not repeated here either - the
@@ -461,17 +473,16 @@ function NavBar() {
           </>
         )}
 
-        {/* Account deletion isn't built yet - the row is here so the
-            destination exists in the menu ahead of the feature, deliberately
-            inert (no handler, no route) until that flow is ready. */}
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.15)', margin: '0.9rem 0 0.7rem' }} />
         <div style={MENU_SECTION_LABEL_STYLE}>Account</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-          <MenuRow icon={UserX} disabled>Delete Account</MenuRow>
+          <MenuRow to="/account" icon={Settings} onClick={() => setMenuOpen(false)}>Profile</MenuRow>
+          <SupportNote />
         </div>
 
         </div>
       </div>
+      <AppUpdateModal open={updating} />
     </div>
   )
 }

@@ -1,4 +1,6 @@
+import AdaptivePageHeader from './components/AdaptivePageHeader'
 import { useState, useEffect, useMemo, useCallback, useRef, Fragment } from 'react'
+import { createPortal } from 'react-dom'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import { useAuth } from './AuthContext'
@@ -17,7 +19,7 @@ import { useToast } from './Toast'
 import PageSkeleton from './components/PageSkeleton'
 import { useDeferredLoading } from './components/loadingHooks'
 import { ErrorState } from './ErrorState'
-import { usePageOptions, usePageBack } from './PageTitleContext'
+import { usePageOptions, usePageBack, useDesktopHeader } from './PageTitleContext'
 import { getPageCache, setPageCache } from './hooks/pageCache'
 import { RefreshingIndicator } from './components/InlineLoader'
 import EmptyState, { SearchOffIcon } from './components/EmptyState'
@@ -51,6 +53,8 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
   const { showToast } = useToast()
   const { session } = useAuth()
   const isMobile = useIsMobile()
+  const { desktopHeaderTarget } = useDesktopHeader()
+  const useTopBar = !isMobile && !!desktopHeaderTarget && !formIdProp
   const [pendingConfirm, setPendingConfirm] = useState(null) // { type: 'deleteSelected' } | { type: 'permanentlyDelete', subId } | { type: 'emptyBin' }
   const [form, setForm] = useState(null)
   // RLS is the real enforcement boundary for a Viewer collaborator's write
@@ -974,6 +978,124 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
     </>
   )
 
+  const recordsFilters = (<>
+        {/* Always visible now, no click-to-reveal icon step - same "🔍
+            Search..." placeholder-as-icon convention ProductManager.jsx's
+            catalogue search already uses, one less tap to get to it. */}
+        <input
+          type="text"
+          className="records-search"
+          placeholder="🔍 Search all records..."
+          value={searchText}
+          onChange={(e) => { setSearchText(e.target.value); setCurrentPage(1) }}
+          style={{ padding: '0.5rem' }}
+        />
+
+        <div className="date-range-row">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', width: isMobile ? '100%' : 'auto' }}>
+            {isMobile && (
+              <div style={{ display: 'flex', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)', overflow: 'hidden', flexShrink: 0 }}>
+                <button
+                  type="button"
+                  onClick={() => setMobileViewMode('table')}
+                  className={mobileViewMode === 'table' ? '' : 'secondary'}
+                  title="Table view"
+                  style={{ padding: '0.4rem 0.55rem', borderRadius: 0, border: 'none' }}
+                >
+                  ☰
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMobileViewMode('cards')}
+                  className={mobileViewMode === 'cards' ? '' : 'secondary'}
+                  title="Card view"
+                  style={{ padding: '0.4rem 0.55rem', borderRadius: 0, border: 'none' }}
+                >
+                  ▦
+                </button>
+              </div>
+            )}
+            <select
+              aria-label="Date range"
+              value={dateRange}
+              onChange={(e) => { setDateRange(e.target.value); setCurrentPage(1) }}
+              style={{ padding: '0.5rem', flex: 1, minWidth: 0, width: 'auto' }}
+            >
+              {DATE_RANGE_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {dateRange === 'specific' && (
+            <div className="date-range-group">
+              <input
+                type="date"
+                value={customStart}
+                onChange={(e) => { setCustomStart(e.target.value); setCurrentPage(1) }}
+                style={{ padding: '0.5rem' }}
+              />
+            </div>
+          )}
+
+          {dateRange === 'custom' && (
+            <div className="date-range-group">
+              <input
+                type="date"
+                value={customStart}
+                onChange={(e) => { setCustomStart(e.target.value); setCurrentPage(1) }}
+                style={{ padding: '0.5rem' }}
+              />
+              <span style={{ color: 'var(--color-muted)', fontSize: '0.9rem', flexShrink: 0 }}>to</span>
+              <input
+                type="date"
+                value={customEnd}
+                title="Leave blank to filter to just the start date"
+                onChange={(e) => { setCustomEnd(e.target.value); setCurrentPage(1) }}
+                style={{ padding: '0.5rem' }}
+              />
+            </div>
+          )}
+        </div>
+  </>)
+
+  const recordsToolbar = (
+      <div className="records-topbar-controls" style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem', marginTop: useTopBar ? 0 : '0.5rem' }}>
+        {useTopBar && <h1 style={{ margin: 0, fontSize: '1.3rem', overflowWrap: 'anywhere' }}>{form.name} Records</h1>}
+        <RefreshingIndicator show={refreshing} />
+        {recordsFilters}
+
+        {/* Desktop only (see .page-options-panel-desktop in index.css) - a
+            dropdown anchored under this button. Below 768px this whole
+            thing hides in favor of the portaled version further down (see
+            the same reasoning in Report.jsx: escaping any ancestor
+            transform/filter/backdrop-filter that would otherwise hijack a
+            "fixed" panel's containing block, rather than chasing it with
+            more CSS). */}
+        <div className="options-menu-anchor page-options-panel-desktop" style={{ position: 'relative', flexShrink: 0, display: 'inline-block' }}>
+          <button className="secondary options-menu-button page-options-trigger" onClick={() => setActiveMenu(activeMenu === 'options' ? null : 'options')}>
+            Options ▾
+          </button>
+          {activeMenu === 'options' && (
+            <>
+              <div style={overlayStyle} onClick={() => setActiveMenu(null)} />
+              {/* dropdownStyle defaults to right:0, meant for a trigger
+                  sitting near the right edge (e.g. a table row's own "⋮"
+                  menu). The Options button lives near the left edge of the
+                  page instead - right:0 there anchored the panel to the
+                  button's own (small, left-side) right edge and let it
+                  expand leftward straight off the screen. left:0 expands it
+                  rightward from the button instead, which actually stays
+                  on screen. */}
+              <div className="dropdown-panel" style={{ ...dropdownStyle, left: useTopBar ? 'auto' : 0, right: useTopBar ? 0 : 'auto', minWidth: '220px' }} onClick={(e) => e.stopPropagation()}>
+                {optionsMenuItems}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+  )
+
   return (
     <div className="page" style={isFocusMode ? { paddingTop: '4rem' } : undefined}>
       <style>{`
@@ -1102,118 +1224,7 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
         </div>
       )}
 
-      {/* Search, the date filter and Options all share one wrapping row -
-          each wraps as its own unit when space is tight rather than Options
-          being pushed to a separate line underneath. */}
-      <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem', marginTop: '0.5rem' }}>
-        <RefreshingIndicator show={refreshing} />
-        {/* Always visible now, no click-to-reveal icon step - same "🔍
-            Search..." placeholder-as-icon convention ProductManager.jsx's
-            catalogue search already uses, one less tap to get to it. */}
-        <input
-          type="text"
-          className="records-search"
-          placeholder="🔍 Search all records..."
-          value={searchText}
-          onChange={(e) => { setSearchText(e.target.value); setCurrentPage(1) }}
-          style={{ padding: '0.5rem' }}
-        />
-
-        <div className="date-range-row">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', width: isMobile ? '100%' : 'auto' }}>
-            {isMobile && (
-              <div style={{ display: 'flex', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)', overflow: 'hidden', flexShrink: 0 }}>
-                <button
-                  type="button"
-                  onClick={() => setMobileViewMode('table')}
-                  className={mobileViewMode === 'table' ? '' : 'secondary'}
-                  title="Table view"
-                  style={{ padding: '0.4rem 0.55rem', borderRadius: 0, border: 'none' }}
-                >
-                  ☰
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMobileViewMode('cards')}
-                  className={mobileViewMode === 'cards' ? '' : 'secondary'}
-                  title="Card view"
-                  style={{ padding: '0.4rem 0.55rem', borderRadius: 0, border: 'none' }}
-                >
-                  ▦
-                </button>
-              </div>
-            )}
-            <select
-              value={dateRange}
-              onChange={(e) => { setDateRange(e.target.value); setCurrentPage(1) }}
-              style={{ padding: '0.5rem', flex: 1, minWidth: 0, width: 'auto' }}
-            >
-              {DATE_RANGE_OPTIONS.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-          </div>
-
-          {dateRange === 'specific' && (
-            <div className="date-range-group">
-              <input
-                type="date"
-                value={customStart}
-                onChange={(e) => { setCustomStart(e.target.value); setCurrentPage(1) }}
-                style={{ padding: '0.5rem' }}
-              />
-            </div>
-          )}
-
-          {dateRange === 'custom' && (
-            <div className="date-range-group">
-              <input
-                type="date"
-                value={customStart}
-                onChange={(e) => { setCustomStart(e.target.value); setCurrentPage(1) }}
-                style={{ padding: '0.5rem' }}
-              />
-              <span style={{ color: 'var(--color-muted)', fontSize: '0.9rem', flexShrink: 0 }}>to</span>
-              <input
-                type="date"
-                value={customEnd}
-                title="Leave blank to filter to just the start date"
-                onChange={(e) => { setCustomEnd(e.target.value); setCurrentPage(1) }}
-                style={{ padding: '0.5rem' }}
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Desktop only (see .page-options-panel-desktop in index.css) - a
-            dropdown anchored under this button. Below 768px this whole
-            thing hides in favor of the portaled version further down (see
-            the same reasoning in Report.jsx: escaping any ancestor
-            transform/filter/backdrop-filter that would otherwise hijack a
-            "fixed" panel's containing block, rather than chasing it with
-            more CSS). */}
-        <div className="options-menu-anchor page-options-panel-desktop" style={{ position: 'relative', flexShrink: 0, display: 'inline-block' }}>
-          <button className="secondary options-menu-button page-options-trigger" onClick={() => setActiveMenu(activeMenu === 'options' ? null : 'options')}>
-            Options ▾
-          </button>
-          {activeMenu === 'options' && (
-            <>
-              <div style={overlayStyle} onClick={() => setActiveMenu(null)} />
-              {/* dropdownStyle defaults to right:0, meant for a trigger
-                  sitting near the right edge (e.g. a table row's own "⋮"
-                  menu). The Options button lives near the left edge of the
-                  page instead - right:0 there anchored the panel to the
-                  button's own (small, left-side) right edge and let it
-                  expand leftward straight off the screen. left:0 expands it
-                  rightward from the button instead, which actually stays
-                  on screen. */}
-              <div className="dropdown-panel" style={{ ...dropdownStyle, left: 0, right: 'auto', minWidth: '220px' }} onClick={(e) => e.stopPropagation()}>
-                {optionsMenuItems}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
+      {useTopBar ? createPortal(<AdaptivePageHeader title={form.name + ' Records'} filters={recordsFilters} minimumFilterWidth={dateRange === 'custom' ? 580 : dateRange === 'specific' ? 440 : 300} filterWidth={dateRange === 'custom' ? 720 : dateRange === 'specific' ? 560 : 420} open={activeMenu === 'options'} onOpenChange={open => setActiveMenu(open ? 'options' : null)}>{optionsMenuItems}</AdaptivePageHeader>, desktopHeaderTarget) : recordsToolbar}
 
       <MobileOptionsPanel
         open={activeMenu === 'options'}

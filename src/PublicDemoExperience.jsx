@@ -102,7 +102,7 @@ function TopBar() {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', minWidth: 0 }}>
-        <VerticalsLogo height={19} style={{ color: 'var(--color-primary)' }} />
+        <VerticalsLogo height={23} style={{ color: 'var(--color-primary)' }} />
         <span style={{
           fontSize: '0.64rem', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase',
           color: 'var(--color-primary)', border: '1px solid var(--color-primary)', borderRadius: 999, padding: '2px 8px',

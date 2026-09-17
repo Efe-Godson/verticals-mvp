@@ -10,7 +10,7 @@
 // account's own accent color pick (see theme.js).
 const ASPECT = 2.972423802612482 // intrinsic width/height of the source artwork
 
-export default function VerticalsLogo({ height = 20, style, ...rest }) {
+export default function VerticalsLogo({ height = 24, style, ...rest }) {
   const width = height * ASPECT
   return (
     <svg

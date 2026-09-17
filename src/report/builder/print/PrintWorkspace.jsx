@@ -11,6 +11,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useToast } from '../../../Toast'
 import PageSkeleton from '../../../components/PageSkeleton'
 import { ErrorState } from '../../../ErrorState'
+import Modal from '../../../components/Modal'
 import useIsMobile from '../../../hooks/useIsMobile'
 import { useReportBuilder } from '../useReportBuilder'
 import { buildChartTiles } from '../../analysis/buildDashboardTiles'
@@ -30,6 +31,8 @@ import { buildTokenContext, AVAILABLE_TOKENS } from './dynamicTokens'
 import { analyzeReport, scoreReport } from './designQuality'
 import { tidyPage } from './tidyUp'
 import PresentationMode from './PresentationMode'
+import FocusRankingControl from '../../focus/FocusRankingControl'
+import { GRANULARITIES } from '../../components/TrendLineChart'
 
 const sideBtn = { fontSize: '0.78rem', padding: '0.3rem 0.5rem' }
 
@@ -57,10 +60,17 @@ export default function PrintWorkspace() {
   // delete needs to know the current selection regardless of which page's
   // canvas last changed it.
   const [selection, setSelection] = useState({ pageId: null, ids: [] })
+  const [textEditor, setTextEditor] = useState(null)
+  const [tileControls, setTileControls] = useState({})
   const selectPage = useCallback((pageId, ids) => setSelection({ pageId, ids }), [])
   const pageRefs = useRef({})
 
   const pages = rb.printLayout?.pages || []
+
+  function openTextEditor(pageId, elementId) {
+    const element = pages.find(p => p.id === pageId)?.elements.find(el => el.id === elementId)
+    if (element?.kind === 'text') setTextEditor({ pageId, elementId, draft: { ...(element.text || {}) } })
+  }
 
   // First visit to Print View: pre-fill it with a paginated replica of the
   // main Report.jsx dashboard (every chart tile + every promoted visual)
@@ -274,6 +284,11 @@ export default function PrintWorkspace() {
   const selectedPage = pages.find(p => p.id === selection.pageId) || null
   const activePage = pages.find(p => p.id === activePageId) || null
   const selectedElements = selectedPage ? selectedPage.elements.filter(el => selection.ids.includes(el.id)) : []
+  const selectedTileElement = selectedElements.length === 1 && selectedElements[0].kind === 'tile' ? selectedElements[0] : null
+  const selectedTile = selectedTileElement ? tilesById[selectedTileElement.tileId] : null
+  const selectedTileControlState = selectedTile?.trendConfig
+    ? (tileControls[selectedTile.id] || { granularity: selectedTile.trendConfig.defaultGranularity, showLabels: false })
+    : null
 
   const sidebar = (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto', padding: '0.8rem' }}>
@@ -535,6 +550,12 @@ export default function PrintWorkspace() {
           onChange={e => rb.updatePrintSettings({ masterHeaderText: e.target.value })}
           style={{ width: '100%', fontSize: '0.8rem', padding: '0.25rem 0.4rem', boxSizing: 'border-box', marginBottom: '0.4rem' }}
         />
+        <label style={{ display: 'block', fontSize: '0.82rem', marginBottom: '0.2rem' }}>Report date</label>
+        <input
+          type="date" value={settings.reportDate || ''}
+          onChange={e => rb.updatePrintSettings({ reportDate: e.target.value })}
+          style={{ width: '100%', fontSize: '0.8rem', padding: '0.25rem 0.4rem', boxSizing: 'border-box', marginBottom: '0.4rem' }}
+        />
         <label style={{ display: 'block', fontSize: '0.82rem', marginBottom: '0.2rem' }}>Footer text</label>
         <input
           type="text" value={settings.masterFooterText || ''} placeholder="(none)"
@@ -568,12 +589,12 @@ export default function PrintWorkspace() {
   return (
     <div className="pw-workspace" style={{ position: 'fixed', inset: 0, background: 'var(--color-bg)', display: 'flex', flexDirection: 'column', zIndex: 50 }}>
       <style>{`
-        .pw-cols { display: grid; grid-template-columns: 260px 1fr; flex: 1; min-height: 0; }
-        .pw-cols.pw-cols-inspector { grid-template-columns: 260px 1fr 240px; }
-        .pw-cols > * { min-height: 0; }
+        .pw-cols { display: grid; grid-template-columns: 260px minmax(0, 1fr); flex: 1; min-height: 0; }
+        .pw-cols.pw-cols-inspector { grid-template-columns: 260px minmax(0, 1fr) 240px; }
+        .pw-cols > * { min-width: 0; min-height: 0; }
         .pw-side { background: var(--color-surface); border-right: 1px solid var(--color-border); overflow: hidden; }
         .pw-inspector { background: var(--color-surface); border-left: 1px solid var(--color-border); overflow: hidden; }
-        .pw-canvas { overflow-y: auto; padding: 1.5rem; }
+        .pw-canvas { overflow-x: hidden; overflow-y: auto; padding: 1.5rem; }
         .pw-mobile-bar { display: none; }
         @media (max-width: 900px) {
           .pw-cols, .pw-cols.pw-cols-inspector { grid-template-columns: 1fr; }
@@ -599,7 +620,43 @@ export default function PrintWorkspace() {
             <button className="secondary" style={{ fontSize: '0.74rem', padding: '0.1rem 0.35rem' }} onClick={autosave.retry}>Retry</button>
           </span>
         )}
-        <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 1, flexWrap: 'wrap' }}>
+          {selectedTile?.trendConfig && selectedTileControlState && (
+            <>
+              <div style={{ display: 'flex', gap: '0.15rem', alignItems: 'center', border: '1px solid var(--color-border)', borderRadius: '6px', padding: '0.15rem' }}>
+                {GRANULARITIES.map(([value, short]) => (
+                  <button
+                    key={value}
+                    className={selectedTileControlState.granularity === value ? '' : 'secondary'}
+                    onClick={() => setTileControls(current => ({ ...current, [selectedTile.id]: { ...selectedTileControlState, granularity: value } }))}
+                    title={`Group by ${value}`}
+                    style={{ fontSize: '0.75rem', padding: '0.2rem 0.4rem' }}
+                  >{short}</button>
+                ))}
+              </div>
+              <button
+                className={selectedTileControlState.showLabels ? '' : 'secondary'}
+                onClick={() => setTileControls(current => ({ ...current, [selectedTile.id]: { ...selectedTileControlState, showLabels: !selectedTileControlState.showLabels } }))}
+                style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+              >{selectedTileControlState.showLabels ? 'Hide labels' : 'Show labels'}</button>
+            </>
+          )}
+          {selectedElements.length === 1 && selectedElements[0].kind === 'visual' && (() => {
+            const selected = selectedElements[0]
+            const visual = visualsById[selected.visualId]
+            if (!visual?.query?.dimension) return null
+            const query = { ...visual.query, ...(selected.override || {}) }
+            return <FocusRankingControl
+              mode={query.sort === 'metric-asc' ? 'bottom' : 'top'}
+              n={query.topN ?? null}
+              onChange={(mode, n) => rb.updatePrintElement(activePageId, selected.id, {
+                override: { ...(selected.override || {}), topN: n, sort: mode === 'bottom' ? 'metric-asc' : 'metric-desc' },
+              })}
+            />
+          })()}
+          {selectedElements.length === 1 && (
+            <button className="secondary" onClick={() => { rb.removePrintElements(selection.pageId, selection.ids); setSelection({ pageId: null, ids: [] }) }} title="Remove selected visual" style={{ fontSize: '0.8rem' }}>Delete</button>
+          )}
           <button className="secondary" onClick={rb.undoPrint} disabled={!rb.canUndoPrint} title="Undo (Ctrl+Z)" style={{ fontSize: '0.8rem' }}>↶ Undo</button>
           <button className="secondary" onClick={rb.redoPrint} disabled={!rb.canRedoPrint} title="Redo (Ctrl+Shift+Z)" style={{ fontSize: '0.8rem' }}>↷ Redo</button>
           <button className="secondary" onClick={handleTidyUp} title="Snap this page's elements to a grid and pull anything off-page back in" style={{ fontSize: '0.8rem' }}>✨ Tidy Up</button>
@@ -646,6 +703,9 @@ export default function PrintWorkspace() {
                 onUpdateElements={rb.updatePrintElements}
                 selectedIds={selection.pageId === p.id ? selection.ids : []}
                 onSelect={ids => selectPage(p.id, ids)}
+                onTextEdit={openTextEditor}
+                tileControls={tileControls}
+                onTileControlChange={(tileId, patch) => setTileControls(current => ({ ...current, [tileId]: { ...(current[tileId] || {}), ...patch } }))}
                 tokenContext={tokenContext}
               />
             </div>
@@ -727,6 +787,69 @@ export default function PrintWorkspace() {
             )}
           </div>
         </>
+      )}
+
+      {textEditor && (
+        <Modal
+          title="Edit text"
+          size="md"
+          onClose={() => setTextEditor(null)}
+          footer={(
+            <>
+              <button className="secondary" onClick={() => setTextEditor(null)}>Cancel</button>
+              <button onClick={() => {
+                rb.updatePrintElement(textEditor.pageId, textEditor.elementId, { text: textEditor.draft })
+                setTextEditor(null)
+              }}>Apply</button>
+            </>
+          )}
+        >
+          <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-muted)', marginBottom: '0.3rem' }}>Text</label>
+          <textarea
+            autoFocus
+            value={textEditor.draft.content || ''}
+            onChange={e => setTextEditor(current => ({ ...current, draft: { ...current.draft, content: e.target.value } }))}
+            rows={5}
+            style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical', marginBottom: '1rem' }}
+          />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px 1fr', gap: '0.6rem' }}>
+            <label style={{ fontSize: '0.8rem' }}>
+              Font
+              <select
+                value={textEditor.draft.fontFamily || 'inherit'}
+                onChange={e => setTextEditor(current => ({ ...current, draft: { ...current.draft, fontFamily: e.target.value === 'inherit' ? undefined : e.target.value } }))}
+                style={{ width: '100%', marginTop: '0.25rem' }}
+              >
+                <option value="inherit">Theme default</option>
+                <option value="Arial, sans-serif">Arial</option>
+                <option value="Georgia, serif">Georgia</option>
+                <option value="Verdana, sans-serif">Verdana</option>
+                <option value="Trebuchet MS, sans-serif">Trebuchet MS</option>
+              </select>
+            </label>
+            <label style={{ fontSize: '0.8rem' }}>
+              Size
+              <input
+                type="number" min="6" max="120" value={textEditor.draft.fontSize || 16}
+                onChange={e => setTextEditor(current => ({ ...current, draft: { ...current.draft, fontSize: Math.max(6, Math.min(120, Number(e.target.value) || 16)) } }))}
+                style={{ width: '100%', marginTop: '0.25rem', boxSizing: 'border-box' }}
+              />
+            </label>
+            <label style={{ fontSize: '0.8rem' }}>
+              Alignment
+              <select
+                value={textEditor.draft.align || 'left'}
+                onChange={e => setTextEditor(current => ({ ...current, draft: { ...current.draft, align: e.target.value } }))}
+                style={{ width: '100%', marginTop: '0.25rem' }}
+              >
+                <option value="left">Left</option>
+                <option value="center">Center</option>
+                <option value="right">Right</option>
+                <option value="justify">Justify</option>
+              </select>
+            </label>
+          </div>
+        </Modal>
       )}
 
       {presenting && (
