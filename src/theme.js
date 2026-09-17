@@ -97,6 +97,13 @@ export function applyThemeColor(hex) {
   root.style.setProperty('--color-primary-hover', mix(hex, dark ? '#ffffff' : '#000000', dark ? 0.25 : 0.15))
   root.style.setProperty('--color-primary-soft', mix(hex, dark ? '#1c1e24' : '#ffffff', dark ? 0.82 : 0.92))
   localStorage.setItem(STORAGE_KEY, hex)
+  // <meta name="theme-color"> is what an installed PWA's title bar/task
+  // switcher chrome actually reads (the static manifest.webmanifest's own
+  // theme_color only ever applies at install time, before any account is
+  // even signed in, and can't be account-specific) - kept in sync here so
+  // that chrome follows whichever color this account has actually chosen,
+  // index.html's hardcoded default notwithstanding.
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', hex)
 }
 
 // Boot-time only: paints the last-known color immediately, before there's
