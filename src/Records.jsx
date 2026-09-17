@@ -99,6 +99,10 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
   const [filters, setFilters] = useState({})
   const [sortConfig, setSortConfig] = useState(null) // { fieldId, dir: 'asc' | 'desc' }
   const [openFilterId, setOpenFilterId] = useState(null)
+  // The currently-open column's "Sort & filter" trigger button - ColumnHeaderMenu
+  // measures its position from this to render as a fixed-position portal
+  // instead of getting clipped by the table's own horizontal scroll container.
+  const openFilterTriggerRef = useRef(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedRecord, setSelectedRecord] = useState(null)
   const [openRecordEditing, setOpenRecordEditing] = useState(false)
@@ -1688,6 +1692,7 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
                           const active = !!filters[field.id] || sortConfig?.fieldId === field.id
                           return (
                             <button
+                              ref={(el) => { if (field.id === openFilterId) openFilterTriggerRef.current = el }}
                               onClick={() => setOpenFilterId(openFilterId === field.id ? null : field.id)}
                               title="Sort & filter"
                               style={{
@@ -1715,6 +1720,7 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
                             onApply={(filterData) => applyFilter(field.id, filterData)}
                             onClear={() => clearFilter(field.id)}
                             onClose={() => setOpenFilterId(null)}
+                            anchorRef={openFilterTriggerRef}
                           />
                         </>
                       )}

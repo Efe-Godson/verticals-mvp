@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useLayoutEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 // Excel-style column dropdown for the Records table: sort the column, and
 // filter it by ticking specific values (with a "(Blanks)" option and a
@@ -9,9 +10,17 @@ import { useMemo, useState } from 'react'
 //   currentFilter: the saved filter for this column, or undefined.
 //   currentSort  : 'asc' | 'desc' | null  (only set when THIS column is the
 //                  sorted one).
+//   anchorRef    : ref to the "Sort & filter" trigger button this menu opened
+//                  from - its own header cell sits inside the records
+//                  table's horizontally-scrolling container, which used to
+//                  clip this menu (position: absolute + an ancestor's
+//                  overflow) whenever the value list was tall enough to
+//                  need it. Portaled to <body> and positioned in fixed
+//                  coordinates measured from the trigger instead, so it
+//                  always renders in full regardless of table scroll.
 export function ColumnHeaderMenu({
   field, valueSummary, currentFilter, currentSort,
-  onSort, onApply, onClear, onClose,
+  onSort, onApply, onClear, onClose, anchorRef,
 }) {
   const allValues = useMemo(() => valueSummary.values.map(x => x.v), [valueSummary])
 
@@ -28,6 +37,28 @@ export function ColumnHeaderMenu({
   )
   const [text, setText] = useState(currentFilter?.kind === 'values' ? (currentFilter.text || '') : '')
   const [listSearch, setListSearch] = useState('')
+
+  // Fixed-position coordinates measured from the trigger button, re-measured
+  // on every window/table scroll or resize while this is open so it tracks
+  // the button instead of drifting - null on the very first paint (nothing
+  // to measure against yet), so the menu itself is skipped that one frame
+  // rather than flashing at the wrong spot.
+  const [pos, setPos] = useState(null)
+  useLayoutEffect(() => {
+    function measure() {
+      const el = anchorRef?.current
+      if (!el) return
+      const rect = el.getBoundingClientRect()
+      setPos({ top: rect.bottom + 4, left: rect.left, right: window.innerWidth - rect.right })
+    }
+    measure()
+    window.addEventListener('scroll', measure, true)
+    window.addEventListener('resize', measure)
+    return () => {
+      window.removeEventListener('scroll', measure, true)
+      window.removeEventListener('resize', measure)
+    }
+  }, [anchorRef])
 
   const q = listSearch.trim().toLowerCase()
   const shownValues = q
@@ -62,12 +93,18 @@ export function ColumnHeaderMenu({
     })
   }
 
+  if (!pos) return null
+  // Opens leftward instead when there isn't 260px of room to the right of
+  // the trigger (a far-right column in a horizontally-scrolled table) -
+  // whichever direction keeps the whole panel on screen.
   const box = {
-    position: 'absolute', top: '100%', left: 0, marginTop: '0.25rem',
+    position: 'fixed', top: pos.top,
+    ...(pos.left + 260 <= window.innerWidth ? { left: pos.left } : { right: pos.right }),
     background: 'var(--color-surface)', border: '1px solid var(--color-border)',
     borderRadius: '10px', boxShadow: '0 12px 28px rgba(15,23,42,0.16)',
-    zIndex: 21, width: '260px', maxWidth: '92vw', padding: '0.5rem',
+    zIndex: 1000, width: '260px', maxWidth: '92vw', padding: '0.5rem',
     fontWeight: 400, fontSize: '0.85rem',
+    maxHeight: `calc(100vh - ${pos.top + 16}px)`, overflowY: 'auto',
   }
   const sortBtn = (active) => ({
     display: 'flex', alignItems: 'center', gap: '0.4rem', width: '100%',
@@ -77,7 +114,7 @@ export function ColumnHeaderMenu({
   })
   const rule = { height: 1, background: 'var(--color-border)', margin: '0.4rem 0' }
 
-  return (
+  return createPortal(
     <div style={box} onClick={(e) => e.stopPropagation()}>
       <button type="button" style={sortBtn(currentSort === 'asc')} onClick={() => { onSort(currentSort === 'asc' ? null : 'asc'); onClose() }}>
         {currentSort === 'asc' ? '✓ ' : ''}{sortLabels[0]}
@@ -140,6 +177,7 @@ export function ColumnHeaderMenu({
         <button type="button" className="secondary" onClick={() => { onClear(); onClose() }}>Clear filter</button>
         <button type="button" onClick={() => { apply(); onClose() }}>Apply</button>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
