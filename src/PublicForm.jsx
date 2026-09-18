@@ -538,7 +538,15 @@ function PublicForm() {
       } else if (data.status !== 'published') {
         setMessage('This form is not live yet.')
       } else {
-        setForm(data)
+        // Never reveal why to an anonymous visitor (billing is the owner's
+        // business, not this form's respondents) - just the same "not
+        // available right now" shape the other blocked states above use.
+        const { data: restricted } = await supabase.rpc('is_form_restricted', { p_form_id: id })
+        if (restricted) {
+          setMessage('This form is temporarily unavailable.')
+        } else {
+          setForm(data)
+        }
       }
       setLoading(false)
     }

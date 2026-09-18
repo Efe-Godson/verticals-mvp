@@ -767,6 +767,8 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
         showToast(
           error.message?.startsWith('ENTRY_LIMIT_REACHED')
             ? "This import would go past your monthly entry limit, so none of it was added - upgrade your plan or wait until your allowance resets."
+            : error.message?.startsWith('SUBSCRIPTION_RESTRICTED')
+            ? 'Your subscription needs to be renewed before you can add new entries.'
             : 'Could not import: ' + error.message,
           'error'
         )

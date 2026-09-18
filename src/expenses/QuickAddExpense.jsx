@@ -88,6 +88,8 @@ export default function QuickAddExpense({ form, onClose, onSaved }) {
       showToast(
         error.message?.startsWith('ENTRY_LIMIT_REACHED')
           ? 'You have reached your monthly entry limit - upgrade your plan to keep adding expenses.'
+          : error.message?.startsWith('SUBSCRIPTION_RESTRICTED')
+          ? 'Your subscription needs to be renewed before you can add new entries.'
           : 'Could not save: ' + error.message,
         'error'
       )

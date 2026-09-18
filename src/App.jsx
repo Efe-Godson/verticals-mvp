@@ -14,6 +14,7 @@ import useIsMobile from './hooks/useIsMobile'
 import DarkModeToggle from './DarkModeToggle'
 import { LoadingState } from './LoadingState'
 import OfflineBanner from './OfflineBanner'
+import SubscriptionLifecycleGate from './components/SubscriptionLifecycleGate'
 import SEO from './seo/SEO'
 import { seoPages } from './config/seo'
 
@@ -249,6 +250,7 @@ function AppShell() {
   return (
     <>
       <OfflineBanner />
+      <SubscriptionLifecycleGate />
       {showNavBar && <NavBar />}
       {useHomeShell && <HomeSidePanel />}
       {(showNavBar || useHomeShell) && <DarkModeToggle />}

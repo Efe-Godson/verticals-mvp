@@ -58,11 +58,19 @@ Deno.serve(async req => {
 
     const { data: submission, error: insertError } = await supabase
       .from('submissions')
-      .insert([{ form_id, data, ip_address: clientIp(req), edit_token: editToken }])
+      .insert([{ form_id, data, ip_address: clientIp(req), edit_token: editToken, created_via: 'public_form' }])
       .select('id, order_number, edit_token')
       .single()
 
-    if (insertError) throw insertError
+    if (insertError) {
+      if (insertError.message?.startsWith('ENTRY_LIMIT_REACHED')) {
+        return jsonResponse({ error: 'This business has reached its monthly entry limit. Please try again later.' }, 403)
+      }
+      if (insertError.message?.startsWith('SUBSCRIPTION_RESTRICTED')) {
+        return jsonResponse({ error: 'This form is temporarily unavailable.' }, 403)
+      }
+      throw insertError
+    }
 
     // Best-effort inventory decrement: a cart field's submitted value looks
     // like { items: [{ id, quantity, ... }], total, ... } (see PublicForm.jsx's

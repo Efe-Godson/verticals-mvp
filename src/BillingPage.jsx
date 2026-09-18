@@ -67,6 +67,16 @@ const BANNER_STYLE = {
   info: { background: 'var(--color-primary-soft)', color: 'var(--color-primary)' },
 }
 
+const STATUS_LABELS = {
+  active: 'Active',
+  expiring_soon: 'Renewing soon',
+  grace_period: 'Grace period',
+  restricted: 'Restricted',
+  cancelled: 'Cancelled',
+  past_due: 'Past due',
+  expired: 'Expired',
+}
+
 export default function BillingPage() {
   const { session } = useAuth()
   const { showToast } = useToast()
@@ -227,6 +237,24 @@ export default function BillingPage() {
           Your {PLAN_LABELS[subscription.pending_plan]} plan will begin on {formatDate(subscription.current_period_end)}.
         </div>
       )}
+      {subscription?.status === 'grace_period' && (
+        <div className="card" style={{ padding: '0.9rem 1.1rem', marginBottom: '1rem', background: 'var(--color-warning-soft)', color: '#8a5a12', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.8rem', flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ fontWeight: 700 }}>GRACE PERIOD - {daysUntil(subscription.grace_period_ends_at) ?? 0} days remaining</div>
+            <div style={{ fontSize: '0.85rem' }}>Renew before {formatDate(subscription.grace_period_ends_at)} to keep adding new entries.</div>
+          </div>
+          <button onClick={() => document.getElementById('choose-plan')?.scrollIntoView({ behavior: 'smooth' })}>Renew subscription</button>
+        </div>
+      )}
+      {subscription?.status === 'restricted' && (
+        <div className="card" style={{ padding: '0.9rem 1.1rem', marginBottom: '1rem', background: 'var(--color-warning-soft)', color: '#a8382a', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.8rem', flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ fontWeight: 700 }}>Your subscription needs to be renewed</div>
+            <div style={{ fontSize: '0.85rem' }}>Your data is safe and remains available, but new entries are paused until you renew.</div>
+          </div>
+          <button onClick={() => document.getElementById('choose-plan')?.scrollIntoView({ behavior: 'smooth' })}>Renew subscription</button>
+        </div>
+      )}
       {banner && (
         <div className="card" style={{ padding: '0.9rem 1.1rem', marginBottom: '1rem', ...BANNER_STYLE[banner.tone] }}>
           <div style={{ fontWeight: 700 }}>{banner.title}</div>
@@ -273,7 +301,7 @@ export default function BillingPage() {
             </div>
           )}
           <div style={{ fontSize: '0.85rem', color: 'var(--color-muted)', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            <span>Status: {subscription?.status === 'active' ? 'Active' : subscription?.status}</span>
+            <span>Status: {STATUS_LABELS[subscription?.status] || subscription?.status}</span>
             <span>{BILLING_INTERVAL_LABELS[subscription?.billing_interval] || 'Monthly'} billing</span>
           </div>
           <div style={{ marginTop: '0.8rem', paddingTop: '0.8rem', borderTop: '1px solid var(--color-border)', fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
@@ -359,7 +387,7 @@ export default function BillingPage() {
       </div>
 
       {/* Billing selector + plan cards */}
-      <h2 style={{ fontSize: '1.05rem', marginBottom: '0.4rem' }}>Choose Your Plan</h2>
+      <h2 id="choose-plan" style={{ fontSize: '1.05rem', marginBottom: '0.4rem' }}>Choose Your Plan</h2>
       <p style={{ color: 'var(--color-muted)', marginTop: 0, marginBottom: '1rem', fontSize: '0.88rem' }}>
         Pick the number of entries your business needs each month - all your workflows stay in one place.
       </p>
