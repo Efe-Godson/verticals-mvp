@@ -1,33 +1,22 @@
 // Place at: supabase/functions/_shared/aiProvider.ts
 // Every AI edge function (ai-analyst, ai-ask, extract-products-ai,
 // extract-order-ai) calls the model through generateText() instead of
-// hitting Gemini directly. Gemini stays primary - its responseSchema mode
-// gives strict structured output, worth keeping as the default - but a 429
-// (free-tier quota exhausted) or 503 (model overloaded/unavailable)
-// automatically retries the same prompt against OpenRouter's hosted Llama
-// instead of just failing the request outright. Only those two statuses
-// trigger the Gemini->OpenRouter fallback: a real prompt/parsing error would
-// fail the same way on the second provider too, so there's nothing to gain
-// retrying those, just double the latency on a request that was never going
-// to succeed. If OpenRouter *also* fails - for any reason, not just 429/503,
-// since by this point it's the last resort before giving up entirely - Vercel
-// AI Gateway is tried as a third tier. It's opt-in: with no
-// AI_GATEWAY_API_KEY secret set, this whole tier is skipped and the
-// OpenRouter error surfaces as before.
+// hitting a provider directly. Baseten (DeepSeek V4.1 Flash) is primary -
+// cheap, fast, no free-tier quota to exhaust. A failure gets one same-tier
+// retry (most failures on a hosted-inference endpoint are brief blips), then
+// cascades to Gemini - whose responseSchema mode still gives strict
+// structured decoding as a fallback - and finally to OpenRouter's hosted
+// Llama (best-effort prompt-embedded schema + json_object mode) as the
+// last resort before giving up entirely.
 const GEMINI_MODEL = 'gemini-flash-latest'
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
 // The ":free" suffix matters - without it this is OpenRouter's paid Llama
 // ($0.10 / $0.32 per 1M tokens), not the free tier this fallback is meant
-// to be. Free-tier rate limits are tighter, which is exactly why the Gateway
-// tier below exists - to catch requests this one can't serve right now.
+// to be.
 const OPENROUTER_MODEL = 'meta-llama/llama-3.3-70b-instruct:free'
-// Model catalogue is account/plan-specific and changes over time - confirm
-// this is still valid via `GET https://ai-gateway.vercel.sh/v1/models`
-// (with your AI_GATEWAY_API_KEY) or the Playground/Model List pages in the
-// Vercel dashboard before relying on it, and swap it there if not.
-const GATEWAY_URL = 'https://ai-gateway.vercel.sh/v1/chat/completions'
-const GATEWAY_MODEL = 'openai/gpt-5.4'
+const BASETEN_URL = 'https://inference.baseten.co/v1/chat/completions'
+const BASETEN_MODEL = 'deepseek-ai/DeepSeek-V4.1-Flash'
 
 async function callGemini(prompt: string, jsonSchema?: object) {
   const res = await fetch(`${GEMINI_URL}?key=${Deno.env.get('GEMINI_API_KEY')}`, {
@@ -61,7 +50,7 @@ async function callGemini(prompt: string, jsonSchema?: object) {
 // prompt here to give it the exact shape to follow.
 async function callOpenRouter(prompt: string, jsonSchema?: object) {
   const apiKey = Deno.env.get('OPENROUTER_API_KEY')
-  if (!apiKey) throw new Error('Gemini is rate-limited and OPENROUTER_API_KEY is not set, so there is no fallback available right now.')
+  if (!apiKey) throw new Error('Baseten and Gemini both failed, and OPENROUTER_API_KEY is not set, so there is no further fallback available right now.')
 
   const fullPrompt = jsonSchema
     ? `${prompt}\n\nRespond with ONLY a JSON object matching exactly this schema (use these exact property names and nesting, omit nothing the schema requires):\n${JSON.stringify(jsonSchema)}`
@@ -83,27 +72,33 @@ async function callOpenRouter(prompt: string, jsonSchema?: object) {
   return text
 }
 
-// OpenAI-compatible Chat Completions endpoint - same request/response shape
-// as callOpenRouter, just a different base URL/model and (for structured
-// output) OpenAI's json_schema response_format instead of prompt-embedding
-// the schema, since the Gateway supports it natively.
-async function callVercelGateway(prompt: string, jsonSchema?: object) {
-  const apiKey = Deno.env.get('AI_GATEWAY_API_KEY')
-  if (!apiKey) throw new Error('Gemini and OpenRouter both failed, and AI_GATEWAY_API_KEY is not set, so there is no further fallback available right now.')
+// OpenAI-compatible Chat Completions endpoint, same request/response shape
+// as callOpenRouter. DeepSeek's structured-output support isn't as
+// well-established as OpenAI's own json_schema mode, so this plays it safe
+// and reuses OpenRouter's approach: prompt-embed the schema and only ask for
+// json_object mode, rather than trusting json_schema to be enforced
+// strictly on what is now the primary tier.
+async function callBaseten(prompt: string, jsonSchema?: object) {
+  const apiKey = Deno.env.get('BASETEN_API_KEY')
+  if (!apiKey) throw new Error('BASETEN_API_KEY is not set.')
 
-  const res = await fetch(GATEWAY_URL, {
+  const fullPrompt = jsonSchema
+    ? `${prompt}\n\nRespond with ONLY a JSON object matching exactly this schema (use these exact property names and nesting, omit nothing the schema requires):\n${JSON.stringify(jsonSchema)}`
+    : prompt
+
+  const res = await fetch(BASETEN_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
     body: JSON.stringify({
-      model: GATEWAY_MODEL,
-      messages: [{ role: 'user', content: prompt }],
-      ...(jsonSchema ? { response_format: { type: 'json_schema', json_schema: { name: 'response', schema: jsonSchema } } } : {}),
+      model: BASETEN_MODEL,
+      messages: [{ role: 'user', content: fullPrompt }],
+      ...(jsonSchema ? { response_format: { type: 'json_object' } } : {}),
     }),
   })
-  if (!res.ok) throw new Error(`Vercel AI Gateway error: ${res.status} ${await res.text()}`)
+  if (!res.ok) throw new Error(`Baseten API error: ${res.status} ${await res.text()}`)
   const data = await res.json()
   const text = data.choices?.[0]?.message?.content
-  if (!text) throw new Error('No content returned from Vercel AI Gateway')
+  if (!text) throw new Error('No content returned from Baseten')
   return text
 }
 
@@ -116,28 +111,19 @@ async function retryOnce<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 // jsonSchema: pass the Gemini responseSchema object for structured output -
-// used for Gemini's own strict decoding, and doubles as the signal to ask
-// OpenRouter for JSON mode on fallback. Omit for a plain free-text answer
-// (see ai-ask).
+// doubles as the signal to ask Baseten/OpenRouter for JSON mode on
+// fallback. Omit for a plain free-text answer (see ai-ask).
 export async function generateText(prompt: string, jsonSchema?: object) {
   try {
-    return await callGemini(prompt, jsonSchema)
-  } catch (geminiErr) {
-    const status = (geminiErr as Error & { status?: number }).status
-    if (status !== 429 && status !== 503) throw geminiErr
+    // One same-tier retry before cascading further - most failures on a
+    // hosted-inference endpoint are brief blips, cheaper to retry than to
+    // fall all the way to a different provider.
+    return await retryOnce(() => callBaseten(prompt, jsonSchema))
+  } catch {
     try {
-      // One same-tier retry before cascading further - a 429/503 is often a
-      // brief blip on a free/shared tier, and retrying costs far less than
-      // falling all the way to Vercel AI Gateway (opt-in, last resort - and
-      // currently unusable without a credit card on file for that Vercel
-      // team, so every request that reaches it fails outright).
-      return await retryOnce(() => callGemini(prompt, jsonSchema))
+      return await callGemini(prompt, jsonSchema)
     } catch {
-      try {
-        return await retryOnce(() => callOpenRouter(prompt, jsonSchema))
-      } catch {
-        return await callVercelGateway(prompt, jsonSchema)
-      }
+      return await callOpenRouter(prompt, jsonSchema)
     }
   }
 }
