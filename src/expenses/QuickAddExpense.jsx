@@ -82,9 +82,17 @@ export default function QuickAddExpense({ form, onClose, onSaved }) {
     }
     if (!data.date) data.date = todayISO()
 
-    const { error } = await supabase.from('submissions').insert([{ form_id: form.id, data }])
+    const { error } = await supabase.from('submissions').insert([{ form_id: form.id, data, created_via: 'manual' }])
     setSaving(false)
-    if (error) { showToast('Could not save: ' + error.message, 'error'); return }
+    if (error) {
+      showToast(
+        error.message?.startsWith('ENTRY_LIMIT_REACHED')
+          ? 'You have reached your monthly entry limit - upgrade your plan to keep adding expenses.'
+          : 'Could not save: ' + error.message,
+        'error'
+      )
+      return
+    }
     showToast(`Expense recorded - ${formatNaira(amountNum)}`, 'success')
     onSaved?.()
     onClose?.()

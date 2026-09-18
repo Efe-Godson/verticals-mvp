@@ -12,7 +12,7 @@ import useIsMobile from './hooks/useIsMobile'
 import useAppUpdate from './hooks/useAppUpdate'
 import VerticalsLogo from './components/VerticalsLogo'
 import AppUpdateModal from './components/AppUpdateModal'
-import { LayoutGrid, FlaskConical, Trash2, SquarePen, Wallet, Sparkles, Settings, X, RefreshCw } from 'lucide-react'
+import { LayoutGrid, FlaskConical, Trash2, SquarePen, Wallet, Sparkles, Settings, CreditCard, X, RefreshCw } from 'lucide-react'
 
 // Same icon spec PosSidePanel.jsx's nav rows use, so the two menus read as
 // one visual language.
@@ -247,6 +247,13 @@ function NavBar() {
                   >
                     Profile
                   </Link>
+                  <Link
+                    to="/billing"
+                    onClick={() => setAccountMenuOpen(false)}
+                    style={{ display: 'block', padding: '0.5rem 0.6rem', fontSize: '0.85rem', borderRadius: '6px', color: 'var(--color-text)' }}
+                  >
+                    Pricing &amp; Usage
+                  </Link>
                   {binTrigger && (
                     <button
                       className="secondary"
@@ -477,6 +484,7 @@ function NavBar() {
         <div style={MENU_SECTION_LABEL_STYLE}>Account</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
           <MenuRow to="/account" icon={Settings} onClick={() => setMenuOpen(false)}>Profile</MenuRow>
+          <MenuRow to="/billing" icon={CreditCard} onClick={() => setMenuOpen(false)}>Pricing &amp; Usage</MenuRow>
           <SupportNote />
         </div>
 

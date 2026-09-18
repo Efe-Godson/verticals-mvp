@@ -78,6 +78,8 @@ const ConfirmEmail = lazy(() => import('./ConfirmEmail'))
 const ResetPassword = lazy(() => import('./ResetPassword'))
 const Templates = lazy(() => import('./Templates'))
 const AccountPage = lazy(() => import('./AccountPage'))
+const BillingPage = lazy(() => import('./BillingPage'))
+const PricingPage = lazy(() => import('./marketing/pages/PricingPage'))
 const ProductPage = lazy(() => import('./marketing/pages/ProductPage'))
 const FormsPage = lazy(() => import('./marketing/pages/FormsPage'))
 const RecordsPage = lazy(() => import('./marketing/pages/RecordsPage'))
@@ -182,7 +184,7 @@ function AppShell() {
   const isLandingPreview = location.pathname === '/lab/landing'
   // Public marketing sub-pages (see src/marketing/pages/) bring their own
   // MarketingNav/MarketingFooter, same reasoning as isLandingRoot above.
-  const isMarketingSubpage = ['/product', '/forms', '/product/records', '/product/reports', '/sales-tracking', '/expense-tracking', '/inventory-management', '/payroll', '/for-small-businesses', '/for-restaurants', '/for-retail', '/resources', '/template-gallery', '/about', '/contact', '/privacy', '/terms', '/trust', '/security', '/cookies', '/subprocessors'].includes(location.pathname)
+  const isMarketingSubpage = ['/product', '/forms', '/product/records', '/product/reports', '/sales-tracking', '/expense-tracking', '/inventory-management', '/payroll', '/pricing', '/for-small-businesses', '/for-restaurants', '/for-retail', '/resources', '/template-gallery', '/about', '/contact', '/privacy', '/terms', '/trust', '/security', '/cookies', '/subprocessors'].includes(location.pathname)
     || location.pathname.startsWith('/resources/')
   const isPublicForm = /^\/form\/[^/]+(\/response\/[^/]+)?$/.test(location.pathname)
   // /s/:code (see ShortLinkRedirect.jsx) is just a brief hop through to the
@@ -278,6 +280,7 @@ function AppShell() {
         <Route path="/forms" element={<FormsPage />} />
         <Route path="/product/records" element={<RecordsPage />} />
         <Route path="/product/reports" element={<ReportsPage />} />
+        <Route path="/pricing" element={<PricingPage />} />
         <Route path="/sales-tracking" element={<SalesTrackingPage />} />
         <Route path="/expense-tracking" element={<ExpenseTrackingPage />} />
         <Route path="/about" element={<AboutPage />} />
@@ -337,6 +340,7 @@ function AppShell() {
         <Route path="/templates/forms/locations" element={<PrivateRoute><StaffScopedRoute><FormsTemplateHome /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/templates/:slug/locations" element={<PrivateRoute><StaffScopedRoute><TemplateLocations /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/account" element={<PrivateRoute><StaffScopedRoute><AccountPage /></StaffScopedRoute></PrivateRoute>} />
+        <Route path="/billing" element={<PrivateRoute><StaffScopedRoute><BillingPage /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/create" element={<PrivateRoute><StaffScopedRoute><CreateForm /></StaffScopedRoute></PrivateRoute>} />
         <Route path="/form/:id" element={<PublicFormPage />} />
         <Route path="/form/:id/response/:token" element={<PublicFormPage />} />

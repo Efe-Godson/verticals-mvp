@@ -1,7 +1,7 @@
 import SupportNote from './components/SupportNote'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { Home, ClipboardList, ChartNoAxesColumnIncreasing, LayoutGrid, FlaskConical, User, Trash2, RefreshCw, LogOut, ChevronLeft } from 'lucide-react'
+import { Home, ClipboardList, ChartNoAxesColumnIncreasing, LayoutGrid, FlaskConical, User, CreditCard, Trash2, RefreshCw, LogOut, ChevronLeft } from 'lucide-react'
 import { useAuth } from './AuthContext'
 import { useRecycleBinTrigger } from './RecycleBinContext'
 import { TEMPLATE_ADMIN_USER_ID } from './adminAccount'
@@ -86,6 +86,7 @@ export default function HomeSidePanel() {
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.2)', margin: '1rem 0 0.7rem' }} />
         <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', opacity: 0.7, marginBottom: '0.5rem' }}>Account</div>
         <Link to="/account" className="pos-nav-item"><User size={18} aria-hidden="true" /><span>Profile</span></Link>
+        <Link to="/billing" className="pos-nav-item"><CreditCard size={18} aria-hidden="true" /><span>Pricing &amp; Usage</span></Link>
         {binTrigger && <button type="button" className="pos-nav-item" onClick={binTrigger.onOpen}><Trash2 size={18} aria-hidden="true" /><span>Recycle Bin{binTrigger.count > 0 ? ' (' + binTrigger.count + ')' : ''}</span></button>}
         <button type="button" className="pos-nav-item" onClick={updateApp}><RefreshCw size={18} aria-hidden="true" /><span>Update app</span></button>
         <button type="button" className="pos-nav-item" onClick={async () => { await supabase.auth.signOut(); navigate('/') }}><LogOut size={18} aria-hidden="true" /><span>Log out</span></button>

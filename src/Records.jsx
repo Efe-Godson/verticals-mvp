@@ -760,11 +760,16 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
 
       const { data, error } = await supabase
         .from('submissions')
-        .insert(submissions.map(s => ({ form_id: form.id, data: s.data })))
+        .insert(submissions.map(s => ({ form_id: form.id, data: s.data, created_via: 'import' })))
         .select()
 
       if (error) {
-        showToast('Could not import: ' + error.message, 'error')
+        showToast(
+          error.message?.startsWith('ENTRY_LIMIT_REACHED')
+            ? "This import would go past your monthly entry limit, so none of it was added - upgrade your plan or wait until your allowance resets."
+            : 'Could not import: ' + error.message,
+          'error'
+        )
         return
       }
 
