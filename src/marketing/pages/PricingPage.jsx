@@ -16,12 +16,12 @@ import { fetchPlanCatalogue, groupCatalogueByPlan, BILLING_INTERVAL_LABELS } fro
 const BILLING_INTERVALS = ['monthly', 'quarterly', 'half_year', 'yearly']
 
 const COMPARISON_ROWS = [
-  { label: 'Monthly entries', values: ['100', '500', '2,000', '5,000', '15,000'] },
-  { label: 'Multiple workflows', values: ['✓', '✓', '✓', '✓', '✓'] },
-  { label: 'Forms & records', values: ['✓', '✓', '✓', '✓', '✓'] },
-  { label: 'Reports', values: ['✓', '✓', '✓', '✓', '✓'] },
-  { label: 'Exports', values: ['✓', '✓', '✓', '✓', '✓'] },
-  { label: 'Shared access', values: ['✓', '✓', '✓', '✓', '✓'] },
+  { label: 'Monthly entries', values: ['100', '500', '2,000', '5,000'] },
+  { label: 'Multiple workflows', values: ['✓', '✓', '✓', '✓'] },
+  { label: 'Forms & records', values: ['✓', '✓', '✓', '✓'] },
+  { label: 'Reports', values: ['✓', '✓', '✓', '✓'] },
+  { label: 'Exports', values: ['✓', '✓', '✓', '✓'] },
+  { label: 'Shared access', values: ['✓', '✓', '✓', '✓'] },
 ]
 
 export default function PricingPage() {
@@ -103,7 +103,6 @@ export default function PricingPage() {
                 <th style={{ textAlign: 'center', padding: '0.6rem' }}>Starter</th>
                 <th style={{ textAlign: 'center', padding: '0.6rem' }}>Business</th>
                 <th style={{ textAlign: 'center', padding: '0.6rem' }}>Growth</th>
-                <th style={{ textAlign: 'center', padding: '0.6rem' }}>Scale</th>
               </tr>
             </thead>
             <tbody>

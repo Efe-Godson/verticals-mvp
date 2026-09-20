@@ -6,7 +6,10 @@
 // trusting anything the client sends.
 import { supabase } from '../supabaseClient'
 
-export const PLAN_ORDER = ['free', 'starter', 'business', 'growth', 'scale', 'enterprise']
+// 'scale' is intentionally dropped from display (not deleted from
+// plan_catalogue/the backend - any existing Scale subscriber keeps working,
+// it's just no longer offered here). Re-add it to bring it back.
+export const PLAN_ORDER = ['free', 'starter', 'business', 'growth', 'enterprise']
 
 export const PLAN_LABELS = {
   free: 'Free',

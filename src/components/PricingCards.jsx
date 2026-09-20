@@ -27,6 +27,7 @@ function PlanCard({ plan, catalogueForPlan, billingInterval, isCurrent, mode, on
       style={{
         padding: '1.4rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', position: 'relative',
         border: isMostPopular ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
+        height: '100%', boxSizing: 'border-box',
       }}
     >
       {isMostPopular && (
@@ -69,11 +70,16 @@ function PlanCard({ plan, catalogueForPlan, billingInterval, isCurrent, mode, on
         )}
       </div>
 
+      {/* marginTop: 'auto' - not a fixed gap - pins every card's button to the
+          same bottom edge regardless of how tall its own content block above
+          happens to be (Enterprise's "Custom pricing" vs. a priced plan's
+          extra "Equivalent to.../Save..." lines), so the CTA row reads as one
+          consistent strip across the whole grid. */}
       <button
         className={isCurrent ? 'secondary' : undefined}
         disabled={isCurrent || busy}
         onClick={() => isEnterprise ? onContactSales?.() : onSelect?.(plan, billingInterval)}
-        style={{ marginTop: '0.5rem', width: '100%' }}
+        style={{ marginTop: 'auto', width: '100%' }}
       >
         {ctaLabel}
       </button>
@@ -85,7 +91,19 @@ function PlanCard({ plan, catalogueForPlan, billingInterval, isCurrent, mode, on
 // (highlights the current plan and disables its own button).
 export default function PricingCards({ catalogue, billingInterval, currentPlan, mode = 'marketing', onSelect, onContactSales, busyPlan }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+    <div
+      className="pricing-cards-grid"
+      // --pricing-plan-count drives the desktop one-row layout below - reads
+      // straight off PLAN_ORDER.length so adding/removing a plan (as just
+      // happened with Scale) never needs a matching CSS edit.
+      style={{ '--pricing-plan-count': PLAN_ORDER.length }}
+    >
+      <style>{`
+        .pricing-cards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; align-items: stretch; }
+        @media (min-width: 900px) {
+          .pricing-cards-grid { grid-template-columns: repeat(var(--pricing-plan-count), minmax(0, 1fr)); }
+        }
+      `}</style>
       {PLAN_ORDER.map(plan => (
         <PlanCard
           key={plan}
