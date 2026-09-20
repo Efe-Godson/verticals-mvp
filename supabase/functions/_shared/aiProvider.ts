@@ -18,13 +18,26 @@ const OPENROUTER_MODEL = 'meta-llama/llama-3.3-70b-instruct:free'
 const BASETEN_URL = 'https://inference.baseten.co/v1/chat/completions'
 const BASETEN_MODEL = 'deepseek-ai/DeepSeek-V4.1-Flash'
 
+// A cap only ever applied for structured (jsonSchema) calls - ai-analyst/
+// ai-ask's free-form prose answers pass no schema and stay uncapped. 8192
+// tokens is generous headroom above any realistic extraction response (even
+// a large pasted menu's worth of products), so this only ever cuts off a
+// truly runaway/repeating generation - the actual latency risk it guards
+// against - rather than a normal-sized real answer.
+const MAX_STRUCTURED_OUTPUT_TOKENS = 8192
+
 async function callGemini(prompt: string, jsonSchema?: object) {
   const res = await fetch(`${GEMINI_URL}?key=${Deno.env.get('GEMINI_API_KEY')}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      ...(jsonSchema ? { generationConfig: { responseMimeType: 'application/json', responseSchema: jsonSchema } } : {}),
+      ...(jsonSchema ? {
+        generationConfig: {
+          responseMimeType: 'application/json', responseSchema: jsonSchema,
+          maxOutputTokens: MAX_STRUCTURED_OUTPUT_TOKENS,
+        },
+      } : {}),
     }),
   })
   if (!res.ok) {
@@ -62,7 +75,7 @@ async function callOpenRouter(prompt: string, jsonSchema?: object) {
     body: JSON.stringify({
       model: OPENROUTER_MODEL,
       messages: [{ role: 'user', content: fullPrompt }],
-      ...(jsonSchema ? { response_format: { type: 'json_object' } } : {}),
+      ...(jsonSchema ? { response_format: { type: 'json_object' }, max_tokens: MAX_STRUCTURED_OUTPUT_TOKENS } : {}),
     }),
   })
   if (!res.ok) throw new Error(`OpenRouter API error: ${res.status} ${await res.text()}`)
@@ -92,7 +105,7 @@ async function callBaseten(prompt: string, jsonSchema?: object) {
     body: JSON.stringify({
       model: BASETEN_MODEL,
       messages: [{ role: 'user', content: fullPrompt }],
-      ...(jsonSchema ? { response_format: { type: 'json_object' } } : {}),
+      ...(jsonSchema ? { response_format: { type: 'json_object' }, max_tokens: MAX_STRUCTURED_OUTPUT_TOKENS } : {}),
     }),
   })
   if (!res.ok) throw new Error(`Baseten API error: ${res.status} ${await res.text()}`)

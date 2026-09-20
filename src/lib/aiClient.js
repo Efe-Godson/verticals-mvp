@@ -75,6 +75,36 @@ export async function extractProductsFromText(text) {
   return data.products
 }
 
+const PRODUCT_FILTER_STOPWORDS = new Set(['and', 'the', 'with', 'for', 'of', 'a', 'an', 'to', 'in', 'on', 'at'])
+// Below this catalogue size, filtering isn't worth the risk - a small
+// product list barely affects prompt length either way, so just send it all.
+const PRODUCT_FILTER_THRESHOLD = 60
+// A filtered set this thin is more likely a bad match (unusual phrasing,
+// product codes instead of names) than a genuinely tiny order - falling
+// back to the full catalogue trades away this request's speedup rather than
+// risk missing a real product.
+const PRODUCT_FILTER_MIN_MATCHES = 3
+
+// extract-order-ai's prompt embeds the whole product catalogue verbatim
+// (see its buildPrompt) - for a shop with hundreds of SKUs that's usually
+// the largest chunk of the prompt the model has to read before it can even
+// start generating, and token count is the dominant driver of extraction
+// latency. This trims the catalogue down to only products plausibly
+// mentioned in the pasted text before it ever reaches the network request.
+// Deliberately generous (a substring match on any significant word in the
+// product's name, not an exact or edit-distance fuzzy match) so a typo or
+// pluralization ("cokes" for "Coke") still matches.
+function filterProductsForText(products, text) {
+  const list = products || []
+  if (list.length <= PRODUCT_FILTER_THRESHOLD) return list
+  const haystack = text.toLowerCase()
+  const matches = list.filter(p => {
+    const words = (p.name || '').toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length >= 3 && !PRODUCT_FILTER_STOPWORDS.has(w))
+    return words.some(w => haystack.includes(w))
+  })
+  return matches.length >= PRODUCT_FILTER_MIN_MATCHES ? matches : list
+}
+
 // Turns a pasted order message into cart items + field answers for
 // PublicForm.jsx's "Fill from Text" button - products/fields describe the
 // current form's own catalogue and question list so the model only ever
@@ -84,5 +114,5 @@ export async function extractProductsFromText(text) {
 // substitute for it. Caller shows these for review before applying them,
 // same "never commit straight from AI" rule as extractProductsFromText above.
 export async function extractOrderFromText(text, products, fields, rules) {
-  return invokeAI('extract-order-ai', { text, products, fields, rules })
+  return invokeAI('extract-order-ai', { text, products: filterProductsForText(products, text), fields, rules })
 }
