@@ -119,7 +119,6 @@ function HorizontalBarChart({
     // fixed px width that truncated product names hard. Labels also wrap to
     // two lines instead of ellipsising at one.
     const labelWidth = isMobile ? "46%" : "clamp(120px, 32%, 300px)"
-    const valueWidth = isMobile ? 58 : 84
     const barHeight = isMobile ? 24 : 20
     const gap = isMobile ? ".45rem" : ".7rem"
     const labelFont = isMobile ? ".78rem" : ".82rem"
@@ -442,15 +441,19 @@ function HorizontalBarChart({
                             {d.label}
                         </div>
 
-                        {/* Bar */}
+                        {/* Bar + value - no track behind the bar (that's the
+                            "shading" that used to run the full row width
+                            regardless of value), and the value sits right
+                            after the bar's own actual end instead of a fixed
+                            column aligned to the highest bar in the list. */}
 
                         <div
                             style={{
                                 flex: 1,
-                                height: barHeight,
-                                background: "var(--color-primary-soft)",
-                                borderRadius: "6px",
-                                overflow: "hidden",
+                                minWidth: 0,
+                                display: "flex",
+                                alignItems: "center",
+                                gap: ".5rem",
                                 cursor: "default",
                             }}
                         >
@@ -461,7 +464,8 @@ function HorizontalBarChart({
                                         (d.count / maxValue) * 100,
                                         2
                                     )}%`,
-                                    height: "100%",
+                                    flexShrink: 0,
+                                    height: barHeight,
                                     background: "var(--color-primary)",
                                     borderRadius: "6px",
                                     opacity: hovered === null || hovered === d.label ? 1 : 0.55,
@@ -469,23 +473,19 @@ function HorizontalBarChart({
                                 }}
                             />
 
-                        </div>
+                            <div
+                                style={{
+                                    flexShrink: 0,
+                                    fontSize: valueFont,
+                                    color: "var(--color-text)",
+                                    fontWeight: hovered === d.label ? 700 : 400,
+                                    whiteSpace: "nowrap",
+                                    fontVariantNumeric: "tabular-nums",
+                                }}
+                            >
+                                {valueText(d)}
+                            </div>
 
-                        {/* Value */}
-
-                        <div
-                            style={{
-                                width: valueWidth,
-                                flexShrink: 0,
-                                fontSize: valueFont,
-                                color: "var(--color-text)",
-                                fontWeight: hovered === d.label ? 700 : 400,
-                                textAlign: "right",
-                                whiteSpace: "nowrap",
-                                fontVariantNumeric: "tabular-nums",
-                            }}
-                        >
-                            {valueText(d)}
                         </div>
 
                     </div>
