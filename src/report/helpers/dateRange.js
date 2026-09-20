@@ -87,3 +87,43 @@ export function getDateRangeLabel(dateRange, customStart, customEnd) {
   if (dateRange === 'custom') return customEnd ? `${customStart || '…'} to ${customEnd}` : (customStart || '…')
   return DATE_RANGE_OPTIONS.find(o => o.value === dateRange)?.label || ''
 }
+
+// Display formats for the Designer's date-range card element (elementModel.js's
+// makeDateRangeElement) - kept here, not in print/, so both the on-canvas
+// render and exportPptx.js's native-text path (which can't re-run React) can
+// compute the exact same string from one place.
+export const DATE_RANGE_DISPLAY_FORMATS = [
+  { value: 'label', label: 'Preset label (This month)' },
+  { value: 'short', label: 'Short (01/09/2026)' },
+  { value: 'medium', label: '1 Sep 2026' },
+  { value: 'long', label: '1 September 2026' },
+  { value: 'month-year', label: 'September 2026' },
+]
+
+function formatOneDate(date, format) {
+  if (format === 'short') return date.toLocaleDateString('en-GB')
+  if (format === 'long') return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+  if (format === 'month-year') return date.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) // medium (default)
+}
+
+// Renders a chosen preset+format as one display string, evaluated fresh at
+// render/export time (same "always current" behavior as dynamicTokens.js's
+// {{date.today}}). Open-ended presets (this week/month, last 3/6/12 months)
+// only carry a start bound (see getDateRangeBounds above) - shown here as
+// "start – today" rather than a single dangling date.
+export function formatDateRangeDisplay(range, customStart, customEnd, format = 'medium') {
+  if (format === 'label') return getDateRangeLabel(range, customStart, customEnd)
+  if (range === 'all') return 'All time'
+  const { start, end } = getDateRangeBounds(range, customStart, customEnd)
+  if (!start) return getDateRangeLabel(range, customStart, customEnd)
+  const effectiveEnd = end || new Date()
+  // "month-year" only carries month+year precision, so a start/end that land
+  // in the same month (e.g. "This month") would otherwise print as a
+  // pointless "September 2026 – September 2026" - collapse those down to one.
+  const sameBucket = format === 'month-year'
+    ? start.getFullYear() === effectiveEnd.getFullYear() && start.getMonth() === effectiveEnd.getMonth()
+    : start.toDateString() === effectiveEnd.toDateString()
+  if (sameBucket) return formatOneDate(start, format)
+  return `${formatOneDate(start, format)} – ${formatOneDate(effectiveEnd, format)}`
+}

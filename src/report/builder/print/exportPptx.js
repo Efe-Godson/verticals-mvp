@@ -12,6 +12,7 @@
 import PptxGenJS from 'pptxgenjs'
 import html2canvas from 'html2canvas'
 import { pageFormatMm } from './printConstants'
+import { formatDateRangeDisplay } from '../../helpers/dateRange'
 
 const MM_PER_INCH = 25.4
 
@@ -70,6 +71,26 @@ function addShapeElement(pptx, slide, el, box) {
   })
 }
 
+// The date-range card renders as a computed string (DateRangeElement.jsx),
+// never typed-in content - recomputed here from the element's own
+// preset/format fields via the same shared helper, rather than reading
+// el.text.content (there isn't one) or rasterizing the card as an image.
+function addDateRangeElement(slide, el, box) {
+  const label = formatDateRangeDisplay(el.preset, el.customStart, el.customEnd, el.format)
+  slide.addText(label, {
+    x: box.x, y: box.y, w: box.w, h: box.h,
+    fontSize: el.fontSize || 14, bold: !!el.bold, align: el.align || 'center', valign: 'middle',
+    // pptxgenjs wants one bare font name, not a CSS font-stack (elementModel.js
+    // stores fontFamily the same "Segoe UI, sans-serif" way PrintTextElement.jsx
+    // hands straight to CSS) - only the first name transfers.
+    fontFace: el.fontFamily ? el.fontFamily.split(',')[0].trim() : undefined,
+    color: hex(el.color || '#334155'), fill: { color: hex(el.fill || '#ffffff') },
+    line: { color: hex(el.stroke || '#cbd5e1'), width: 1 },
+    shape: 'roundRect', rectRadius: 0.5, // 0.0-1.0 ratio (pptxgenjs), not a length - 0.5 reads as a full pill for a short/wide card
+    rotate: el.rotation || 0,
+  })
+}
+
 async function addRasterizedElement(slide, pageNode, el, box) {
   const node = pageNode?.querySelector(`[data-print-el-id="${el.id}"]`)
   if (!node) return
@@ -106,6 +127,7 @@ export async function exportPrintLayoutToPptx(printLayout, pageNodes, fileName, 
       if (el.kind === 'text') addTextElement(slide, el, box)
       else if (el.kind === 'shape') addShapeElement(pptx, slide, el, box)
       else if (el.kind === 'image' && el.src) slide.addImage({ path: el.src, x: box.x, y: box.y, w: box.w, h: box.h, rotate: el.rotation || 0 })
+      else if (el.kind === 'date-range') addDateRangeElement(slide, el, box)
       else await addRasterizedElement(slide, pageNode, el, box) // visual/tile, or an image without a resolvable src
     }
   }

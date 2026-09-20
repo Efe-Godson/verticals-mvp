@@ -30,6 +30,7 @@ export const DEFAULT_ELEMENT_SIZE = {
   image: { width: 30, height: 20 },
   visual: { width: 50, height: 40 },
   tile: { width: 50, height: 40 },
+  'date-range': { width: 32, height: 9 },
 }
 
 // styleRef/groupId are Phase 2 fields, reserved on every kind from the
@@ -55,4 +56,19 @@ export function makeShapeElement({ shape = 'rectangle', fill = '#e5e7eb', stroke
 
 export function makeImageElement({ src = '', fit = 'cover', opacity = 1, radius = 0, crop = null, ...overrides } = {}) {
   return makeBase('image', { src, fit, opacity, radius, crop, ...overrides })
+}
+
+// A floating "date range" card - text is computed live from preset/format
+// via src/report/helpers/dateRange.js's formatDateRangeDisplay(), not typed
+// in directly, so it stays correct if the report's period changes. Style
+// fields mirror makeTextElement/makeShapeElement's own defaults (fontFamily
+// undefined = theme default, same convention PrintTextElement.jsx uses) so
+// the card's Format-panel controls behave like every other element's.
+export function makeDateRangeElement({
+  preset = 'thismonth', customStart = '', customEnd = '', format = 'medium',
+  fontFamily = undefined, fontSize = 14, bold = true, align = 'center', color = '#334155',
+  fill = '#ffffff', stroke = '#cbd5e1',
+  ...overrides
+} = {}) {
+  return makeBase('date-range', { preset, customStart, customEnd, format, fontFamily, fontSize, bold, align, color, fill, stroke, ...overrides })
 }

@@ -15,18 +15,20 @@ import Modal from '../../../components/Modal'
 import useIsMobile from '../../../hooks/useIsMobile'
 import { useReportBuilder } from '../useReportBuilder'
 import { buildChartTiles } from '../../analysis/buildDashboardTiles'
+import { buildKpis } from '../../analysis/buildKpis'
 import { exportPrintLayoutToPDF } from '../../../reportExport'
 import PrintPage from './PrintPage'
 import FormatInspector from './FormatInspector'
 import LayersPanel from './LayersPanel'
 import PageThumbnail from './PageThumbnail'
+import LayoutPickerModal from './LayoutPickerModal'
 import { useAutosave } from './useAutosave'
 import { TEXT_VARIANTS, defaultElementSize, PAGE_SIZES, PAGE_NUMBER_FORMATS } from './printConstants'
 import { buildDashboardReplicaPages } from './replicateDashboard'
-import { makeShapeElement, makeImageElement, SHAPE_TYPES } from './elementModel'
+import { makeShapeElement, makeImageElement, makeDateRangeElement, SHAPE_TYPES } from './elementModel'
 import { CATALOGUE_BY_TYPE } from '../catalogue'
 import { THEMES } from './theme'
-import { PAGE_LAYOUTS, PAGE_LAYOUTS_BY_ID } from './pageLayouts'
+import { PAGE_LAYOUTS_BY_ID } from './pageLayouts'
 import { buildTokenContext, AVAILABLE_TOKENS } from './dynamicTokens'
 import { analyzeReport, scoreReport } from './designQuality'
 import { tidyPage } from './tidyUp'
@@ -55,6 +57,8 @@ export default function PrintWorkspace() {
   const [exportProgress, setExportProgress] = useState(null)
   const [tileSearch, setTileSearch] = useState('')
   const [visualSearch, setVisualSearch] = useState('')
+  const [kpiSearch, setKpiSearch] = useState('')
+  const [layoutPickerOpen, setLayoutPickerOpen] = useState(false)
   // Selection lives here (not inside DesignerCanvas) because there's one
   // DesignerCanvas per page but only one Format Inspector, and keyboard
   // delete needs to know the current selection regardless of which page's
@@ -64,8 +68,15 @@ export default function PrintWorkspace() {
   const [tileControls, setTileControls] = useState({})
   const selectPage = useCallback((pageId, ids) => setSelection({ pageId, ids }), [])
   const pageRefs = useRef({})
+  const canvasRef = useRef(null)
 
   const pages = rb.printLayout?.pages || []
+  // Falls back to the first page, same as addVisualToActivePage etc. below -
+  // activePageId is still null for one render right after load, before the
+  // pages-sync effect below fires to set it. The single-page canvas uses
+  // this (not raw activePageId) so nothing renders off-canvas with zero
+  // pages visible during that one render.
+  const effectiveActivePageId = activePageId || pages[0]?.id
 
   function openTextEditor(pageId, elementId) {
     const element = pages.find(p => p.id === pageId)?.elements.find(el => el.id === elementId)
@@ -92,6 +103,14 @@ export default function PrintWorkspace() {
     if (!activePageId && pages.length > 0) setActivePageId(pages[0].id)
     if (activePageId && !pages.some(p => p.id === activePageId)) setActivePageId(pages[0]?.id || null)
   }, [pages, activePageId])
+
+  // Single-page edit mode (below) shows one page at a time - reset scroll to
+  // the top whenever the visible page changes, or when leaving Preview's
+  // continuous-scroll view back into edit mode, so a scroll position from a
+  // previous page/mode never carries over onto the newly-shown page.
+  useEffect(() => {
+    if (!preview) canvasRef.current?.scrollTo({ top: 0 })
+  }, [activePageId, preview])
 
   // Clear a stale selection - its page got deleted - rather than leave the
   // Inspector pointed at nothing.
@@ -142,6 +161,19 @@ export default function PrintWorkspace() {
   )
   const tilesById = useMemo(() => Object.fromEntries(dashboardTiles.map(t => [t.id, t])), [dashboardTiles])
 
+  // Every KPI card the main Report.jsx dashboard's KPIGrid shows (Revenue/
+  // Orders/... plus every "More metrics" card) - same shared buildKpis()
+  // Report.jsx itself calls, so this list can't drift from what's actually
+  // on that page. No previousSubmissions here - Designer has no "previous
+  // period" comparison UI, so every kpi.trend just comes back undefined
+  // (StatTile already renders fine without one).
+  const kpis = useMemo(
+    () => (rb.form ? buildKpis({ form: rb.form, submissions: rb.scopedSubmissions }) : { primaryKpis: [], moreKpis: [] }),
+    [rb.form, rb.scopedSubmissions],
+  )
+  const allKpis = useMemo(() => [...kpis.primaryKpis, ...kpis.moreKpis], [kpis])
+  const kpisByLabel = useMemo(() => Object.fromEntries(allKpis.map(k => [k.label, k])), [allKpis])
+
   // Dynamic {{token}} text (Phase 2) - built once per data change, not per
   // text element, since every element on the page shares the same context.
   const tokenContext = useMemo(
@@ -153,8 +185,8 @@ export default function PrintWorkspace() {
   // geometry-only checks (designQuality.js), not a DOM measurement, so this
   // is fine to run on every render rather than debouncing.
   const qualityIssues = useMemo(
-    () => analyzeReport(rb.printLayout, { visualsById, tilesById }),
-    [rb.printLayout, visualsById, tilesById],
+    () => analyzeReport(rb.printLayout, { visualsById, tilesById, kpisById: kpisByLabel }),
+    [rb.printLayout, visualsById, tilesById, kpisByLabel],
   )
   const qualityScore = useMemo(() => scoreReport(qualityIssues), [qualityIssues])
 
@@ -176,6 +208,11 @@ export default function PrintWorkspace() {
     if (!pageId) return
     rb.addPrintElement(pageId, { kind: 'tile', tileId, layout: { ...defaultElementSize('visual') } })
   }
+  function addKpiToActivePage(kpiLabel) {
+    const pageId = activePageId || pages[0]?.id
+    if (!pageId) return
+    rb.addPrintElement(pageId, { kind: 'kpi', kpiLabel, width: 22, height: 14 })
+  }
   function addTextToActivePage(variant) {
     const pageId = activePageId || pages[0]?.id
     if (!pageId) return
@@ -194,6 +231,11 @@ export default function PrintWorkspace() {
     const pageId = activePageId || pages[0]?.id
     if (!pageId) return
     rb.addPrintElement(pageId, makeImageElement())
+  }
+  function addDateRangeToActivePage() {
+    const pageId = activePageId || pages[0]?.id
+    if (!pageId) return
+    rb.addPrintElement(pageId, makeDateRangeElement({ preset: rb.builderFilters?.dateRange || 'thismonth', customStart: rb.builderFilters?.customStart || '', customEnd: rb.builderFilters?.customEnd || '' }))
   }
 
   async function handleSave() {
@@ -280,6 +322,7 @@ export default function PrintWorkspace() {
 
   const filteredTiles = dashboardTiles.filter(t => t.title?.toLowerCase().includes(tileSearch.trim().toLowerCase()))
   const filteredVisuals = (rb.visuals || []).filter(v => v.title?.toLowerCase().includes(visualSearch.trim().toLowerCase()))
+  const filteredKpis = allKpis.filter(k => k.label.toLowerCase().includes(kpiSearch.trim().toLowerCase()))
 
   const selectedPage = pages.find(p => p.id === selection.pageId) || null
   const activePage = pages.find(p => p.id === activePageId) || null
@@ -329,6 +372,41 @@ export default function PrintWorkspace() {
                   onClick={() => addTileToActivePage(t.id)}
                 >
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
+                  <span>+</span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      <div style={{ marginBottom: '1.2rem' }}>
+        <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-muted)', marginBottom: '0.5rem' }}>
+          KPIs
+        </div>
+        {allKpis.length === 0 ? (
+          <p style={{ fontSize: '0.8rem', color: 'var(--color-muted)' }}>No KPIs to show yet.</p>
+        ) : (
+          <>
+            <input
+              type="text" value={kpiSearch} onChange={e => setKpiSearch(e.target.value)}
+              placeholder="Search KPIs..."
+              style={{ width: '100%', fontSize: '0.8rem', padding: '0.3rem 0.5rem', marginBottom: '0.4rem', boxSizing: 'border-box' }}
+            />
+            <div style={{
+              display: 'flex', flexDirection: 'column', gap: '0.3rem', maxHeight: '260px', overflowY: 'auto',
+              border: '1px solid var(--color-border)', borderRadius: '6px', padding: '0.35rem',
+            }}>
+              {filteredKpis.length === 0 && (
+                <p style={{ fontSize: '0.78rem', color: 'var(--color-muted)', margin: '0.2rem' }}>No matches.</p>
+              )}
+              {filteredKpis.map(k => (
+                <button
+                  key={k.label} className="secondary"
+                  style={{ ...sideBtn, textAlign: 'left', display: 'flex', justifyContent: 'space-between', gap: '0.4rem' }}
+                  onClick={() => addKpiToActivePage(k.label)}
+                >
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{k.label}</span>
                   <span>+</span>
                 </button>
               ))}
@@ -409,7 +487,12 @@ export default function PrintWorkspace() {
         <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-muted)', marginBottom: '0.5rem' }}>
           Media
         </div>
-        <button className="secondary" style={sideBtn} onClick={addImageToActivePage}>+ Add image</button>
+        <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
+          <button className="secondary" style={sideBtn} onClick={addImageToActivePage}>+ Add image</button>
+          <button className="secondary" style={sideBtn} onClick={addDateRangeToActivePage} title="A floating card showing the report's date range - drag it anywhere on the page">
+            + Add date range
+          </button>
+        </div>
       </div>
 
       {(rb.printLayout.savedComponents || []).length > 0 && (
@@ -451,20 +534,9 @@ export default function PrintWorkspace() {
       <div style={{ marginBottom: '1.2rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
           <span style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-muted)' }}>Pages</span>
-          <select
-            style={{ fontSize: '0.76rem', padding: '0.15rem 0.3rem' }}
-            value=""
-            onChange={e => {
-              const layout = PAGE_LAYOUTS_BY_ID[e.target.value]
-              if (!layout) return
-              const newId = layout.id === 'blank' ? rb.addPrintPage(activePageId) : rb.addPrintPageWithElements(activePageId, layout.make)
-              setActivePageId(newId)
-              e.target.value = ''
-            }}
-          >
-            <option value="" disabled>+ Add page ▾</option>
-            {PAGE_LAYOUTS.map(l => <option key={l.id} value={l.id}>{l.label}</option>)}
-          </select>
+          <button className="secondary" style={{ fontSize: '0.76rem', padding: '0.15rem 0.5rem' }} onClick={() => setLayoutPickerOpen(true)}>
+            + Add page
+          </button>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
           {pages.map((p, i) => (
@@ -594,7 +666,7 @@ export default function PrintWorkspace() {
         .pw-cols > * { min-width: 0; min-height: 0; }
         .pw-side { background: var(--color-surface); border-right: 1px solid var(--color-border); overflow: hidden; }
         .pw-inspector { background: var(--color-surface); border-left: 1px solid var(--color-border); overflow: hidden; }
-        .pw-canvas { overflow-x: hidden; overflow-y: auto; padding: 1.5rem; }
+        .pw-canvas { overflow-x: hidden; overflow-y: auto; padding: 1.5rem; position: relative; }
         .pw-mobile-bar { display: none; }
         @media (max-width: 900px) {
           .pw-cols, .pw-cols.pw-cols-inspector { grid-template-columns: 1fr; }
@@ -682,34 +754,52 @@ export default function PrintWorkspace() {
 
       <div className={`pw-cols${!preview ? ' pw-cols-inspector' : ''}`}>
         {!preview && <div className="pw-side">{sidebar}</div>}
-        <div className="pw-canvas">
-          {pages.map((p, i) => (
-            <div key={p.id} onClick={() => setActivePageId(p.id)}>
-              <PrintPage
-                page={p}
-                pageSize={pageSize}
-                orientation={orientation}
-                visualsById={visualsById}
-                tilesById={tilesById}
-                form={rb.form}
-                submissions={rb.scopedSubmissions}
-                editing={!preview}
-                settings={settings}
-                pageNumber={i + 1}
-                totalPages={pages.length}
-                pageRef={node => { pageRefs.current[p.id] = node }}
-                onRemoveElement={rb.removePrintElement}
-                onUpdateElement={rb.updatePrintElement}
-                onUpdateElements={rb.updatePrintElements}
-                selectedIds={selection.pageId === p.id ? selection.ids : []}
-                onSelect={ids => selectPage(p.id, ids)}
-                onTextEdit={openTextEditor}
-                tileControls={tileControls}
-                onTileControlChange={(tileId, patch) => setTileControls(current => ({ ...current, [tileId]: { ...(current[tileId] || {}), ...patch } }))}
-                tokenContext={tokenContext}
-              />
-            </div>
-          ))}
+        <div className="pw-canvas" ref={canvasRef}>
+          {!preview && pages.length > 0 && (() => {
+            const activeIndex = pages.findIndex(p => p.id === effectiveActivePageId)
+            return (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem', maxWidth: '1000px', margin: '0 auto 1rem' }}>
+                <button className="secondary" disabled={activeIndex <= 0} onClick={() => setActivePageId(pages[activeIndex - 1].id)}>← Prev</button>
+                <span style={{ fontSize: '0.82rem', color: 'var(--color-muted)' }}>Page {activeIndex + 1} of {pages.length}</span>
+                <button className="secondary" disabled={activeIndex < 0 || activeIndex >= pages.length - 1} onClick={() => setActivePageId(pages[activeIndex + 1].id)}>Next →</button>
+              </div>
+            )
+          })()}
+          {pages.map((p, i) => {
+            const offCanvas = !preview && p.id !== effectiveActivePageId
+            return (
+              <div
+                key={p.id}
+                onClick={() => setActivePageId(p.id)}
+                style={offCanvas ? { position: 'absolute', left: '-9999px', top: 0, width: '1000px', pointerEvents: 'none' } : undefined}
+              >
+                <PrintPage
+                  page={p}
+                  pageSize={pageSize}
+                  orientation={orientation}
+                  visualsById={visualsById}
+                  tilesById={tilesById}
+                  kpisById={kpisByLabel}
+                  form={rb.form}
+                  submissions={rb.scopedSubmissions}
+                  editing={!preview}
+                  settings={settings}
+                  pageNumber={i + 1}
+                  totalPages={pages.length}
+                  pageRef={node => { pageRefs.current[p.id] = node }}
+                  onRemoveElement={rb.removePrintElement}
+                  onUpdateElement={rb.updatePrintElement}
+                  onUpdateElements={rb.updatePrintElements}
+                  selectedIds={selection.pageId === p.id ? selection.ids : []}
+                  onSelect={ids => selectPage(p.id, ids)}
+                  onTextEdit={openTextEditor}
+                  tileControls={tileControls}
+                  onTileControlChange={(tileId, patch) => setTileControls(current => ({ ...current, [tileId]: { ...(current[tileId] || {}), ...patch } }))}
+                  tokenContext={tokenContext}
+                />
+              </div>
+            )
+          })}
         </div>
         {!preview && (
           <div className="pw-inspector">
@@ -789,6 +879,19 @@ export default function PrintWorkspace() {
         </>
       )}
 
+      <LayoutPickerModal
+        open={layoutPickerOpen}
+        onClose={() => setLayoutPickerOpen(false)}
+        pageSize={pageSize}
+        orientation={orientation}
+        onPick={layoutId => {
+          const layout = PAGE_LAYOUTS_BY_ID[layoutId]
+          if (!layout) return
+          const newId = layout.id === 'blank' ? rb.addPrintPage(activePageId) : rb.addPrintPageWithElements(activePageId, layout.make)
+          setActivePageId(newId)
+        }}
+      />
+
       {textEditor && (
         <Modal
           title="Edit text"
@@ -821,6 +924,7 @@ export default function PrintWorkspace() {
                 style={{ width: '100%', marginTop: '0.25rem' }}
               >
                 <option value="inherit">Theme default</option>
+                <option value="Segoe UI, sans-serif">Segoe UI</option>
                 <option value="Arial, sans-serif">Arial</option>
                 <option value="Georgia, serif">Georgia</option>
                 <option value="Verdana, sans-serif">Verdana</option>
@@ -857,6 +961,7 @@ export default function PrintWorkspace() {
           printLayout={rb.printLayout}
           visualsById={visualsById}
           tilesById={tilesById}
+          kpisById={kpisByLabel}
           form={rb.form}
           submissions={rb.scopedSubmissions}
           tokenContext={tokenContext}

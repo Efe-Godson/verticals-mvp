@@ -10,7 +10,7 @@
 // (elements always carry x/y/width/height percentages once migrated).
 import { pageAspectRatio } from './printConstants'
 
-const KIND_COLOR = { text: '#cbd5e1', visual: '#93c5fd', tile: '#93c5fd', shape: '#fde68a', image: '#a7f3d0' }
+const KIND_COLOR = { text: '#cbd5e1', visual: '#93c5fd', tile: '#93c5fd', kpi: '#93c5fd', shape: '#fde68a', image: '#a7f3d0', 'date-range': '#5eead4' }
 
 export default function PageThumbnail({ page, pageSize, orientation }) {
   return (

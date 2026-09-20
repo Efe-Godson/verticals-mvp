@@ -7,7 +7,7 @@
 import { useEffect, useState } from 'react'
 import PrintPage from './PrintPage'
 
-export default function PresentationMode({ printLayout, visualsById, tilesById, form, submissions, tokenContext, onClose }) {
+export default function PresentationMode({ printLayout, visualsById, tilesById, kpisById, form, submissions, tokenContext, onClose }) {
   const pages = printLayout?.pages || []
   const [index, setIndex] = useState(0)
 
@@ -42,6 +42,7 @@ export default function PresentationMode({ printLayout, visualsById, tilesById, 
           orientation={printLayout.orientation}
           visualsById={visualsById}
           tilesById={tilesById}
+          kpisById={kpisById}
           form={form}
           submissions={submissions}
           editing={false}

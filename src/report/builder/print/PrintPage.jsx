@@ -12,13 +12,15 @@ import DesignerCanvas from './DesignerCanvas'
 import PrintVisualElement from './PrintVisualElement'
 import PrintTextElement from './PrintTextElement'
 import PrintTileElement from './PrintTileElement'
+import PrintKpiElement from './PrintKpiElement'
 import ShapeElement from './elements/ShapeElement'
 import ImageElement from './elements/ImageElement'
+import DateRangeElement from './elements/DateRangeElement'
 import { pageFormatMm, pageAspectRatio, PAGE_SIZES, formatPageNumber } from './printConstants'
 import { themeCssVars } from './theme'
 
 export default function PrintPage({
-  page, pageSize, orientation, visualsById, tilesById, form, submissions, editing, settings,
+  page, pageSize, orientation, visualsById, tilesById, kpisById, form, submissions, editing, settings,
   pageNumber, totalPages, onRemoveElement, onUpdateElement, onUpdateElements, pageRef,
   selectedIds, onSelect, onTextEdit, tokenContext, tileControls, onTileControlChange,
 }) {
@@ -56,8 +58,8 @@ export default function PrintPage({
     // wrapping them in the generic card would double up the border/padding.
     const boxed = !(
       (el.kind === 'text' && ['title', 'big-number'].includes(el.text?.variant || 'body'))
-      || el.kind === 'shape' || el.kind === 'image'
-      || el.kind === 'visual' || el.kind === 'tile'
+      || el.kind === 'shape' || el.kind === 'image' || el.kind === 'date-range'
+      || el.kind === 'visual' || el.kind === 'tile' || el.kind === 'kpi'
     )
     return (
       <div
@@ -84,10 +86,14 @@ export default function PrintPage({
             controlState={tileControls?.[el.tileId]}
             onControlChange={patch => onTileControlChange?.(el.tileId, patch)}
           />
+        ) : el.kind === 'kpi' ? (
+          <PrintKpiElement kpi={kpisById?.[el.kpiLabel]} />
         ) : el.kind === 'shape' ? (
           <ShapeElement element={el} />
         ) : el.kind === 'image' ? (
           <ImageElement element={el} editing={editing} onChange={patch => onUpdateElement(page.id, el.id, patch)} />
+        ) : el.kind === 'date-range' ? (
+          <DateRangeElement element={el} />
         ) : (
           <PrintVisualElement
             visual={visualsById[el.visualId]} form={form} submissions={submissions}

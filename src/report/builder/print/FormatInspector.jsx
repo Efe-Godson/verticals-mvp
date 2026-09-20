@@ -1,5 +1,6 @@
 // Place at: src/report/builder/print/FormatInspector.jsx
 import { CHART_PRESETS, CHART_PRESETS_BY_ID } from './chartPresets'
+import { DATE_RANGE_OPTIONS, DATE_RANGE_DISPLAY_FORMATS } from '../../helpers/dateRange'
 // Right-hand contextual panel (Designer 2.0 Phase 1, step 5) - shows
 // properties for whatever's currently selected on the freeform canvas.
 // Deliberately kind-agnostic for now: Shape/Image/Chart-specific panels
@@ -110,6 +111,7 @@ function TextStyleFields({ page, el, onUpdateElement, onBeginBatch, onCommitBatc
           onChange={e => patchText({ fontFamily: e.target.value === 'inherit' ? undefined : e.target.value })}
         >
           <option value="inherit">Theme default</option>
+          <option value="Segoe UI, sans-serif">Segoe UI</option>
           <option value="Arial, sans-serif">Arial</option>
           <option value="Georgia, serif">Georgia</option>
           <option value="Verdana, sans-serif">Verdana</option>
@@ -240,6 +242,81 @@ function ImageStyleFields({ page, el, onUpdateElement, onBeginBatch, onCommitBat
   )
 }
 
+// The "regular filter options" - the exact same DATE_RANGE_OPTIONS the
+// Report Builder's own filter bar uses (BuilderFilterBar.jsx), so a card's
+// preset picker never drifts out of sync with what "This month" etc. mean
+// elsewhere in the app.
+function DateRangeStyleFields({ page, el, onUpdateElement, onBeginBatch, onCommitBatch }) {
+  const patch = p => onUpdateElement(page.id, el.id, p)
+  return (
+    <>
+      <SectionLabel>Date range</SectionLabel>
+      <FieldRow label="Range">
+        <select style={{ fontSize: '0.8rem' }} value={el.preset || 'thismonth'} onChange={e => patch({ preset: e.target.value })}>
+          {DATE_RANGE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+      </FieldRow>
+      {el.preset === 'specific' && (
+        <FieldRow label="Date">
+          <input type="date" style={{ fontSize: '0.8rem' }} value={el.customStart || ''} onChange={e => patch({ customStart: e.target.value })} />
+        </FieldRow>
+      )}
+      {el.preset === 'custom' && (
+        <>
+          <FieldRow label="From">
+            <input type="date" style={{ fontSize: '0.8rem' }} value={el.customStart || ''} onChange={e => patch({ customStart: e.target.value })} />
+          </FieldRow>
+          <FieldRow label="To">
+            <input type="date" style={{ fontSize: '0.8rem' }} value={el.customEnd || ''} onChange={e => patch({ customEnd: e.target.value })} />
+          </FieldRow>
+        </>
+      )}
+      <FieldRow label="Format">
+        <select style={{ fontSize: '0.8rem', maxWidth: '150px' }} value={el.format || 'medium'} onChange={e => patch({ format: e.target.value })}>
+          {DATE_RANGE_DISPLAY_FORMATS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
+        </select>
+      </FieldRow>
+
+      <SectionLabel>Style</SectionLabel>
+      <FieldRow label="Font">
+        <select style={{ fontSize: '0.8rem', maxWidth: '130px' }} value={el.fontFamily || 'inherit'} onChange={e => patch({ fontFamily: e.target.value === 'inherit' ? undefined : e.target.value })}>
+          <option value="inherit">Theme default</option>
+          <option value="Segoe UI, sans-serif">Segoe UI</option>
+          <option value="Arial, sans-serif">Arial</option>
+          <option value="Georgia, serif">Georgia</option>
+          <option value="Verdana, sans-serif">Verdana</option>
+          <option value="Trebuchet MS, sans-serif">Trebuchet MS</option>
+        </select>
+      </FieldRow>
+      <FieldRow label="Size (px)">
+        <NumberInput
+          value={el.fontSize ?? 14} step={1} onFocus={onBeginBatch} onBlur={onCommitBatch}
+          onChange={v => patch({ fontSize: Math.max(6, Math.min(72, v)) })}
+        />
+      </FieldRow>
+      <FieldRow label="Bold">
+        <input type="checkbox" checked={!!el.bold} onChange={e => patch({ bold: e.target.checked })} />
+      </FieldRow>
+      <FieldRow label="Align">
+        <select style={{ fontSize: '0.8rem' }} value={el.align || 'center'} onChange={e => patch({ align: e.target.value })}>
+          <option value="left">Left</option>
+          <option value="center">Center</option>
+          <option value="right">Right</option>
+        </select>
+      </FieldRow>
+      <FieldRow label="Text color">
+        <input type="color" value={el.color || '#334155'} onFocus={onBeginBatch} onBlur={onCommitBatch} onChange={e => patch({ color: e.target.value })} />
+      </FieldRow>
+      <FieldRow label="Fill">
+        <input type="color" value={el.fill || '#ffffff'} onFocus={onBeginBatch} onBlur={onCommitBatch} onChange={e => patch({ fill: e.target.value })} />
+      </FieldRow>
+      <FieldRow label="Border">
+        <input type="color" value={el.stroke || '#cbd5e1'} onFocus={onBeginBatch} onBlur={onCommitBatch} onChange={e => patch({ stroke: e.target.value })} />
+      </FieldRow>
+    </>
+  )
+}
+
 // Reusable text/shape styles (Phase 2) - "Save as style" captures the
 // element's own kind-specific props (never position/size/rotation - those
 // stay per-placement); the picker below only lists styles saved from the
@@ -286,6 +363,8 @@ function labelForKind(kind) {
   if (kind === 'text') return 'Text'
   if (kind === 'shape') return 'Shape'
   if (kind === 'image') return 'Image'
+  if (kind === 'date-range') return 'Date range'
+  if (kind === 'kpi') return 'KPI'
   return 'Element'
 }
 
@@ -344,6 +423,9 @@ export default function FormatInspector({
       )}
       {el.kind === 'image' && (
         <ImageStyleFields page={page} el={el} onUpdateElement={onUpdateElement} onBeginBatch={onBeginBatch} onCommitBatch={onCommitBatch} />
+      )}
+      {el.kind === 'date-range' && (
+        <DateRangeStyleFields page={page} el={el} onUpdateElement={onUpdateElement} onBeginBatch={onBeginBatch} onCommitBatch={onCommitBatch} />
       )}
       {isTableVisual && <TableStyleFields page={page} el={el} onUpdateElement={onUpdateElement} visual={visual} form={form} />}
       {isChartVisual && <ChartStyleFields page={page} el={el} onUpdateElement={onUpdateElement} />}

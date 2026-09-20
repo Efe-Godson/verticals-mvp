@@ -10,6 +10,8 @@ function labelForElement(el, visualsById, tilesById) {
   if (el.kind === 'tile') return tilesById?.[el.tileId]?.title || 'Dashboard tile'
   if (el.kind === 'shape') return `Shape - ${(el.shape || 'rectangle').replace('-', ' ')}`
   if (el.kind === 'image') return el.src ? 'Image' : 'Image (empty)'
+  if (el.kind === 'date-range') return 'Date range'
+  if (el.kind === 'kpi') return `KPI - ${el.kpiLabel || '?'}`
   return 'Element'
 }
 

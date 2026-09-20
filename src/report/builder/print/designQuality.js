@@ -17,7 +17,7 @@ function overlaps(a, b) {
 
 const SEVERITY = { error: 3, warning: 2, info: 1 }
 
-export function analyzePage(page, { visualsById, tilesById } = {}) {
+export function analyzePage(page, { visualsById, tilesById, kpisById } = {}) {
   const issues = []
   const elements = (page.elements || []).filter(el => el.visible !== false)
 
@@ -33,6 +33,9 @@ export function analyzePage(page, { visualsById, tilesById } = {}) {
     }
     if (el.kind === 'tile' && !tilesById?.[el.tileId]) {
       issues.push({ severity: 'error', pageId: page.id, elementId: el.id, message: 'Dashboard tile reference is broken.' })
+    }
+    if (el.kind === 'kpi' && !kpisById?.[el.kpiLabel]) {
+      issues.push({ severity: 'error', pageId: page.id, elementId: el.id, message: `KPI reference is broken ("${el.kpiLabel}" is no longer available).` })
     }
     if (el.kind === 'image' && !el.src) {
       issues.push({ severity: 'warning', pageId: page.id, elementId: el.id, message: 'Image placeholder has no image uploaded yet.' })
@@ -68,6 +71,8 @@ function describeElement(el, visualsById, tilesById) {
   if (el.kind === 'tile') return tilesById?.[el.tileId]?.title || 'Dashboard tile'
   if (el.kind === 'shape') return `Shape (${el.shape})`
   if (el.kind === 'image') return 'Image'
+  if (el.kind === 'date-range') return 'Date range'
+  if (el.kind === 'kpi') return `KPI (${el.kpiLabel})`
   return 'Element'
 }
 

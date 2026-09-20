@@ -194,7 +194,19 @@ export default function DesignerCanvas({
             }}
           >
             <div
-              onDoubleClick={e => handleDoubleSelect(el.id, e)}
+              onDoubleClick={e => {
+                // Text elements open the Format panel's text editor modal
+                // (PrintWorkspace.jsx's openTextEditor/textEditor state) on
+                // double-click instead of the plain select-toggle every
+                // other element kind gets - matches the "Double-click to
+                // edit..." placeholder PrintTextElement.jsx already shows.
+                if (el.kind === 'text' && el.text?.variant !== 'divider' && onTextEdit) {
+                  if (!selectedIds.includes(el.id)) onSelect(groupSelectionFor(el.id))
+                  onTextEdit(page.id, el.id)
+                } else {
+                  handleDoubleSelect(el.id, e)
+                }
+              }}
               data-print-el-id={el.id}
               style={{
                 width: '100%', height: '100%', position: 'relative',
