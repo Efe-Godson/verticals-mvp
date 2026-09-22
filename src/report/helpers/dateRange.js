@@ -69,9 +69,11 @@ export function getDateRangeBounds(range, customStart, customEnd) {
       start: customStart ? new Date(customStart) : null,
       end: customStart ? new Date(customStart + 'T23:59:59') : null,
     }
-  } else if (range === 'custom') {
-    // Optional end: fill in just the start to filter to that one day, add
-    // an end to turn it into a real range.
+  } else if (range === 'custom' || range === 'slider') {
+    // 'slider' (Report.jsx's Power BI-style two-handle date slider) reads
+    // the exact same customStart/customEnd values as 'custom' - it's just a
+    // different way of setting them. Optional end: fill in just the start
+    // to filter to that one day, add an end to turn it into a real range.
     return {
       start: customStart ? new Date(customStart) : null,
       end: customEnd ? new Date(customEnd + 'T23:59:59') : (customStart ? new Date(customStart + 'T23:59:59') : null),
@@ -84,7 +86,7 @@ export function getDateRangeBounds(range, customStart, customEnd) {
 export function getDateRangeLabel(dateRange, customStart, customEnd) {
   if (dateRange === 'all') return 'All time'
   if (dateRange === 'specific') return customStart || '…'
-  if (dateRange === 'custom') return customEnd ? `${customStart || '…'} to ${customEnd}` : (customStart || '…')
+  if (dateRange === 'custom' || dateRange === 'slider') return customEnd ? `${customStart || '…'} to ${customEnd}` : (customStart || '…')
   return DATE_RANGE_OPTIONS.find(o => o.value === dateRange)?.label || ''
 }
 

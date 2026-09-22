@@ -8,6 +8,7 @@ import { useAuth } from './AuthContext'
 import { printReport, exportReportToPDF } from './reportExport'
 
 import StatTile from './report/components/StatTile'
+import DateRangeSlider from './report/components/DateRangeSlider'
 import { buildChartTiles } from './report/analysis/buildDashboardTiles'
 import AIRecommendationsModal from './report/ai/AIRecommendationsModal'
 import PromotedVisuals from './report/PromotedVisuals'
@@ -15,6 +16,7 @@ import Modal from './components/Modal'
 import { LoadingSpinner } from './LoadingState'
 import { RefreshingIndicator } from './components/InlineLoader'
 import { getPageCache, setPageCache } from './hooks/pageCache'
+import { fetchAllRows } from './lib/fetchAllRows'
 import { formatNaira, getEntryNoun } from './report/helpers/analysisUtils'
 import { DATE_RANGE_OPTIONS, getDateRangeBounds, getDateRangeLabel } from './report/helpers/dateRange'
 import { buildKpis, formatKpiValue, CATEGORICAL_TYPES } from './report/analysis/buildKpis'
@@ -24,6 +26,12 @@ import useIsMobile from './hooks/useIsMobile'
 import { ErrorState } from './ErrorState'
 import { usePageOptions, usePageBack, useDesktopHeader } from './PageTitleContext'
 import MobileOptionsPanel from './components/MobileOptionsPanel'
+
+// Local to this page, not the shared DATE_RANGE_OPTIONS export - the Report
+// Builder's filter bar and its print/export date-range card also read that
+// shared list, and neither renders anything for a 'slider' value, so adding
+// it there would leave those pickers showing an option with no matching UI.
+const REPORT_DATE_RANGE_OPTIONS = [...DATE_RANGE_OPTIONS, { value: 'slider', label: 'Date slider' }]
 
 function getPreviousDateRangeBounds(range, customStart, customEnd) {
   if (range === 'all') return { start: null, end: null }
@@ -71,6 +79,12 @@ function Report({ formId: formIdProp, headerExtra, extraSubmissions = [] } = {})
   const [dateRange, setDateRange] = useState('all')
   const [customStart, setCustomStart] = useState('')
   const [customEnd, setCustomEnd] = useState('')
+  // Minimized = the slider collapses to the same two plain date inputs
+  // 'custom' already uses, for a narrow window or a precise typed date.
+  const [sliderExpanded, setSliderExpanded] = useState(true)
+  const [productFilters, setProductFilters] = useState([]) // [] = All products; else exact cart item names, any-of match
+  const [productSearch, setProductSearch] = useState('') // the combobox's own search text - independent of productFilters, which only change when a row is actually toggled
+  const [productDropdownOpen, setProductDropdownOpen] = useState(false)
   const [optionsMenuOpen, setOptionsMenuOpen] = useState(false)
   const [moreMenuOpen, setMoreMenuOpen] = useState(false)
   const [showAIPanel, setShowAIPanel] = useState(false)
@@ -119,10 +133,10 @@ function Report({ formId: formIdProp, headerExtra, extraSubmissions = [] } = {})
         setDateRange(formData.settings?.staffReportRange || 'today')
       }
 
-      const { data: subsData, error: subsError } = await supabase
+      const { data: subsData, error: subsError } = await fetchAllRows(() => supabase
         .from('submissions').select('*').eq('form_id', id)
         .is('deleted_at', null)
-        .order('created_at', { ascending: true })
+        .order('created_at', { ascending: true }))
 
       if (subsError) {
         if (!silent) { setError('Could not load records: ' + subsError.message); setLoading(false) }
@@ -189,6 +203,96 @@ function Report({ formId: formIdProp, headerExtra, extraSubmissions = [] } = {})
     return new Date(sub.created_at)
   }
 
+  // Bounds the "Date slider" to where there's actually something to show -
+  // dragging past either end wouldn't reveal more data, just empty room.
+  // Off the full (unfiltered) submissions list, same date basis recordDate
+  // uses everywhere else, so the slider's ends line up with what the charts
+  // themselves consider the earliest/latest record.
+  const dateBounds = useMemo(() => {
+    if (submissions.length === 0) return null
+    let min = null, max = null
+    submissions.forEach(s => {
+      const when = recordDate(s)
+      if (!min || when < min) min = when
+      if (!max || when > max) max = when
+    })
+    return { min, max }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [submissions, reportDateField])
+
+  // Selecting the slider starts it fully open (the whole data range - same
+  // effective result as "All time") rather than an empty/invalid selection;
+  // from there the owner narrows it by dragging.
+  useEffect(() => {
+    if (dateRange === 'slider' && dateBounds && !customStart) {
+      const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      setCustomStart(iso(dateBounds.min))
+      setCustomEnd(iso(dateBounds.max))
+    }
+  }, [dateRange, dateBounds, customStart])
+
+  // Product filter (below): narrows the whole report to submissions whose
+  // cart contains any of the chosen products (an "any of" match, same as
+  // picking several values on a normal dropdown filter), same "one filtered
+  // set, every tile reads it" shape the date range filter already has. Every
+  // chart/KPI on this page reads cart items straight off filteredSubmissions
+  // (Cartreport.jsx's itemQty/itemRevenue, buildKpis' computeCartTotals, the
+  // trend tiles' revenue points, ...), so a *submission*-level filter alone
+  // would still leak an order's other products into every per-product/
+  // category breakdown - e.g. "Revenue by Product" would still show every
+  // product in a mixed order, not just the ones filtered on.
+  // scopeSubmissionToProducts (below) strips each qualifying order down to
+  // just the selected products' line items - and recomputes `total`/zeroes
+  // `deliveryFee` (which isn't attributable to one product) - so every
+  // visual on the page, not just the filter dropdown itself, only ever sees
+  // the selected products' data.
+  const cartFields = useMemo(() => (form ? form.fields.filter(f => f.type === 'cart') : []), [form])
+  function submissionHasAnyProduct(sub, names) {
+    return cartFields.some(field => (sub.data[field.id]?.items || []).some(item => names.includes(item?.name)))
+  }
+  function scopeSubmissionToProducts(sub, names) {
+    const wanted = new Set(names)
+    const data = { ...sub.data }
+    cartFields.forEach(field => {
+      const v = sub.data[field.id]
+      if (!v || !Array.isArray(v.items)) return
+      const items = v.items.filter(item => wanted.has(item?.name))
+      const total = items.reduce((sum, item) => sum + (Number(item.price) || 0) * (Number(item.quantity) || 0), 0)
+      data[field.id] = { ...v, items, total, deliveryFee: 0 }
+    })
+    return { ...sub, data }
+  }
+  // Sourced from what's actually been ordered, not the cart field's product
+  // catalogue - a catalogue item nobody's bought yet would be a dead end
+  // here, and a product since removed from the catalogue would otherwise
+  // vanish from the filter even though its historical orders are still on
+  // this report.
+  const availableProducts = useMemo(() => {
+    if (cartFields.length === 0) return []
+    const names = new Set()
+    submissions.forEach(s => cartFields.forEach(field => {
+      (s.data[field.id]?.items || []).forEach(item => { if (item?.name) names.add(item.name) })
+    }))
+    return Array.from(names).sort((a, b) => a.localeCompare(b))
+  }, [submissions, cartFields])
+  const filteredProductOptions = useMemo(
+    () => availableProducts.filter(name => name.toLowerCase().includes(productSearch.trim().toLowerCase())),
+    [availableProducts, productSearch],
+  )
+  // Toggle, not replace - the dropdown stays open (see the JSX below) so
+  // several products can be picked in one go without reopening it each time.
+  function toggleProductFilter(name) {
+    setProductFilters(current => current.includes(name) ? current.filter(n => n !== name) : [...current, name])
+  }
+  function removeProductFilter(name) {
+    setProductFilters(current => current.filter(n => n !== name))
+  }
+  function clearProductFilter() {
+    setProductFilters([])
+    setProductSearch('')
+    setProductDropdownOpen(false)
+  }
+
   // The filter pipeline (date range -> current/previous period) and the
   // dashboard's chart tiles all scan the full submissions array (tiles via
   // ~40+ map/filter/sort/reduce calls in buildDashboardTiles.js), so each
@@ -202,14 +306,16 @@ function Report({ formId: formIdProp, headerExtra, extraSubmissions = [] } = {})
     [dateRange, customStart, customEnd]
   )
   const filteredSubmissions = useMemo(() => {
-    return submissions.filter(s => {
+    const inRange = submissions.filter(s => {
       const when = recordDate(s)
       if (rangeStart && when < rangeStart) return false
       if (rangeEnd && when > rangeEnd) return false
+      if (productFilters.length > 0 && !submissionHasAnyProduct(s, productFilters)) return false
       return true
     })
+    return productFilters.length > 0 ? inRange.map(s => scopeSubmissionToProducts(s, productFilters)) : inRange
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [submissions, rangeStart, rangeEnd, reportDateField])
+  }, [submissions, rangeStart, rangeEnd, reportDateField, productFilters, cartFields])
 
   const previousRange = useMemo(
     () => getPreviousDateRangeBounds(dateRange, customStart, customEnd),
@@ -217,14 +323,16 @@ function Report({ formId: formIdProp, headerExtra, extraSubmissions = [] } = {})
   )
   const previousFilteredSubmissions = useMemo(() => {
     if (!previousRange.start) return []
-    return submissions.filter(s => {
+    const inRange = submissions.filter(s => {
       const when = recordDate(s)
       if (previousRange.start && when < previousRange.start) return false
       if (previousRange.end && when > previousRange.end) return false
+      if (productFilters.length > 0 && !submissionHasAnyProduct(s, productFilters)) return false
       return true
     })
+    return productFilters.length > 0 ? inRange.map(s => scopeSubmissionToProducts(s, productFilters)) : inRange
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [submissions, previousRange, reportDateField])
+  }, [submissions, previousRange, reportDateField, productFilters, cartFields])
 
   // Every chart tile the dashboard shows, built by the exact same function
   // the Print/PDF builder calls (see report/analysis/buildDashboardTiles.js)
@@ -233,6 +341,7 @@ function Report({ formId: formIdProp, headerExtra, extraSubmissions = [] } = {})
     if (!form) return { tiles: [], entryNoun: { singular: 'Response', plural: 'Responses' } }
     return buildChartTiles(form, filteredSubmissions)
   }, [form, filteredSubmissions])
+
 
   // Passed straight into ChartTileGrid (memoized below) - useCallback keeps
   // this stable across renders that don't actually change the tile list or
@@ -279,7 +388,10 @@ function Report({ formId: formIdProp, headerExtra, extraSubmissions = [] } = {})
   const dateRangeLabel = getDateRangeLabel(dateRange, customStart, customEnd)
 
   function buildFilterSummary() {
-    return dateRange === 'all' ? '' : dateRangeLabel
+    const parts = []
+    if (dateRange !== 'all') parts.push(dateRangeLabel)
+    if (productFilters.length > 0) parts.push(`Product${productFilters.length > 1 ? 's' : ''}: ${productFilters.join(', ')}`)
+    return parts.join(' • ')
   }
 
   function handlePrint() {
@@ -350,8 +462,7 @@ function Report({ formId: formIdProp, headerExtra, extraSubmissions = [] } = {})
   )
 
   const reportFilters = (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap' }}>
-          <div className="report-filter-group" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="report-filter-group" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <label htmlFor="report-date-range" style={{ fontSize: '0.85rem', color: 'var(--color-text)', fontWeight: 600 }}>Date range</label>
           {isStaffView ? (
             <span
@@ -366,7 +477,7 @@ function Report({ formId: formIdProp, headerExtra, extraSubmissions = [] } = {})
           ) : (
             <>
               <select id="report-date-range" value={dateRange} onChange={(e) => setDateRange(e.target.value)} style={{ padding: '0.3rem 0.4rem', fontSize: '0.85rem' }}>
-                {DATE_RANGE_OPTIONS.map(opt => (
+                {REPORT_DATE_RANGE_OPTIONS.map(opt => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
@@ -385,10 +496,120 @@ function Report({ formId: formIdProp, headerExtra, extraSubmissions = [] } = {})
                   />
                 </div>
               )}
+              {dateRange === 'slider' && dateBounds && (
+                <div className="date-range-group" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  {sliderExpanded ? (
+                    <DateRangeSlider
+                      minDate={dateBounds.min}
+                      maxDate={dateBounds.max}
+                      startValue={customStart}
+                      endValue={customEnd}
+                      onChange={(start, end) => { setCustomStart(start); setCustomEnd(end) }}
+                    />
+                  ) : (
+                    <>
+                      <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} style={{ padding: '0.3rem 0.4rem', fontSize: '0.85rem' }} />
+                      <span style={{ color: 'var(--color-muted)', fontSize: '0.85rem' }}>to</span>
+                      <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} style={{ padding: '0.3rem 0.4rem', fontSize: '0.85rem' }} />
+                    </>
+                  )}
+                  <button
+                    type="button" className="secondary" onClick={() => setSliderExpanded(v => !v)}
+                    title={sliderExpanded ? 'Minimize to date inputs' : 'Expand to slider'}
+                    style={{ padding: '0.2rem 0.4rem', fontSize: '0.78rem', flexShrink: 0 }}
+                  >
+                    {sliderExpanded ? '⌄' : '⌃'}
+                  </button>
+                </div>
+              )}
             </>
           )}
-          </div>
         </div>
+  )
+
+  // Its own row (not squeezed inline beside Date range) because it can carry
+  // an open-ended number of chips - cramming it into the same fixed-width
+  // slot as the date range control meant chips got flex-shrunk to nothing
+  // once a few products were picked.
+  const productFilterBar = availableProducts.length > 0 && (
+    <div className="report-product-filter-bar" data-html2canvas-ignore="true">
+      <div
+        className="report-filter-group"
+        style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap', position: 'relative' }}
+        onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setProductDropdownOpen(false) }}
+      >
+        <label htmlFor="report-product-filter" style={{ fontSize: '0.85rem', color: 'var(--color-text)', fontWeight: 600 }}>Product</label>
+        {productFilters.map(name => (
+          <span
+            key={name}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '0.3rem', background: 'var(--color-primary-soft)',
+              borderRadius: 999, padding: '0.15rem 0.3rem 0.15rem 0.6rem', fontSize: '0.78rem', maxWidth: '160px',
+            }}
+          >
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+            <button
+              type="button" onClick={() => removeProductFilter(name)} title={`Remove ${name}`}
+              style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '0 0.2rem', fontSize: '0.75rem', lineHeight: 1, color: 'var(--color-muted)' }}
+            >
+              ✕
+            </button>
+          </span>
+        ))}
+        <input
+          id="report-product-filter"
+          type="text"
+          value={productSearch}
+          onChange={(e) => { setProductSearch(e.target.value); setProductDropdownOpen(true) }}
+          onFocus={() => setProductDropdownOpen(true)}
+          onKeyDown={(e) => { if (e.key === 'Escape') { setProductDropdownOpen(false); e.currentTarget.blur() } }}
+          placeholder={productFilters.length > 0 ? 'Add another…' : 'All products'}
+          autoComplete="off"
+          style={{ padding: '0.3rem 0.4rem', fontSize: '0.85rem', width: '140px' }}
+          title="Narrows the whole report to orders that include any of the chosen products - their other line items still count toward totals, same as opening that order on Records would show"
+        />
+        {productFilters.length > 0 && (
+          <button
+            type="button" className="secondary" onClick={clearProductFilter} title="Clear all product filters"
+            style={{ padding: '0.2rem 0.4rem', fontSize: '0.78rem' }}
+          >
+            Clear
+          </button>
+        )}
+        {productDropdownOpen && (
+          <div style={{
+            position: 'absolute', top: '100%', left: 0, marginTop: '0.25rem', zIndex: 20,
+            width: '240px', maxHeight: '240px', overflowY: 'auto',
+            background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
+            boxShadow: '0 4px 14px rgba(0,0,0,0.12)', padding: '0.3rem',
+          }}>
+            <button
+              type="button" className="secondary" onClick={clearProductFilter}
+              style={{ display: 'block', width: '100%', textAlign: 'left', fontSize: '0.82rem', padding: '0.35rem 0.5rem', fontWeight: productFilters.length === 0 ? 700 : 400 }}
+            >
+              All products
+            </button>
+            {filteredProductOptions.length === 0 ? (
+              <p style={{ fontSize: '0.78rem', color: 'var(--color-muted)', margin: '0.3rem 0.5rem' }}>No matches.</p>
+            ) : filteredProductOptions.map(name => {
+              const checked = productFilters.includes(name)
+              return (
+                <button
+                  key={name} type="button" className="secondary" onClick={() => toggleProductFilter(name)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '0.4rem', width: '100%', textAlign: 'left',
+                    fontSize: '0.82rem', padding: '0.35rem 0.5rem', fontWeight: checked ? 700 : 400,
+                  }}
+                >
+                  <span style={{ width: '1em', flexShrink: 0, color: 'var(--color-primary)' }}>{checked ? '✓' : ''}</span>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
   )
 
   const reportHeader = (
@@ -500,7 +721,8 @@ function Report({ formId: formIdProp, headerExtra, extraSubmissions = [] } = {})
         }
       `}</style>
 
-      {useTopBar ? createPortal(<AdaptivePageHeader title={form.name + ' Report'} filters={reportFilters} minimumFilterWidth={dateRange === 'custom' ? 460 : dateRange === 'specific' ? 320 : 210} filterWidth={dateRange === 'custom' ? 540 : dateRange === 'specific' ? 380 : 240} open={optionsMenuOpen} onOpenChange={setOptionsMenuOpen}>{optionsMenuItems}</AdaptivePageHeader>, desktopHeaderTarget) : reportHeader}
+      {useTopBar ? createPortal(<AdaptivePageHeader title={form.name + ' Report'} filters={reportFilters} minimumFilterWidth={dateRange === 'slider' && sliderExpanded ? 520 : dateRange === 'custom' || dateRange === 'slider' ? 460 : dateRange === 'specific' ? 320 : 210} filterWidth={dateRange === 'slider' && sliderExpanded ? 600 : dateRange === 'custom' || dateRange === 'slider' ? 540 : dateRange === 'specific' ? 380 : 240} open={optionsMenuOpen} onOpenChange={setOptionsMenuOpen}>{optionsMenuItems}</AdaptivePageHeader>, desktopHeaderTarget) : reportHeader}
+      {productFilterBar}
 
       <MobileOptionsPanel
         open={optionsMenuOpen}
@@ -515,9 +737,11 @@ function Report({ formId: formIdProp, headerExtra, extraSubmissions = [] } = {})
         <div className="card" style={{ padding: '1.8rem', marginBottom: '1.2rem' }}>
           <h3 style={{ marginTop: 0, marginBottom: '0.5rem' }}>No {entryNoun.plural.toLowerCase()} in this range yet</h3>
           <p style={{ color: 'var(--color-muted)', margin: '0 0 0.9rem' }}>
-            Try a wider date range, or collect a few more submissions to unlock richer insights.
+            {productFilters.length > 0
+              ? 'Try a wider date range, different products, or collect a few more submissions to unlock richer insights.'
+              : 'Try a wider date range, or collect a few more submissions to unlock richer insights.'}
           </p>
-          <button className="secondary" onClick={() => { setDateRange('all'); setCustomStart(''); setCustomEnd('') }}>Reset to all time</button>
+          <button className="secondary" onClick={() => { setDateRange('all'); setCustomStart(''); setCustomEnd(''); clearProductFilter() }}>Reset filters</button>
         </div>
       ) : (
         <>

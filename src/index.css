@@ -134,11 +134,16 @@
   to { transform: rotate(360deg); }
 }
 
-/* Shared by LoadingState.jsx's ExtractingOverlay - a moving tinted band
-   across the field being read, rather than a static "Loading..." label. */
-@keyframes verticals-shimmer {
-  0% { background-position: 100% 50%; }
-  100% { background-position: 0 50%; }
+/* Shared by LoadingState.jsx's ExtractingOverlay - an optimistic fill (no
+   real progress signal from a single fetch) that decelerates and settles
+   just short of full via these keyframe stops, rather than sitting at 0%
+   the whole time or claiming 100% before the request has actually resolved. */
+@keyframes verticals-progress-fill {
+  0% { width: 4%; }
+  20% { width: 35%; }
+  50% { width: 62%; }
+  80% { width: 80%; }
+  100% { width: 90%; }
 }
 
 /* --- Skeleton loading primitives (src/components/Skeleton.jsx) ---------
@@ -1411,7 +1416,8 @@ textarea.pf-control {
     flex: 1;
   }
 
-  .report-filter-group input[type="date"] {
+  .report-filter-group input[type="date"],
+  .report-filter-group input[type="text"] {
     flex: 1 1 140px;
     min-width: 0;
   }
@@ -1670,5 +1676,14 @@ body.payroll-panel-docked .payroll-shell > .page {
 .adaptive-inline-filters > div:has(.report-filter-group) { width: 100%; flex-wrap: nowrap !important; }
 .adaptive-inline-filters .report-filter-group { width: 100%; flex-wrap: nowrap !important; }
 .adaptive-inline-filters .report-filter-group label { flex-shrink: 0; white-space: nowrap; margin: 0; }
-.adaptive-inline-filters .report-filter-group select { flex: 1 1 120px; width: auto; min-width: 90px; }
+.adaptive-inline-filters .report-filter-group select,
+.adaptive-inline-filters .report-filter-group input[type="text"] { flex: 1 1 120px; width: auto; min-width: 90px; }
 .adaptive-inline-filters .report-filter-group .date-range-group { flex-shrink: 1; }
+
+/* Product filter: its own full-width row below the header instead of a
+   fixed-width slot beside Date range, since it can carry an open-ended
+   number of chips. */
+.report-product-filter-bar {
+  display: flex; padding: 0.5rem 0.7rem; border: 1px solid var(--color-border);
+  border-radius: var(--radius); margin-bottom: 0.75rem; background: var(--color-surface);
+}

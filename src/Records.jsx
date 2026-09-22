@@ -21,6 +21,7 @@ import { useDeferredLoading } from './components/loadingHooks'
 import { ErrorState } from './ErrorState'
 import { usePageOptions, usePageBack, useDesktopHeader } from './PageTitleContext'
 import { getPageCache, setPageCache } from './hooks/pageCache'
+import { fetchAllRows } from './lib/fetchAllRows'
 import { RefreshingIndicator } from './components/InlineLoader'
 import EmptyState, { SearchOffIcon } from './components/EmptyState'
 import useIsMobile from './hooks/useIsMobile'
@@ -185,10 +186,10 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
       // so callers showing it to a visitor (see defaultToAllTime) skip this.
       if (isCartForm && !defaultToAllTime) setDateRange('today')
 
-      const { data: subsData, error: subsError } = await supabase
+      const { data: subsData, error: subsError } = await fetchAllRows(() => supabase
         .from('submissions').select('*').eq('form_id', id)
         .is('deleted_at', null)
-        .order('created_at', { ascending: false })
+        .order('created_at', { ascending: false }))
 
       if (subsError) {
         if (!silent) { setError('Could not load records: ' + subsError.message); setLoading(false) }
@@ -350,10 +351,10 @@ function Records({ formId: formIdProp, defaultToAllTime = false, extraSubmission
   }, [])
 
   async function reloadSubmissions() {
-    const { data } = await supabase
+    const { data } = await fetchAllRows(() => supabase
       .from('submissions').select('*').eq('form_id', id)
       .is('deleted_at', null)
-      .order('created_at', { ascending: false })
+      .order('created_at', { ascending: false }))
     if (data) setSubmissions(data)
   }
 
