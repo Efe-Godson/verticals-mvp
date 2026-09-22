@@ -579,7 +579,7 @@ function Report({ formId: formIdProp, headerExtra, extraSubmissions = [] } = {})
         {productDropdownOpen && (
           <div style={{
             position: 'absolute', top: '100%', left: 0, marginTop: '0.25rem', zIndex: 20,
-            width: '240px', maxHeight: '240px', overflowY: 'auto',
+            width: '240px', maxWidth: '92vw', maxHeight: '240px', overflowY: 'auto',
             background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)',
             boxShadow: '0 4px 14px rgba(0,0,0,0.12)', padding: '0.3rem',
           }}>

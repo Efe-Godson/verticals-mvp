@@ -82,7 +82,7 @@ export default function DateRangeSlider({ minDate, maxDate, startValue, endValue
   })
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', width: '260px', padding: '0.2rem 0' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', width: '100%', minWidth: '160px', maxWidth: '260px', padding: '0.2rem 0' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--color-text)', fontWeight: 600 }}>
         <span>{toISODate(new Date(minDate.getFullYear(), minDate.getMonth(), minDate.getDate() + (startDay - minDay)))}</span>
         <span>{toISODate(new Date(minDate.getFullYear(), minDate.getMonth(), minDate.getDate() + (endDay - minDay)))}</span>
