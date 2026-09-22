@@ -123,6 +123,13 @@ function HorizontalBarChart({
     const gap = isMobile ? ".45rem" : ".7rem"
     const labelFont = isMobile ? ".78rem" : ".82rem"
     const valueFont = isMobile ? ".76rem" : ".8rem"
+    // Reserved room for the trailing value text, desktop list only - without
+    // this a bar at (or near) 100% of maxValue has nowhere left for its own
+    // value to sit (both are flex-shrink: 0, so they'd overflow the tile
+    // instead of the whole row just... stopping short of the edge) - capping
+    // the bar's width below 100% here is what actually fixes that, not just
+    // moving the value next to the bar.
+    const valueReserve = isMobile ? "3.2rem" : "4.5rem"
 
     function valueText(d) {
         if (valueMode === 'pct') {
@@ -251,7 +258,9 @@ function HorizontalBarChart({
                 }}
             >
 
-                {shown.map(d => (
+                {shown.map(d => {
+                    const barHeightPx = Math.max((d.count / maxValue) * (isMobile ? 74 : 150), 4)
+                    return (
 
                     <div
                         key={d.label}
@@ -272,47 +281,44 @@ function HorizontalBarChart({
                         }}
                     >
 
-                        <div
-                            title={formatValue(d.count)}
-                            style={{
-                                fontSize: isMobile ? ".72rem" : valueFont,
-                                color: "var(--color-text)",
-                                marginBottom: ".4rem",
-                                whiteSpace: "nowrap",
-                                maxWidth: "100%",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                fontVariantNumeric: "tabular-nums",
-                                fontWeight: hovered === d.label ? 700 : 400,
-                            }}
-                        >
-                            {valueText(d)}
-                        </div>
-
+                        {/* No track behind the bar (that was a fixed-height
+                            box that made every value label line up at the
+                            same height regardless of its own bar) - the
+                            label is anchored to this bar's own actual top
+                            via `bottom: barHeightPx`, so it moves with it. */}
                         <div
                             style={{
+                                position: "relative",
                                 width: "100%",
                                 maxWidth: isMobile ? "48px" : "56px",
                                 height: isMobile ? "74px" : "150px",
-                                background: "var(--color-primary-soft)",
-                                borderRadius: "5px 5px 0 0",
-                                display: "flex",
-                                alignItems: "flex-end",
-                                opacity: hovered === null || hovered === d.label ? 1 : 0.55,
-                                transition: "opacity .12s ease",
                                 cursor: "default",
                             }}
                         >
                             <div
+                                title={formatValue(d.count)}
                                 style={{
-                                    width: "100%",
-                                    height: `${Math.max(
-                                        (d.count / maxValue) *
-                                            (isMobile ? 74 : 150),
-                                        4
-                                    )}px`,
+                                    position: "absolute", left: 0, right: 0, bottom: `${barHeightPx + 4}px`,
+                                    textAlign: "center",
+                                    fontSize: isMobile ? ".72rem" : valueFont,
+                                    color: "var(--color-text)",
+                                    whiteSpace: "nowrap",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    fontVariantNumeric: "tabular-nums",
+                                    fontWeight: hovered === d.label ? 700 : 400,
+                                }}
+                            >
+                                {valueText(d)}
+                            </div>
+                            <div
+                                style={{
+                                    position: "absolute", left: 0, right: 0, bottom: 0,
+                                    height: `${barHeightPx}px`,
                                     background: "var(--color-primary)",
                                     borderRadius: "5px 5px 0 0",
+                                    opacity: hovered === null || hovered === d.label ? 1 : 0.55,
+                                    transition: "opacity .12s ease",
                                 }}
                             />
                         </div>
@@ -338,7 +344,8 @@ function HorizontalBarChart({
 
                     </div>
 
-                ))}
+                    )
+                })}
 
             </div>
 
@@ -464,6 +471,7 @@ function HorizontalBarChart({
                                         (d.count / maxValue) * 100,
                                         2
                                     )}%`,
+                                    maxWidth: `calc(100% - ${valueReserve})`,
                                     flexShrink: 0,
                                     height: barHeight,
                                     background: "var(--color-primary)",

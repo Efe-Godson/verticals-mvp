@@ -28,20 +28,33 @@ export function LoadingState({ label = 'Loading...' }) {
   )
 }
 
-// Covers a field (a textarea being read by AI, say) with a moving
-// theme-tinted band instead of just relabeling the submit button - the
-// person's eye is on what they just pasted, not the button, while the
-// model reads it. Parent needs position: 'relative' so this fills it.
+// Covers a field (a textarea being read by AI, say) with a progress bar
+// instead of just relabeling the submit button - the person's eye is on
+// what they just pasted, not the button, while the model reads it. Parent
+// needs position: 'relative' so this fills it.
+//
+// There's no real progress signal from a single fetch (no streaming), so
+// the fill is an "optimistic" animation: it eases up toward 90% over
+// PROGRESS_DURATION and then just holds there via animation-fill-mode -
+// it never claims to reach 100% until the real request actually resolves
+// and this whole overlay unmounts.
+const PROGRESS_DURATION = '9s'
+
 export function ExtractingOverlay({ label = 'Reading...' }) {
   return (
     <div style={{
       position: 'absolute', inset: 0, borderRadius: 'var(--radius)',
-      background: 'linear-gradient(90deg, var(--color-primary-soft) 25%, var(--color-surface) 37%, var(--color-primary-soft) 63%)',
-      backgroundSize: '400% 100%', animation: 'verticals-shimmer 1.4s ease infinite',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+      background: 'var(--color-primary-soft)',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.7rem',
+      padding: '0 1.5rem',
     }}>
-      <LoadingSpinner color="var(--color-primary)" />
       <span style={{ color: 'var(--color-primary)', fontWeight: 600, fontSize: '0.9rem' }}>{label}</span>
+      <div style={{ width: '100%', maxWidth: '220px', height: '6px', borderRadius: '999px', background: 'var(--color-surface)', overflow: 'hidden' }}>
+        <div style={{
+          height: '100%', borderRadius: '999px', background: 'var(--color-primary)',
+          animation: `verticals-progress-fill ${PROGRESS_DURATION} ease forwards`,
+        }} />
+      </div>
     </div>
   )
 }
